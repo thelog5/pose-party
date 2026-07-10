@@ -21,7 +21,7 @@ const server = spawn("node", ["index.js"], {
   stdio: "pipe",
 });
 await new Promise((res, rej) => {
-  server.stdout.on("data", d => String(d).includes("server on") && res());
+  server.stdout.on("data", d => String(d).includes("server running") && res());
   setTimeout(() => rej(new Error("server failed to start")), 5000);
 });
 

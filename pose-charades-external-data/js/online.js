@@ -111,11 +111,14 @@ async function ensureSocket(){
   if(socket && socket.connected) return socket;
   await loadSocketScript();
   if(socket){ socket.disconnect(); }
-  socket = window.io({ transports: ["websocket", "polling"] });
+  /* Polling first, then upgrade: plain-HTTP polling works anywhere the page
+     itself loads, while a websocket-first connect dies on machines whose
+     antivirus/filters block unencrypted ws:// to LAN addresses. */
+  socket = window.io({ transports: ["polling", "websocket"] });
   await new Promise((resolve, reject) => {
     socket.once("connect", resolve);
     socket.once("connect_error", e => reject(new Error("cannot reach server: "+e.message)));
-    setTimeout(() => reject(new Error("server connection timed out")), 5000);
+    setTimeout(() => reject(new Error("server connection timed out")), 8000);
   });
   await syncClock();
   wireSocket(socket);

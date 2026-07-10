@@ -6,6 +6,7 @@
    landmarks or training data. */
 
 import path from "path";
+import os from "os";
 import { fileURLToPath } from "url";
 import http from "http";
 import express from "express";
@@ -42,6 +43,13 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // CDN resources carry no CORP headers
 }));
 
+/* Support log: note page loads so LAN reachability problems are visible. */
+app.use((req, res, next) => {
+  if(req.path === "/" || req.path === "/index.html")
+    console.log(new Date().toISOString().slice(11,19), `page load from ${req.ip}`);
+  next();
+});
+
 app.use(express.static(GAME_DIR, { index: "index.html" }));
 
 const httpServer = http.createServer(app);
@@ -66,9 +74,18 @@ setInterval(() => {
   createLimit.sweep(); joinLimit.sweep(); claimLimit.sweep(); signalLimit.sweep();
 }, 60000).unref();
 
+/* Support log: connection + room events only — never landmarks or video
+   (none are ever sent), and no full payload dumps. */
+const log = (...a) => console.log(new Date().toISOString().slice(11,19), ...a);
+
+io.engine.on("connection_error", err => {
+  log(`handshake FAILED from ${err.req?.socket?.remoteAddress || "?"}: ${err.message} (code ${err.code})`);
+});
+
 io.on("connection", socket => {
   const ip = socket.handshake.address || "unknown";
   const ack = cb => (typeof cb === "function" ? cb : () => {});
+  log(`connect ${socket.id.slice(0,6)} from ${ip} (origin: ${socket.handshake.headers.origin || "?"})`);
 
   socket.on("room:create", (payload, cb) => {
     cb = ack(cb);
@@ -77,7 +94,9 @@ io.on("connection", socket => {
     const name = cleanName(payload.name);
     const labels = cleanLabels(payload.labels);
     if(!name || !labels) return cb({ error: "bad-payload" });
-    cb(store.createRoom(socket.id, name, labels));
+    const res = store.createRoom(socket.id, name, labels);
+    log(`create by "${name}" -> ${res.code || "ERROR " + res.error}`);
+    cb(res);
   });
 
   socket.on("room:join", (payload, cb) => {
@@ -87,8 +106,13 @@ io.on("connection", socket => {
     const code = cleanCode(payload.code);
     const name = cleanName(payload.name);
     const labels = cleanLabels(payload.labels);
-    if(!code || !name || !labels) return cb({ error: "bad-payload" });
-    cb(store.joinRoom(socket.id, code, name, labels));
+    if(!code || !name || !labels){
+      log(`join rejected: bad payload (code=${JSON.stringify(payload.code)})`);
+      return cb({ error: "bad-payload" });
+    }
+    const res = store.joinRoom(socket.id, code, name, labels);
+    log(`join ${code} by "${name}" -> ${res.error ? "ERROR " + res.error : "ok, peer " + res.peerName}`);
+    cb(res);
   });
 
   socket.on("player:ready", (payload, cb) => {
@@ -114,10 +138,17 @@ io.on("connection", socket => {
   socket.on("time:sync", (payload, cb) => ack(cb)({ serverNow: Date.now() }));
 
   socket.on("room:leave", (payload, cb) => { store.leave(socket.id); ack(cb)({ ok: true }); });
-  socket.on("disconnect", () => store.leave(socket.id));
+  socket.on("disconnect", reason => {
+    log(`disconnect ${socket.id.slice(0,6)} (${reason})`);
+    store.leave(socket.id);
+  });
 });
 
 httpServer.listen(config.port, () => {
-  console.log(`Pose Charades server on http://localhost:${config.port}`);
-  console.log(`Allowed cross-origin: ${config.corsOrigins.join(", ") || "(same-origin only)"}`);
+  console.log(`Pose Charades server running.`);
+  console.log(`  On this computer:   http://localhost:${config.port}`);
+  for(const addrs of Object.values(os.networkInterfaces()))
+    for(const a of addrs || [])
+      if(a.family === "IPv4" && !a.internal)
+        console.log(`  On other computers: http://${a.address}:${config.port}`);
 });

@@ -33,7 +33,7 @@ const once = (sock, ev, timeoutMs = 4000) => new Promise((resolve, reject) => {
 
 const server = spawn("node", [path.join(__dirname, "..", "index.js")], { env: ENV, stdio: "pipe" });
 await new Promise((resolve, reject) => {
-  server.stdout.on("data", d => { if (String(d).includes("server on")) resolve(); });
+  server.stdout.on("data", d => { if (String(d).includes("server running")) resolve(); });
   server.on("error", reject);
   setTimeout(() => reject(new Error("server did not start")), 5000);
 });
