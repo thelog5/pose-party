@@ -7,7 +7,7 @@ import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { ROUNDS } from "./constants.js";
 
-const RAILS = { home:"railHome", play:"railPlay", train:"railTrain", results:"railResults" };
+const RAILS = { home:"railHome", play:"railPlay", train:"railTrain", results:"railResults", lobby:"railLobby" };
 
 /* countdown/playing/word-won all show the in-game screen; which one depends
    on the mode of the running game. */
@@ -16,7 +16,7 @@ function screenFor(fsmState){
     case "menu": return "home";
     case "training": return "train";
     case "results": return "results";
-    case "lobby": return "versus";
+    case "lobby": return "lobby";
     case "countdown": case "playing": case "word-won":
       return (state.game && state.game.mode!=="ai") ? "versus" : "play";
     default: return "home";

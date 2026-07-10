@@ -173,13 +173,21 @@ export function gameCheck(){
 
   if(topLab===game.word && topP>=THRESH){
     if(!game.holdSince) game.holdSince=performance.now();
-    if(performance.now()-game.holdSince>=HOLD_MS) finishWord("you", {confidence:topP});
+    if(performance.now()-game.holdSince>=HOLD_MS){
+      if(game.mode==="online"){
+        // point claims are validated and awarded by the server
+        if(state.onlineClaim) state.onlineClaim(topP);
+        game.holdSince=0;
+      }else{
+        finishWord("you", {confidence:topP});
+      }
+    }
   } else {
     game.holdSince=0;
   }
 }
 
-function gameTick(){
+export function gameTick(){
   const game=state.game;
   if(!game) return;
   const now=performance.now();
@@ -198,7 +206,8 @@ function gameTick(){
     renderGuesses();
   }
 
-  if(wLeft<=0 && gameState()==="playing") missWord(false);
+  // online rounds are ended authoritatively by the server (round:result)
+  if(wLeft<=0 && gameState()==="playing" && game.mode!=="online") missWord(false);
 }
 
 export function missWord(isSkip){

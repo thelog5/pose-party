@@ -10,6 +10,7 @@ import { exportData, importData, preloadBundledDataset } from "./data.js";
 import { render } from "./screens.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
+import { enterLobby, quitOnline, leaveRoom } from "./online.js";
 import { boot } from "./engine.js";
 
 /* Order matters: repaint the screen first, then let the game module tear
@@ -28,14 +29,17 @@ function wireControls(){
   };
 
   $("btnStart").onclick=()=>startGame("ai");
-  $("btnAgain").onclick=()=>startGame(state.lastMode);
-  $("btnHome").onclick=()=>transition("menu");
+  $("btnAgain").onclick=()=>state.lastMode==="online" ? enterLobby() : startGame(state.lastMode);
+  $("btnHome").onclick=()=>{ leaveRoom(); transition("menu"); };
   $("btnSkip").onclick=()=>missWord(true);
   $("btnQuit").onclick=()=>state.game&&endGame();
-  $("btnQuitVs").onclick=()=>state.game&&endGame();
+  $("btnQuitVs").onclick=()=>{
+    if(state.game?.mode==="online") quitOnline();
+    else if(state.game) endGame();
+  };
 
   if($("modeAI")) $("modeAI").onclick=()=>startGame("ai");
-  $("modeVS").onclick=()=>startGame("vs");
+  $("modeVS").onclick=()=>enterLobby();
   $("modeParty").onclick=()=>toast("Party Mode is coming soon.");
 
   $("btnRecord").onclick=startRecording;

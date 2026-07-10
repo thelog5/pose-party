@@ -72,10 +72,13 @@ export function renderGuesses(){
     const pct=Math.round((top[0][1]||0)*100);
     setSegbar("segbarVsYou", pct);
     $("guessListVsYou").innerHTML=guessRows(top,4);
-    const rtop=fakeRivalGuesses();
-    const rpct=rtop.length?Math.round(rtop[0][1]*100):0;
-    setSegbar("segbarVsRival", rpct);
-    $("guessListVsRival").innerHTML=guessRows(rtop,4);
+    if(state.game?.mode!=="online"){
+      // online: the rival's AI runs on their device; online.js sets a static note
+      const rtop=fakeRivalGuesses();
+      const rpct=rtop.length?Math.round(rtop[0][1]*100):0;
+      setSegbar("segbarVsRival", rpct);
+      $("guessListVsRival").innerHTML=guessRows(rtop,4);
+    }
   }
   state.prevRank={}; top.forEach((g,i)=>state.prevRank[g[0]]=i);
 }

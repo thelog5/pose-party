@@ -75,7 +75,6 @@
         <img class="gotthis hidden" id="gotthis" src="assets/you-got-this.png" alt="You got this!">
 
         <div class="flash" id="flash"></div>
-        <div class="countdown hidden" id="countdown"></div>
         <div class="recdot" id="recdot"><i></i>REC</div>
         <div class="status" id="status">Loading the pose engine…</div>
       </div>
@@ -169,6 +168,31 @@
       </div>
     </div>
 
+    <div class="rail hidden" id="railLobby">
+      <div class="trainpanel">
+        <h3>
+          <svg viewBox="0 0 120 120"><rect x="16" y="26" width="88" height="72" rx="20" fill="#F58AB0" stroke="#FAF3E3" stroke-width="6"/><circle cx="44" cy="56" r="11" fill="#fff"/><circle cx="76" cy="56" r="11" fill="#fff"/><circle cx="44" cy="56" r="5" fill="#2F2470"/><circle cx="76" cy="56" r="5" fill="#2F2470"/><rect x="42" y="76" width="36" height="13" rx="6" fill="#fff"/></svg>
+          1v1 Showdown
+        </h3>
+        <div>
+          <label for="lobbyName">Your name</label>
+          <input type="text" id="lobbyName" maxlength="16" placeholder="e.g. Sam" autocomplete="off">
+        </div>
+        <button class="btn amber" id="btnCreateRoom">Create private room</button>
+        <div>
+          <label for="lobbyCode">Have a code? Join a friend</label>
+          <div class="row2" style="margin-top:4px">
+            <input type="text" id="lobbyCode" maxlength="6" placeholder="ABC234" autocomplete="off" autocapitalize="characters" style="margin-top:0">
+            <button class="btn mint" id="btnJoinRoom">Join room</button>
+          </div>
+        </div>
+        <div class="trainreport" id="lobbyStatus"></div>
+        <div class="hint">Online play needs the game served by the Node server (<b>npm start</b> in <b>server/</b>). Your camera video goes directly to your friend over WebRTC — never through the server.</div>
+        <button class="btn ghost" id="btnPractice">Practice vs robot rival</button>
+        <button class="btn ghost" id="btnLobbyBack">Back to menu</button>
+      </div>
+    </div>
+
     <div class="rail hidden" id="railResults">
       <div class="rescard" id="rescard"></div>
       <button class="btn amber" id="btnAgain" style="font-size:20px;padding:15px">Play again</button>
@@ -189,7 +213,8 @@
       </div>
       <div class="vs-col">
         <div class="vs-stage">
-          <div class="ribbon rival">Rival</div>
+          <div class="ribbon rival" id="rivalRibbon">Rival</div>
+          <video id="videoRemote" playsinline autoplay class="hidden"></video>
           <div class="vs-placeholder" id="rivalPlaceholder">
             <img src="assets/robot-think-2.png" alt="">
             <span>Rival camera</span>
@@ -261,6 +286,7 @@
 
 </div>
 
+<div class="countdown hidden" id="countdown"></div>
 <div class="pointBurst" id="pointBurst"><div class="burstCard"><div class="headline" id="pointHeadline"></div><div class="detail" id="pointDetail"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
 

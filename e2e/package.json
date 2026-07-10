@@ -1,0 +1,13 @@
+{
+  "name": "pose-charades-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Headless-Chrome end-to-end tests (fake camera; vision input simulated by seeding classifier output).",
+  "scripts": {
+    "offline": "node offline.test.mjs",
+    "online": "node online.test.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

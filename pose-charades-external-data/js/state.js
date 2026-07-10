@@ -10,6 +10,11 @@ export const state = {
   handmarker: null,
   lastSampleT: 0,
   liveBuf: [],
+  mediaStream: null,   // local camera stream; shared with WebRTC in online 1v1
+
+  /* online 1v1: game.js calls this instead of scoring locally when
+     game.mode === "online" (set by online.js; avoids an import cycle) */
+  onlineClaim: null,
 
   /* captured clips */
   dataset: { app:"pose-charades", version:2, joints:JOINTS, hands:true, framePoints:FRAME_POINTS, fps:15, clips:[] },

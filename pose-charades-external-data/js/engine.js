@@ -45,6 +45,7 @@ export async function boot(){
 
   try{
     const stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480}, audio:false });
+    state.mediaStream=stream;
     video.srcObject=stream; await video.play();
     const v2=$("videoVs"); if(v2){ v2.srcObject=stream; v2.play().catch(()=>{}); }
   }catch(e){ return showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally — see README.)"); }
