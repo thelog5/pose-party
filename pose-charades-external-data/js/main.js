@@ -7,14 +7,20 @@ import { toast, renderClasses } from "./ui.js";
 import { startRecording } from "./capture.js";
 import { train } from "./training.js";
 import { exportData, importData, preloadBundledDataset } from "./data.js";
-import { setScreen } from "./screens.js";
-import { startGame, missWord, endGame } from "./game.js";
+import { render } from "./screens.js";
+import { gameState, transition, onTransition } from "./fsm.js";
+import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
 import { boot } from "./engine.js";
 
+/* Order matters: repaint the screen first, then let the game module tear
+   down abandoned games. */
+onTransition(to=>render(to));
+bindGameLifecycle();
+
 function wireControls(){
-  $("logoHome").onclick=()=>setScreen("home");
-  $("btnGear").onclick=()=>setScreen(state.screen==="train"?"home":"train");
-  $("btnDoneTrain").onclick=()=>setScreen("home");
+  $("logoHome").onclick=()=>transition("menu");
+  $("btnGear").onclick=()=>transition(gameState()==="training"?"menu":"training");
+  $("btnDoneTrain").onclick=()=>transition("menu");
   $("btnSound").onclick=()=>{
     state.muted=!state.muted;
     $("sndOn").classList.toggle("hidden",state.muted);
@@ -23,8 +29,8 @@ function wireControls(){
 
   $("btnStart").onclick=()=>startGame("ai");
   $("btnAgain").onclick=()=>startGame(state.lastMode);
-  $("btnHome").onclick=()=>setScreen("home");
-  $("btnSkip").onclick=()=>state.game&&missWord(true);
+  $("btnHome").onclick=()=>transition("menu");
+  $("btnSkip").onclick=()=>missWord(true);
   $("btnQuit").onclick=()=>state.game&&endGame();
   $("btnQuitVs").onclick=()=>state.game&&endGame();
 
@@ -51,6 +57,6 @@ function buildStarterWords(){
 wireControls();
 buildStarterWords();
 renderClasses();
-setScreen("home");
+render(gameState());
 preloadBundledDataset();
 boot();

@@ -1,6 +1,11 @@
-/* Round loop for both modes.
+/* Round loop for the local modes.
    "ai": you score when the AI holds the right guess above THRESH.
-   "vs": same word, but the simulated rival races you to it. */
+   "vs": same word, but the simulated rival races you to it.
+
+   All flow control goes through the FSM:
+     countdown -> playing -> word-won -> playing ... -> results
+   Scoring is only accepted in "playing", which makes the per-word scoring
+   lock structural rather than a boolean flag. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
@@ -8,8 +13,46 @@ import { CATEGORIES, ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS,
          PTS_CORRECT, PTS_PER_SEC, PTS_SKIP } from "./constants.js";
 import { toast, flash, pointBurst, renderGuesses, topGuesses } from "./ui.js";
 import { blip } from "./audio.js";
-import { setScreen } from "./screens.js";
+import { gameState, transition, onTransition } from "./fsm.js";
 import { fakeRivalGuesses } from "./rival.js";
+
+const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
+const WORD_WON_PAUSE_MS = 1050;
+
+let preCountTimer = null;
+
+/* Registered from main.js AFTER the render listener, so the screen is
+   repainted before the game object disappears. */
+export function bindGameLifecycle(){
+  onTransition((to, from)=>{
+    // Leaving the in-game states for anything but results = abandon the game.
+    const inGame = s => s==="countdown"||s==="playing"||s==="word-won";
+    if(inGame(from) && !inGame(to) && to!=="results" && state.game){
+      cancelPreCount();
+      clearInterval(state.game.timer);
+      state.game=null;
+    }
+  });
+}
+
+function cancelPreCount(){
+  if(preCountTimer){ clearInterval(preCountTimer); preCountTimer=null; }
+  $("countdown").classList.add("hidden");
+}
+
+function runPreCount(done){
+  let n=PRECOUNT_FROM;
+  const cd=$("countdown");
+  cd.classList.remove("hidden"); cd.textContent=n;
+  blip([440]);
+  preCountTimer=setInterval(()=>{
+    n--;
+    if(n>0){ cd.textContent=n; blip([440]); return; }
+    clearInterval(preCountTimer); preCountTimer=null;
+    cd.classList.add("hidden");
+    done();
+  }, PRECOUNT_STEP_MS);
+}
 
 function shuffledDeck(){
   const words=state.model.labels.filter(l=>l!=="idle");
@@ -21,16 +64,21 @@ export function startGame(mode="ai"){
   state.lastMode=mode;
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
     toast("Train the AI first — record idle plus at least one action word. Tap the gear.");
-    setScreen("train"); return;
+    transition("training"); return;
   }
-  setScreen(mode==="vs" ? "versus" : "play");
   state.game={ mode, deck:shuffledDeck(), word:null, round:0, wordEnd:0,
                holdSince:0, score:0, rivalScore:0, results:[], bestWrong:{} };
+  if(!transition("countdown")){ state.game=null; return; }
   $("pillScore").textContent="0";
   $("pillRivalScore").textContent="0";
+  $("pillRound").textContent="1/"+ROUNDS;
   if($("bub1")) $("bub1").textContent="I’m guessing…";
-  nextWord();
-  state.game.timer=setInterval(gameTick,100);
+  runPreCount(()=>{
+    if(gameState()!=="countdown" || !state.game) return; // user backed out
+    transition("playing");
+    nextWord();
+    state.game.timer=setInterval(gameTick,100);
+  });
 }
 
 function animateWordChange(){
@@ -47,7 +95,7 @@ function nextWord(){
   if(!game.deck.length) game.deck=shuffledDeck();
   game.word=game.deck.pop();
   game.wordEnd=performance.now()+WORD_MS;
-  game.holdSince=0; game.bestWrong={}; game.wordLocked=false;
+  game.holdSince=0; game.bestWrong={};
   const cat=CATEGORIES[game.word]||"Your Words";
   $("gameWord").textContent=game.word;
   $("gameCatTxt").textContent=cat;
@@ -65,12 +113,13 @@ function pointsForCurrentWord(){
   return PTS_CORRECT+bonus;
 }
 
-/* winner: "you" | "rival" | "miss". wordLocked keeps the loops from
-   double-scoring during the pause before the next word. */
+/* winner: "you" | "rival" | "miss". The playing->word-won transition is the
+   scoring lock: it can only fire once per word, so a word can never be
+   awarded twice even if two code paths race in the same tick. */
 function finishWord(winner, opts={}){
   const game=state.game;
-  if(!game || game.wordLocked) return;
-  game.wordLocked=true;
+  if(!game || gameState()!=="playing") return;
+  if(!transition("word-won", {winner, word:game.word})) return;
   game.holdSince=0;
   const pts=pointsForCurrentWord();
 
@@ -102,16 +151,19 @@ function finishWord(winner, opts={}){
   }
 
   setTimeout(()=>{
-    if(!state.game || !state.game.wordLocked) return;
+    if(gameState()!=="word-won" || !state.game) return;
+    if(state.game.round>=ROUNDS){ endGame(); return; }
     if($("bub1")) $("bub1").textContent="I’m guessing…";
+    transition("playing");
     nextWord();
-  }, 1050);
+  }, WORD_WON_PAUSE_MS);
 }
 
-/* Called from the classifier whenever fresh guesses land. */
+/* Called from the classifier whenever fresh guesses land. Awards only when
+   the right word stays over THRESH for HOLD_MS (stability window). */
 export function gameCheck(){
   const game=state.game;
-  if(!game || game.wordLocked) return;
+  if(!game || gameState()!=="playing") return;
   const t=topGuesses(1)[0]; if(!t) return;
   const [topLab, topP]=t;
 
@@ -138,7 +190,7 @@ function gameTick(){
 
   if(game.mode==="vs"){
     const rtop=fakeRivalGuesses();
-    if(!game.wordLocked && rtop[0] && rtop[0][0]===game.word && rtop[0][1]>=RIVAL_THRESH){
+    if(gameState()==="playing" && rtop[0] && rtop[0][0]===game.word && rtop[0][1]>=RIVAL_THRESH){
       finishWord("rival", {confidence:rtop[0][1]});
       renderGuesses();
       return;
@@ -146,12 +198,12 @@ function gameTick(){
     renderGuesses();
   }
 
-  if(wLeft<=0 && !game.wordLocked) missWord(false);
+  if(wLeft<=0 && gameState()==="playing") missWord(false);
 }
 
 export function missWord(isSkip){
   const game=state.game;
-  if(!game || game.wordLocked) return;
+  if(!game || gameState()!=="playing") return;
   if(isSkip){
     game.score=Math.max(0,game.score-PTS_SKIP);
     $("pillScore").textContent=game.score;
@@ -160,6 +212,7 @@ export function missWord(isSkip){
 }
 
 export function endGame(){
+  cancelPreCount();
   clearInterval(state.game.timer);
   const g=state.game; state.game=null;
   const rows=g.results.map(r=>{
@@ -172,6 +225,6 @@ export function endGame(){
   const title = g.mode==="vs" ? 'YOU '+g.score+' — RIVAL '+g.rivalScore : 'SCORE '+g.score;
   const sub = g.mode==="vs" ? (g.score>=g.rivalScore?'You won the showdown':'Rival won the showdown') : (got+' of '+g.results.length+' words guessed');
   $("rescard").innerHTML='<h2>'+title+'</h2><div class="sub">'+sub+'</div>'+rows;
-  setScreen("results");
+  transition("results");
   $("pillScore").textContent=g.score;
 }

@@ -1,4 +1,6 @@
-/* Single place that decides which chrome is visible for a given screen.
+/* Maps FSM states to visible chrome. Pure presentation — game lifecycle
+   (killing timers etc.) lives in game.js so this stays side-effect-light.
+
    Screens: home | play | train | results | versus */
 
 import { $ } from "./dom.js";
@@ -7,9 +9,26 @@ import { ROUNDS } from "./constants.js";
 
 const RAILS = { home:"railHome", play:"railPlay", train:"railTrain", results:"railResults" };
 
-export function setScreen(s){
-  state.screen=s;
-  document.body.dataset.screen=s;
+/* countdown/playing/word-won all show the in-game screen; which one depends
+   on the mode of the running game. */
+function screenFor(fsmState){
+  switch(fsmState){
+    case "menu": return "home";
+    case "training": return "train";
+    case "results": return "results";
+    case "lobby": return "versus";
+    case "countdown": case "playing": case "word-won":
+      return (state.game && state.game.mode!=="ai") ? "versus" : "play";
+    default: return "home";
+  }
+}
+
+export function render(fsmState){
+  const s = screenFor(fsmState);
+  state.screen = s;
+  document.body.dataset.screen = s;
+  document.body.dataset.state = fsmState;
+
   for(const k in RAILS) $(RAILS[k]).classList.toggle("hidden", k!==s);
   $("mainGrid").classList.toggle("hidden", s==="versus");
   $("vsShell").classList.toggle("hidden", s!=="versus");
@@ -23,11 +42,11 @@ export function setScreen(s){
   $("scoreLabel").textContent = s==="versus" ? "Your score" : "Score";
   $("modeLabel").textContent = s==="versus" ? "1v1" : "PLAY WITH AI";
 
-  if(s!=="play" && s!=="versus" && state.game){ clearInterval(state.game.timer); state.game=null; }
-  if(s!=="play" && s!=="versus"){
+  const inGame = fsmState==="countdown"||fsmState==="playing"||fsmState==="word-won";
+  if(!inGame){
     $("pillTime").textContent="0:20";
     $("pillRound").textContent="1/"+ROUNDS;
     $("pillRivalScore").textContent="0";
   }
-  if(s==="home") $("pillScore").textContent="0";
+  if(fsmState==="menu") $("pillScore").textContent="0";
 }

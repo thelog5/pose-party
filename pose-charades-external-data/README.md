@@ -61,8 +61,9 @@ deliberately override the section files above them, so **do not reorder the
 | `capture.js` | Recording clips. |
 | `data.js` | Dataset import / export / bundled preload. |
 | `game.js` | Round loop and scoring for both modes. |
+| `fsm.js` | The finite game-state machine (DOM-free, unit-testable). |
 | `rival.js` | Simulated 1v1 opponent. |
-| `screens.js` | Which chrome is visible per screen. |
+| `screens.js` | Maps FSM states to visible chrome. |
 | `ui.js` | Guess list, toasts, flashes, class list. |
 | `state.js` | Shared mutable state, in one object. |
 | `constants.js` | Tunables and fixed tables. |
@@ -70,6 +71,43 @@ deliberately override the section files above them, so **do not reorder the
 
 `pose.js` and `classifier.js` are pure and dependency-free — the easiest place to
 add tests. The frame layout in `constants.js` is mirrored by `train_model.py`.
+
+## Game states
+
+All flow control goes through the explicit state machine in `js/fsm.js`:
+
+```
+menu ──────────► countdown ──► playing ◄──► word-won
+  │  ▲              ▲             │             │
+  ▼  │              │             ▼             ▼
+training        results ◄─────────┴─────────────┘
+```
+
+- **countdown** — 3·2·1 overlay before the first word; backing out (gear/logo)
+  cancels the game cleanly.
+- **playing** — the only state that accepts score events. A point is awarded
+  when the top prediction equals the current word, confidence is over the
+  threshold (`THRESH`), and it stays valid for the stability window
+  (`HOLD_MS`).
+- **word-won** — entered the instant a word resolves (won, missed, or
+  skipped). Because `playing → word-won` can only fire once per word, this
+  transition *is* the scoring lock: no double awards even if two code paths
+  race. After a short celebration pause the game returns to `playing` with
+  the next word, or goes to `results` after the last round.
+
+Illegal transitions are rejected and logged rather than crashing the game.
+
+## Data flow
+
+```
+webcam ──► MediaPipe Pose (+Hand, visual only) ──► normalize (pose.js)
+   ──► 30-frame sliding window ──► features (classifier.js) ──► kNN vs
+       labeled windows from assets/data/pose-charades-data.json
+   ──► smoothed guesses ──► ui.js (guess list) + game.js (scoring)
+```
+
+Hand landmarks are drawn and exported in clips, but the classifier uses only
+the 15 normalized body landmarks (`MODEL_POINTS`) — fingers were too noisy.
 
 ## Notes
 
