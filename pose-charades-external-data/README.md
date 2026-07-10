@@ -4,20 +4,24 @@
 
 Do **not** double click `index.html`. The browser blocks the app from loading `assets/data/pose-charades-data.json` when opened as a plain local file.
 
-On Mac:
+**Full game including online 1v1** — run the Node server (serves this folder *and* powers online rooms):
 
 ```bash
-cd ~/Downloads
-unzip pose-charades-external-data.zip
+cd ../server
+npm install   # first time only
+npm start
+```
+
+Then open `http://localhost:3000` in Chrome.
+
+**Offline modes only** (Play with AI, training, practice 1v1) — any static server works:
+
+```bash
 cd pose-charades-external-data
 python3 -m http.server 8000
 ```
 
-Then open this in Chrome:
-
-```text
-http://localhost:8000
-```
+Then open `http://localhost:8000`.
 
 ## Updating training data
 
@@ -60,9 +64,11 @@ deliberately override the section files above them, so **do not reorder the
 | `training.js` | Fits the model, reports a holdout accuracy estimate. |
 | `capture.js` | Recording clips. |
 | `data.js` | Dataset import / export / bundled preload. |
-| `game.js` | Round loop and scoring for both modes. |
+| `game.js` | Round loop and scoring for the local modes. |
 | `fsm.js` | The finite game-state machine (DOM-free, unit-testable). |
-| `rival.js` | Simulated 1v1 opponent. |
+| `rival.js` | Simulated 1v1 opponent (practice mode). |
+| `online.js` | Online 1v1: lobby, server events → FSM, point claims. |
+| `webrtc.js` | Peer-to-peer video link for online 1v1. |
 | `screens.js` | Maps FSM states to visible chrome. |
 | `ui.js` | Guess list, toasts, flashes, class list. |
 | `state.js` | Shared mutable state, in one object. |
@@ -108,6 +114,54 @@ webcam ──► MediaPipe Pose (+Hand, visual only) ──► normalize (pose.j
 
 Hand landmarks are drawn and exported in clips, but the classifier uses only
 the 15 normalized body landmarks (`MODEL_POINTS`) — fingers were too noisy.
+
+## Online 1v1
+
+Pick **1v1 Showdown** → create a room and read your friend the 6-letter code
+(or join with theirs). Works only when the game is served by the Node server
+in `../server`.
+
+How it fits together:
+
+- The **server is authoritative**: it deals a shared word from the
+  intersection of both players' trained word lists, times each round, and
+  awards exactly **one point per word to the first valid claim**. Stale
+  round ids, duplicate claims, and out-of-window claims are rejected;
+  client-reported scores are never trusted.
+- **Classification never leaves your device.** Each browser runs MediaPipe
+  and the kNN on its own player and submits only a claim ("my AI passed the
+  threshold"). Landmarks, training data, and classifier output are never
+  sent anywhere — which is also why the rival's guess panel shows a note
+  instead of live guesses.
+- **Video is peer-to-peer WebRTC** (the server only relays the opaque
+  connection handshake). Nothing is recorded or stored. Without a TURN
+  server, some strict NATs may fail to connect video — the match still
+  works, you just can't see each other.
+- Round timing is synced with a clock-offset ping, so both players see the
+  same countdown and timer.
+
+## Testing
+
+- `cd ../server && npm test` — 34-assertion server integration test
+  (full match with two real socket clients + every rejection path).
+- `cd ../e2e && npm install` then:
+  - `npm run offline` — 30 checks against a static host on port 8123
+    (`python3 -m http.server 8123` in this folder first).
+  - `npm run online` — 20 checks: spawns the real server and two isolated
+    headless-Chrome players who play a full match over Socket.IO + WebRTC.
+
+Both suites use Chrome's fake camera; the only simulated part is the vision
+input (classifier output is seeded, then real `gameCheck()` scoring runs).
+Manual browser testing is still needed for anything involving a real body in
+front of a real camera — see "Manual test checklist" below.
+
+## Manual test checklist
+
+- Camera permission prompt, then skeleton overlay tracks you.
+- Train two words + idle, watch live guesses, play a round for real.
+- Online: two machines (or two browser profiles), create/join, confirm you
+  see each other's video and the same word, and that acting the word out
+  scores for the right player.
 
 ## Notes
 
