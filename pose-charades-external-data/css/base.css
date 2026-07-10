@@ -1,0 +1,33 @@
+/* Design tokens, reset, and page shell. */
+
+  :root{
+    --bg:#251C5E;
+    --panel:#372E7D;
+    --row:#4A3E96;
+    --navy:#2F2470;
+    --cream:#FAF3E3;
+    --cream-line:#EFE5CC;
+    --amber:#FFB937;
+    --mint:#3ED598;
+    --red:#F8485E;
+    --blue:#3D7BF7;
+    --purple:#6C4FE0;
+    --teal:#8FD9D9;
+    --pink:#F58AB0;
+    --text-dim:#B9AEE8;
+    --sh:0 5px 0 rgba(12,7,40,.38);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--cream);
+    font-family:'Baloo 2',system-ui,sans-serif;
+    font-weight:700;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 18px 46px;position:relative}
+  svg{display:block}
+  button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
+  button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  .hidden{display:none!important}

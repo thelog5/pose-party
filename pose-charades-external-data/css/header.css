@@ -1,0 +1,21 @@
+/* Top bar: logo, mode pill, stat pills, icon buttons. */
+
+  /* ================= header ================= */
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  .logoimg{height:74px;width:auto;cursor:pointer;transform:rotate(-1deg);filter:drop-shadow(0 3px 0 rgba(12,7,40,.3))}
+
+  .modepill{display:flex;align-items:center;gap:9px;background:#3A2F86;border:3px solid var(--cream);border-radius:16px;padding:8px 16px;box-shadow:var(--sh);font-size:16px;letter-spacing:.8px;color:#fff}
+  .modepill svg{width:26px;height:26px}
+
+  .pills{display:flex;gap:12px;flex-wrap:wrap;margin-left:auto;align-items:center}
+  .pillimg{position:relative;filter:drop-shadow(0 4px 0 rgba(12,7,40,.3))}
+  .pillimg img{height:78px;width:auto;display:block}
+  .pillimg span{position:absolute;transform:translate(-50%,-50%);font-weight:800;white-space:nowrap;line-height:1}
+  .pillimg.t span{left:63%;top:64%;font-size:28px;color:#1E1440}
+  .pillimg.r span{left:50%;top:66%;font-size:25px;color:#0B4A2F}
+  .pillimg.s span{left:50%;top:63%;font-size:28px;color:#FFFFFF}
+
+  .hbtns{display:flex;gap:10px}
+  .iconbtn{width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:#3A2F86;border:3px solid var(--cream);border-radius:15px;box-shadow:var(--sh)}
+  .iconbtn:hover{filter:brightness(1.12)}
+  .iconbtn svg{width:22px;height:22px}

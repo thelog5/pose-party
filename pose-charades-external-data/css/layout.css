@@ -1,0 +1,5 @@
+/* Main two-column grid. */
+
+  /* ================= layout ================= */
+  .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,1fr);gap:18px;align-items:stretch}
+  @media(max-width:920px){.grid{grid-template-columns:1fr}}
