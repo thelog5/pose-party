@@ -19,8 +19,11 @@ export const MODEL_POINTS = JOINTS.length;
 
 export const SAMPLE_MS = 66, WIN = 30, STRIDE = 8, K = 7;
 export const HOLD_MS = 250, THRESH = 0.60, RIVAL_THRESH = 0.60;
-export const ROUNDS = 5, WORD_MS = 20000;
-export const PTS_CORRECT = 100, PTS_PER_SEC = 10, PTS_SKIP = 1;
+export const ROUNDS = 5, WORD_MS = 30000;
+/* Scoring (matches the on-screen copy): 100 per word, +100 fast bonus if
+   guessed inside 15s, whole thing multiplied by the current streak.
+   Skipping costs 500 and breaks the streak. */
+export const PTS_CORRECT = 100, PTS_FAST_BONUS = 100, FAST_WINDOW_MS = 15000, PTS_SKIP = 500;
 
 export const STARTERS = ["idle","jumping jacks","swimming","boxing","guitar","archery","basketball shot","golf swing","sleeping","driving","rowing","climbing","disco dance","hula hoop","skiing","chicken dance","weightlifting","tennis serve","marching","bowling","t-rex","robot"];
 

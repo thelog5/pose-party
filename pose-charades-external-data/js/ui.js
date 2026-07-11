@@ -1,4 +1,4 @@
-/* Everything that writes to the DOM outside of screen routing. */
+/* DOM writers: guess panels, camera pill, toasts, flashes, class list. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
@@ -29,61 +29,82 @@ export function pointBurst(headline, detail, kind="good"){
   void b.offsetWidth; // restart the animation
   b.classList.add("show");
   clearTimeout(pointBurst._t);
-  pointBurst._t=setTimeout(()=>b.classList.remove("show"),1350);
+  pointBurst._t=setTimeout(()=>b.classList.remove("show"),1300);
 }
 
-/* ---------------- guess list ---------------- */
-const CROWN = '<img class="crown" src="assets/crown.png" alt="">';
-const ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6 12l6-6 6 6"/></svg>';
+export const fmtTime = ms => {
+  const s=Math.max(0,Math.ceil(ms/1000));
+  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+};
 
+export const fmtScore = n => (n|0).toLocaleString("en-US");
+
+/* ---------------- guess rendering ---------------- */
 export const topGuesses = (n=5) => Object.entries(state.smooth).sort((a,b)=>b[1]-a[1]).slice(0,n);
 
-function guessRows(top, limit=5){
+const displayName = lab => lab==="idle" ? "just standing" : lab;
+
+/* fill one "AI'S TOP GUESS" panel: big word + robot % + 12-seg meter + rows */
+export function fillGuessPanel(prefix, top, rows=4){
+  const best=top[0];
+  const pct=best?Math.round(best[1]*100):0;
+  $(prefix+"TopWord").textContent = best ? displayName(best[0]).toUpperCase() : "…";
+  $(prefix+"TopPct").textContent = pct+"%";
+  const segs=$(prefix+"Meter").children;
+  const on=Math.round(pct/100*segs.length);
+  [...segs].forEach((seg,i)=>seg.classList.toggle("on", i<on));
   const html=[];
-  for(let i=0;i<Math.min(limit, top.length);i++){
-    const lab=top[i][0], p=top[i][1];
-    const name = lab==="idle" ? "just standing" : esc(lab);
-    const rose = (state.prevRank[lab]!==undefined && state.prevRank[lab]>i);
-    const pctHtml = Math.round(p*100)+"%"+(i===0&&rose?ARROW_UP:"");
-    html.push('<div class="grow'+(i===0?' first':'')+'">'+(i===0?CROWN:'')+
-      '<span class="rank">'+(i+1)+'</span><span class="gname">'+name+'</span>'+
-      '<span class="gpct">'+pctHtml+'</span></div>');
+  for(let i=1;i<Math.min(1+rows,top.length);i++){
+    const p=Math.round(top[i][1]*100);
+    html.push('<div class="grow"><span class="rank">'+(i+1)+'</span>'+
+      '<span class="gname">'+esc(displayName(top[i][0]))+'</span>'+
+      '<span class="gbar"><i style="width:'+p+'%"></i></span>'+
+      '<span class="gpct">'+p+'%</span></div>');
   }
-  return html.join("");
+  $(prefix+"GuessList").innerHTML=html.join("");
 }
 
-function setSegbar(id, pct){
-  const el=$(id); if(!el) return;
-  const on=Math.round(pct/100*6);
-  [...el.children].forEach((seg,i)=>seg.classList.toggle("on", i<on));
+/* rows-only variant (training panel live list) */
+function guessRowsInto(id, top, from=0, limit=5){
+  const rows=[];
+  for(let i=from;i<Math.min(from+limit,top.length);i++){
+    const p=Math.round(top[i][1]*100);
+    rows.push('<div class="grow"><span class="rank">'+(i+1)+'</span>'+
+      '<span class="gname">'+esc(displayName(top[i][0]))+'</span>'+
+      '<span class="gbar"><i style="width:'+p+'%"></i></span>'+
+      '<span class="gpct">'+p+'%</span></div>');
+  }
+  $(id).innerHTML=rows.join("");
+}
+
+/* "AI THINKS YOU ARE... | WORD • 97%" pill on the camera */
+function fillAiPill(top){
+  const best=top[0];
+  $("aiPillGuess").textContent = best
+    ? displayName(best[0]).toUpperCase()+" • "+Math.round(best[1]*100)+"%"
+    : "WARMING UP…";
 }
 
 export function renderGuesses(){
   const top=topGuesses(5);
   if(!top.length) return;
-  if(state.screen==="play"){
-    const pct=Math.round((top[0][1]||0)*100);
-    $("confBig").textContent=pct+"%";
-    setSegbar("segbar", pct);
-    $("guessList").innerHTML=guessRows(top,5);
-  } else if(state.screen==="train") {
-    $("trainGuessList").innerHTML=guessRows(top,5);
-  } else if(state.screen==="versus") {
-    const pct=Math.round((top[0][1]||0)*100);
-    setSegbar("segbarVsYou", pct);
-    $("guessListVsYou").innerHTML=guessRows(top,4);
-    if(state.game?.mode!=="online"){
-      // online: the rival's AI runs on their device; online.js sets a static note
-      const rtop=fakeRivalGuesses();
-      const rpct=rtop.length?Math.round(rtop[0][1]*100):0;
-      setSegbar("segbarVsRival", rpct);
-      $("guessListVsRival").innerHTML=guessRows(rtop,4);
+  const s=state.screen;
+  if(s==="home"||s==="lobby"){
+    fillAiPill(top);
+  } else if(s==="solo"){
+    fillGuessPanel("solo", top);
+  } else if(s==="match"){
+    fillGuessPanel("my", top, 2);
+    if(state.game?.mode==="vs"){
+      // practice mode: the robot rival's "AI" runs right here
+      fillGuessPanel("rival", fakeRivalGuesses(), 2);
     }
+  } else if(s==="train"){
+    guessRowsInto("trainGuessList", top, 0, 5);
   }
-  state.prevRank={}; top.forEach((g,i)=>state.prevRank[g[0]]=i);
 }
 
-/* ---------------- recorded class list ---------------- */
+/* ---------------- recorded class list (training) ---------------- */
 export function renderClasses(){
   const counts={};
   for(const c of state.dataset.clips) counts[c.label]=(counts[c.label]||0)+1;

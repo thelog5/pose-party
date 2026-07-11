@@ -16,12 +16,11 @@ import { gameCheck } from "./game.js";
 
 const CLASSIFY_EVERY_MS = 250;
 
-let video, overlay, ctx, overlayVs, ctxVs;
+let video, overlay, ctx;
 let lastClassifyT = 0;
 
 export async function boot(){
   video=$("video"); overlay=$("overlay"); ctx=overlay.getContext("2d");
-  overlayVs=$("overlayVs"); ctxVs=overlayVs?overlayVs.getContext("2d"):null;
 
   let vision;
   try{
@@ -47,11 +46,9 @@ export async function boot(){
     const stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480}, audio:false });
     state.mediaStream=stream;
     video.srcObject=stream; await video.play();
-    const v2=$("videoVs"); if(v2){ v2.srcObject=stream; v2.play().catch(()=>{}); }
   }catch(e){ return showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally — see README.)"); }
 
   overlay.width=video.videoWidth; overlay.height=video.videoHeight;
-  if(overlayVs){ overlayVs.width=video.videoWidth; overlayVs.height=video.videoHeight; }
   showStatus(null);
   requestAnimationFrame(loop);
 }
@@ -73,17 +70,10 @@ function loop(){
   const handRes=state.handmarker ? state.handmarker.detectForVideo(video, now) : null;
 
   ctx.clearRect(0,0,overlay.width,overlay.height);
-  if(ctxVs && overlayVs){
-    if(overlayVs.width!==video.videoWidth || overlayVs.height!==video.videoHeight){
-      overlayVs.width=video.videoWidth; overlayVs.height=video.videoHeight;
-    }
-    ctxVs.clearRect(0,0,overlayVs.width,overlayVs.height);
-  }
 
   const lm = res.landmarks && res.landmarks[0];
   if(lm){
     drawSkeleton(lm, handRes, ctx, overlay);
-    if(ctxVs && overlayVs) drawSkeleton(lm, handRes, ctxVs, overlayVs);
     if(now-state.lastSampleT >= SAMPLE_MS){
       state.lastSampleT=now;
       const f=normalize(lm, handRes);

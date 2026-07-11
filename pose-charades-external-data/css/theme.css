@@ -1,100 +1,86 @@
-/* Later cascade layer. These rules intentionally override the
-   section files above and only work because this file is linked after
-   them. Kept separate rather than merged so the refactor is behavior
-   preserving; folding it into the section files is a good follow-up. */
+/* POSE PARTY theme — tokens, reset, page shell, header. */
 
-/* ===================== REF MOCKUP PASS ===================== */
+:root{
+  --bg:#E8ECF9;
+  --card:#FFFFFF;
+  --panel:#F2F5FD;
+  --tint:#E4EAFB;
+  --ink:#152A6E;          /* deep navy text */
+  --ink-soft:#3D4E8F;
+  --line:#16307A;         /* strong card borders */
+  --line-soft:#C7D2F0;    /* subtle panel borders */
+  --blue:#2F5BE0;
+  --blue-deep:#2348BE;
+  --orange:#F0512D;
+  --orange-soft:#F4653F;
+  --yellow:#FFC531;
+  --yellow-deep:#F5B70F;
+  --green:#3FC98C;
+  --purple:#7C5CE0;
+  --red:#E8402A;
+  --live:#F0512D;
+  --sh:0 4px 0 rgba(21,42,110,.16);
+  --sh-big:0 6px 0 rgba(21,42,110,.18);
+  --r-sm:12px; --r-md:16px; --r-lg:22px;
+  --f-display:'Baloo 2',system-ui,sans-serif;
+  --f-body:'Nunito',system-ui,sans-serif;
+  --f-mono:'Courier New',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
 body{
-  background:
-    radial-gradient(circle at 50% -20%, rgba(106,79,224,.36), transparent 36%),
-    radial-gradient(circle at 15% 20%, rgba(61,123,247,.12), transparent 25%),
-    #120C35;
-  overflow-x:hidden;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--f-body);
+  font-weight:700;
+  min-height:100vh;
 }
-.wrap{max-width:1368px;min-height:100vh;padding:14px 18px 18px;display:flex;flex-direction:column;}
-.wrap:before,.wrap:after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.36;z-index:-1;background-image:
-  radial-gradient(circle at 14% 82%, rgba(255,185,55,.22) 0 2px, transparent 3px),
-  radial-gradient(circle at 84% 18%, rgba(62,213,152,.18) 0 2px, transparent 3px),
-  radial-gradient(circle at 72% 78%, rgba(248,72,94,.16) 0 2px, transparent 3px);
+.wrap{max-width:1440px;margin:0 auto;padding:16px 22px 22px;min-height:100vh;display:flex;flex-direction:column}
+svg{display:block}
+button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+input,select{font-family:var(--f-body)}
+.hidden{display:none!important}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:18px;margin-bottom:14px;min-height:74px}
+
+/* logo: two offset chips, pure CSS */
+.logo{display:flex;gap:6px;cursor:pointer;user-select:none;flex:none}
+.logo span{
+  font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1;
+  padding:8px 16px 10px;border-radius:14px;color:#fff;border:3px solid var(--ink);
+  letter-spacing:1px;
 }
-header{height:112px;margin-bottom:8px;display:grid;grid-template-columns:250px auto 1fr auto;gap:16px;align-items:start;}
-.logoimg{height:92px;align-self:start;justify-self:start;}
-.modepill{align-self:center;border:2.5px solid #5D42BE;background:#22164E;color:#B99BFF;border-radius:14px;padding:8px 18px;min-width:176px;height:44px;box-shadow:0 4px 0 rgba(10,5,35,.42);font-size:17px;letter-spacing:1.7px;justify-content:center;}
-.modepill svg{width:20px;height:20px;}
-.pills{margin-left:0;justify-self:center;display:flex;gap:14px;align-items:flex-start;flex-wrap:nowrap;}
-.statpill{height:92px;min-width:136px;border:3px solid #fff;border-radius:16px;box-shadow:0 5px 0 rgba(10,5,35,.5);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;color:#120C35;text-transform:uppercase;letter-spacing:1.3px;position:relative;overflow:hidden;}
-.statpill:after{content:"";position:absolute;inset:8px;border:2px solid rgba(255,255,255,.35);border-radius:12px;pointer-events:none;}
-.statpill .statlabel{font-size:15px;font-weight:900;opacity:.9;margin-bottom:8px;}
-.statpill .statvalue{font-size:38px;font-weight:900;letter-spacing:2px;}
-.statpill.timer{background:linear-gradient(#FFC653,#FFB437);min-width:184px;}
-.statpill.timer .timewrap{display:flex;align-items:center;gap:10px;}
-.statpill.timer .statvalue{font-size:44px;color:#0D0926;}
-.statpill.round{background:linear-gradient(#4BE4A2,#29C57F);min-width:126px;}
-.statpill.score{background:linear-gradient(#FF536D,#F83452);color:#fff;min-width:146px;}
-.statpill.score.youScore{background:linear-gradient(#3288ED,#0967CC);}
-.statpill.rival{background:linear-gradient(#FF536D,#F83452);color:#fff;min-width:160px;}
-.clockico{width:32px;height:32px;border:4px solid #0D0926;border-radius:50%;position:relative;display:inline-block;}
-.clockico:before{content:"";position:absolute;left:12px;top:6px;width:4px;height:12px;background:#0D0926;border-radius:4px;transform-origin:bottom center;}
-.clockico:after{content:"";position:absolute;left:13px;top:16px;width:12px;height:4px;background:#0D0926;border-radius:4px;transform:rotate(32deg);transform-origin:left center;}
-.hbtns{align-self:center;gap:12px;}
-.iconbtn{width:56px;height:56px;border:2.5px solid #5D42BE;background:#1C1249;border-radius:13px;box-shadow:none;}
-.iconbtn svg{width:24px;height:24px;}
+.logo .l1{background:var(--blue);transform:rotate(-2deg);box-shadow:-4px 5px 0 var(--yellow),0 4px 0 rgba(21,42,110,.25)}
+.logo .l2{background:var(--orange);transform:rotate(1.5deg) translateY(3px);box-shadow:0 4px 0 rgba(21,42,110,.25)}
 
-.grid{grid-template-columns:minmax(0,1.95fr) minmax(360px,.98fr);gap:22px;align-items:start;flex:1;}
-.stagecard{aspect-ratio:16/9;border:4px solid #FFFFFF;border-radius:22px;box-shadow:0 7px 0 rgba(8,4,30,.58);background:#10092B;}
-.stagecard video,.stagecard canvas{object-fit:cover;}
-.status{background:rgba(16,9,43,.94);font-size:17px;color:#EEE7FF;}
-.fullbody{top:18px;right:18px;background:#332564;border-radius:10px;border:0;color:#fff;font-size:14px;padding:9px 14px;letter-spacing:1.1px;}
-.wordcard{top:14px;left:16px;width:min(355px,48%);}
-.wordcard .word{top:49%;font-size:clamp(30px,4vw,56px);letter-spacing:5px;}
-.wordcard .cat{top:71%;font-size:12px;}
-.gotthis{width:146px;left:16px;bottom:12px;}
+.tagline{display:flex;align-items:center;gap:12px;font-family:var(--f-mono);font-weight:700;letter-spacing:2px;font-size:16px;color:var(--blue-deep);white-space:nowrap}
+.tagline .dim{color:#8A97C8}
+.tagline .bot{width:44px;height:44px;flex:none}
 
-.rail{gap:18px;}
-.modecard{min-height:132px;background:#FFF6E4;border-radius:19px;padding:17px 22px;box-shadow:0 5px 0 rgba(10,5,35,.48);transition:transform .12s ease, filter .12s ease;}
-button.modecard:hover{transform:translateY(-2px);filter:brightness(1.03);}
-.modecard h4{font-size:32px;letter-spacing:2px;}
-.modecard p{font-size:18px;color:#171040;line-height:1.32;margin-top:8px;}
-.modecard .art{width:118px;}
-.modecard .art img{max-width:112px;max-height:90px;object-fit:contain;}
-.modecard.ai{border:3.5px solid #6C4FE0;}
-.modecard.vs{border:3.5px solid #F8485E;}
-.modecard.party{border:3.5px solid #2BD88D;}
-.modecard.locked{opacity:1;}
-.soonchip{display:none;}
+/* round-progress dots (1v1 match) */
+.dots{display:flex;gap:16px;justify-content:flex-start;margin:2px 0 10px 12px}
+.dots i{width:13px;height:13px;border-radius:50%;background:#C9D4F2}
+.dots i.on{background:var(--orange)}
+.dots i.done{background:var(--blue)}
 
-.aipanel{height:100%;min-height:560px;border:3px solid #583DC0;background:#211653;border-radius:20px;box-shadow:0 5px 0 rgba(10,5,35,.5);padding:22px 24px;}
-.aihdr{justify-content:flex-start;}
-.aihdr h3{font-size:34px;letter-spacing:2px;color:#fff;line-height:1.05;}
-.aitop{gap:18px;margin-top:6px;}
-.thoughtimg{width:196px;}
-.confside .lab{font-size:15px;color:#CDBEFF;}
-.confside .num{font-size:54px;}
-.segbar{width:162px;border-width:3px;}
-.segbar i{height:16px;}
-.glist{gap:10px;}
-.grow{border-radius:12px;padding:11px 17px;min-height:48px;background:#49329A;}
-.grow.first{background:#4BE49A;}
-.grow .gname{font-size:18px;}
-.grow.first .gname{font-size:20px;}
-.grow .gpct{font-size:18px;}
-.ainote{font-size:16px;color:#EEE7FF;margin-top:auto;}
+/* header right: stat pills */
+.pills{display:flex;gap:12px;margin-left:auto}
+.statpill{min-width:126px;border:3px solid var(--ink);border-radius:var(--r-md);padding:8px 18px 10px;text-align:center;box-shadow:var(--sh);color:#fff}
+.statpill .lab{font-size:12.5px;font-weight:900;letter-spacing:1.4px;text-transform:uppercase;opacity:.95}
+.statpill .val{font-family:var(--f-display);font-weight:800;font-size:29px;line-height:1.05;letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:7px}
+.statpill.score{background:var(--blue)}
+.statpill.timer{background:var(--yellow);color:var(--ink)}
+.statpill.round{background:var(--green);color:#0B4A2F}
+.statpill.streak{background:var(--orange)}
+.statpill .ico{width:22px;height:22px}
 
-.bottombar{height:88px;margin-top:14px;align-items:center;}
-.startbtn{max-width:620px;margin:0 auto;border-radius:20px;font-size:36px;height:72px;padding:14px 36px;}
-.mascot-corner{width:118px;}
-.skipbtn{height:66px;min-width:280px;border-radius:17px;padding:8px 38px;}
-.skipbtn .t1{font-size:25px;}
-.imgbtn img{height:56px;}
-.autoskip img{height:68px;}
-.autoskip span{font-size:28px;}
-.robochat .minibot{width:96px;}
-.bub{font-size:16px;}
-.trainpanel{border-color:#5D42BE;background:#211653;}
-.rescard{background:#FFF6E4;}
+/* header right: icon buttons (home / party / etc.) */
+.hicons{display:flex;gap:12px;margin-left:auto}
+.iconbtn{width:66px;height:66px;background:var(--card);border:2.5px solid var(--blue);border-radius:16px;box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--blue-deep)}
+.iconbtn:hover{filter:brightness(1.04);transform:translateY(-1px)}
+.iconbtn svg{width:24px;height:24px}
+.iconbtn small{font-size:9.5px;font-weight:900;letter-spacing:.6px}
 
-/* Shared CSS-built UI pieces so the app does not depend on noisy generated button assets. */
-.gamebtn{display:inline-flex;align-items:center;justify-content:center;gap:12px;height:58px;border:3px solid #fff;border-radius:16px;background:#1B1249;color:#fff;padding:0 28px;box-shadow:0 5px 0 rgba(10,5,35,.5);font-weight:900;text-transform:uppercase;letter-spacing:1.6px;font-size:20px;}
-.gamebtn.danger{background:#1B1249;border-color:#583DC0;color:#EFE8FF;}
-.gamebtn.red{background:#F8485E;color:#fff;border-color:#fff;min-width:282px;flex-direction:column;gap:0;height:70px;}
-.gamebtn.red small{font-size:13px;color:#FFE0E5;line-height:1;}
+@media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }

@@ -1,4 +1,4 @@
-# Pose Charades
+# Pose Party (formerly Pose Charades)
 
 ## Launch it correctly
 
@@ -67,9 +67,10 @@ deliberately override the section files above them, so **do not reorder the
 | `game.js` | Round loop and scoring for the local modes. |
 | `fsm.js` | The finite game-state machine (DOM-free, unit-testable). |
 | `rival.js` | Simulated 1v1 opponent (practice mode). |
-| `online.js` | Online 1v1: lobby, server events → FSM, point claims. |
+| `online.js` | Online 1v1: lobby, host settings, server events → FSM, point claims. |
 | `webrtc.js` | Peer-to-peer video link for online 1v1. |
-| `screens.js` | Maps FSM states to visible chrome. |
+| `party.js` | Party-mode waiting room (lobby only; game not built yet). |
+| `screens.js` | Maps FSM states to screens; moves the camera dock between them. |
 | `ui.js` | Guess list, toasts, flashes, class list. |
 | `state.js` | Shared mutable state, in one object. |
 | `constants.js` | Tunables and fixed tables. |
@@ -87,14 +88,18 @@ menu ──────────► countdown ──► playing ◄──► 
   │  ▲              ▲             │             │
   ▼  │              │             ▼             ▼
 training        results ◄─────────┴─────────────┘
+  (also: menu ◄──► party — the Team Rush waiting room
+   and menu ◄──► lobby — the online 1v1 room screen)
 ```
 
 - **countdown** — 3·2·1 overlay before the first word; backing out (gear/logo)
   cancels the game cleanly.
-- **playing** — the only state that accepts score events. A point is awarded
+- **playing** — the only state that accepts score events. A word is won
   when the top prediction equals the current word, confidence is over the
   threshold (`THRESH`), and it stays valid for the stability window
-  (`HOLD_MS`).
+  (`HOLD_MS`). Solo scoring: (100 + 100 fast bonus inside 15s) × current
+  streak; skipping costs 500 and breaks the streak. Online 1v1 scores one
+  point per word, first valid claim wins.
 - **word-won** — entered the instant a word resolves (won, missed, or
   skipped). Because `playing → word-won` can only fire once per word, this
   transition *is* the scoring lock: no double awards even if two code paths
@@ -142,12 +147,12 @@ How it fits together:
 
 ## Testing
 
-- `cd ../server && npm test` — 34-assertion server integration test
+- `cd ../server && npm test` — 41-assertion server integration test
   (full match with two real socket clients + every rejection path).
 - `cd ../e2e && npm install` then:
-  - `npm run offline` — 30 checks against a static host on port 8123
+  - `npm run offline` — 51 checks against a static host on port 8123
     (`python3 -m http.server 8123` in this folder first).
-  - `npm run online` — 20 checks: spawns the real server and two isolated
+  - `npm run online` — 26 checks: spawns the real server and two isolated
     headless-Chrome players who play a full match over Socket.IO + WebRTC.
 
 Both suites use Chrome's fake camera; the only simulated part is the vision
@@ -169,3 +174,16 @@ front of a real camera — see "Manual test checklist" below.
 - Start Playing launches Play with AI.
 - Hand markers are visual only; body pose is used for scoring.
 - A point banner appears when a word is won, then the word card animates to the next word.
+
+## UI (POSE PARTY overhaul)
+
+The interface was rebuilt to the POSE PARTY mockups: home (mode cards +
+how-to strip), solo play (word card, AI top-guess meter), 1v1 lobby (room
+code boxes, share link, host match settings), 1v1 match (dual video +
+centered action word), and the party-mode waiting room. There is exactly one
+local camera `<video>` — a "camera dock" that gets reparented into whichever
+screen is active — so MediaPipe never re-initializes. All art is inline SVG
+placeholders; see `../ASSETS-NEEDED.md` for what real assets would replace.
+
+Party mode is a waiting room only (join/switch teams, room code, locked
+start) — the team game itself is not built yet.

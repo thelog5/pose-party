@@ -53,6 +53,9 @@ try {
   ok(/^[A-Z2-9]{6}$/.test(r.code || ""), `room created with code ${r.code}`);
   const code = r.code;
 
+  r = await emit(C, "room:create", { name: "X", labels: ["idle","x"], settings: { rounds: 99, wordSecs: 10, target: 5 } });
+  ok(r.error === "bad-payload", `out-of-range settings rejected (${r.error})`);
+
   r = await emit(B, "room:join", { code: "ZZZZZZ", name: "Bob", labels: LABELS_B });
   ok(r.error === "no-such-room", `wrong code rejected (${r.error})`);
 
@@ -67,9 +70,22 @@ try {
   ok(r.error === "no-active-round", `claim before match rejected (${r.error})`);
 
   console.log("match:");
-  const aStart = once(A, "match:start"), bStart = once(B, "match:start");
+  const aReady = once(A, "room:ready"), bReady = once(B, "room:ready");
+  r = await emit(B, "match:begin", {});
+  ok(r.error === "not-host", `non-host cannot begin (${r.error})`);
   await emit(A, "player:ready", {});
+  r = await emit(A, "match:begin", {});
+  ok(r.error === "not-ready", `begin before both ready rejected (${r.error})`);
   await emit(B, "player:ready", {});
+  await Promise.all([aReady, bReady]);
+  ok(true, "both clients told room:ready");
+
+  r = await emit(B, "room:settings", { settings: { rounds: 4, wordSecs: 15, target: 5 } });
+  ok(r.error === "not-host", `non-host cannot change settings (${r.error})`);
+
+  const aStart = once(A, "match:start"), bStart = once(B, "match:start");
+  r = await emit(A, "match:begin", {});
+  ok(r.ok === true, "host begins the match");
   const [ms] = await Promise.all([aStart, bStart]);
   ok(ms.rounds === 3, `match:start rounds=3`);
   ok(ms.startAt > Date.now() - 100, "startAt in the future");
@@ -141,6 +157,33 @@ try {
   await peerLeft;
   ok(true, "peer notified on disconnect");
 
+  // settings broadcast + target score ends the match early
+  console.log("settings + target score:");
+  const H = connect(URL, { transports: ["websocket"] });
+  const I = connect(URL, { transports: ["websocket"] });
+  await Promise.all([once(H, "connect"), once(I, "connect")]);
+  const r4c = await emit(H, "room:create", { name: "Hana", labels: SHARED, settings: { rounds: 10, wordSecs: 10, target: 5 } });
+  ok(!!r4c.code, "room with custom settings created");
+  const rj = await emit(I, "room:join", { code: r4c.code, name: "Ivy", labels: SHARED });
+  ok(rj.settings && rj.settings.rounds === 10 && rj.settings.target === 5, `joiner got settings in ack (${JSON.stringify(rj.settings)})`);
+  const iSettings = once(I, "room:settings");
+  r = await emit(H, "room:settings", { settings: { rounds: 10, wordSecs: 10, target: 1 } });
+  ok(r.ok === true, "host settings update accepted");
+  const sPayload = await iSettings;
+  ok(sPayload.settings.target === 1, "joiner received settings broadcast");
+  const hReady = once(H, "room:ready");
+  await emit(H, "player:ready", {}); await emit(I, "player:ready", {});
+  await hReady;
+  const hStart = once(H, "round:start");
+  await emit(H, "match:begin", {});
+  const hr1 = await hStart;
+  const hEnd = once(H, "match:end", 4000), iEnd = once(I, "match:end", 4000);
+  await emit(H, "round:claim", { roundId: hr1.roundId });
+  const [endH] = await Promise.all([hEnd, iEnd]);
+  const hScore = endH.scores.find(p => p.name === "Hana").score;
+  ok(hScore === 1, `match ended at target score 1 after round 1 (Hana=${hScore})`);
+  H.disconnect(); I.disconnect();
+
   console.log("abuse:");
   // disjoint labels -> no-shared-words
   const F = connect(URL, { transports: ["websocket"] });
@@ -148,10 +191,14 @@ try {
   await Promise.all([once(F, "connect"), once(G, "connect")]);
   const r3c = await emit(F, "room:create", { name: "Fred", labels: ["idle", "boxing"] });
   await emit(G, "room:join", { code: r3c.code, name: "Gia", labels: ["idle", "skiing"] });
-  const errF = once(F, "room:error");
+  const fReady = once(F, "room:ready");
   await emit(F, "player:ready", {});
   await emit(G, "player:ready", {});
-  ok((await errF).error === "no-shared-words", "disjoint word lists rejected at match start");
+  await fReady;
+  const errF = once(F, "room:error");
+  const rBegin = await emit(F, "match:begin", {});
+  ok(rBegin.error === "no-shared-words", `begin with disjoint word lists rejected (${rBegin.error})`);
+  ok((await errF).error === "no-shared-words", "both players told no-shared-words");
 
   // rate limit: creates share one IP (localhost), so the earlier creates count too
   let limited = false;

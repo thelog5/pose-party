@@ -16,7 +16,7 @@ import { Server } from "socket.io";
 import { config } from "./config.js";
 import { createRoomStore } from "./rooms.js";
 import { createLimiter } from "./ratelimit.js";
-import { cleanName, cleanLabels, cleanCode, isPlainObject, signalOk } from "./validate.js";
+import { cleanName, cleanLabels, cleanCode, cleanSettings, isPlainObject, signalOk } from "./validate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GAME_DIR = path.join(__dirname, "..", "pose-charades-external-data");
@@ -93,8 +93,9 @@ io.on("connection", socket => {
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     const name = cleanName(payload.name);
     const labels = cleanLabels(payload.labels);
-    if(!name || !labels) return cb({ error: "bad-payload" });
-    const res = store.createRoom(socket.id, name, labels);
+    const settings = cleanSettings(payload.settings);
+    if(!name || !labels || settings === null) return cb({ error: "bad-payload" });
+    const res = store.createRoom(socket.id, name, labels, settings);
     log(`create by "${name}" -> ${res.code || "ERROR " + res.error}`);
     cb(res);
   });
@@ -118,6 +119,23 @@ io.on("connection", socket => {
   socket.on("player:ready", (payload, cb) => {
     cb = ack(cb);
     cb(store.ready(socket.id));
+  });
+
+  socket.on("room:settings", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const settings = cleanSettings(payload.settings);
+    if(settings === null || !Object.keys(settings).length) return cb({ error: "bad-payload" });
+    cb(store.setSettings(socket.id, settings));
+  });
+
+  socket.on("match:begin", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    const res = store.begin(socket.id);
+    log(`begin by ${socket.id.slice(0,6)} -> ${res.error ? "ERROR " + res.error : "ok"}`);
+    cb(res);
   });
 
   socket.on("round:claim", (payload, cb) => {

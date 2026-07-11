@@ -3,160 +3,392 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pose Charades</title>
-<link rel="icon" type="image/png" href="assets/logo.png">
+<title>Pose Party</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='25' width='80' height='62' rx='18' fill='%23fff' stroke='%23152A6E' stroke-width='6'/><rect x='22' y='38' width='56' height='38' rx='10' fill='%23152A6E'/><circle cx='38' cy='55' r='6' fill='%23FFC531'/><circle cx='62' cy='55' r='6' fill='%23FFC531'/><line x1='50' y1='25' x2='50' y2='12' stroke='%23152A6E' stroke-width='6'/><circle cx='50' cy='9' r='7' fill='%23F0512D'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
-
-<!-- Load order matters: theme.css onward override the section files above them. -->
-<link rel="stylesheet" href="css/base.css">
-<link rel="stylesheet" href="css/header.css">
-<link rel="stylesheet" href="css/layout.css">
-<link rel="stylesheet" href="css/stage.css">
-<link rel="stylesheet" href="css/rail.css">
-<link rel="stylesheet" href="css/bottombar.css">
-<link rel="stylesheet" href="css/train.css">
-<link rel="stylesheet" href="css/results.css">
 <link rel="stylesheet" href="css/theme.css">
-<link rel="stylesheet" href="css/versus.css">
-<link rel="stylesheet" href="css/feedback.css">
-<link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/screens.css">
+<link rel="stylesheet" href="css/overlays.css">
 </head>
 <body>
+
+<!-- ============ shared SVG placeholder art (see ASSETS-NEEDED.md) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="botHead" viewBox="0 0 100 100">
+      <line x1="50" y1="24" x2="50" y2="10" stroke="#152A6E" stroke-width="6"/><circle cx="50" cy="8" r="7" fill="#F0512D"/>
+      <rect x="8" y="24" width="84" height="64" rx="18" fill="#fff" stroke="#152A6E" stroke-width="6"/>
+      <rect x="20" y="37" width="60" height="40" rx="11" fill="#152A6E"/>
+      <circle cx="38" cy="54" r="6.5" fill="#FFC531"/><circle cx="62" cy="54" r="6.5" fill="#FFC531"/>
+      <path d="M42 67 q8 6 16 0" stroke="#FFC531" stroke-width="4" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="botFull" viewBox="0 0 120 130">
+      <line x1="60" y1="20" x2="60" y2="8" stroke="#152A6E" stroke-width="6"/><circle cx="60" cy="7" r="7" fill="#F0512D"/>
+      <rect x="22" y="20" width="76" height="56" rx="16" fill="#fff" stroke="#152A6E" stroke-width="6"/>
+      <rect x="33" y="32" width="54" height="34" rx="10" fill="#152A6E"/>
+      <circle cx="49" cy="47" r="6" fill="#FFC531"/><circle cx="71" cy="47" r="6" fill="#FFC531"/>
+      <path d="M53 58 q7 5 14 0" stroke="#FFC531" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <rect x="36" y="80" width="48" height="36" rx="12" fill="#fff" stroke="#152A6E" stroke-width="6"/>
+      <circle cx="60" cy="97" r="6" fill="#3FC98C"/>
+      <path d="M32 92 q-14 -4 -10 -18" fill="none" stroke="#152A6E" stroke-width="7" stroke-linecap="round"/>
+      <path d="M88 92 q14 -4 10 -18" fill="none" stroke="#152A6E" stroke-width="7" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="vsBurst" viewBox="0 0 120 120">
+      <path d="M60 6 71 26 94 14 88 38 112 42 94 58 112 74 88 78 94 102 71 90 60 112 49 90 26 102 32 78 8 74 26 58 8 42 32 38 26 14 49 26z" fill="#fff" stroke="#152A6E" stroke-width="4"/>
+      <text x="60" y="72" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="800" font-size="34" fill="#F5B70F" stroke="#152A6E" stroke-width="1.5">VS</text>
+    </symbol>
+    <symbol id="icoWordArt" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="40" fill="#FFF2D9" stroke="#F0512D" stroke-width="4" stroke-dasharray="7 6"/>
+      <circle cx="50" cy="34" r="9" fill="#F0512D"/>
+      <path d="M50 45 v22 M50 50 l-15 -8 M50 50 l15 -8 M50 67 l-11 16 M50 67 l11 16" stroke="#F0512D" stroke-width="6" stroke-linecap="round" fill="none"/>
+    </symbol>
+    <symbol id="icoUsers" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4" fill="currentColor"/><path d="M3 19c0-3.4 2.7-5.4 6-5.4s6 2 6 5.4z" fill="currentColor"/><circle cx="17" cy="9" r="2.7" fill="currentColor"/><path d="M14.8 19c.4-2.6 2.4-4.3 4.9-4.3 1.9 0 3.6 1.2 3.2 4.3z" fill="currentColor"/></symbol>
+    <symbol id="icoSpeaker" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z" fill="currentColor"/><path d="M15 9.5a4 4 0 0 1 0 5M17.5 7a8 8 0 0 1 0 10" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="icoSpeakerOff" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19z" fill="currentColor"/><path d="M16 9.5 21 14.5M21 9.5l-5 5" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="icoGear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="icoLock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.4"/></symbol>
+    <symbol id="icoTrophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0z" fill="#FFC531" stroke="#152A6E" stroke-width="1.6"/><path d="M7 5H4a3 3 0 0 0 3 4M17 5h3a3 3 0 0 1-3 4" fill="none" stroke="#152A6E" stroke-width="1.6"/><path d="M10 14h4l1 5H9z" fill="#FFC531" stroke="#152A6E" stroke-width="1.6"/><rect x="8" y="19" width="8" height="2.4" rx="1" fill="#152A6E"/></symbol>
+    <symbol id="icoBolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="#FFC531" stroke="#152A6E" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="icoClock" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8" fill="#fff" stroke="#152A6E" stroke-width="2.2"/><path d="M12 8.5V13l3.4 2" stroke="#152A6E" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M9.5 3h5" stroke="#152A6E" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="icoFire" viewBox="0 0 24 24"><path d="M12 2c4.2 3.8 6.5 7 6.5 10.7a6.5 6.5 0 1 1-13 0c0-2.1.9-4 2.3-5.7.5 1.3 1.4 2.1 2.6 2.3C10 6.5 10.6 4.2 12 2z" fill="#FFC531" stroke="#F0512D" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="icoStar" viewBox="0 0 24 24"><path d="M12 2.5 14.9 9l7 .6-5.3 4.6 1.6 6.8L12 17.4 5.8 21l1.6-6.8L2.1 9.6l7-.6z" fill="#FFC531" stroke="#152A6E" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="icoLink" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.6 1.6M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.6-1.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="icoEnvelope" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="15" rx="3" fill="#fff" stroke="#152A6E" stroke-width="2"/><path d="m3 7 9 7 9-7" fill="none" stroke="#152A6E" stroke-width="2"/></symbol>
+    <symbol id="icoSearch" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="icoTarget" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="#F0512D" stroke-width="2.2"/><circle cx="12" cy="12" r="4.6" fill="none" stroke="#F0512D" stroke-width="2.2"/><circle cx="12" cy="12" r="1.6" fill="#F0512D"/></symbol>
+    <symbol id="icoMedal" viewBox="0 0 24 24"><circle cx="12" cy="14" r="6.5" fill="#FFC531" stroke="#152A6E" stroke-width="1.8"/><path d="m8.5 3 3.5 6L15.5 3" fill="none" stroke="#152A6E" stroke-width="2.2"/><path d="M12 11.3 13 13.5l2.3.2-1.7 1.5.5 2.3-2.1-1.2-2.1 1.2.5-2.3-1.7-1.5 2.3-.2z" fill="#152A6E"/></symbol>
+    <symbol id="icoPose" viewBox="0 0 24 24"><circle cx="12" cy="4.5" r="2.4" fill="currentColor"/><path d="M12 7.5v7M12 9.5 6.5 7M12 9.5l5.5-2.5M12 14.5 8.5 21M12 14.5l3.5 6.5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="icoCopy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="2.2"/></symbol>
+    <symbol id="icoSwitch" viewBox="0 0 24 24"><circle cx="8" cy="7" r="3" fill="#fff"/><circle cx="16" cy="7" r="3" fill="#fff"/><path d="M4 20c0-3 1.8-5 4-5M20 20c0-3-1.8-5-4-5" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M9 17h6m0 0-2-2m2 2-2 2" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="icoHeart" viewBox="0 0 24 24"><path d="M12 20 4.8 12.6a4.6 4.6 0 0 1 6.5-6.5l.7.7.7-.7a4.6 4.6 0 0 1 6.5 6.5z" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+
 <div class="wrap">
 
+  <!-- ============ header ============ -->
   <header>
-    <img class="logoimg" id="logoHome" src="assets/logo.png" alt="Pose Charades" title="Home">
+    <div class="logo" id="logoHome" title="Home"><span class="l1">POSE</span><span class="l2">PARTY</span></div>
+    <div class="tagline"><span id="modeLabel">AI is watching. Strike a pose.</span><svg class="bot"><use href="#botHead"/></svg></div>
 
-    <div class="modepill hidden" id="modePill">
-      <svg viewBox="0 0 120 120" aria-hidden="true"><line x1="60" y1="10" x2="60" y2="26" stroke="#FAF3E3" stroke-width="8"/><circle cx="60" cy="9" r="8" fill="#F8485E"/><rect x="18" y="26" width="84" height="70" rx="20" fill="#8FD9D9"/><rect x="4" y="50" width="14" height="26" rx="7" fill="#F58AB0"/><rect x="102" y="50" width="14" height="26" rx="7" fill="#F58AB0"/><circle cx="45" cy="56" r="11" fill="#fff"/><circle cx="75" cy="56" r="11" fill="#fff"/><circle cx="45" cy="56" r="5" fill="#2F2470"/><circle cx="75" cy="56" r="5" fill="#2F2470"/><rect x="44" y="74" width="32" height="12" rx="6" fill="#fff"/></svg>
-      <span id="modeLabel">PLAY WITH AI</span>
+    <div class="pills hidden" id="hdrPills">
+      <div class="statpill score"><div class="lab">Score</div><div class="val" id="pillScore">0</div></div>
+      <div class="statpill timer"><div class="lab">Round timer</div><div class="val"><svg class="ico"><use href="#icoClock"/></svg><span id="pillTime">00:30</span></div></div>
+      <div class="statpill round"><div class="lab">Round</div><div class="val" id="pillRound">1 / 5</div></div>
+      <div class="statpill streak"><div class="lab">Streak</div><div class="val"><svg class="ico"><use href="#icoFire"/></svg><span id="pillStreak">x1</span></div></div>
     </div>
 
-    <div class="pills">
-      <div class="statpill score" id="statScore"><div class="statlabel" id="scoreLabel">Score</div><div class="statvalue" id="pillScore">0</div></div>
-      <div class="statpill timer"><div class="statlabel" id="timerLabel">Round timer</div><div class="timewrap"><i class="clockico" aria-hidden="true"></i><div class="statvalue" id="pillTime">0:20</div></div></div>
-      <div class="statpill round"><div class="statlabel">Round</div><div class="statvalue" id="pillRound">1/5</div></div>
-      <div class="statpill rival hidden" id="statRival"><div class="statlabel">Rival score</div><div class="statvalue" id="pillRivalScore">0</div></div>
-    </div>
-
-    <div class="hbtns">
-      <button class="iconbtn" id="btnSound" title="Sound on/off" aria-label="Toggle sound">
-        <svg id="sndOn" viewBox="0 0 24 24" fill="none" stroke="#FAF3E3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19z" fill="#FAF3E3"/><path d="M15 9.5a4 4 0 0 1 0 5"/><path d="M17.5 7a8 8 0 0 1 0 10"/></svg>
-        <svg id="sndOff" class="hidden" viewBox="0 0 24 24" fill="none" stroke="#FAF3E3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6.5 9H3v6h3.5L11 19z" fill="#FAF3E3"/><path d="M16 9.5 21 14.5M21 9.5l-5 5"/></svg>
+    <div class="hicons" id="hdrIcons">
+      <button class="iconbtn" id="btnFriends" title="Friends"><svg><use href="#icoUsers"/></svg><small>FRIENDS</small></button>
+      <button class="iconbtn" id="btnSound" title="Volume">
+        <svg id="sndOn"><use href="#icoSpeaker"/></svg><svg id="sndOff" class="hidden"><use href="#icoSpeakerOff"/></svg><small>VOLUME</small>
       </button>
-      <button class="iconbtn" id="btnGear" title="Train the AI" aria-label="Train the AI">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#FAF3E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/></svg>
-      </button>
+      <button class="iconbtn" id="btnGear" title="Settings & AI training"><svg><use href="#icoGear"/></svg><small>SETTINGS</small></button>
     </div>
   </header>
 
-  <div class="grid" id="mainGrid">
-    <!-- ============ LEFT: stage ============ -->
-    <div>
-      <div class="stagecard">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
+  <div class="dots hidden" id="roundDots"></div>
 
-        <div class="wordcard hidden" id="wordcard">
-          <img src="assets/word-card.png" alt="Act this word">
-          <div class="word" id="gameWord">—</div>
-          <div class="cat">
-            <svg viewBox="0 0 24 24" fill="#231800"><circle cx="8" cy="7" r="3.2"/><path d="M2.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5z"/><circle cx="16.5" cy="8" r="2.6"/><path d="M13.8 19c.4-2.4 2.3-4 4.7-4 1.8 0 3.4 1 3 4z"/></svg>
-            <span id="gameCatTxt">Sports & Action</span>
+  <!-- ============ camera dock (reparented into the active screen) ============ -->
+  <div class="camdock" id="cameraDock">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+    <span class="livebadge left"><i></i>LIVE</span>
+    <span class="brackets"><i></i><i></i><i></i><i></i></span>
+    <div class="recdot" id="recdot"><i></i>REC</div>
+    <div class="flash" id="flash"></div>
+    <div class="aipill" id="aiPill">
+      <svg class="boticon"><use href="#botHead"/></svg>
+      <span class="who">AI THINKS<br>YOU ARE...</span>
+      <span class="sep"></span>
+      <span class="guess" id="aiPillGuess">WARMING UP…</span>
+    </div>
+    <div class="camstatus" id="status">Loading the pose engine…</div>
+  </div>
+
+  <!-- ============ HOME ============ -->
+  <section class="screen" id="scrHome">
+    <div class="cols">
+      <div class="camcard"><div class="slot" id="slotHome"></div></div>
+      <div class="modestack">
+        <button class="modecard ai" id="modeAI">
+          <span class="art"><svg><use href="#botFull"/></svg></span>
+          <span class="txt"><h4>Play with AI</h4><p>Test your poses, beat your streak, and outguess the AI.</p></span>
+          <span class="go"><span class="chip white">SOLO</span><span class="chev">›</span></span>
+        </button>
+        <button class="modecard vs" id="modeVS">
+          <span class="art"><svg><use href="#vsBurst"/></svg></span>
+          <span class="txt"><h4>1v1 Showdown</h4><p>Face a friend in a real-time pose battle. Same word, one winner.</p></span>
+          <span class="go"><span class="chip white">HEAD-TO-HEAD</span><span class="chev">›</span></span>
+        </button>
+        <button class="modecard party" id="modeParty">
+          <span class="art"><svg><use href="#botFull"/></svg></span>
+          <span class="txt"><h4>Team Rush <span class="chip yellow">COMING SOON</span></h4><p>2v2 chaos! Work together, outguess everyone.</p></span>
+          <span class="lock"><svg><use href="#icoLock"/></svg></span>
+        </button>
+        <button class="bigbtn yellow" id="btnLetsGo">Let’s Go <span class="arrow">→</span></button>
+      </div>
+    </div>
+    <div class="howto">
+      <div class="cell">
+        <svg class="hicart"><use href="#botHead"/></svg>
+        <span class="bub">Need a hand?<br>Here’s how to play!</span>
+      </div>
+      <div class="cell"><span class="num">1</span><span><b>Strike a pose</b><small>based on the secret word.</small></span><svg class="hicart" style="color:var(--blue)"><use href="#icoPose"/></svg></div>
+      <div class="cell"><span class="num">2</span><span><b>The AI (or your rival)</b><small>guesses what you’re doing.</small></span><svg class="hicart" style="color:var(--blue)"><use href="#icoSearch"/></svg></div>
+      <div class="cell"><span class="num">3</span><span><b>Score points</b><small>for correct guesses!</small></span><svg class="hicart"><use href="#icoTrophy"/></svg></div>
+      <div class="cell"><svg class="hicart"><use href="#icoStar"/></svg><span><small>First to the target score wins the party!</small></span></div>
+    </div>
+  </section>
+
+  <!-- ============ SOLO PLAY ============ -->
+  <section class="screen hidden" id="scrSolo">
+    <div class="cols">
+      <div class="camcard"><div class="slot" id="slotSolo"></div></div>
+      <div class="rail">
+        <div class="wordcard" id="soloWordCard">
+          <span class="chip orange" style="position:absolute;top:-14px;left:50%;transform:translateX(-50%)">CURRENT WORD</span>
+          <svg class="wart"><use href="#icoWordArt"/></svg>
+          <span class="wtxt">
+            <span class="cur" id="soloWord">—</span>
+            <span class="bonus" id="soloBonus">Bonus: +100 if guessed within 15 seconds</span>
+          </span>
+        </div>
+        <div class="guesspanel" style="flex:1">
+          <span class="paneltag">AI’s Top Guess</span>
+          <div class="topguess">
+            <span class="word" id="soloTopWord">…</span>
+            <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="soloTopPct">0%</span></span>
           </div>
+          <div class="meter">
+            <div class="segs" id="soloMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
+          </div>
+          <div class="glist" id="soloGuessList"></div>
         </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="bigbtn outline" id="btnExitSolo">Exit Game</button>
+      <button class="bigbtn orange" id="btnSkipSolo">Skip Word (−500)</button>
+    </div>
+  </section>
 
-        <div class="fullbody" id="fullbody">
-          <svg viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="4" r="2.6"/><path d="M12 7.5c-2 0-3.6 1-3.6 3v3.5h1.8V22h1.4v-6h.8v6h1.4v-8h1.8V10.5c0-2-1.6-3-3.6-3z"/></svg>
-          <span>BODY AI + HAND TRACKER</span>
-        </div>
-
-        <img class="gotthis hidden" id="gotthis" src="assets/you-got-this.png" alt="You got this!">
-
-        <div class="flash" id="flash"></div>
-        <div class="recdot" id="recdot"><i></i>REC</div>
-        <div class="status" id="status">Loading the pose engine…</div>
+  <!-- ============ 1v1 LOBBY ============ -->
+  <section class="screen hidden" id="scrLobby">
+    <div class="toprow">
+      <div class="camcard">
+        <div class="slot" id="slotLobbyYou"></div>
+        <span class="namebadge you">YOU</span>
+        <span class="livebadge right"><i></i>LIVE</span>
+      </div>
+      <div class="selmode">
+        <span class="chip white">SELECTED MODE</span>
+        <h4>1v1 Showdown</h4>
+        <p>Face a friend in a real-time pose battle. Same word, one winner.</p>
+        <svg class="botart"><use href="#botFull"/></svg>
+        <span class="winchip"><svg><use href="#icoTrophy"/></svg>ONE WINNER · Beat the clock!</span>
+      </div>
+      <div class="camcard">
+        <div class="slot" id="slotLobbyRival"></div>
+        <span class="namebadge rival" id="rivalBadgeLobby">RIVAL</span>
+        <span class="livebadge right"><i></i>LIVE</span>
       </div>
     </div>
 
-    <!-- ============ RIGHT: rails ============ -->
-    <div class="rail" id="railHome">
-      <button class="modecard ai" id="modeAI">
-        <span class="art"><img src="assets/robot-think.png" alt="" style="width:78px;height:auto"></span>
-        <span><h4>Play with AI</h4><p>AI guesses<br>your pose</p></span>
-      </button>
+    <div class="midrow">
+      <div class="panel">
+        <h3>Room Code <svg style="margin-left:auto"><use href="#icoEnvelope"/></svg></h3>
+        <div class="sub">Share this code with your rival!</div>
+        <div class="codeboxes" id="codeBoxes"><b>·</b><b>·</b><b>·</b><b>·</b><b>·</b><b>·</b></div>
+        <div class="field"><label for="roomLink">Room link</label>
+          <div class="linkrow">
+            <input type="text" id="roomLink" readonly value="">
+            <button class="btn blue" id="btnCopyLink"><svg width="16" height="16"><use href="#icoLink"/></svg>Copy Link</button>
+          </div>
+        </div>
+        <div class="locknote"><svg><use href="#icoLock"/></svg>Anyone with the link can join</div>
+        <div class="field" style="margin-top:12px"><label for="joinCode">Have a code? Join a friend</label>
+          <div class="joinrow">
+            <input type="text" id="joinCode" maxlength="6" placeholder="ABC234" autocomplete="off" autocapitalize="characters">
+            <button class="btn mint" id="btnJoinRoom">Join</button>
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px"><label for="lobbyName">Your name</label>
+          <input type="text" id="lobbyName" maxlength="16" placeholder="e.g. Sam" autocomplete="off">
+        </div>
+        <div class="lobbystatus" id="lobbyStatus"></div>
+      </div>
 
-      <button class="modecard vs" id="modeVS">
-        <span class="art"><img src="assets/badge-1v1.png" alt="" style="width:88px;height:auto"></span>
-        <span><h4>1v1 Showdown</h4><p>Same word, higher score when time runs out</p></span>
-        <span class="soonchip">PLAY</span>
-      </button>
+      <div class="panel">
+        <h3><svg style="color:var(--blue)"><use href="#icoGear"/></svg>Match Settings</h3>
+        <div class="sub">Customize your 1v1 showdown.</div>
+        <div style="margin-top:10px">
+          <div class="setrow"><svg class="ic"><use href="#icoMedal"/></svg><span class="meta"><b>Rounds</b><small>Best of</small></span>
+            <span class="stepper"><button id="roundsMinus">−</button><span class="stepval" id="setRounds">5</span><button id="roundsPlus">+</button></span></div>
+          <div class="setrow"><svg class="ic"><use href="#icoClock"/></svg><span class="meta"><b>Round timer</b><small>Time per round</small></span>
+            <span class="stepper"><button id="timerMinus">−</button><span class="stepval" id="setTimer">30s</span><button id="timerPlus">+</button></span></div>
+          <div class="setrow"><svg class="ic"><use href="#icoTarget"/></svg><span class="meta"><b>Target score</b><small>Score to win</small></span>
+            <span class="stepper"><button id="targetMinus">−</button><span class="stepval" id="setTarget">5</span><button id="targetPlus">+</button></span></div>
+        </div>
+        <div class="setnote"><svg width="15" height="15"><use href="#icoStar"/></svg>First to reach the target score wins!</div>
+      </div>
 
-      <button class="modecard party locked" id="modeParty">
-        <span class="art">
-          <svg width="60" height="60" viewBox="0 0 120 120">
-            <path d="M22 98 46 44l30 30z" fill="#FFB937" stroke="#2F2470" stroke-width="5" stroke-linejoin="round"/>
-            <path d="M30 90l32-32" stroke="#F8485E" stroke-width="5" stroke-linecap="round"/>
-            <circle cx="88" cy="30" r="6" fill="#F8485E"/><circle cx="104" cy="52" r="5" fill="#3ED598"/><circle cx="70" cy="18" r="5" fill="#6C4FE0"/>
-            <path d="M84 62q10-4 14 4" fill="none" stroke="#3D7BF7" stroke-width="4" stroke-linecap="round"/>
-            <path d="M60 24q-2-10 6-12" fill="none" stroke="#FFB937" stroke-width="4" stroke-linecap="round"/>
-            <path d="M96 14l3-7M106 24l7-4" stroke="#F8485E" stroke-width="4" stroke-linecap="round"/>
-          </svg>
+      <div class="panel" style="position:relative">
+        <h3>How It Works</h3>
+        <div class="sub">Quick recap before we battle!</div>
+        <div class="bullets" style="max-width:70%">
+          <div class="bullet"><span class="bic"><svg><use href="#icoBolt"/></svg></span><span><b>Same secret word</b><small>Both of you get the same pose.</small></span></div>
+          <div class="bullet"><span class="bic"><svg><use href="#icoClock"/></svg></span><span><b>Beat the clock</b><small>Score points with correct guesses.</small></span></div>
+          <div class="bullet"><span class="bic"><svg><use href="#icoTrophy"/></svg></span><span><b>Highest score wins</b><small>First to the target takes it!</small></span></div>
+        </div>
+        <svg style="position:absolute;right:12px;bottom:12px;width:104px;height:112px"><use href="#botFull"/></svg>
+      </div>
+    </div>
+
+    <div class="botrow">
+      <div class="hostnote"><svg><use href="#botHead"/></svg><span id="lobbyRoleNote">Host controls the match.</span></div>
+      <button class="bigbtn yellow" id="btnStartMatch" disabled>Start Match <span class="arrow">→</span></button>
+      <div class="helpside">Need help?<button class="btn ghost" id="btnViewGuide">View Guide</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 1v1 MATCH ============ -->
+  <section class="screen hidden" id="scrMatch">
+    <div class="board">
+      <div class="camcard"><div class="slot" id="slotMatchYou"></div></div>
+      <div class="camcard">
+        <div class="slot" id="slotMatchRival"></div>
+        <span class="livebadge left"><i></i>LIVE</span>
+      </div>
+      <div class="vsword" id="vsWordCard">
+        <span class="chip orange">ACTION WORD</span>
+        <div class="word" id="vsWord">—</div>
+      </div>
+    </div>
+    <div class="panels">
+      <div class="guesspanel">
+        <span class="paneltag">AI’s Top Guess</span>
+        <div class="topguess">
+          <span class="word" id="myTopWord">…</span>
+          <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="myTopPct">0%</span></span>
+        </div>
+        <div class="meter">
+          <div class="segs" id="myMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
+        </div>
+        <div class="glist" id="myGuessList"></div>
+      </div>
+      <div class="guesspanel">
+        <span class="paneltag">AI’s Top Guess</span>
+        <div class="topguess">
+          <span class="word" id="rivalTopWord">…</span>
+          <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="rivalTopPct">0%</span></span>
+        </div>
+        <div class="meter">
+          <div class="segs" id="rivalMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
+        </div>
+        <div class="glist" id="rivalGuessList"></div>
+      </div>
+    </div>
+    <div class="exitrow"><button class="btn ghost" id="btnExitMatch">✕ &nbsp;End Game</button></div>
+  </section>
+
+  <!-- rival video dock: reparented between lobby + match rival slots -->
+  <div class="camdock hidden" id="rivalDock" style="transform:none">
+    <video id="videoRemote" playsinline autoplay class="hidden"></video>
+    <div class="vsplaceholder" id="rivalPlaceholder">
+      <svg><use href="#botFull"/></svg>
+      <span>Waiting for rival…</span>
+      <small>share the room code or link below</small>
+    </div>
+  </div>
+
+  <!-- ============ PARTY LOBBY (waiting room only) ============ -->
+  <section class="screen hidden" id="scrParty">
+    <div class="inforow">
+      <button class="btn ghost" id="btnPartyBack">← Back to Home</button>
+      <div class="panel partybanner">
+        <svg width="24" height="24"><use href="#icoStar"/></svg>
+        <span><h4>PARTY MODE</h4><small>Waiting for players to join and pick a team!</small></span>
+        <svg width="24" height="24"><use href="#icoStar"/></svg>
+      </div>
+      <div class="panel roomcodebig"><span><span class="lab">Room code</span><div class="code" id="partyCode">······</div></span>
+        <button class="btn ghost" id="btnPartyCopy" style="padding:8px 12px"><svg width="18" height="18"><use href="#icoCopy"/></svg>COPY</button>
+      </div>
+      <div class="panel playercount"><svg width="30" height="30" style="color:var(--blue)"><use href="#icoUsers"/></svg><span><b id="partyCount">1 / 12</b><br><small>PLAYERS</small></span></div>
+      <div class="panel"><span><b style="font-size:14px">INVITE FRIENDS</b><br><small style="font-size:11.5px;color:var(--ink-soft)">Share the room code!</small></span>
+        <span style="display:flex;gap:8px">
+          <button class="btn blue" style="padding:8px 10px" data-invite><svg width="16" height="16"><use href="#icoLink"/></svg></button>
+          <button class="btn mint" style="padding:8px 10px" data-invite><svg width="16" height="16"><use href="#icoUsers"/></svg></button>
+          <button class="btn ghost" style="padding:8px 10px" data-invite>···</button>
         </span>
-        <span><h4>Party Mode</h4><p>Big laughs,<br>everyone plays</p></span>
-        <span class="soonchip">SOON</span>
-      </button>
-    </div>
-
-    <div class="rail hidden" id="railPlay">
-      <div class="aipanel">
-        <div class="aihdr">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#FFB937" stroke-width="2.4" stroke-linecap="round"><path d="M4 12h3M12 4v3M20 12h-3M12 20v-3"/></svg>
-          <h3>AI thinks you are…</h3>
-          <svg viewBox="0 0 24 24"><path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#F8485E"/></svg>
-        </div>
-
-        <div class="aitop">
-          <img class="thoughtimg" src="assets/robot-think.png" alt="AI thinking">
-          <div class="confside">
-            <span class="lab">Confidence</span>
-            <span class="num" id="confBig">0%</span>
-            <span class="segbar" id="segbar"><i></i><i></i><i></i><i></i><i></i><i></i></span>
-          </div>
-        </div>
-
-        <div class="glist" id="guessList"></div>
-
-        <div class="ainote">
-          <svg viewBox="0 0 24 24"><path d="M12 2l1.6 5.4L19 9l-5.4 1.6L12 16l-1.6-5.4L5 9l5.4-1.6z" fill="#FFB937"/></svg>
-          <span>Scores and advances when the right word crosses 60%!</span>
-        </div>
       </div>
     </div>
 
-    <div class="rail hidden" id="railTrain">
-      <div class="trainpanel">
-        <h3>
-          <svg viewBox="0 0 120 120"><rect x="16" y="26" width="88" height="72" rx="20" fill="#8FD9D9" stroke="#FAF3E3" stroke-width="6"/><circle cx="44" cy="56" r="11" fill="#fff"/><circle cx="76" cy="56" r="11" fill="#fff"/><circle cx="44" cy="56" r="5" fill="#2F2470"/><circle cx="76" cy="56" r="5" fill="#2F2470"/><rect x="42" y="76" width="36" height="13" rx="6" fill="#fff"/></svg>
-          Train the AI
-        </h3>
-        <div>
+    <div class="teams">
+      <div class="teampanel blue">
+        <div class="teamhead"><h4>Blue Team</h4><span class="cnt" id="blueCnt">1 / 6</span><button class="btn ghost" id="btnJoinBlue">JOIN BLUE</button></div>
+        <div class="teamgrid" id="blueGrid"></div>
+      </div>
+      <svg class="vsburst"><use href="#vsBurst"/></svg>
+      <div class="teampanel orange">
+        <div class="teamhead"><h4>Orange Team</h4><span class="cnt" id="orangeCnt">1 / 6</span><button class="btn ghost" id="btnJoinOrange">JOIN ORANGE</button></div>
+        <div class="teamgrid" id="orangeGrid"></div>
+      </div>
+    </div>
+
+    <div class="botrow">
+      <div class="panel">
+        <h3><svg style="color:var(--blue)"><use href="#icoGear"/></svg>Match Settings <span class="chip blue" style="font-size:10px">HOST ONLY</span></h3>
+        <div class="settingsgrid">
+          <div class="cell"><div class="lab">Rounds</div><b>3</b></div>
+          <div class="cell"><div class="lab">Turn time</div><b>30s</b></div>
+          <div class="cell"><div class="lab">Word pack</div><b>Standard</b><small id="partyWordCount">— words</small></div>
+          <div class="cell"><div class="lab">Target score</div><b>100 <small style="display:inline">pts</small></b></div>
+        </div>
+        <div class="setnote">These settings apply to the entire match.</div>
+      </div>
+      <div class="startcol">
+        <button class="bigbtn yellow" id="btnPartyStart" disabled>Start Game <span class="arrow">→</span></button>
+        <span class="startnote">Game will start when both teams have at least 2 players.</span>
+      </div>
+      <div class="panel">
+        <h3><svg><use href="#botHead"/></svg>How to Play <button class="btn ghost" id="btnPartyGuide" style="margin-left:auto;padding:6px 12px;font-size:11px">VIEW GUIDE</button></h3>
+        <div class="bullets">
+          <div class="bullet"><span class="bic"><svg style="color:var(--blue)"><use href="#icoPose"/></svg></span><span><small>Strike a pose based on the secret word</small></span></div>
+          <div class="bullet"><span class="bic"><svg style="color:var(--blue)"><use href="#icoUsers"/></svg></span><span><small>Your team guesses to earn points</small></span></div>
+          <div class="bullet"><span class="bic"><svg><use href="#icoTrophy"/></svg></span><span><small>Outguess the other team!</small></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TRAINING ============ -->
+  <section class="screen hidden" id="scrTrain">
+    <div class="cols">
+      <div class="camcard"><div class="slot" id="slotTrain"></div></div>
+      <div class="panel trainpanel">
+        <h3><svg><use href="#botHead"/></svg>Train the AI</h3>
+        <div class="field">
           <label for="classInput">Word / action to record</label>
           <input type="text" id="classInput" list="classSuggestions" placeholder="e.g. jumping jacks">
           <datalist id="classSuggestions"></datalist>
         </div>
         <div class="chips" id="starterChips"></div>
         <div class="row2">
-          <div><label for="personInput">Who’s performing</label><input type="text" id="personInput" placeholder="your name"></div>
-          <div><label for="clipLen">Clip length</label>
+          <div class="field"><label for="personInput">Who’s performing</label><input type="text" id="personInput" placeholder="your name"></div>
+          <div class="field"><label for="clipLen">Clip length</label>
             <select id="clipLen"><option value="3">3 seconds</option><option value="4" selected>4 seconds</option><option value="6">6 seconds</option><option value="8">8 seconds</option></select>
           </div>
         </div>
-        <button class="btn red" id="btnRecord"><span class="dot"></span>Record clip (3·2·1)</button>
+        <button class="btn orange" id="btnRecord"><span class="dot"></span>Record clip (3·2·1)</button>
         <div class="hint">Record <b>idle</b> too (stand, fidget, read) — it stops the AI guessing between words. Aim for 10–15 clips per word, full body in frame.</div>
         <div class="classlist" id="classList"></div>
-        <button class="btn amber" id="btnTrain">Train the AI</button>
+        <button class="btn blue" id="btnTrain">Train the AI</button>
         <div class="trainreport" id="trainReport"></div>
         <div class="glist" id="trainGuessList"></div>
         <div class="row2">
@@ -167,129 +399,23 @@
         <button class="btn mint" id="btnDoneTrain">Done — back to play</button>
       </div>
     </div>
+  </section>
 
-    <div class="rail hidden" id="railLobby">
-      <div class="trainpanel">
-        <h3>
-          <svg viewBox="0 0 120 120"><rect x="16" y="26" width="88" height="72" rx="20" fill="#F58AB0" stroke="#FAF3E3" stroke-width="6"/><circle cx="44" cy="56" r="11" fill="#fff"/><circle cx="76" cy="56" r="11" fill="#fff"/><circle cx="44" cy="56" r="5" fill="#2F2470"/><circle cx="76" cy="56" r="5" fill="#2F2470"/><rect x="42" y="76" width="36" height="13" rx="6" fill="#fff"/></svg>
-          1v1 Showdown
-        </h3>
-        <div>
-          <label for="lobbyName">Your name</label>
-          <input type="text" id="lobbyName" maxlength="16" placeholder="e.g. Sam" autocomplete="off">
-        </div>
-        <button class="btn amber" id="btnCreateRoom">Create private room</button>
-        <div>
-          <label for="lobbyCode">Have a code? Join a friend</label>
-          <div class="row2" style="margin-top:4px">
-            <input type="text" id="lobbyCode" maxlength="6" placeholder="ABC234" autocomplete="off" autocapitalize="characters" style="margin-top:0">
-            <button class="btn mint" id="btnJoinRoom">Join room</button>
-          </div>
-        </div>
-        <div class="trainreport" id="lobbyStatus"></div>
-        <div class="hint">Online play needs the game served by the Node server (<b>npm start</b> in <b>server/</b>). Your camera video goes directly to your friend over WebRTC — never through the server.</div>
-        <button class="btn ghost" id="btnPractice">Practice vs robot rival</button>
-        <button class="btn ghost" id="btnLobbyBack">Back to menu</button>
-      </div>
+  <!-- ============ RESULTS ============ -->
+  <section class="screen hidden" id="scrResults">
+    <div class="rescard" id="rescard"></div>
+    <div class="actions" style="width:min(720px,94%)">
+      <button class="bigbtn yellow" id="btnAgain">Play Again</button>
+      <button class="bigbtn outline" id="btnHome">Home</button>
     </div>
-
-    <div class="rail hidden" id="railResults">
-      <div class="rescard" id="rescard"></div>
-      <button class="btn amber" id="btnAgain" style="font-size:20px;padding:15px">Play again</button>
-      <button class="btn ghost" id="btnHome">Home</button>
-    </div>
-  </div>
-
-
-  <!-- ============ 1v1 reference layout ============ -->
-  <div class="vs-shell hidden" id="vsShell">
-    <div class="vs-board">
-      <div class="vs-col">
-        <div class="vs-stage you">
-          <div class="ribbon">You</div>
-          <video id="videoVs" playsinline muted></video>
-          <canvas id="overlayVs"></canvas>
-        </div>
-      </div>
-      <div class="vs-col">
-        <div class="vs-stage">
-          <div class="ribbon rival" id="rivalRibbon">Rival</div>
-          <video id="videoRemote" playsinline autoplay class="hidden"></video>
-          <div class="vs-placeholder" id="rivalPlaceholder">
-            <img src="assets/robot-think-2.png" alt="">
-            <span>Rival camera</span>
-            <small>remote player stream goes here</small>
-          </div>
-        </div>
-      </div>
-      <div class="vsWord" id="vsWordCard">
-        <img src="assets/word-card-vs.png" alt="Act this word">
-        <div class="word" id="vsWord">ARCHERY</div>
-        <div class="cat" id="vsCat">People & Characters</div>
-      </div>
-    </div>
-
-    <div class="vs-guess-row">
-      <div class="ai-mini">
-        <h3>AI thinks you are...</h3>
-        <img class="thoughtimg" src="assets/robot-think.png" alt="AI thinking">
-        <div class="glist" id="guessListVsYou"></div>
-        <div class="conf-mini"><span>Confidence</span><span class="segbar" id="segbarVsYou"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-      </div>
-      <div class="ai-mini">
-        <h3>AI thinks rival is...</h3>
-        <img class="thoughtimg" src="assets/robot-think-2.png" alt="Rival AI thinking">
-        <div class="glist" id="guessListVsRival"></div>
-        <div class="conf-mini"><span>Confidence</span><span class="segbar" id="segbarVsRival"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-      </div>
-    </div>
-
-    <div class="vs-bottom">
-      <button class="gamebtn danger" id="btnQuitVs" title="End game">×&nbsp; End game</button>
-      <div class="autoBox"><span class="lab">Auto skip in</span><span class="val" id="autoskipTxtVs">0:20</span></div>
-      <div class="vs-rule">First side over 60% wins the word.<span class="star">☆</span></div>
-    </div>
-  </div>
-
-  <!-- ============ bottom bars ============ -->
-  <div class="bottombar" id="homeBottom">
-    <button class="startbtn" id="btnStart">
-      <span>Start playing</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="#2F2470" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
-    </button>
-    <svg class="mascot-corner" viewBox="0 0 130 140">
-      <line x1="66" y1="12" x2="66" y2="32" stroke="#2F2470" stroke-width="8"/><circle cx="66" cy="11" r="8" fill="#F8485E" stroke="#2F2470" stroke-width="4"/>
-      <rect x="24" y="32" width="84" height="66" rx="20" fill="#8FD9D9" stroke="#2F2470" stroke-width="6"/>
-      <rect x="10" y="54" width="14" height="26" rx="7" fill="#F58AB0" stroke="#2F2470" stroke-width="5"/>
-      <rect x="108" y="54" width="14" height="26" rx="7" fill="#F58AB0" stroke="#2F2470" stroke-width="5"/>
-      <circle cx="52" cy="58" r="11" fill="#fff" stroke="#2F2470" stroke-width="5"/><circle cx="82" cy="58" r="11" fill="#fff" stroke="#2F2470" stroke-width="5"/>
-      <circle cx="52" cy="58" r="5" fill="#2F2470"/><circle cx="82" cy="58" r="5" fill="#2F2470"/>
-      <rect x="50" y="76" width="34" height="13" rx="6" fill="#fff" stroke="#2F2470" stroke-width="5"/>
-      <rect x="36" y="98" width="60" height="34" rx="12" fill="#8FD9D9" stroke="#2F2470" stroke-width="6"/>
-      <path d="M20 110q-12-4-8-18" fill="none" stroke="#2F2470" stroke-width="7" stroke-linecap="round"/>
-      <path d="M112 110q14-2 12-16" fill="none" stroke="#2F2470" stroke-width="7" stroke-linecap="round"/>
-      <path d="M4 84l5-7M2 96l-1-2" stroke="#F8485E" stroke-width="4" stroke-linecap="round"/>
-    </svg>
-  </div>
-
-  <div class="bottombar hidden" id="playBottom">
-    <button class="gamebtn danger" id="btnQuit" title="End game">×&nbsp; End game</button>
-    <button class="gamebtn red" id="btnSkip">
-      <span>▶▶&nbsp; Skip word</span>
-      <small>−1 POINT</small>
-    </button>
-    <div class="robochat">
-      <div class="bubs"><div class="bub" id="bub1">I’m guessing…</div><div class="bub">keep it up!</div></div>
-      <img class="minibot" src="assets/robot-think-2.png" alt="">
-    </div>
-  </div>
+  </section>
 
 </div>
 
+<!-- overlays -->
 <div class="countdown hidden" id="countdown"></div>
 <div class="pointBurst" id="pointBurst"><div class="burstCard"><div class="headline" id="pointHeadline"></div><div class="detail" id="pointDetail"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
-
 
 <script type="module" src="js/main.js"></script>
 </body>

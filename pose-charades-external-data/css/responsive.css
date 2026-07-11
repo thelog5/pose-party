@@ -1,7 +1,0 @@
-/* Narrow-viewport overrides. Must stay last. */
-
-@media(max-width:1000px){
-  header{height:auto;grid-template-columns:1fr;align-items:center;}
-  .logoimg{height:74px}.pills{justify-self:start;flex-wrap:wrap}.grid{grid-template-columns:1fr}.aipanel{min-height:0}
-  .vs-board,.vs-guess-row{grid-template-columns:1fr}.vsWord{position:relative;top:auto;left:auto;transform:none;margin:-8px auto}.vs-bottom{grid-template-columns:1fr}.vs-rule{text-align:center}
-}

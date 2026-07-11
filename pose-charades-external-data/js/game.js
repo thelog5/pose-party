@@ -1,19 +1,23 @@
 /* Round loop for the local modes.
-   "ai": you score when the AI holds the right guess above THRESH.
-   "vs": same word, but the simulated rival races you to it.
+   "ai": solo — score when the AI holds the right guess above THRESH.
+   "vs": practice 1v1 — the simulated robot rival races you.
 
    All flow control goes through the FSM:
      countdown -> playing -> word-won -> playing ... -> results
    Scoring is only accepted in "playing", which makes the per-word scoring
-   lock structural rather than a boolean flag. */
+   lock structural rather than a boolean flag.
+
+   Scoring (see constants.js): (100 + fast bonus) × streak per word;
+   skip costs 500 and breaks the streak; a miss just breaks the streak. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
-import { CATEGORIES, ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS,
-         PTS_CORRECT, PTS_PER_SEC, PTS_SKIP } from "./constants.js";
-import { toast, flash, pointBurst, renderGuesses, topGuesses } from "./ui.js";
+import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS,
+         PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
+import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
+import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
 
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
@@ -25,7 +29,6 @@ let preCountTimer = null;
    repainted before the game object disappears. */
 export function bindGameLifecycle(){
   onTransition((to, from)=>{
-    // Leaving the in-game states for anything but results = abandon the game.
     const inGame = s => s==="countdown"||s==="playing"||s==="word-won";
     if(inGame(from) && !inGame(to) && to!=="results" && state.game){
       cancelPreCount();
@@ -60,19 +63,26 @@ function shuffledDeck(){
   return words;
 }
 
+function updateHud(){
+  const g=state.game; if(!g) return;
+  $("pillScore").textContent=fmtScore(g.score);
+  $("pillStreak").textContent="x"+Math.max(1,g.streak);
+  $("pillRound").textContent=g.round+" / "+g.rounds;
+  if(state.screen==="match") renderDots(g.round, g.rounds);
+}
+
 export function startGame(mode="ai"){
   state.lastMode=mode;
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
-    toast("Train the AI first — record idle plus at least one action word. Tap the gear.");
+    toast("Train the AI first — record idle plus at least one action word. Tap SETTINGS.");
     transition("training"); return;
   }
-  state.game={ mode, deck:shuffledDeck(), word:null, round:0, wordEnd:0,
-               holdSince:0, score:0, rivalScore:0, results:[], bestWrong:{} };
+  state.game={ mode, deck:shuffledDeck(), word:null, round:0, rounds:ROUNDS, wordEnd:0,
+               wordStart:0, holdSince:0, score:0, rivalScore:0, streak:0,
+               results:[], bestWrong:{} };
   if(!transition("countdown")){ state.game=null; return; }
-  $("pillScore").textContent="0";
-  $("pillRivalScore").textContent="0";
-  $("pillRound").textContent="1/"+ROUNDS;
-  if($("bub1")) $("bub1").textContent="I’m guessing…";
+  updateHud();
+  $("pillRound").textContent="1 / "+ROUNDS;
   runPreCount(()=>{
     if(gameState()!=="countdown" || !state.game) return; // user backed out
     transition("playing");
@@ -82,7 +92,7 @@ export function startGame(mode="ai"){
 }
 
 function animateWordChange(){
-  [$("wordcard"), $("vsWordCard")].forEach(el=>{
+  [$("soloWordCard"), $("vsWordCard")].forEach(el=>{
     if(!el) return;
     el.classList.remove("wordswap"); void el.offsetWidth; el.classList.add("wordswap");
   });
@@ -91,69 +101,61 @@ function animateWordChange(){
 function nextWord(){
   const game=state.game;
   game.round++;
-  if(game.round>ROUNDS){ endGame(); return; }
+  if(game.round>game.rounds){ endGame(); return; }
   if(!game.deck.length) game.deck=shuffledDeck();
   game.word=game.deck.pop();
-  game.wordEnd=performance.now()+WORD_MS;
+  game.wordStart=performance.now();
+  game.wordEnd=game.wordStart+WORD_MS;
   game.holdSince=0; game.bestWrong={};
-  const cat=CATEGORIES[game.word]||"Your Words";
-  $("gameWord").textContent=game.word;
-  $("gameCatTxt").textContent=cat;
-  if($("vsWord")) $("vsWord").textContent=game.word;
-  if($("vsCat")) $("vsCat").textContent=cat;
-  $("pillRound").textContent=game.round+"/"+ROUNDS;
+  $("soloWord").textContent=game.word;
+  $("vsWord").textContent=game.word;
+  updateHud();
   animateWordChange();
 }
 
-/* Base points plus a speed bonus for every whole second left on the clock. */
 function pointsForCurrentWord(){
   const game=state.game;
-  if(!game) return PTS_CORRECT;
-  const bonus=Math.ceil(Math.max(0, game.wordEnd-performance.now())/1000)*PTS_PER_SEC;
-  return PTS_CORRECT+bonus;
+  const fast = performance.now()-game.wordStart <= FAST_WINDOW_MS;
+  return (PTS_CORRECT + (fast?PTS_FAST_BONUS:0)) * Math.max(1, game.streak);
 }
 
 /* winner: "you" | "rival" | "miss". The playing->word-won transition is the
-   scoring lock: it can only fire once per word, so a word can never be
-   awarded twice even if two code paths race in the same tick. */
+   scoring lock: it can only fire once per word. */
 function finishWord(winner, opts={}){
   const game=state.game;
   if(!game || gameState()!=="playing") return;
   if(!transition("word-won", {winner, word:game.word})) return;
   game.holdSince=0;
-  const pts=pointsForCurrentWord();
 
   if(winner==="you"){
+    game.streak++;
+    const pts=pointsForCurrentWord();
     game.score+=pts;
     game.results.push({word:game.word, ok:true, pts, confidence:opts.confidence||0});
-    $("pillScore").textContent=game.score;
-    const msg = game.mode==="vs" ? "You won the word! +"+pts : "AI got it! +"+pts;
-    toast(msg);
-    pointBurst(game.mode==="vs" ? "You win!" : "+"+pts+" points", game.word+" · +"+pts, "good");
-    if($("bub1")) $("bub1").textContent=msg;
+    pointBurst("+"+fmtScore(pts)+" points", game.word+(game.streak>1?" · streak x"+game.streak:""), "good");
     flash("good");
     blip([523,659,784]);
   }else if(winner==="rival"){
+    game.streak=0;
+    const pts=PTS_CORRECT;
     game.rivalScore+=pts;
     game.results.push({word:game.word, ok:false, rival:true, rivalPts:pts, thought:"Rival guessed it first"});
-    $("pillRivalScore").textContent=game.rivalScore;
-    toast("Rival won the word! +"+pts);
     pointBurst("Rival wins!", game.word+" · +"+pts, "rival");
     flash("bad");
     blip([330,247]);
   }else{
-    game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab});
+    game.streak=0;
+    game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
     const missMsg = opts.skip ? "Skipped" : "Time up";
-    toast(missMsg+" — next word");
-    pointBurst(missMsg, "Next word coming up", "bad");
+    pointBurst(missMsg, opts.skip ? "−"+PTS_SKIP+" points" : "Next word coming up", "bad");
     flash("bad");
     blip([220,165]);
   }
+  updateHud();
 
   setTimeout(()=>{
     if(gameState()!=="word-won" || !state.game) return;
-    if(state.game.round>=ROUNDS){ endGame(); return; }
-    if($("bub1")) $("bub1").textContent="I’m guessing…";
+    if(state.game.round>=state.game.rounds){ endGame(); return; }
     transition("playing");
     nextWord();
   }, WORD_WON_PAUSE_MS);
@@ -190,11 +192,8 @@ export function gameCheck(){
 export function gameTick(){
   const game=state.game;
   if(!game) return;
-  const now=performance.now();
-  const wLeft=Math.max(0,game.wordEnd-now);
-  const txt="0:"+String(Math.ceil(wLeft/1000)).padStart(2,"0");
-  $("pillTime").textContent=txt;
-  if($("autoskipTxtVs")) $("autoskipTxtVs").textContent=txt;
+  const wLeft=Math.max(0,game.wordEnd-performance.now());
+  $("pillTime").textContent=fmtTime(wLeft);
 
   if(game.mode==="vs"){
     const rtop=fakeRivalGuesses();
@@ -213,10 +212,7 @@ export function gameTick(){
 export function missWord(isSkip){
   const game=state.game;
   if(!game || gameState()!=="playing") return;
-  if(isSkip){
-    game.score=Math.max(0,game.score-PTS_SKIP);
-    $("pillScore").textContent=game.score;
-  }
+  if(isSkip) game.score=Math.max(0,game.score-PTS_SKIP);
   finishWord("miss", {skip:isSkip});
 }
 
@@ -225,15 +221,15 @@ export function endGame(){
   clearInterval(state.game.timer);
   const g=state.game; state.game=null;
   const rows=g.results.map(r=>{
-    const right='<span class="ok">You +'+ (r.pts||0)+'</span>';
+    const right='<span class="ok">You +'+fmtScore(r.pts||0)+'</span>';
     const rival='<span class="miss">Rival +'+(r.rivalPts||0)+'</span><span class="thought">Rival guessed it first.</span>';
-    const wrong='<span class="miss">missed</span>'+(r.thought?'<span class="thought">AI thought: '+esc(r.thought)+'</span>':'');
+    const wrong='<span class="miss">'+(r.skipped?'skipped':'missed')+'</span>'+(r.thought?'<span class="thought">AI thought: '+esc(r.thought)+'</span>':'');
     return '<div class="resrow"><span>'+esc(r.word)+'</span><span>'+(r.ok?right:(r.rival?rival:wrong))+'</span></div>';
   }).join("");
   const got=g.results.filter(r=>r.ok).length;
-  const title = g.mode==="vs" ? 'YOU '+g.score+' — RIVAL '+g.rivalScore : 'SCORE '+g.score;
-  const sub = g.mode==="vs" ? (g.score>=g.rivalScore?'You won the showdown':'Rival won the showdown') : (got+' of '+g.results.length+' words guessed');
+  const title = g.mode==="vs" ? 'YOU '+fmtScore(g.score)+' — RIVAL '+fmtScore(g.rivalScore) : 'SCORE '+fmtScore(g.score);
+  const sub = g.mode==="vs" ? (g.score>=g.rivalScore?'You won the showdown!':'Rival won the showdown') : (got+' of '+g.results.length+' words guessed');
   $("rescard").innerHTML='<h2>'+title+'</h2><div class="sub">'+sub+'</div>'+rows;
   transition("results");
-  $("pillScore").textContent=g.score;
+  $("pillScore").textContent=fmtScore(g.score);
 }

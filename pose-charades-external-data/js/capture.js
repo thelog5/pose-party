@@ -16,14 +16,14 @@ export function startRecording(){
   const t=setInterval(()=>{
     n--; if(n>0){ cd.textContent=n; return; }
     clearInterval(t); cd.classList.add("hidden");
-    $("recdot").style.display="flex"; $("fullbody").classList.add("hidden");
+    $("recdot").style.display="flex";
     state.recording={ label, person, frames:[], endAt: performance.now()+secs*1000 };
   },800);
 }
 
 export function finishRecording(){
   const r=state.recording; state.recording=null;
-  $("recdot").style.display="none"; $("fullbody").classList.remove("hidden");
+  $("recdot").style.display="none";
   $("btnRecord").disabled=false;
   if(r.frames.length<15){ flash("bad"); toast("Too short — couldn’t see you. More light, step back!"); return; }
   state.dataset.clips.push({label:r.label, person:r.person, ts:Date.now(), frames:r.frames});

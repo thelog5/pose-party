@@ -48,3 +48,16 @@ export function signalOk(x){
   if(!isPlainObject(x)) return false;
   try{ return JSON.stringify(x).length <= 20000; }catch{ return false; }
 }
+
+/* Host match settings: rounds 1-10, round timer 10-60s, target 1-20 (or 0 =
+   no target). Returns server-shape {rounds, wordMs, target} or null. */
+export function cleanSettings(raw){
+  if(raw === undefined || raw === null) return {};
+  if(!isPlainObject(raw)) return null;
+  const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi ? v : null;
+  const rounds = int(raw.rounds, 1, 10);
+  const wordSecs = int(raw.wordSecs, 10, 60);
+  const target = raw.target === 0 ? Infinity : int(raw.target, 1, 20);
+  if(rounds === null || wordSecs === null || target === null) return null;
+  return { rounds, wordMs: wordSecs * 1000, target };
+}

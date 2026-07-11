@@ -37,7 +37,7 @@ export function createRoomStore({ config, emit }){
 
   /* ---------------- lifecycle ---------------- */
 
-  function createRoom(socketId, name, labels){
+  function createRoom(socketId, name, labels, settings){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     if(rooms.size >= config.maxRooms) return { error: "server-full" };
     const code = randomCode();
@@ -45,6 +45,12 @@ export function createRoomStore({ config, emit }){
       code,
       createdAt: Date.now(),
       players: [{ id: socketId, name, labels, score: 0, ready: false }],
+      /* host-picked, validated in index.js; falls back to server config */
+      settings: {
+        rounds: settings?.rounds ?? config.rounds,
+        wordMs: settings?.wordMs ?? config.wordMs,
+        target: settings?.target ?? Infinity,
+      },
       phase: "lobby",              // lobby | starting | round | between | done
       roundNum: 0,
       roundId: null,
@@ -69,26 +75,57 @@ export function createRoomStore({ config, emit }){
     socketRoom.set(socketId, code);
     const host = room.players[0];
     emit(host.id, "room:peer", { name });
-    return { code, peerName: host.name };
+    return { code, peerName: host.name, settings: publicSettings(room) };
   }
 
-  /* Both players must flag ready (camera up, dataset trained). */
+  function publicSettings(room){
+    const s = room.settings;
+    return { rounds: s.rounds, wordSecs: Math.round(s.wordMs/1000),
+             target: Number.isFinite(s.target) ? s.target : 0 };
+  }
+
+  /* Host tweaks settings while the room is still in the lobby. */
+  function setSettings(socketId, s){
+    const room = roomOf(socketId);
+    if(!room) return { error: "not-in-room" };
+    if(room.players[0].id !== socketId) return { error: "not-host" };
+    if(room.phase !== "lobby") return { error: "match-in-progress" };
+    room.settings = { rounds: s.rounds, wordMs: s.wordMs, target: s.target };
+    const peer = peerOf(room, socketId);
+    if(peer) emit(peer.id, "room:settings", { settings: publicSettings(room) });
+    return { ok: true };
+  }
+
+  /* Both players must flag ready (camera up, dataset trained). When both
+     are, each client hears room:ready — the host's START button unlocks. */
   function ready(socketId){
     const room = roomOf(socketId);
     if(!room) return { error: "not-in-room" };
     if(room.phase !== "lobby") return { error: "match-in-progress" };
     const me = playerOf(room, socketId);
     me.ready = true;
-    if(room.players.length === 2 && room.players.every(p => p.ready)){
-      const shared = room.players[0].labels.filter(l =>
-        l !== "idle" && room.players[1].labels.includes(l));
-      if(!shared.length){
-        for(const p of room.players) emit(p.id, "room:error", { error: "no-shared-words" });
-        return { error: "no-shared-words" };
-      }
-      room.sharedWords = shared;
-      startMatch(room);
+    if(room.players.length === 2 && room.players.every(p => p.ready))
+      for(const p of room.players) emit(p.id, "room:ready", {});
+    return { ok: true };
+  }
+
+  /* Host presses START MATCH. The server, not the client, decides whether
+     the match can begin. */
+  function begin(socketId){
+    const room = roomOf(socketId);
+    if(!room) return { error: "not-in-room" };
+    if(room.phase !== "lobby") return { error: "match-in-progress" };
+    if(room.players[0].id !== socketId) return { error: "not-host" };
+    if(room.players.length < 2) return { error: "need-two" };
+    if(!room.players.every(p => p.ready)) return { error: "not-ready" };
+    const shared = room.players[0].labels.filter(l =>
+      l !== "idle" && room.players[1].labels.includes(l));
+    if(!shared.length){
+      for(const p of room.players) emit(p.id, "room:error", { error: "no-shared-words" });
+      return { error: "no-shared-words" };
     }
+    room.sharedWords = shared;
+    startMatch(room);
     return { ok: true };
   }
 
@@ -106,27 +143,27 @@ export function createRoomStore({ config, emit }){
     room.deck = shuffledDeck(room);
     const startAt = Date.now() + config.preCountMs;
     for(const p of room.players)
-      emit(p.id, "match:start", { startAt, rounds: config.rounds, players: scoresPayload(room) });
+      emit(p.id, "match:start", { startAt, rounds: room.settings.rounds, players: scoresPayload(room) });
     room.timer = setTimeout(() => startRound(room), config.preCountMs);
   }
 
   function startRound(room){
     if(!rooms.has(room.code)) return;
     room.roundNum++;
-    if(room.roundNum > config.rounds){ return endMatch(room); }
+    if(room.roundNum > room.settings.rounds){ return endMatch(room); }
     if(!room.deck.length) room.deck = shuffledDeck(room);
     room.phase = "round";
     room.word = room.deck.pop();
     room.roundId = crypto.randomBytes(8).toString("hex");
     room.roundStart = Date.now();
-    room.roundEnd = room.roundStart + config.wordMs;
+    room.roundEnd = room.roundStart + room.settings.wordMs;
     for(const p of room.players)
       emit(p.id, "round:start", {
         roundId: room.roundId, word: room.word,
-        roundNum: room.roundNum, rounds: config.rounds,
+        roundNum: room.roundNum, rounds: room.settings.rounds,
         endsAt: room.roundEnd, scores: scoresPayload(room),
       });
-    room.timer = setTimeout(() => resolveRound(room, null, "timeout"), config.wordMs);
+    room.timer = setTimeout(() => resolveRound(room, null, "timeout"), room.settings.wordMs);
   }
 
   /* The heart of the authority: accept or reject a point claim. */
@@ -158,7 +195,11 @@ export function createRoomStore({ config, emit }){
         scores: scoresPayload(room),
       });
     room.roundId = null;
-    room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
+    /* first to the target score ends the match early */
+    if(winner && winner.score >= room.settings.target)
+      room.timer = setTimeout(() => endMatch(room), config.betweenRoundsMs);
+    else
+      room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
   }
 
   function endMatch(room){
@@ -203,6 +244,6 @@ export function createRoomStore({ config, emit }){
     return { ok: true };
   }
 
-  return { createRoom, joinRoom, ready, claim, leave, relaySignal, sweep,
-           _rooms: rooms };
+  return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
+           relaySignal, sweep, _rooms: rooms };
 }
