@@ -6,7 +6,7 @@
 .camdock canvas{pointer-events:none}
 .camstatus{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;background:rgba(14,27,74,.93);color:#fff;font-weight:800;font-size:15px;line-height:1.5;padding:26px;z-index:7}
 
-.camcard{position:relative;background:var(--card);border:3px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-big);overflow:hidden}
+.camcard{position:relative;background:var(--card);border:2.5px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-big);overflow:hidden}
 .camcard .slot{position:absolute;inset:0;border-radius:inherit}
 
 /* live badge */
@@ -36,14 +36,14 @@
 @keyframes pop{0%{opacity:1}100%{opacity:0}}
 
 /* "AI THINKS YOU ARE..." pill overlaying camera bottom */
-.aipill{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:6;width:min(640px,88%);display:flex;align-items:center;gap:14px;background:var(--card);border:2.5px solid var(--line-soft);border-radius:var(--r-md);padding:10px 20px;box-shadow:var(--sh)}
-.aipill .boticon{width:44px;height:44px;flex:none}
-.aipill .who{font-family:var(--f-mono);font-weight:700;font-size:14px;letter-spacing:1px;color:var(--ink);line-height:1.25;white-space:nowrap}
+.aipill{position:absolute;left:50%;bottom:38px;transform:translateX(-50%);z-index:6;width:min(720px,88%);display:flex;align-items:center;gap:18px;background:rgba(255,255,255,.96);border:2.5px solid var(--blue);border-radius:24px;padding:14px 24px;box-shadow:var(--sh)}
+.aipill .boticon{width:54px;height:54px;flex:none}
+.aipill .who{font-family:var(--f-mono);font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--ink);line-height:1.25;white-space:nowrap}
 .aipill .sep{width:2px;align-self:stretch;background:var(--line-soft);flex:none}
 .aipill .guess{font-family:var(--f-display);font-weight:800;font-size:clamp(18px,2.2vw,30px);letter-spacing:1px;color:var(--yellow-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
 
 /* ---------- guess panel (AI'S TOP GUESS) ---------- */
-.guesspanel{position:relative;background:var(--card);border:2.5px solid var(--blue);border-radius:var(--r-lg);box-shadow:var(--sh);padding:20px 22px 16px}
+.guesspanel{position:relative;background:rgba(255,255,255,.78);border:2.5px solid var(--blue);border-radius:var(--r-lg);box-shadow:var(--sh);padding:26px 26px 18px}
 .paneltag{position:absolute;top:-14px;left:22px;background:var(--blue);color:#fff;border-radius:999px;padding:5px 16px;font-weight:900;font-size:12.5px;letter-spacing:1.5px;text-transform:uppercase}
 .paneltag.orange{background:var(--orange)}
 .topguess{display:flex;align-items:center;justify-content:space-between;gap:14px}
@@ -74,7 +74,7 @@
 .grow .gpct{flex:none;font-weight:900;font-size:16px;color:var(--ink);min-width:48px;text-align:right}
 
 /* ---------- big action buttons ---------- */
-.bigbtn{display:flex;align-items:center;justify-content:center;gap:14px;border:3px solid var(--ink);border-radius:var(--r-md);padding:16px 30px;font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:2px;text-transform:uppercase;box-shadow:var(--sh-big);line-height:1}
+.bigbtn{display:flex;align-items:center;justify-content:center;gap:14px;border:2.5px solid var(--ink);border-radius:18px;padding:18px 30px;font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:2px;text-transform:uppercase;box-shadow:var(--sh-big);line-height:1}
 .bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(21,42,110,.18)}
 .bigbtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .bigbtn.yellow{background:var(--yellow);color:var(--ink)}

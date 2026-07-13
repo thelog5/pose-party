@@ -11,7 +11,7 @@ import { transition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 
 const CODE_ALPHABET="ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-const TEAM_CAP=6, ROOM_CAP=12;
+const TEAM_CAP=4, ROOM_CAP=8;
 
 let myTeam="blue";
 let code=null;
@@ -28,6 +28,7 @@ export function enterParty(){
   if(!code) code=randomCode();
   myTeam="blue";
   $("partyCode").textContent=code;
+  $("partyName").value=(localStorage.getItem("poseCharadesName")||"You").slice(0,12);
   $("partyWordCount").textContent=(state.model?state.model.labels.length:0)+" words";
   renderTeams();
 }
@@ -58,13 +59,12 @@ function renderTeams(){
   mine.appendChild(you);
 
   /* the resident robot keeps you company */
-  const bot=tile('<svg class="botfill"><use href="#botFull"/></svg>'+
+  const bot=tile('<img class="botasset" src="assets/ui/robot-wave.png" alt="">'+
     '<span class="pname">PoseMaster99<span class="mini">✌️</span></span>');
   mine.appendChild(bot);
 
   /* empty waiting slots */
   const emptyTile=()=>tile('<svg width="30" height="30" style="color:var(--line-soft)"><use href="#icoUsers"/></svg><span>Waiting for<br>players…</span>','empty');
-  mine.appendChild(emptyTile());
   mine.appendChild(emptyTile());
   mine.appendChild(emptyTile());
   other.appendChild(emptyTile());
@@ -75,11 +75,6 @@ function renderTeams(){
   const sw=tile('<svg><use href="#icoSwitch"/></svg><span>JOIN / SWITCH<br>TO THIS TEAM!</span>','join');
   sw.onclick=()=>switchTeam(myTeam==="blue"?"orange":"blue");
   other.appendChild(sw);
-
-  /* locked 6th slots */
-  const lockTile=()=>tile('<svg><use href="#icoLock"/></svg><span>Locked<br>6th player unlocks</span>','locked');
-  mine.appendChild(lockTile());
-  other.appendChild(lockTile());
 
   const blueN = myTeam==="blue" ? 2 : 0;
   const orangeN = myTeam==="orange" ? 2 : 0;
@@ -101,6 +96,14 @@ export function wireParty(){
   $("btnPartyBack").onclick=()=>transition("menu");
   $("btnJoinBlue").onclick=()=>switchTeam("blue");
   $("btnJoinOrange").onclick=()=>switchTeam("orange");
+  $("partyName").addEventListener("change",()=>{
+    const name=$("partyName").value.trim().slice(0,12)||"You";
+    $("partyName").value=name;
+    localStorage.setItem("poseCharadesName",name);
+    if(document.body.dataset.screen==="party") renderTeams();
+    toast("Name updated!");
+  });
+  $("partyName").addEventListener("keydown",e=>{ if(e.key==="Enter") e.currentTarget.blur(); });
   $("btnPartyCopy").onclick=async()=>{
     try{ await navigator.clipboard.writeText(code); toast("Room code copied!"); }
     catch(e){ toast("Copy failed — the code is "+code); }

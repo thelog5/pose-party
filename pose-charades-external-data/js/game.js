@@ -108,6 +108,9 @@ function nextWord(){
   game.wordEnd=game.wordStart+WORD_MS;
   game.holdSince=0; game.bestWrong={};
   $("soloWord").textContent=game.word;
+  const chicken=/chicken/i.test(game.word);
+  $("soloWordArtChicken").classList.toggle("hidden",!chicken);
+  $("soloWordArtGeneric").classList.toggle("hidden",chicken);
   $("vsWord").textContent=game.word;
   updateHud();
   animateWordChange();
