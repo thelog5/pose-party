@@ -57,8 +57,10 @@ export function render(fsmState){
 
   for(const k in SCREENS) $(SCREENS[k]).classList.toggle("hidden", k!==s);
 
-  /* header: stat pills during play/lobby, icon buttons elsewhere */
-  const pills = (s==="solo"||s==="lobby"||s==="match");
+  /* header: hidden entirely on the immersive solo screen; stat pills
+     during lobby/match; icon buttons elsewhere */
+  document.querySelector("header").classList.toggle("hidden", s==="solo");
+  const pills = (s==="lobby"||s==="match");
   $("hdrPills").classList.toggle("hidden", !pills);
   $("hdrIcons").classList.toggle("hidden", pills);
   $("modeLabel").textContent = MODE_LABELS[s];

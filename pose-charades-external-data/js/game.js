@@ -19,6 +19,9 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
+import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
+         timerFrozen as soloFrozen, roundState as soloState,
+         ROUND_END_PAUSE_MS } from "./soloRound.js";
 
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
 const WORD_WON_PAUSE_MS = 1050;
@@ -33,6 +36,7 @@ export function bindGameLifecycle(){
     if(inGame(from) && !inGame(to) && to!=="results" && state.game){
       cancelPreCount();
       clearInterval(state.game.timer);
+      if(state.game.mode==="ai") soloEnd();
       state.game=null;
     }
   });
@@ -63,11 +67,16 @@ function shuffledDeck(){
   return words;
 }
 
+const setTxt=(id,v)=>{ const el=$(id); if(el) el.textContent=v; };
+
 function updateHud(){
   const g=state.game; if(!g) return;
-  $("pillScore").textContent=fmtScore(g.score);
-  $("pillStreak").textContent="x"+Math.max(1,g.streak);
-  $("pillRound").textContent=g.round+" / "+g.rounds;
+  setTxt("pillScore",fmtScore(g.score));
+  setTxt("pillStreak","x"+Math.max(1,g.streak));
+  setTxt("pillRound",g.round+" / "+g.rounds);
+  setTxt("soloScoreVal",fmtScore(g.score));
+  setTxt("soloStreakVal","x"+Math.max(1,g.streak));
+  setTxt("soloRoundLab","ROUND "+Math.max(1,g.round)+"/"+g.rounds);
   if(state.screen==="match") renderDots(g.round, g.rounds);
 }
 
@@ -92,7 +101,7 @@ export function startGame(mode="ai"){
 }
 
 function animateWordChange(){
-  [$("soloWordCard"), $("vsWordCard")].forEach(el=>{
+  [$("promptBar"), $("vsWordCard")].forEach(el=>{
     if(!el) return;
     el.classList.remove("wordswap"); void el.offsetWidth; el.classList.add("wordswap");
   });
@@ -107,19 +116,50 @@ function nextWord(){
   game.wordStart=performance.now();
   game.wordEnd=game.wordStart+WORD_MS;
   game.holdSince=0; game.bestWrong={};
-  $("soloWord").textContent=game.word;
-  const chicken=/chicken/i.test(game.word);
-  $("soloWordArtChicken").classList.toggle("hidden",!chicken);
-  $("soloWordArtGeneric").classList.toggle("hidden",chicken);
-  $("vsWord").textContent=game.word;
+  setTxt("vsWord",game.word);
   updateHud();
+  if(game.mode==="ai"){
+    game.pendingPts=pointsForCurrentWord(true);
+    soloBegin(game.word, onSoloResolve);
+  }
   animateWordChange();
 }
 
-function pointsForCurrentWord(){
+/* Resolution callback from soloRound.js — for wins it fires when the points
+   chip ARRIVES at the score card, so this is the only place solo score and
+   streak ever change. */
+function onSoloResolve({won, skip}){
+  const game=state.game;
+  if(!game || game.mode!=="ai" || gameState()!=="playing") return;
+  if(!transition("word-won", {winner:won?"you":"miss", word:game.word})) return;
+
+  if(won){
+    game.streak++;
+    const pts=game.pendingPts||PTS_CORRECT;
+    game.score+=pts;
+    game.results.push({word:game.word, ok:true, pts});
+  }else{
+    game.streak=0;
+    if(skip) game.score=Math.max(0,game.score-PTS_SKIP);
+    game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!skip});
+  }
+  updateHud();
+
+  setTimeout(()=>{
+    if(gameState()!=="word-won" || !state.game) return;
+    if(state.game.round>=state.game.rounds){ endGame(); return; }
+    transition("playing");
+    nextWord();
+  }, ROUND_END_PAUSE_MS);
+}
+
+/* nextStreak=true prices the word as if the CURRENT attempt wins (used for
+   the solo pending-points chip, computed before the streak increments). */
+function pointsForCurrentWord(nextStreak=false){
   const game=state.game;
   const fast = performance.now()-game.wordStart <= FAST_WINDOW_MS;
-  return (PTS_CORRECT + (fast?PTS_FAST_BONUS:0)) * Math.max(1, game.streak);
+  const streak = Math.max(1, game.streak + (nextStreak?1:0));
+  return (PTS_CORRECT + (fast?PTS_FAST_BONUS:0)) * streak;
 }
 
 /* winner: "you" | "rival" | "miss". The playing->word-won transition is the
@@ -169,6 +209,7 @@ function finishWord(winner, opts={}){
 export function gameCheck(){
   const game=state.game;
   if(!game || gameState()!=="playing") return;
+  if(game.mode==="ai") return; // solo locking lives in soloRound.js
   const t=topGuesses(1)[0]; if(!t) return;
   const [topLab, topP]=t;
 
@@ -195,8 +236,22 @@ export function gameCheck(){
 export function gameTick(){
   const game=state.game;
   if(!game) return;
+
+  if(game.mode==="ai"){
+    /* hitstop and the lock sequence freeze the clock */
+    if(soloFrozen()) return;
+    const left=Math.max(0,game.wordEnd-performance.now());
+    setTxt("soloTime",fmtTime(left));
+    setTxt("pillTime",fmtTime(left));
+    if(soloState()==="guessing"){
+      game.pendingPts=pointsForCurrentWord(true);
+      if(left<=0 && gameState()==="playing") missWord(false);
+    }
+    return;
+  }
+
   const wLeft=Math.max(0,game.wordEnd-performance.now());
-  $("pillTime").textContent=fmtTime(wLeft);
+  setTxt("pillTime",fmtTime(wLeft));
 
   if(game.mode==="vs"){
     const rtop=fakeRivalGuesses();
@@ -215,6 +270,11 @@ export function gameTick(){
 export function missWord(isSkip){
   const game=state.game;
   if(!game || gameState()!=="playing") return;
+  if(game.mode==="ai"){
+    /* bubble flips to its failed state; scoring lands in onSoloResolve */
+    soloFail(!!isSkip);
+    return;
+  }
   if(isSkip) game.score=Math.max(0,game.score-PTS_SKIP);
   finishWord("miss", {skip:isSkip});
 }
@@ -222,6 +282,7 @@ export function missWord(isSkip){
 export function endGame(){
   cancelPreCount();
   clearInterval(state.game.timer);
+  if(state.game.mode==="ai") soloEnd();
   const g=state.game; state.game=null;
   const rows=g.results.map(r=>{
     const right='<span class="ok">You +'+fmtScore(r.pts||0)+'</span>';

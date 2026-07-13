@@ -13,6 +13,7 @@ import { features, classify } from "./classifier.js";
 import { showStatus, renderGuesses } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
+import { setModelOutput } from "./soloRound.js";
 
 const CLASSIFY_EVERY_MS = 250;
 
@@ -57,6 +58,13 @@ function classifyLive(){
   if(state.liveBuf.length<15) return;
   const scores=classify(features(state.liveBuf.slice(-WIN)), state.model);
   for(const lab of state.model.labels) state.smooth[lab]=0.65*(state.smooth[lab]||0)+0.35*(scores[lab]||0);
+  /* solo: RAW top guess funnels through setModelOutput every inference
+     frame — soloRound.js owns all smoothing/debounce from there */
+  if(state.game?.mode==="ai"){
+    let top=null;
+    for(const k in scores) if(!top || scores[k]>scores[top]) top=k;
+    if(top) setModelOutput(top, scores[top]);
+  }
   renderGuesses();
   if(state.game) gameCheck();
 }

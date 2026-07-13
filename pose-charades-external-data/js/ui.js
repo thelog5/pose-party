@@ -91,8 +91,6 @@ export function renderGuesses(){
   const s=state.screen;
   if(s==="home"||s==="lobby"){
     fillAiPill(top);
-  } else if(s==="solo"){
-    fillGuessPanel("solo", top);
   } else if(s==="match"){
     fillGuessPanel("my", top, 2);
     if(state.game?.mode==="vs"){

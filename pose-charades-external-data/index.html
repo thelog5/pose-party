@@ -146,37 +146,80 @@
     </div>
   </section>
 
-  <!-- ============ SOLO PLAY ============ -->
-  <section class="screen hidden" id="scrSolo">
-    <div class="cols">
-      <div class="camcard"><div class="slot" id="slotSolo"></div></div>
-      <div class="rail">
-        <div class="wordcard" id="soloWordCard">
-          <span class="chip orange" style="position:absolute;top:-14px;left:50%;transform:translateX(-50%)">CURRENT WORD</span>
-          <img class="wart" id="soloWordArtChicken" src="assets/ui/chicken-dance.png" alt="Dancing chicken" width="100" height="100">
-          <svg class="wart hidden" id="soloWordArtGeneric" aria-hidden="true"><use href="#icoWordArt"/></svg>
-          <span class="wtxt">
-            <span class="cur" id="soloWord">—</span>
-            <span class="bonus" id="soloBonus">Bonus: +100 if guessed within 15 seconds</span>
-          </span>
+  <!-- ============ SOLO PLAY (immersive: camera is the scene) ============
+       Every stateful element renders off data-rstate on this section:
+       idle | guessing | hitstop | locked | round_end  (see soloRound.js) -->
+  <section class="screen hidden" id="scrSolo" data-rstate="idle">
+    <div class="solostage" id="soloStage">
+      <div class="slot" id="slotSolo"></div>
+
+      <!-- decorative frame clouds (pointer-transparent) -->
+      <img class="cloudcorner bl" src="assets/ui/cloud-bl.png" alt="">
+      <img class="cloudcorner br" src="assets/ui/cloud-br.png" alt="">
+
+      <!-- brand lockup, top-left -->
+      <div class="sbrand">
+        <img src="assets/ui/brand-lockup.png" alt="Pose Party">
+        <span class="bt1">POSE</span><span class="bt2">PARTY</span><span class="bt3">LIVE</span>
+      </div>
+
+      <!-- timer + round, top-center -->
+      <div class="stimer">
+        <img src="assets/ui/hud-timer.png" alt="">
+        <span class="tval" id="soloTime">00:30</span>
+        <span class="tround" id="soloRoundLab">ROUND 1/5</span>
+      </div>
+
+      <!-- score + streak cards, top-right -->
+      <div class="shud">
+        <div class="hudcard" id="soloScoreCard">
+          <img src="assets/ui/hud-score.png" alt="">
+          <span class="htab">SCORE</span>
+          <span class="hval"><svg width="22" height="22"><use href="#icoStar"/></svg><b id="soloScoreVal">0</b></span>
         </div>
-        <div class="guesspanel" style="flex:1">
-          <span class="paneltag">AI’s Top Guess</span>
-          <div class="topguess">
-            <span class="word" id="soloTopWord">…</span>
-            <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="soloTopPct">0%</span></span>
-          </div>
-          <div class="meter">
-            <div class="segs" id="soloMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-            <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
-          </div>
-          <div class="glist" id="soloGuessList"></div>
+        <div class="hudcard">
+          <img src="assets/ui/hud-streak.png" alt="">
+          <span class="htab">STREAK</span>
+          <span class="hval"><svg width="22" height="22"><use href="#icoFire"/></svg><b id="soloStreakVal">x1</b></span>
         </div>
       </div>
-    </div>
-    <div class="actions">
-      <button class="bigbtn outline" id="btnExitSolo">Exit Game</button>
-      <button class="bigbtn orange" id="btnSkipSolo">Skip Word (−500)</button>
+
+      <!-- encouragement cloud, mid-left (guessing only) -->
+      <div class="cheer">KEEP<br>IT UP!</div>
+
+      <!-- mascot + its speech bubble column, bottom-right.
+           ONE bubble; the fill inside it is the confidence meter. -->
+      <div class="mascotcol">
+        <div class="bhistory" id="bubbleHistory"></div>
+        <div class="gbubble live" id="guessBubble">
+          <img class="shell" src="assets/ui/bubble-white.png" alt="">
+          <span class="bfillclip"><i id="bubbleFill"></i></span>
+          <span class="btext">
+            <span class="blabel" id="bubbleLabel">…</span>
+            <span class="bpct" id="bubblePct">0%</span>
+            <span class="bmark ok">✓</span>
+            <span class="bmark bad">✗</span>
+          </span>
+        </div>
+        <img class="mascot" id="mascotImg" src="assets/ui/robot-wave.png" data-pose="thinking" alt="AI mascot">
+      </div>
+
+      <!-- bottom prompt bar: the target word ONLY — never a percentage -->
+      <div class="promptbar" id="promptBar">
+        <img class="shell" src="assets/ui/bubble-yellow.png" alt="">
+        <svg class="pstar" width="40" height="40"><use href="#icoStar"/></svg>
+        <span class="pword" id="promptWord">—</span>
+        <span class="pmark">✓</span>
+      </div>
+
+      <!-- skip + exit, bottom-left -->
+      <div class="sactions">
+        <button class="skipbtn" id="btnSkipSolo">
+          <img src="assets/ui/btn-skip.png" alt="">
+          <span>SKIP WORD<br><b>−500</b> <svg width="15" height="15" style="display:inline"><use href="#icoStar"/></svg></span>
+        </button>
+        <button class="exitbtn" id="btnExitSolo" title="End game">✕ EXIT</button>
+      </div>
     </div>
   </section>
 
