@@ -12,6 +12,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
 import { enterLobby, quitOnline, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty } from "./party.js";
+import { wireHomeAlive } from "./homeAlive.js";
 import { boot } from "./engine.js";
 
 /* Order matters: repaint the screen first, then let the game module tear
@@ -35,13 +36,12 @@ function wireControls(){
   $("btnSound").onclick=toggleMute;
   $("btnHomeSound").onclick=toggleMute;
 
-  /* home (paper-craft): SOLO card -> solo, 1V1 card -> lobby,
-     START PARTY -> party waiting room, gear -> training */
+  /* home (Figma v2): SOLO card -> solo, 1V1 -> lobby, PARTY -> party room */
   $("modeAI").onclick=()=>startGame("ai");
-  $("btnLetsGo").onclick=()=>enterParty();
   $("modeVS").onclick=()=>enterLobby();
+  $("modeParty").onclick=()=>enterParty();
   $("btnHomeGear").onclick=()=>transition("training");
-  $("modeSolo2").onclick=()=>startGame("ai");
+  wireHomeAlive();
 
   /* in-game */
   $("btnExitSolo").onclick=()=>state.game&&endGame();
