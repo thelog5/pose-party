@@ -32,20 +32,26 @@ function cyclePhrase(){
   blip([392, 523], 0.07);
 }
 
-/* Robot tap: head pops to surprised and the wave gets bigger for a beat. */
-let moodTimer = null;
-function surpriseRobot(){
+/* Faces cycle on head taps and STAY — no auto-revert. Add more moods here
+   as head components land in Figma. */
+const FACES = ["happy", "surprised"];
+let faceIx = 0;
+
+function cycleFace(){
+  faceIx = (faceIx + 1) % FACES.length;
   const head = $("robotHead");
-  head.src = "assets/ui/figma/robot-head-surprised.png";
-  head.dataset.mood = "surprised";
+  head.src = "assets/ui/figma/robot-head-" + FACES[faceIx] + ".png";
+  head.dataset.mood = FACES[faceIx];
+  head.classList.remove("boing"); void head.offsetWidth; head.classList.add("boing");
+}
+
+/* Any robot tap hypes the wave for a beat (face is left alone). */
+let hypeTimer = null;
+function hypeWave(){
   $("homeStage").classList.add("excited");
   blip([659, 880], 0.08);
-  clearTimeout(moodTimer);
-  moodTimer = setTimeout(() => {
-    head.src = "assets/ui/figma/robot-head-happy.png";
-    head.dataset.mood = "happy";
-    $("homeStage").classList.remove("excited");
-  }, 1400);
+  clearTimeout(hypeTimer);
+  hypeTimer = setTimeout(() => $("homeStage").classList.remove("excited"), 1400);
 }
 
 function shake(el){
@@ -89,9 +95,8 @@ function routePointer(e){
 
 export function wireHomeAlive(){
   $("speechBubble").onclick = cyclePhrase;
-  for(const id of ["robotHead", "robotBody"]){
-    $(id).onclick = () => { surpriseRobot(); cyclePhrase(); };
-  }
+  $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
+  $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
   document.querySelectorAll("#homeStage .iv").forEach(el => {
     el.addEventListener("click", () => { shake(el); blip([440], 0.05); });
   });

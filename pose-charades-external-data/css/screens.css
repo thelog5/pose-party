@@ -37,15 +37,21 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
   55%{transform:translateX(-4px) rotate(-2deg)}
   75%{transform:translateX(3px) rotate(1.2deg)}
 }
-#logoHomeCraft:hover{transform:translateY(-5px) rotate(1.5deg) scale(1.015)}
+#logoHomeCraft{animation:logofloat 5.2s ease-in-out infinite;transition:translate .2s ease, scale .2s ease}
+#logoHomeCraft:hover{translate:0 -5px;scale:1.015}
+@keyframes logofloat{0%,100%{transform:rotate(0) translateY(0)}50%{transform:rotate(.7deg) translateY(-6px)}}
 
 /* ---------- mode cards: hang from their tape and slip when touched ---------- */
-.fh.card{background:none;border:none;padding:0;cursor:pointer;transition:transform .22s cubic-bezier(.3,1.4,.5,1);
-  transform-origin:50% -10%}
-.fh.card:hover{transform:rotate(-3.2deg) translateY(7px)}
-.fh.card:active{transform:rotate(-4.5deg) translateY(11px)}
-#modeParty.card:hover{transform:rotate(2.8deg) translateY(7px)}   /* taped at top-left, tips the other way */
-#modeParty.card:active{transform:rotate(4deg) translateY(11px)}
+.fh.card{background:none;border:none;padding:0;cursor:pointer;transform-origin:50% -10%;
+  animation:cardfloat 4.6s ease-in-out infinite;
+  transition:rotate .22s cubic-bezier(.3,1.4,.5,1), translate .22s cubic-bezier(.3,1.4,.5,1)}
+#modeVS.card{animation-delay:-1.5s}
+#modeParty.card{animation-delay:-3s}
+@keyframes cardfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.fh.card:hover{rotate:-3.2deg;translate:0 7px}
+.fh.card:active{rotate:-4.5deg;translate:0 11px}
+#modeParty.card:hover{rotate:2.8deg;translate:0 7px}   /* taped at top-left, tips the other way */
+#modeParty.card:active{rotate:4deg;translate:0 11px}
 /* the card's tape twists with it */
 .homestage:has(#modeAI:hover)    #tapeSolo{transform:rotate(-9deg) scale(1.05)}
 .homestage:has(#modeVS:hover)    #tapeVS{transform:rotate(-8deg) scale(1.05)}
@@ -62,17 +68,17 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 #robotArmR{animation:armwaveR 2.4s ease-in-out infinite;transform-origin:22% 88%}
 #robotArmL{animation:armwaveL 2.4s ease-in-out infinite;transform-origin:78% 12%}
 #robotBody{animation:bodysway 2.4s ease-in-out infinite;transform-origin:50% 96%}
-#robotHead{animation:headbob 2.4s ease-in-out infinite}
+#robotHead{animation:headbob 2.4s ease-in-out infinite;transform-origin:50% 88%}
 @keyframes armwaveR{0%,100%{transform:rotate(0)}50%{transform:rotate(-6deg) translateY(-3px)}}
 @keyframes armwaveL{0%,100%{transform:rotate(0)}50%{transform:rotate(3.5deg) translateY(-1px)}}
 @keyframes bodysway{0%,100%{transform:rotate(0)}50%{transform:rotate(-1deg)}}
-@keyframes headbob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-4px) rotate(-1.2deg)}}
+@keyframes headbob{0%,100%{transform:rotate(0)}50%{transform:rotate(-1.1deg) translateY(-1px)}}
 /* tapping the robot: bigger wave + surprised boing, still in sync */
 .homestage.excited #robotArmR{animation:armwaveRBig .6s ease-in-out infinite;transform-origin:22% 88%}
 .homestage.excited #robotArmL{animation:armwaveLBig .6s ease-in-out infinite;transform-origin:78% 12%}
 @keyframes armwaveRBig{0%,100%{transform:rotate(1deg)}50%{transform:rotate(-9deg) translateY(-5px)}}
 @keyframes armwaveLBig{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(6deg) translateY(-3px)}}
-#robotHead[data-mood="surprised"]{animation:headboing .5s cubic-bezier(.2,1.7,.4,1)}
+#robotHead.boing{animation:headboing .5s cubic-bezier(.2,1.7,.4,1)}
 @keyframes headboing{0%{transform:scale(.92) rotate(-3deg)}55%{transform:scale(1.08) rotate(2.5deg)}100%{transform:none}}
 
 /* ---------- speech bubble ---------- */
