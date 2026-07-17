@@ -21,20 +21,27 @@ bindGameLifecycle();
 
 function wireControls(){
   $("logoHome").onclick=()=>transition("menu");
+  $("logoHomeCraft").onclick=()=>transition("menu");
   $("btnGear").onclick=()=>transition(gameState()==="training"?"menu":"training");
   $("btnDoneTrain").onclick=()=>transition("menu");
   $("btnFriends").onclick=()=>toast("Friends lists are coming soon — share a room link to play together!");
-  $("btnSound").onclick=()=>{
+  const toggleMute=()=>{
     state.muted=!state.muted;
-    $("sndOn").classList.toggle("hidden",state.muted);
-    $("sndOff").classList.toggle("hidden",!state.muted);
+    for(const [on,off] of [["sndOn","sndOff"],["homeSndOn","homeSndOff"]]){
+      $(on).classList.toggle("hidden",state.muted);
+      $(off).classList.toggle("hidden",!state.muted);
+    }
   };
+  $("btnSound").onclick=toggleMute;
+  $("btnHomeSound").onclick=toggleMute;
 
-  /* home */
+  /* home (paper-craft): SOLO card -> solo, 1V1 card -> lobby,
+     START PARTY -> party waiting room, gear -> training */
   $("modeAI").onclick=()=>startGame("ai");
-  $("btnLetsGo").onclick=()=>startGame("ai");
+  $("btnLetsGo").onclick=()=>enterParty();
   $("modeVS").onclick=()=>enterLobby();
-  $("modeParty").onclick=()=>enterParty();
+  $("btnHomeGear").onclick=()=>transition("training");
+  $("btnHomeTrophy").onclick=()=>toast("Trophies are coming soon — beat your streak in the meantime!");
 
   /* in-game */
   $("btnExitSolo").onclick=()=>state.game&&endGame();

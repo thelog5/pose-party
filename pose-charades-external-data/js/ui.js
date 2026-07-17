@@ -9,6 +9,10 @@ export function showStatus(msg){
   const s=$("status");
   if(!msg){ s.style.display="none"; return; }
   s.style.display="flex"; s.textContent=msg;
+  /* the home screen has no camera preview, so boot problems must not hide
+     inside the invisible dock */
+  if(state.screen==="home" && msg!==showStatus._last && !/Loading/.test(msg)) toast(msg);
+  showStatus._last=msg;
 }
 
 export function flash(kind){
@@ -89,7 +93,7 @@ export function renderGuesses(){
   const top=topGuesses(5);
   if(!top.length) return;
   const s=state.screen;
-  if(s==="home"||s==="lobby"){
+  if(s==="lobby"){
     fillAiPill(top);
   } else if(s==="match"){
     fillGuessPanel("my", top, 2);

@@ -111,38 +111,80 @@
     <div class="camstatus" id="status">Loading the pose engine…</div>
   </div>
 
-  <!-- ============ HOME ============ -->
+  <!-- ============ HOME (paper-craft, from the Figma starter system) ============ -->
   <section class="screen" id="scrHome">
-    <div class="cols">
-      <div class="camcard"><div class="slot" id="slotHome"></div></div>
-      <div class="modestack">
-        <button class="modecard ai" id="modeAI">
-          <span class="art"><img src="assets/ui/robot-wave.png" alt="" width="118" height="108"></span>
-          <span class="txt"><h4>Play with AI</h4><p>Test your poses, beat your streak, and outguess the AI.</p></span>
-          <span class="go"><span class="chip white">SOLO</span><span class="chev">›</span></span>
-        </button>
-        <button class="modecard vs" id="modeVS">
-          <span class="art"><svg><use href="#vsBurst"/></svg></span>
-          <span class="txt"><h4>1v1 Showdown</h4><p>Face a friend in a real-time pose battle. Same word, one winner.</p></span>
-          <span class="go"><span class="chip white">HEAD-TO-HEAD</span><span class="chev">›</span></span>
-        </button>
-        <button class="modecard party" id="modeParty">
-          <span class="art"><img src="assets/ui/team-robots.png" alt="" width="118" height="108"></span>
-          <span class="txt"><h4>Team Rush <span class="chip yellow">COMING SOON</span></h4><p>2v2 chaos! Work together, outguess everyone.</p></span>
-          <span class="lock"><svg><use href="#icoLock"/></svg></span>
-        </button>
-        <button class="bigbtn yellow" id="btnLetsGo">Let’s Go <span class="arrow">→</span></button>
+    <div class="homestage">
+      <!-- camera stays alive but out of sight: the design has no home preview -->
+      <div class="campark"><div class="slot" id="slotHomePark"></div></div>
+
+      <!-- torn blue wave along the bottom -->
+      <svg class="pp-wave" viewBox="0 0 1600 260" preserveAspectRatio="none" aria-hidden="true">
+        <path fill="var(--fig-navy)" d="M0 118 L38 96 91 112 149 84 214 106 268 78 335 102 401 72 470 96 545 70 610 92 686 66 758 88 826 62 905 86 972 60 1048 84 1123 58 1204 82 1279 56 1352 80 1428 54 1509 78 1560 60 1600 74 L1600 260 0 260 Z"/>
+        <path fill="var(--fig-blue)" d="M0 168 L45 148 108 166 170 140 236 160 302 134 368 156 440 130 512 152 588 128 654 150 730 124 806 146 878 122 954 144 1030 118 1106 142 1182 116 1258 140 1334 114 1410 138 1486 112 1556 134 1600 120 L1600 260 0 260 Z"/>
+      </svg>
+
+      <!-- decorative confetti: corners only (HUD rule 3) -->
+      <span class="conf star s1"></span><span class="conf star s2"></span><span class="conf star s3"></span>
+      <span class="conf tri t1"></span><span class="conf tri t2"></span><span class="conf tri t3"></span><span class="conf tri t4"></span>
+
+      <!-- robot mascot -->
+      <img class="pp-robot" src="assets/ui/robot-wave.png" alt="Pose Party robot waving">
+
+      <!-- torn-paper logo plaques -->
+      <div class="pp-logo" id="logoHomeCraft" title="Pose Party">
+        <span class="tape tp1"></span>
+        <div class="plaque pose">POSE</div>
+        <div class="plaque party">PARTY</div>
+        <span class="tape tp2"></span>
       </div>
-    </div>
-    <div class="howto">
-      <div class="cell">
-        <svg class="hicart"><use href="#botHead"/></svg>
-        <span class="bub">Need a hand?<br>Here’s how to play!</span>
+
+      <!-- note card -->
+      <div class="pp-note">
+        <span class="tape tp3"></span>
+        Strike a pose.<br>Let the AI guess!
       </div>
-      <div class="cell"><span class="num">1</span><span><b>Strike a pose</b><small>based on the secret word.</small></span><svg class="hicart" style="color:var(--blue)"><use href="#icoPose"/></svg></div>
-      <div class="cell"><span class="num">2</span><span><b>The AI (or your rival)</b><small>guesses what you’re doing.</small></span><svg class="hicart" style="color:var(--blue)"><use href="#icoSearch"/></svg></div>
-      <div class="cell"><span class="num">3</span><span><b>Score points</b><small>for correct guesses!</small></span><svg class="hicart"><use href="#icoTrophy"/></svg></div>
-      <div class="cell"><svg class="hicart"><use href="#icoStar"/></svg><span><small>First to the target score wins the party!</small></span></div>
+
+      <!-- mode cards -->
+      <div class="pp-cards">
+        <button class="pp-card vs" id="modeVS">
+          <span class="tape tp4"></span>
+          <b>1V1</b>
+          <svg class="cicon" viewBox="0 0 120 52" aria-hidden="true">
+            <circle cx="18" cy="12" r="9" fill="#FBF6EC"/><path d="M4 46c0-12 6-19 14-19s14 7 14 19z" fill="#FBF6EC"/>
+            <circle cx="102" cy="12" r="9" fill="#FBF6EC"/><path d="M88 46c0-12 6-19 14-19s14 7 14 19z" fill="#FBF6EC"/>
+            <path d="M60 4 66 18 81 14 72 27 84 36 68 37 69 52 60 41 51 52 52 37 36 36 48 27 39 14 54 18z" fill="#FBF6EC"/>
+          </svg>
+          <i class="rule"></i>
+          <small>Head-to-head<br>real-time battle</small>
+        </button>
+        <button class="pp-card solo" id="modeAI">
+          <span class="tape tp5"></span>
+          <b>SOLO</b>
+          <svg class="cicon" viewBox="0 0 120 52" aria-hidden="true">
+            <circle cx="60" cy="11" r="10" fill="#FBF6EC"/><path d="M43 50c0-14 7-22 17-22s17 8 17 22z" fill="#FBF6EC"/>
+          </svg>
+          <i class="rule"></i>
+          <small>Beat your streak<br>and outguess the AI</small>
+        </button>
+      </div>
+
+      <!-- start banner -->
+      <button class="pp-start" id="btnLetsGo">
+        <span class="tape tp6"></span><span class="tape tp7"></span>
+        START PARTY <span class="arr">→</span>
+      </button>
+
+      <!-- corner buttons -->
+      <div class="pp-corner left">
+        <button class="pp-circle" id="btnHomeGear" title="Settings & AI training"><svg><use href="#icoGear"/></svg></button>
+        <button class="pp-circle" id="btnHomeSound" title="Volume">
+          <svg id="homeSndOn"><use href="#icoSpeaker"/></svg>
+          <svg id="homeSndOff" class="hidden"><use href="#icoSpeakerOff"/></svg>
+        </button>
+      </div>
+      <div class="pp-corner right">
+        <button class="pp-circle" id="btnHomeTrophy" title="Trophies"><svg><use href="#icoTrophy"/></svg></button>
+      </div>
     </div>
   </section>
 

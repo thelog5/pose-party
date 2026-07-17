@@ -13,7 +13,7 @@ const SCREENS = { home:"scrHome", solo:"scrSolo", lobby:"scrLobby", match:"scrMa
                   party:"scrParty", train:"scrTrain", results:"scrResults" };
 
 /* where the local camera dock lives per screen (party manages its own slot) */
-const CAM_SLOT = { home:"slotHome", solo:"slotSolo", lobby:"slotLobbyYou",
+const CAM_SLOT = { home:"slotHomePark", solo:"slotSolo", lobby:"slotLobbyYou",
                    match:"slotMatchYou", train:"slotTrain" };
 const RIVAL_SLOT = { lobby:"slotLobbyRival", match:"slotMatchRival" };
 
@@ -59,7 +59,7 @@ export function render(fsmState){
 
   /* header: hidden entirely on the immersive solo screen; stat pills
      during lobby/match; icon buttons elsewhere */
-  document.querySelector("header").classList.toggle("hidden", s==="solo");
+  document.querySelector("header").classList.toggle("hidden", s==="solo"||s==="home");
   const pills = (s==="lobby"||s==="match");
   $("hdrPills").classList.toggle("hidden", !pills);
   $("hdrIcons").classList.toggle("hidden", pills);

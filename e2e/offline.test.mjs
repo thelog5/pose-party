@@ -40,12 +40,13 @@ const loaded = await evalApp(`${mod("state.js")}.state.dataset.clips.length`);
 ok(loaded > 0, `bundled dataset loaded (${loaded} clips)`);
 ok(await evalApp(`!!${mod("state.js")}.state.model`), "model trained on preload");
 const dockParent = await page.evaluate(() => document.getElementById("cameraDock").parentElement.id);
-ok(dockParent === "slotHome", `camera dock mounted on home (${dockParent})`);
+ok(dockParent === "slotHomePark", `camera dock parked out of sight on home (${dockParent})`);
+ok(await page.evaluate(() => document.querySelector("header").classList.contains("hidden")), "home is immersive (no global header)");
 
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
-await page.click("#btnLetsGo");
-ok(await fsmState() === "countdown", "LET'S GO -> countdown");
+await page.click("#modeAI");
+ok(await fsmState() === "countdown", "SOLO card -> countdown");
 await sleep(2900);
 ok(await fsmState() === "playing", "countdown -> playing");
 ok(await bodyScreen() === "solo", "solo screen shown");
@@ -140,8 +141,8 @@ ok(await evalApp(`${mod("state.js")}.state.game === null`), "abandoned game torn
 ok(await page.evaluate(() => document.getElementById("countdown").classList.contains("hidden")), "countdown overlay cancelled");
 await page.click("#btnHome");
 ok(await fsmState() === "menu", "home from results");
-await page.click("#btnGear");
-ok(await fsmState() === "training", "SETTINGS opens training");
+await page.click("#btnHomeGear");
+ok(await fsmState() === "training", "home gear opens training");
 ok(await page.evaluate(() => document.getElementById("cameraDock").parentElement.id) === "slotTrain", "camera dock on training screen");
 await page.click("#btnDoneTrain");
 ok(await fsmState() === "menu", "done -> home");
@@ -161,8 +162,8 @@ ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled),
 // ---- party waiting room ----
 console.log("party lobby:");
 await page.click("#logoHome");
-await page.click("#modeParty");
-ok(await fsmState() === "party", "Team Rush card opens party waiting room");
+await page.click("#btnLetsGo");
+ok(await fsmState() === "party", "START PARTY opens the party waiting room");
 ok(await bodyScreen() === "party", "party screen shown");
 const code = await txt("#partyCode");
 ok(/^[A-Z2-9]{6}$/.test(code), `party room code rendered (${code})`);
