@@ -111,79 +111,38 @@
     <div class="camstatus" id="status">Loading the pose engine…</div>
   </div>
 
-  <!-- ============ HOME (paper-craft, from the Figma starter system) ============ -->
+  <!-- ============ HOME — assembled from the Figma "Screen / Home / Desktop"
+       frame (35:17): every element is the user's exported component instance,
+       placed at its exact position from the file. ============ -->
   <section class="screen" id="scrHome">
     <div class="homestage">
       <!-- camera stays alive but out of sight: the design has no home preview -->
       <div class="campark"><div class="slot" id="slotHomePark"></div></div>
 
-      <!-- torn blue wave along the bottom -->
-      <svg class="pp-wave" viewBox="0 0 1600 260" preserveAspectRatio="none" aria-hidden="true">
-        <path fill="var(--fig-navy)" d="M0 118 L38 96 91 112 149 84 214 106 268 78 335 102 401 72 470 96 545 70 610 92 686 66 758 88 826 62 905 86 972 60 1048 84 1123 58 1204 82 1279 56 1352 80 1428 54 1509 78 1560 60 1600 74 L1600 260 0 260 Z"/>
-        <path fill="var(--fig-blue)" d="M0 168 L45 148 108 166 170 140 236 160 302 134 368 156 440 130 512 152 588 128 654 150 730 124 806 146 878 122 954 144 1030 118 1106 142 1182 116 1258 140 1334 114 1410 138 1486 112 1556 134 1600 120 L1600 260 0 260 Z"/>
-      </svg>
+      <img class="fh bg" src="assets/ui/figma/home-bg.jpg" alt="">
+      <img class="fh" id="logoHomeCraft" style="left:-2.8%;top:-3.8%;width:44.2%" src="assets/ui/figma/title-card.png" alt="Pose Party">
+      <button class="fh act" id="btnLetsGo" style="left:28.1%;top:81.5%;width:47.8%" title="Start the party">
+        <img src="assets/ui/figma/btn-start-party.png" alt="Start Party"></button>
+      <button class="fh act" id="modeVS" style="left:46.3%;top:42.5%;width:26.7%" title="1v1 Showdown">
+        <img src="assets/ui/figma/btn-1v1.png" alt="1v1 head-to-head"></button>
+      <button class="fh act" id="modeSolo2" style="left:72.9%;top:43.5%;width:27.1%" title="Solo">
+        <img src="assets/ui/figma/btn-solo-right.png" alt="Solo"></button>
+      <img class="fh" style="left:65.6%;top:2.5%;width:32.6%" src="assets/ui/figma/note-intro.png" alt="Strike a pose. Let the AI guess!">
+      <img class="fh tape" style="left:53.9%;top:37.7%;width:11.5%" src="assets/ui/figma/tape-yellow-long.png" alt="">
+      <img class="fh tape" style="left:81.2%;top:40%;width:12.1%" src="assets/ui/figma/tape-cream-a.png" alt="">
+      <img class="fh tape" style="left:69.2%;top:91.7%;width:10.3%" src="assets/ui/figma/tape-cream-b.png" alt="">
+      <button class="fh act" id="modeAI" style="left:19.2%;top:42.2%;width:27.1%" title="Solo — play with the AI">
+        <img src="assets/ui/figma/btn-solo-left.png" alt="Solo"></button>
+      <img class="fh tape" style="left:27.5%;top:38.8%;width:12.1%" src="assets/ui/figma/tape-cream-c.png" alt="">
+      <img class="fh tape" style="left:75.7%;top:2.1%;width:14.1%" src="assets/ui/figma/tape-blue.png" alt="">
 
-      <!-- decorative confetti: corners only (HUD rule 3) -->
-      <span class="conf star s1"></span><span class="conf star s2"></span><span class="conf star s3"></span>
-      <span class="conf tri t1"></span><span class="conf tri t2"></span><span class="conf tri t3"></span><span class="conf tri t4"></span>
-
-      <!-- robot mascot -->
-      <img class="pp-robot" src="assets/ui/robot-wave.png" alt="Pose Party robot waving">
-
-      <!-- torn-paper logo plaques -->
-      <div class="pp-logo" id="logoHomeCraft" title="Pose Party">
-        <span class="tape tp1"></span>
-        <div class="plaque pose">POSE</div>
-        <div class="plaque party">PARTY</div>
-        <span class="tape tp2"></span>
-      </div>
-
-      <!-- note card -->
-      <div class="pp-note">
-        <span class="tape tp3"></span>
-        Strike a pose.<br>Let the AI guess!
-      </div>
-
-      <!-- mode cards -->
-      <div class="pp-cards">
-        <button class="pp-card vs" id="modeVS">
-          <span class="tape tp4"></span>
-          <b>1V1</b>
-          <svg class="cicon" viewBox="0 0 120 52" aria-hidden="true">
-            <circle cx="18" cy="12" r="9" fill="#FBF6EC"/><path d="M4 46c0-12 6-19 14-19s14 7 14 19z" fill="#FBF6EC"/>
-            <circle cx="102" cy="12" r="9" fill="#FBF6EC"/><path d="M88 46c0-12 6-19 14-19s14 7 14 19z" fill="#FBF6EC"/>
-            <path d="M60 4 66 18 81 14 72 27 84 36 68 37 69 52 60 41 51 52 52 37 36 36 48 27 39 14 54 18z" fill="#FBF6EC"/>
-          </svg>
-          <i class="rule"></i>
-          <small>Head-to-head<br>real-time battle</small>
-        </button>
-        <button class="pp-card solo" id="modeAI">
-          <span class="tape tp5"></span>
-          <b>SOLO</b>
-          <svg class="cicon" viewBox="0 0 120 52" aria-hidden="true">
-            <circle cx="60" cy="11" r="10" fill="#FBF6EC"/><path d="M43 50c0-14 7-22 17-22s17 8 17 22z" fill="#FBF6EC"/>
-          </svg>
-          <i class="rule"></i>
-          <small>Beat your streak<br>and outguess the AI</small>
-        </button>
-      </div>
-
-      <!-- start banner -->
-      <button class="pp-start" id="btnLetsGo">
-        <span class="tape tp6"></span><span class="tape tp7"></span>
-        START PARTY <span class="arr">→</span>
-      </button>
-
-      <!-- corner buttons -->
+      <!-- not in the Figma frame (yet): minimal entries for settings + volume -->
       <div class="pp-corner left">
         <button class="pp-circle" id="btnHomeGear" title="Settings & AI training"><svg><use href="#icoGear"/></svg></button>
         <button class="pp-circle" id="btnHomeSound" title="Volume">
           <svg id="homeSndOn"><use href="#icoSpeaker"/></svg>
           <svg id="homeSndOff" class="hidden"><use href="#icoSpeakerOff"/></svg>
         </button>
-      </div>
-      <div class="pp-corner right">
-        <button class="pp-circle" id="btnHomeTrophy" title="Trophies"><svg><use href="#icoTrophy"/></svg></button>
       </div>
     </div>
   </section>

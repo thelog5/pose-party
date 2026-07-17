@@ -41,7 +41,7 @@ function wireControls(){
   $("btnLetsGo").onclick=()=>enterParty();
   $("modeVS").onclick=()=>enterLobby();
   $("btnHomeGear").onclick=()=>transition("training");
-  $("btnHomeTrophy").onclick=()=>toast("Trophies are coming soon — beat your streak in the meantime!");
+  $("modeSolo2").onclick=()=>startGame("ai");
 
   /* in-game */
   $("btnExitSolo").onclick=()=>state.game&&endGame();

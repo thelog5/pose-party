@@ -2,113 +2,36 @@
 
 .screen{flex:1;display:flex;flex-direction:column;min-height:0}
 
-/* =================== HOME (paper-craft — tokens from the Figma starter system) =================== */
-/* One source of truth per value: every color below comes from these tokens. */
+/* =================== HOME (Figma "Screen / Home / Desktop" 35:17) =================== */
+/* Token palette from the Figma foundations page — kept as the single source
+   of truth for any code-drawn color on this screen. */
 :root{
-  --fig-navy:#3172C3;   /* "Navy" swatch */
-  --fig-blue:#124C9D;   /* "Blue" swatch */
-  --fig-red:#DE7234;    /* "Red" swatch (burnt orange) */
-  --fig-yellow:#EFB43F; /* "Yellow" swatch */
-  --fig-cream:#F1E5D3;  /* "Cream" swatch */
-  --fig-muted:#DAD3CA;  /* "Muted" swatch */
-  --fig-ink:#17356F;    /* foundations text ink */
-  --fig-paper:#FBF6EC;  /* letterform / paper white */
-  /* one shadow + torn-edge family for the whole screen */
-  --fig-sh:0 6px 14px rgba(23,53,111,.22);
-  --torn-a:polygon(2% 6%,9% 1%,21% 5%,33% 0%,46% 4%,58% 1%,71% 5%,84% 0%,94% 4%,99% 10%,97% 28%,100% 45%,97% 63%,100% 80%,96% 93%,86% 99%,72% 95%,58% 100%,44% 96%,30% 100%,17% 96%,7% 99%,1% 90%,3% 72%,0% 52%,3% 34%,0% 18%);
-  --torn-b:polygon(1% 9%,12% 3%,24% 7%,38% 1%,52% 6%,66% 0%,79% 5%,91% 1%,99% 8%,96% 24%,100% 42%,96% 60%,99% 78%,95% 94%,83% 98%,69% 94%,54% 99%,40% 94%,26% 99%,13% 95%,3% 98%,0% 82%,4% 64%,1% 46%,4% 28%);
+  --fig-navy:#3172C3; --fig-blue:#124C9D; --fig-red:#DE7234;
+  --fig-yellow:#EFB43F; --fig-cream:#F1E5D3; --fig-muted:#DAD3CA;
+  --fig-ink:#17356F;
 }
-#scrHome{position:relative}
-.homestage{position:relative;flex:1;min-height:82vh;border-radius:26px;overflow:hidden;border:3px solid var(--fig-ink);box-shadow:var(--sh-big);
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.5), transparent 55%),
-    radial-gradient(ellipse at 80% 70%, rgba(218,211,202,.35), transparent 50%),
-    var(--fig-cream);
-  font-family:var(--f-display)}
+#scrHome{position:relative;align-items:center;justify-content:center}
+/* the frame is 1440x810 — keep its aspect and scale everything in % */
+.homestage{position:relative;width:100%;max-width:calc(88vh * 16 / 9);aspect-ratio:16/9;margin:auto;
+  border-radius:26px;overflow:hidden;border:3px solid var(--fig-ink);box-shadow:var(--sh-big);background:var(--fig-cream)}
 .campark{position:absolute;left:4px;top:4px;width:2px;height:2px;overflow:hidden;opacity:.04;pointer-events:none}
 .campark .slot{width:2px;height:2px}
 
-.pp-wave{position:absolute;left:0;right:0;bottom:0;width:100%;height:24%;z-index:1}
+.fh{position:absolute;display:block}
+.fh.bg{inset:0;width:100%;height:100%;object-fit:cover}
+.fh img{width:100%;display:block}
+.fh.tape{pointer-events:none}
+.fh.act{background:none;border:none;padding:0;cursor:pointer;transition:transform .16s ease;
+  filter:drop-shadow(0 4px 10px rgba(23,53,111,.18))}
+.fh.act:hover{transform:translateY(-6px) scale(1.015)}
+.fh.act:active{transform:translateY(-1px) scale(.99)}
+#logoHomeCraft{cursor:pointer}
 
-/* confetti — corners only */
-.conf{position:absolute;z-index:2;pointer-events:none}
-.conf.star{width:44px;height:44px;background:var(--fig-yellow);clip-path:polygon(50% 0,63% 35%,98% 35%,70% 57%,82% 91%,50% 70%,18% 91%,30% 57%,2% 35%,37% 35%);filter:drop-shadow(0 2px 2px rgba(23,53,111,.25))}
-.conf.star.s1{left:5%;top:12%;transform:rotate(-14deg)}
-.conf.star.s2{right:3.5%;top:7%;width:56px;height:56px;transform:rotate(12deg)}
-.conf.star.s3{right:12%;top:30%;width:26px;height:26px;transform:rotate(28deg);opacity:.9}
-.conf.tri{width:0;height:0;border-left:15px solid transparent;border-right:15px solid transparent;border-bottom:26px solid var(--fig-navy);opacity:.85}
-.conf.tri.t1{left:15%;top:24%;transform:rotate(18deg)}
-.conf.tri.t2{right:2.5%;top:40%;border-bottom-color:var(--fig-red);transform:rotate(-24deg)}
-.conf.tri.t3{left:28%;bottom:30%;border-bottom-color:var(--fig-red);transform:rotate(40deg)}
-.conf.tri.t4{right:9%;bottom:26%;transform:rotate(-10deg)}
-
-.pp-robot{position:absolute;left:3%;bottom:6%;width:min(23vw,330px);z-index:4;filter:drop-shadow(0 10px 14px rgba(23,53,111,.28))}
-
-/* washi tape — one family, rotated per spot */
-.tape{position:absolute;width:96px;height:26px;background:var(--fig-navy);opacity:.75;border-radius:2px;z-index:6;
-  clip-path:polygon(3% 0,97% 4%,100% 30%,97% 96%,4% 100%,0 68%);box-shadow:0 1px 3px rgba(23,53,111,.18)}
-.tape.tp1{left:16%;top:-12px;transform:rotate(-24deg)}
-.tape.tp2{right:5%;bottom:6%;transform:rotate(20deg);background:#E8D9BC;width:80px}
-.tape.tp3{left:50%;top:-13px;transform:translateX(-50%) rotate(-3deg);background:var(--fig-yellow)}
-.tape.tp4{left:50%;top:-12px;transform:translateX(-50%) rotate(-4deg);width:84px}
-.tape.tp5{left:50%;top:-12px;transform:translateX(-50%) rotate(3deg);background:#E8D9BC;width:84px}
-.tape.tp6{left:-28px;top:30%;transform:rotate(-38deg);background:#E8D9BC;width:78px}
-.tape.tp7{right:-26px;top:34%;transform:rotate(34deg);background:#E8D9BC;width:78px}
-
-/* logo plaques */
-.pp-logo{position:absolute;left:24%;top:4%;width:34%;min-width:340px;z-index:5;cursor:pointer}
-.plaque{clip-path:var(--torn-a);color:var(--fig-paper);text-align:center;font-weight:800;letter-spacing:6px;line-height:1;
-  text-shadow:0 3px 0 rgba(23,53,111,.35);filter:drop-shadow(var(--fig-sh))}
-.plaque.pose{background:var(--fig-blue);font-size:clamp(48px,6vw,96px);padding:4% 6% 5%;transform:rotate(-4deg)}
-.plaque.party{background:var(--fig-red);clip-path:var(--torn-b);font-size:clamp(48px,6vw,96px);padding:4% 6% 5%;margin:-3% 0 0 14%;transform:rotate(2deg);width:92%}
-
-/* note card */
-.pp-note{position:absolute;right:4%;top:9%;width:23%;min-width:250px;z-index:5;
-  color:var(--fig-ink);font-weight:700;font-size:clamp(17px,1.7vw,27px);line-height:1.4;text-align:center;
-  padding:3.2% 2.5%;transform:rotate(1.5deg);filter:drop-shadow(var(--fig-sh))}
-.pp-note:before{content:"";position:absolute;inset:0;background:#EDE7DD;clip-path:var(--torn-b);z-index:-1}
-
-/* mode cards */
-.pp-cards{position:absolute;left:34%;top:44%;width:56%;display:flex;gap:4%;z-index:5}
-.pp-card{position:relative;flex:1;color:var(--fig-paper);text-align:center;padding:5% 4% 6%;cursor:pointer;
-  filter:drop-shadow(var(--fig-sh));transition:transform .15s ease;background:none;border:none}
-.pp-card:before{content:"";position:absolute;inset:0;z-index:-1}
-.pp-card:hover{transform:translateY(-5px) rotate(-.5deg)}
-.pp-card.vs{transform:rotate(-1.2deg)}
-.pp-card.vs:before{background:var(--fig-red);clip-path:var(--torn-a)}
-.pp-card.vs:hover{transform:rotate(-1.2deg) translateY(-5px)}
-.pp-card.solo{transform:rotate(1deg)}
-.pp-card.solo:before{background:var(--fig-blue);clip-path:var(--torn-b)}
-.pp-card.solo:hover{transform:rotate(1deg) translateY(-5px)}
-.pp-card b{display:block;font-size:clamp(26px,2.6vw,42px);font-weight:800;letter-spacing:4px}
-.pp-card .cicon{width:38%;max-width:120px;margin:6% auto 4%;display:block}
-.pp-card .rule{display:block;width:70%;height:2px;background:rgba(251,246,236,.5);margin:0 auto 6%}
-.pp-card small{font-family:var(--f-body);font-weight:800;font-size:clamp(12px,1.1vw,16.5px);line-height:1.35;display:block}
-
-/* start banner */
-.pp-start{position:absolute;left:50%;bottom:5.5%;transform:translateX(-50%) rotate(-.8deg);z-index:6;
-  width:min(52%,720px);background:none;border:none;
-  color:var(--fig-blue);font-family:var(--f-display);font-weight:800;font-size:clamp(30px,3.4vw,54px);letter-spacing:4px;
-  padding:1.6% 2%;cursor:pointer;filter:drop-shadow(var(--fig-sh));transition:transform .15s ease}
-.pp-start:before{content:"";position:absolute;inset:0;background:var(--fig-yellow);clip-path:var(--torn-a);z-index:-1}
-.pp-start:hover{transform:translateX(-50%) rotate(-.8deg) scale(1.025)}
-.pp-start:active{transform:translateX(-50%) rotate(-.8deg) scale(.985)}
-.pp-start .arr{font-family:var(--f-body);font-weight:900}
-
-/* corner circle buttons */
-.pp-corner{position:absolute;bottom:4.5%;z-index:7;display:flex;gap:12px}
+.pp-corner{position:absolute;bottom:3.5%;z-index:9;display:flex;gap:12px}
 .pp-corner.left{left:2%}
-.pp-corner.right{right:2%}
-.pp-circle{width:58px;height:58px;border-radius:50%;background:var(--fig-cream);border:none;display:flex;align-items:center;justify-content:center;color:var(--fig-blue);box-shadow:0 4px 10px rgba(23,53,111,.35);cursor:pointer;transition:transform .15s ease}
+.pp-circle{width:54px;height:54px;border-radius:50%;background:var(--fig-cream);border:none;display:flex;align-items:center;justify-content:center;color:var(--fig-blue);box-shadow:0 4px 10px rgba(23,53,111,.35);cursor:pointer;transition:transform .15s ease;opacity:.92}
 .pp-circle:hover{transform:scale(1.08)}
-.pp-circle svg{width:26px;height:26px}
-
-@media(max-width:1100px){
-  .pp-logo{left:6%;width:56%}
-  .pp-robot{display:none}
-  .pp-cards{left:6%;width:88%;top:48%}
-  .pp-note{right:4%;top:6%}
-}
+.pp-circle svg{width:24px;height:24px}
 
 /* =================== SOLO PLAY (immersive) =================== */
 /* The camera IS the scene; all HUD floats over it. Stateful elements are
