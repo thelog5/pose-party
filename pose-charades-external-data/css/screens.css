@@ -23,13 +23,21 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 /* generic: lift on hover, wiggle on click (js adds .shook) */
 .iv{cursor:pointer;transition:transform .18s ease, filter .18s ease}
 .iv:hover{transform:translateY(-6px) rotate(-1.2deg);filter:brightness(1.04) drop-shadow(0 6px 8px rgba(23,53,111,.22))}
-.iv.wave{z-index:2}
-.iv.wave:hover{transform:translateY(-8px)}
+.iv.wave{z-index:2;transition:translate .25s ease}
+.iv.wave:nth-of-type(1){animation:swellA 7.5s ease-in-out infinite}
+.iv.wave:nth-of-type(2){animation:swellB 9s ease-in-out infinite}
+.iv.wave:nth-of-type(3){animation:swellC 8.2s ease-in-out infinite}
+.iv.wave:hover{translate:0 -7px}
+@keyframes swellA{0%,100%{transform:translate(0,0)}50%{transform:translate(1%,-9px)}}
+@keyframes swellB{0%,100%{transform:translate(0,0)}50%{transform:translate(-1.2%,-12px)}}
+@keyframes swellC{0%,100%{transform:translate(0,-6px)}50%{transform:translate(.8%,4px)}}
 .iv.conf:hover{transform:translateY(-7px) rotate(9deg) scale(1.1)}
 .iv.tape:hover{transform:rotate(-7deg) scale(1.06)}
 .iv.boat{animation:boatrock 3.2s ease-in-out infinite;transform-origin:50% 92%}
-@keyframes boatrock{0%,100%{transform:rotate(-3.5deg) translateY(0)}50%{transform:rotate(3.5deg) translateY(-5px)}}
+@keyframes boatrock{0%,100%{transform:rotate(-4deg) translateY(0)}33%{transform:rotate(2deg) translateY(-9px)}66%{transform:rotate(4deg) translateY(-3px)}}
 .shook{animation:ivshake .55s cubic-bezier(.36,.07,.19,.97)}
+.spun{animation:ivspin .65s cubic-bezier(.3,.8,.4,1)}
+.popped{animation:ivpop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes ivshake{
   0%,100%{transform:none}
   15%{transform:translateX(-7px) rotate(-4deg)}
@@ -37,17 +45,19 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
   55%{transform:translateX(-4px) rotate(-2deg)}
   75%{transform:translateX(3px) rotate(1.2deg)}
 }
-#logoHomeCraft{animation:logofloat 5.2s ease-in-out infinite;transition:translate .2s ease, scale .2s ease}
+@keyframes ivspin{0%{transform:rotate(0) scale(1)}60%{transform:rotate(340deg) scale(1.12)}100%{transform:rotate(360deg) scale(1)}}
+@keyframes ivpop{0%{transform:scale(1)}40%{transform:scale(1.22) rotate(4deg)}70%{transform:scale(.94)}100%{transform:scale(1)}}
+#logoHomeCraft{animation:logofloat 8s ease-in-out infinite;transition:translate .2s ease, scale .2s ease}
 #logoHomeCraft:hover{translate:0 -5px;scale:1.015}
-@keyframes logofloat{0%,100%{transform:rotate(0) translateY(0)}50%{transform:rotate(.7deg) translateY(-6px)}}
+@keyframes logofloat{0%,30%,100%{transform:rotate(0) translateY(0)}60%{transform:rotate(.5deg) translateY(-4px)}}
 
 /* ---------- mode cards: hang from their tape and slip when touched ---------- */
 .fh.card{background:none;border:none;padding:0;cursor:pointer;transform-origin:50% -10%;
-  animation:cardfloat 4.6s ease-in-out infinite;
+  animation:cardfloat 7s ease-in-out infinite;
   transition:rotate .22s cubic-bezier(.3,1.4,.5,1), translate .22s cubic-bezier(.3,1.4,.5,1)}
-#modeVS.card{animation-delay:-1.5s}
-#modeParty.card{animation-delay:-3s}
-@keyframes cardfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+#modeVS.card{animation-delay:-2.3s}
+#modeParty.card{animation-delay:-4.6s}
+@keyframes cardfloat{0%,35%,100%{transform:translateY(0)}65%{transform:translateY(-4px)}}
 .fh.card:hover{rotate:-3.2deg;translate:0 7px}
 .fh.card:active{rotate:-4.5deg;translate:0 11px}
 #modeParty.card:hover{rotate:2.8deg;translate:0 7px}   /* taped at top-left, tips the other way */

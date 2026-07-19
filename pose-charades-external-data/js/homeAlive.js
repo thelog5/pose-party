@@ -13,13 +13,18 @@ const PHRASES = [
   "Strike a pose. Let the AI guess!",
   "I'm watching… in a friendly way!",
   "Bet I can guess your next move.",
-  "Do a T-rex. I love T-rexes!",
-  "My circuits say: DANCE.",
-  "Pose like nobody's watching. (I am.)",
-  "Beep boop — show me your best!",
-  "I never blink. Ever.",
-  "Warmed up? Prove it!",
-  "Jazz hands. Trust me.",
+  "I'll be back",
+  "Sometimes I don't understand human behvavior",
+  "A thing isn't beautiful because it lasts.",
+  "Help me, Obi-Wan Kenobi. You're my only hope",
+  "Fate rarely calls upon us at a moment of our choosing.",
+  "Autobots, rollout!",
+  "EVE?",
+  "Fist bump? Ba-la-la-la-la-la-la",
+  "Here? Or in a Jaegar?",
+  "'Laptop'! You do realize that nickname is demeaning?",
+  "Both of You, Dance Like You Want to Win!",
+  "Can a robot write a symphony?"
 ];
 let phraseIx = 0;
 
@@ -54,8 +59,13 @@ function hypeWave(){
   hypeTimer = setTimeout(() => $("homeStage").classList.remove("excited"), 1400);
 }
 
-function shake(el){
-  el.classList.remove("shook"); void el.offsetWidth; el.classList.add("shook");
+/* Tap reactions vary: sometimes a shake, sometimes a spin, sometimes a pop. */
+const REACTIONS = [["shook",[440]], ["spun",[392,494]], ["popped",[523,392]]];
+function react(el){
+  el.classList.remove("shook","spun","popped"); void el.offsetWidth;
+  const [cls, notes] = REACTIONS[Math.floor(Math.random()*REACTIONS.length)];
+  el.classList.add(cls);
+  blip(notes, 0.06);
 }
 
 /* ---------- alpha-aware pointer routing ----------
@@ -98,7 +108,7 @@ export function wireHomeAlive(){
   $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
   $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
   document.querySelectorAll("#homeStage .iv").forEach(el => {
-    el.addEventListener("click", () => { shake(el); blip([440], 0.05); });
+    el.addEventListener("click", () => react(el));
   });
   for(const id of ["robotBody", "robotHead"]) buildAlphaMap($(id));
   $("homeStage").addEventListener("pointermove", routePointer);
