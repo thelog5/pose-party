@@ -252,82 +252,95 @@
     </div>
   </section>
 
-  <!-- ============ 1v1 LOBBY ============ -->
+  <!-- ============ 1v1 LOBBY — Figma "1v1 Lobby" frame (111:82).
+       Paper art is the user's exported components; live text (name, codes,
+       settings, waiting dots, robot sign) renders in HTML on top. The
+       video mounts BETWEEN each panel background and its torn-frame
+       overlay so the border wraps the feed. ============ -->
   <section class="screen hidden" id="scrLobby">
-    <div class="toprow">
-      <div class="camcard">
-        <div class="slot" id="slotLobbyYou"></div>
-        <span class="namebadge you">YOU</span>
-        <span class="livebadge right"><i></i>LIVE</span>
-      </div>
-      <div class="selmode">
-        <span class="chip white">SELECTED MODE</span>
-        <h4>1v1 Showdown</h4>
-        <p>Face a friend in a real-time pose battle. Same word, one winner.</p>
-        <svg class="botart"><use href="#botFull"/></svg>
-        <span class="winchip"><svg><use href="#icoTrophy"/></svg>ONE WINNER · Beat the clock!</span>
-      </div>
-      <div class="camcard">
-        <div class="slot" id="slotLobbyRival"></div>
-        <span class="namebadge rival" id="rivalBadgeLobby">RIVAL</span>
-        <span class="livebadge right"><i></i>LIVE</span>
-      </div>
-    </div>
+    <div class="lobbystage" id="lobbyStage">
+      <img class="lb bg" src="assets/ui/figma/home-bg2.jpg" alt="">
 
-    <div class="midrow">
-      <div class="panel">
-        <h3>Room Code <svg style="margin-left:auto"><use href="#icoEnvelope"/></svg></h3>
-        <div class="sub">Share this code with your rival!</div>
-        <div class="codeboxes" id="codeBoxes"><b>·</b><b>·</b><b>·</b><b>·</b><b>·</b><b>·</b></div>
-        <div class="field"><label for="roomLink">Room link</label>
-          <div class="linkrow">
-            <input type="text" id="roomLink" readonly value="">
-            <button class="btn blue" id="btnCopyLink"><svg width="16" height="16"><use href="#icoLink"/></svg>Copy Link</button>
-          </div>
-        </div>
-        <div class="locknote"><svg><use href="#icoLock"/></svg>Anyone with the link can join</div>
-        <div class="field" style="margin-top:12px"><label for="joinCode">Have a code? Join a friend</label>
-          <div class="joinrow">
-            <input type="text" id="joinCode" maxlength="6" placeholder="ABC234" autocomplete="off" autocapitalize="characters">
-            <button class="btn mint" id="btnJoinRoom">Join</button>
-          </div>
-        </div>
-        <div class="field" style="margin-top:10px"><label for="lobbyName">Your name</label>
-          <input type="text" id="lobbyName" maxlength="16" placeholder="e.g. Sam" autocomplete="off">
-        </div>
-        <div class="lobbystatus" id="lobbyStatus"></div>
+      <img class="lb iv2" id="logoLobby" style="left:-.3%;top:-.4%;width:13.8%;z-index:3" src="assets/ui/figma/lb-title.png" alt="Pose Party — home">
+      <img class="lb deco" style="left:-1%;top:-1.1%;width:5%;z-index:4" src="assets/ui/figma/lb-tape-b.png" alt="">
+      <img class="lb deco" style="left:10.2%;top:9%;width:4.4%;z-index:4" src="assets/ui/figma/lb-tape-c.png" alt="">
+
+      <img class="lb" style="left:40.5%;top:3.3%;width:19%;z-index:3" src="assets/ui/figma/lb-1v1-card.png" alt="1v1 Lobby">
+      <img class="lb deco" style="left:47%;top:.1%;width:6.7%;z-index:4" src="assets/ui/figma/lb-tape-a.png" alt="">
+
+      <!-- name tag (click to edit) -->
+      <div class="lb nametag" style="left:61.8%;top:4%;width:14.5%;z-index:3">
+        <img src="assets/ui/figma/lb-nametag.png" alt="">
+        <span class="nt-label">Your Name</span>
+        <input id="lobbyName" maxlength="10" autocomplete="off" spellcheck="false" placeholder="TAP TO SET">
+        <img class="nt-pencil" src="assets/ui/figma/lb-pencil.png" alt="">
       </div>
 
-      <div class="panel">
-        <h3><svg style="color:var(--blue)"><use href="#icoGear"/></svg>Match Settings</h3>
-        <div class="sub">Customize your 1v1 showdown.</div>
-        <div style="margin-top:10px">
-          <div class="setrow"><svg class="ic"><use href="#icoMedal"/></svg><span class="meta"><b>Rounds</b><small>Best of</small></span>
-            <span class="stepper"><button id="roundsMinus">−</button><span class="stepval" id="setRounds">5</span><button id="roundsPlus">+</button></span></div>
-          <div class="setrow"><svg class="ic"><use href="#icoClock"/></svg><span class="meta"><b>Round timer</b><small>Time per round</small></span>
-            <span class="stepper"><button id="timerMinus">−</button><span class="stepval" id="setTimer">30s</span><button id="timerPlus">+</button></span></div>
-          <div class="setrow"><svg class="ic"><use href="#icoTarget"/></svg><span class="meta"><b>Target score</b><small>Score to win</small></span>
-            <span class="stepper"><button id="targetMinus">−</button><span class="stepval" id="setTarget">5</span><button id="targetPlus">+</button></span></div>
-        </div>
-        <div class="setnote"><svg width="15" height="15"><use href="#icoStar"/></svg>First to reach the target score wins!</div>
+      <button class="lb pbtn" id="btnExitLobby" style="left:78.1%;top:2.5%;width:22.6%;z-index:3" aria-label="Exit lobby">
+        <img src="assets/ui/figma/lb-exit.png" alt="Exit Lobby"></button>
+
+      <!-- ===== YOU: bg panel / video / torn frame overlay ===== -->
+      <img class="lb" style="left:1.6%;top:16.2%;width:47.6%;z-index:2" src="assets/ui/figma/lb-panel-blue.png" alt="">
+      <div class="lb vidslot" id="slotLobbyYou" style="left:3.4%;top:19%;width:44%;height:50.6%;z-index:3"></div>
+      <img class="lb passthru" style="left:1.2%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-blue.png" alt="">
+      <div class="lb namechip" style="left:2.9%;top:18.4%;width:10.8%;z-index:5">
+        <img src="assets/ui/figma/lb-name-chip.png" alt=""><span id="lobbyYouName">YOU</span>
       </div>
 
-      <div class="panel" style="position:relative">
-        <h3>How It Works</h3>
-        <div class="sub">Quick recap before we battle!</div>
-        <div class="bullets" style="max-width:70%">
-          <div class="bullet"><span class="bic"><svg><use href="#icoBolt"/></svg></span><span><b>Same secret word</b><small>Both of you get the same pose.</small></span></div>
-          <div class="bullet"><span class="bic"><svg><use href="#icoClock"/></svg></span><span><b>Beat the clock</b><small>Score points with correct guesses.</small></span></div>
-          <div class="bullet"><span class="bic"><svg><use href="#icoTrophy"/></svg></span><span><b>Highest score wins</b><small>First to the target takes it!</small></span></div>
-        </div>
-        <svg style="position:absolute;right:12px;bottom:12px;width:104px;height:112px"><use href="#botFull"/></svg>
+      <!-- ===== OPPONENT: bg panel / video / torn frame overlay ===== -->
+      <img class="lb" style="left:50.8%;top:16.9%;width:48.3%;z-index:2" src="assets/ui/figma/lb-panel-orange.png" alt="">
+      <div class="lb vidslot" id="slotLobbyRival" style="left:52.6%;top:19%;width:44.6%;height:50.6%;z-index:3"></div>
+      <img class="lb passthru" style="left:50.5%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-orange.png" alt="">
+      <div class="lb namechip oppchip" style="left:51.9%;top:18.4%;width:10.8%;z-index:6">
+        <img src="assets/ui/figma/lb-name-chip.png" alt=""><span id="lobbyOppName">RIVAL</span>
       </div>
-    </div>
 
-    <div class="botrow">
-      <div class="hostnote"><svg><use href="#botHead"/></svg><span id="lobbyRoleNote">Host controls the match.</span></div>
-      <button class="bigbtn yellow" id="btnStartMatch" disabled>Start Match <span class="arrow">→</span></button>
-      <div class="helpside">Need help?<button class="btn ghost" id="btnViewGuide">View Guide</button></div>
+      <!-- waiting robot lives inside the opponent frame until someone joins -->
+      <div class="lb robotwait" id="lobbyRobotWait" style="left:56.5%;top:18.4%;width:39.7%;z-index:5">
+        <img id="robotWaveHigh" src="assets/ui/figma/lb-robot-high.png" alt="">
+        <img id="robotWaveLow" class="ghosted" src="assets/ui/figma/lb-robot-low.png" alt="">
+        <span class="signtext">waiting<i id="dotsSign">...</i></span>
+      </div>
+      <div class="lb waitbig" id="lobbyWaitBig" style="left:55.3%;top:60.4%;width:44%;z-index:5">
+        WAITING FOR FRIEND<i id="dotsBig">...</i></div>
+
+      <!-- vs badge pops when the opponent arrives -->
+      <img class="lb vsbadge" id="lobbyVs" style="left:45.6%;top:36%;width:8.8%;z-index:7" src="assets/ui/figma/lb-vs.png" alt="VS">
+
+      <!-- ===== invite friend ===== -->
+      <div class="lb invite" style="left:1.7%;top:75.9%;width:29%;z-index:3">
+        <img class="cardart" src="assets/ui/figma/lb-invite-card.png" alt="">
+        <img class="inv-robot" src="assets/ui/figma/lb-robot-icon.png" alt="">
+        <span class="inv-title">Invite a Friend</span>
+        <span class="inv-label" style="top:36%">Your Room</span>
+        <span class="inv-label" style="top:69%">Join With Code</span>
+        <img class="inv-box" style="top:30%" src="assets/ui/figma/lb-code-box.png" alt="">
+        <span class="inv-code" id="roomCodeText">······</span>
+        <button class="inv-btn pbtn" id="btnCopyLink" style="top:32%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Copy</b></button>
+        <img class="inv-box" style="top:64%" src="assets/ui/figma/lb-code-box.png" alt="">
+        <input id="joinCode" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ABC123">
+        <button class="inv-btn pbtn" id="btnJoinRoom" style="top:66%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Join</b></button>
+      </div>
+
+      <!-- ===== match settings (time-based mode) ===== -->
+      <div class="lb settings" style="left:31.9%;top:76%;width:40.1%;z-index:3">
+        <img class="cardart" src="assets/ui/figma/lb-settings-card.png" alt="">
+        <span class="set-title">Match Settings</span>
+        <i class="set-divider"></i>
+        <span class="set-label" style="left:8%">Match Time</span>
+        <button class="set-btn pbtn" id="matchPlus"  style="left:7.5%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
+        <span class="set-badge" style="left:17%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setMatch">3:00</b></span>
+        <button class="set-btn pbtn" id="matchMinus" style="left:37.6%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
+        <span class="set-label" style="left:56.5%">Word Time</span>
+        <button class="set-btn pbtn" id="wordPlus"  style="left:56.3%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
+        <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">30s</b></span>
+        <button class="set-btn pbtn" id="wordMinus" style="left:86.3%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
+      </div>
+
+      <!-- ===== start ===== -->
+      <button class="lb pbtn startbtn" id="btnStartMatch" style="left:72.8%;top:75.3%;width:25.1%;z-index:3" disabled>
+        <img src="assets/ui/figma/lb-start.png" alt="Start match"></button>
+      <div class="lb waitline" id="lobbyStatus" style="left:72.8%;top:91.4%;width:25.1%;z-index:3">Waiting for friend to join<i id="dotsSmall">...</i></div>
     </div>
   </section>
 

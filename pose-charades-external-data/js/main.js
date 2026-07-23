@@ -13,6 +13,7 @@ import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
 import { enterLobby, quitOnline, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty } from "./party.js";
 import { wireHomeAlive } from "./homeAlive.js";
+import { wireLobbyAlive } from "./lobbyAlive.js";
 import { boot } from "./engine.js";
 
 /* Order matters: repaint the screen first, then let the game module tear
@@ -42,6 +43,7 @@ function wireControls(){
   $("modeParty").onclick=()=>enterParty();
   $("btnHomeGear").onclick=()=>transition("training");
   wireHomeAlive();
+  wireLobbyAlive();
 
   /* in-game */
   $("btnExitSolo").onclick=()=>state.game&&endGame();

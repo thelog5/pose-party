@@ -59,12 +59,12 @@ export function render(fsmState){
 
   /* header: hidden entirely on the immersive solo screen; stat pills
      during lobby/match; icon buttons elsewhere */
-  document.querySelector("header").classList.toggle("hidden", s==="solo"||s==="home");
-  const pills = (s==="lobby"||s==="match");
+  document.querySelector("header").classList.toggle("hidden", s==="solo"||s==="home"||s==="lobby");
+  const pills = (s==="match");
   $("hdrPills").classList.toggle("hidden", !pills);
   $("hdrIcons").classList.toggle("hidden", pills);
   $("modeLabel").textContent = MODE_LABELS[s];
-  $("roundDots").classList.toggle("hidden", s!=="match");
+  $("roundDots").classList.toggle("hidden", s!=="match" || state.game?.mode==="online");
 
   /* camera docks follow the screen (party places its own slot) */
   if(CAM_SLOT[s]) mountCamera($(CAM_SLOT[s]));

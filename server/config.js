@@ -12,8 +12,9 @@ export const config = {
   corsOrigins: (process.env.CORS_ORIGINS || "http://localhost:3000,http://127.0.0.1:3000")
     .split(",").map(s => s.trim()).filter(Boolean),
 
-  /* Match shape. */
-  rounds: int(process.env.ROUNDS, 5),
+  /* Match shape. rounds is a safety cap; matchMs governs time-based play. */
+  rounds: int(process.env.ROUNDS, 999),
+  matchMs: int(process.env.MATCH_MS, 180000),
   wordMs: int(process.env.WORD_MS, 20000),
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
   betweenRoundsMs: int(process.env.BETWEEN_ROUNDS_MS, 1800),

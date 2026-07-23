@@ -49,15 +49,15 @@ export function signalOk(x){
   try{ return JSON.stringify(x).length <= 20000; }catch{ return false; }
 }
 
-/* Host match settings: rounds 1-10, round timer 10-60s, target 1-20 (or 0 =
-   no target). Returns server-shape {rounds, wordMs, target} or null. */
+/* Host match settings for the time-based mode: total match time 10s-10min
+   (UI floor is 60s; 10s floor keeps tests fast) and word time 5-60s.
+   Returns server-shape {matchMs, wordMs} or null. */
 export function cleanSettings(raw){
   if(raw === undefined || raw === null) return {};
   if(!isPlainObject(raw)) return null;
   const int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi ? v : null;
-  const rounds = int(raw.rounds, 1, 10);
-  const wordSecs = int(raw.wordSecs, 10, 60);
-  const target = raw.target === 0 ? Infinity : int(raw.target, 1, 20);
-  if(rounds === null || wordSecs === null || target === null) return null;
-  return { rounds, wordMs: wordSecs * 1000, target };
+  const matchSecs = int(raw.matchSecs, 10, 600);
+  const wordSecs = int(raw.wordSecs, 5, 60);
+  if(matchSecs === null || wordSecs === null) return null;
+  return { matchMs: matchSecs * 1000, wordMs: wordSecs * 1000 };
 }

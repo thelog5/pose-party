@@ -6,10 +6,10 @@
    the player's name, word labels, match settings, point claims, and opaque
    WebRTC blobs.
 
-   Lobby flow (matches the mockup): opening 1v1 auto-creates a room and
-   shows the code + share link. A friend joins via code or link. The host
-   picks match settings (rounds / round timer / target score) and presses
-   START MATCH; the joiner's screen says "waiting for host".
+   Lobby flow (Figma "1v1 Lobby" frame): opening 1v1 auto-creates a room
+   and shows the code. A friend joins via code or link. The host picks the
+   match settings — MATCH TIME (total; most points when it ends wins) and
+   WORD TIME (per word) — and presses START MATCH.
 
    The socket.io client script loads lazily from the game server itself, so
    offline modes still work from any static host. */
@@ -20,11 +20,12 @@ import { toast, flash, pointBurst, fmtTime, fmtScore } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
-import { renderDots } from "./screens.js";
 import { createPeer } from "./webrtc.js";
 
 const NAME_KEY = "poseCharadesName";
-const DEFAULT_SETTINGS = { rounds:5, wordSecs:30, target:5 };
+/* time-based mode: the match runs for matchSecs total, most points wins */
+const DEFAULT_SETTINGS = { matchSecs:180, wordSecs:30 };
+const NAME_MAX = 10;
 
 let socket = null;
 let peer = null;
@@ -77,10 +78,11 @@ function resetLobbyUi(){
   settings={ ...DEFAULT_SETTINGS };
   renderCode("");
   renderSettings(true);
-  $("roomLink").value="";
-  $("rivalBadgeLobby").textContent="RIVAL";
-  $("btnStartMatch").disabled=true;
-  $("lobbyRoleNote").textContent="Host controls the match.";
+  $("lobbyStage").classList.remove("joined");
+  $("lobbyOppName").textContent="RIVAL";
+  $("lobbyYouName").textContent=(localStorage.getItem(NAME_KEY)||"YOU").slice(0,NAME_MAX);
+  const start=$("btnStartMatch");
+  start.disabled=true; start.classList.remove("ready");
   setLobbyStatus("Connecting…");
 }
 
@@ -88,13 +90,18 @@ function wireLobby(){
   if(wired) return;
   wired=true;
   $("btnCopyLink").onclick=async()=>{
-    if(!$("roomLink").value) return;
-    try{ await navigator.clipboard.writeText($("roomLink").value); toast("Link copied — send it to your rival!"); }
-    catch(e){ toast("Copy failed — select the link and copy it manually."); }
+    if(!roomCode) return;
+    const link=location.origin+"/#join-"+roomCode;
+    try{ await navigator.clipboard.writeText(link); toast("Invite link copied — send it to your friend!"); }
+    catch(e){ toast("Copy failed — the code is "+roomCode); }
+  };
+  $("roomCodeText").onclick=async()=>{
+    if(!roomCode) return;
+    try{ await navigator.clipboard.writeText(roomCode); toast("Room code copied!"); }catch(e){}
   };
   $("btnJoinRoom").onclick=()=>{
     const code=$("joinCode").value.trim().toUpperCase();
-    if(code.length!==6) return setLobbyStatus("Codes are 6 letters/numbers, like ABC234.");
+    if(code.length!==6) return setLobbyStatus("Codes are 6 letters/numbers, like ABC234");
     leaveRoom();
     joinRoom(code);
   };
@@ -104,22 +111,27 @@ function wireLobby(){
       if(res && res.error) setLobbyStatus(beginError(res.error));
     });
   };
-  $("btnViewGuide").onclick=()=>toast("Same word for both players — first AI to hit the threshold wins the word!");
+  $("btnExitLobby").onclick=()=>transition("menu");   // fsm listener handles leaveRoom
+  $("joinCode").addEventListener("input", e=>{ e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""); });
+  $("lobbyName").addEventListener("input", e=>{
+    const v=e.target.value.slice(0,NAME_MAX);
+    e.target.value=v;
+    $("lobbyYouName").textContent=v.trim()||"YOU";
+  });
   $("lobbyName").onchange=()=>{
-    localStorage.setItem(NAME_KEY, $("lobbyName").value.trim().slice(0,16));
-    setLobbyStatus("Name saved — it applies to the next room you create or join.");
+    localStorage.setItem(NAME_KEY, $("lobbyName").value.trim().slice(0,NAME_MAX));
+    toast("Name saved — it applies to the next room you create or join.");
   };
-  wireStepper("rounds", v=>({...settings, rounds:clamp(v,1,10)}));
-  wireStepper("timer",  v=>({...settings, wordSecs:clamp(v,10,60)}));
-  wireStepper("target", v=>({...settings, target:clamp(v,1,20)}));
+  wireStepper("match", v=>({...settings, matchSecs:clamp(v,60,600)}), 30);
+  wireStepper("word",  v=>({...settings, wordSecs:clamp(v,10,60)}), 5);
 }
 
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+const fmtSecs=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 
-function wireStepper(key, apply){
-  const step = key==="timer" ? 5 : 1;
-  const read = () => key==="rounds"?settings.rounds:key==="timer"?settings.wordSecs:settings.target;
-  const change = delta => {
+function wireStepper(key, apply, step){
+  const read=()=> key==="match"?settings.matchSecs:settings.wordSecs;
+  const change=delta=>{
     if(!isHost) return;
     settings=apply(read()+delta*step);
     renderSettings(isHost);
@@ -130,27 +142,27 @@ function wireStepper(key, apply){
 }
 
 function renderSettings(editable){
-  $("setRounds").textContent=settings.rounds;
-  $("setTimer").textContent=settings.wordSecs+"s";
-  $("setTarget").textContent=settings.target;
-  for(const id of ["roundsMinus","roundsPlus","timerMinus","timerPlus","targetMinus","targetPlus"])
+  $("setMatch").textContent=fmtSecs(settings.matchSecs);
+  $("setWord").textContent=settings.wordSecs+"s";
+  for(const id of ["matchMinus","matchPlus","wordMinus","wordPlus"])
     $(id).disabled=!editable;
 }
 
 function renderCode(code){
-  const boxes=$("codeBoxes").children;
-  for(let i=0;i<boxes.length;i++) boxes[i].textContent=code[i]||"·";
+  $("roomCodeText").textContent=code||"······";
 }
 
 function setLobbyStatus(text){
   const el=$("lobbyStatus");
-  if(!text){ el.classList.remove("show"); return; }
-  el.classList.add("show");
+  if(!text){
+    el.innerHTML='Waiting for friend to join<i id="dotsSmall">...</i>';
+    return;
+  }
   el.textContent=text;
 }
 
 function myName(){
-  const raw=$("lobbyName").value.trim().slice(0,16) || "Player";
+  const raw=$("lobbyName").value.trim().slice(0,NAME_MAX) || "Player";
   localStorage.setItem(NAME_KEY, raw);
   return raw;
 }
@@ -202,15 +214,17 @@ function syncClock(){
 function wireSocket(s){
   s.on("room:peer", ({name}={}) => {          // we are the host; a friend arrived
     peerName=String(name||"Rival");
-    $("rivalBadgeLobby").textContent=peerName.slice(0,12).toUpperCase();
-    setLobbyStatus(peerName+" joined! Press START MATCH when you’re ready.");
-    setRivalPlaceholder(peerName+" connected", "video connecting…");
+    onPeerHere();
+    setLobbyStatus(peerName+" joined! Press START MATCH when you’re ready");
     openPeer(true);
   });
 
   s.on("room:ready", () => {                   // both players ready
     peerReady=true;
-    if(isHost){ $("btnStartMatch").disabled=false; }
+    if(isHost){
+      const b=$("btnStartMatch");
+      b.disabled=false; b.classList.add("ready");
+    }
     else setLobbyStatus("Waiting for "+peerName+" to start the match…");
   });
 
@@ -255,8 +269,7 @@ async function createRoom(){
       isHost=true; roomCode=res.code;
       renderCode(res.code);
       renderSettings(true);
-      $("roomLink").value=location.origin+"/#join-"+res.code;
-      setLobbyStatus("Share the code or link with a friend — the START button unlocks when they join.");
+      setLobbyStatus(null); // back to waiting-with-dots
       s.emit("player:ready", {}, ()=>{});
     });
   }catch(e){ offlineExplain(e); }
@@ -274,12 +287,9 @@ async function joinRoom(code){
       if(res.settings){ settings={...settings, ...res.settings}; }
       renderCode(code);
       renderSettings(false);
-      $("roomLink").value=location.origin+"/#join-"+code;
-      $("rivalBadgeLobby").textContent=peerName.slice(0,12).toUpperCase();
-      $("lobbyRoleNote").textContent=peerName+" is the host — they start the match.";
+      onPeerHere();
       $("btnStartMatch").disabled=true;
-      setLobbyStatus("Joined "+peerName+"’s room — waiting for them to start.");
-      setRivalPlaceholder(peerName+" connected", "video connecting…");
+      setLobbyStatus("Joined "+peerName+"’s room — waiting for them to start");
       openPeer(false);
       s.emit("player:ready", {}, ()=>{});
     });
@@ -315,10 +325,12 @@ function offlineExplain(e){
 
 /* ---------------- webrtc video ---------------- */
 
-function setRivalPlaceholder(main, small){
-  const ph=$("rivalPlaceholder");
-  ph.querySelector("span").textContent=main;
-  ph.querySelector("small").textContent=small;
+/* Opponent arrived: the waving robot steps aside, the VS badge pops, the
+   opponent's name chip appears over their frame. */
+function onPeerHere(){
+  $("lobbyOppName").textContent=peerName.slice(0,NAME_MAX).toUpperCase();
+  $("lobbyStage").classList.add("joined");
+  blip([523,659], 0.08);
 }
 
 function openPeer(initiator){
@@ -332,7 +344,8 @@ function openPeer(initiator){
       const v=$("videoRemote");
       v.srcObject=stream;
       v.classList.remove("hidden");
-      $("rivalPlaceholder").classList.add("hidden");
+      const ph=$("rivalPlaceholder");
+      if(ph) ph.classList.add("hidden");
       v.play().catch(()=>{});
     },
     onConnectionChange: st => {
@@ -346,7 +359,7 @@ function closePeer(){
   const v=$("videoRemote");
   if(v){ v.srcObject=null; v.classList.add("hidden"); }
   const ph=$("rivalPlaceholder");
-  if(ph){ ph.classList.remove("hidden"); setRivalPlaceholder("Waiting for rival…","share the room code or link below"); }
+  if(ph) ph.classList.remove("hidden");
 }
 
 /* ---------------- match flow (server-driven) ---------------- */
@@ -359,12 +372,13 @@ function resetRivalPanel(){
     esc(peerName)+"’s AI runs on their device — first to convince their AI wins the word!</span></div>";
 }
 
-function onMatchStart({startAt, rounds, players}={}){
+function onMatchStart({startAt, matchEndsAt, players}={}){
   const myId=socket.id;
   const rec=(players||[]).find(p=>p.id!==myId);
   if(rec && rec.name) peerName=rec.name;
 
-  state.game={ mode:"online", word:null, round:0, rounds:rounds||settings.rounds,
+  state.game={ mode:"online", word:null, round:0, rounds:0,
+               matchEndsAt:perfFromServer(matchEndsAt),
                wordEnd:0, wordStart:0, holdSince:0, score:0, rivalScore:0, streak:0,
                results:[], roundId:null, claimed:false, bestWrong:{} };
   if(!transition("countdown")){ state.game=null; return; }
@@ -372,8 +386,9 @@ function onMatchStart({startAt, rounds, players}={}){
   resetRivalPanel();
   $("pillScore").textContent="0";
   $("pillStreak").textContent="x1";
-  $("pillRound").textContent="1 / "+state.game.rounds;
-  renderDots(1, state.game.rounds);
+  /* time-based mode: the round pill becomes the match clock */
+  document.querySelector(".statpill.round .lab").textContent="Match";
+  $("pillRound").textContent=fmtTime(state.game.matchEndsAt-performance.now());
 
   const cd=$("countdown");
   cd.classList.remove("hidden");
@@ -393,7 +408,7 @@ function onMatchStart({startAt, rounds, players}={}){
   };
 }
 
-function onRoundStart({roundId, word, roundNum, rounds, endsAt}={}){
+function onRoundStart({roundId, word, roundNum, endsAt}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
   if(gameState()!=="playing" && !transition("playing")) return;
@@ -405,8 +420,6 @@ function onRoundStart({roundId, word, roundNum, rounds, endsAt}={}){
   game.wordStart=performance.now();
   game.wordEnd=perfFromServer(endsAt);
   $("vsWord").textContent=game.word;
-  $("pillRound").textContent=game.round+" / "+(rounds||game.rounds);
-  renderDots(game.round, rounds||game.rounds);
   const vw=$("vsWordCard");
   if(vw){ vw.classList.remove("wordswap"); void vw.offsetWidth; vw.classList.add("wordswap"); }
   if(!game.timer) game.timer=setInterval(gameTick,100);
@@ -487,6 +500,8 @@ export function leaveRoom(){
   if(socket && socket.connected && roomCode) socket.emit("room:leave", {}, ()=>{});
   roomCode=null;
   closePeer();
+  const stage=$("lobbyStage");
+  if(stage) stage.classList.remove("joined");
 }
 
 /* Quit button during an online match. */

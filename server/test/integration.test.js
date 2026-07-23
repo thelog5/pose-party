@@ -53,7 +53,7 @@ try {
   ok(/^[A-Z2-9]{6}$/.test(r.code || ""), `room created with code ${r.code}`);
   const code = r.code;
 
-  r = await emit(C, "room:create", { name: "X", labels: ["idle","x"], settings: { rounds: 99, wordSecs: 10, target: 5 } });
+  r = await emit(C, "room:create", { name: "X", labels: ["idle","x"], settings: { matchSecs: 9999, wordSecs: 10 } });
   ok(r.error === "bad-payload", `out-of-range settings rejected (${r.error})`);
 
   r = await emit(B, "room:join", { code: "ZZZZZZ", name: "Bob", labels: LABELS_B });
@@ -80,14 +80,14 @@ try {
   await Promise.all([aReady, bReady]);
   ok(true, "both clients told room:ready");
 
-  r = await emit(B, "room:settings", { settings: { rounds: 4, wordSecs: 15, target: 5 } });
+  r = await emit(B, "room:settings", { settings: { matchSecs: 120, wordSecs: 15 } });
   ok(r.error === "not-host", `non-host cannot change settings (${r.error})`);
 
   const aStart = once(A, "match:start"), bStart = once(B, "match:start");
   r = await emit(A, "match:begin", {});
   ok(r.ok === true, "host begins the match");
   const [ms] = await Promise.all([aStart, bStart]);
-  ok(ms.rounds === 3, `match:start rounds=3`);
+  ok(ms.matchEndsAt > ms.startAt, "match:start carries the match deadline");
   ok(ms.startAt > Date.now() - 100, "startAt in the future");
   const bobName = ms.players.find(p => p.name !== "Alice")?.name;
   ok(bobName === "Bobscript", `name sanitized server-side ("${bobName}")`);
@@ -157,31 +157,33 @@ try {
   await peerLeft;
   ok(true, "peer notified on disconnect");
 
-  // settings broadcast + target score ends the match early
-  console.log("settings + target score:");
+  // settings broadcast + the match clock ends the match
+  console.log("settings + match time:");
   const H = connect(URL, { transports: ["websocket"] });
   const I = connect(URL, { transports: ["websocket"] });
   await Promise.all([once(H, "connect"), once(I, "connect")]);
-  const r4c = await emit(H, "room:create", { name: "Hana", labels: SHARED, settings: { rounds: 10, wordSecs: 10, target: 5 } });
+  const r4c = await emit(H, "room:create", { name: "Hana", labels: SHARED, settings: { matchSecs: 10, wordSecs: 5 } });
   ok(!!r4c.code, "room with custom settings created");
   const rj = await emit(I, "room:join", { code: r4c.code, name: "Ivy", labels: SHARED });
-  ok(rj.settings && rj.settings.rounds === 10 && rj.settings.target === 5, `joiner got settings in ack (${JSON.stringify(rj.settings)})`);
+  ok(rj.settings && rj.settings.matchSecs === 10 && rj.settings.wordSecs === 5, `joiner got settings in ack (${JSON.stringify(rj.settings)})`);
   const iSettings = once(I, "room:settings");
-  r = await emit(H, "room:settings", { settings: { rounds: 10, wordSecs: 10, target: 1 } });
+  r = await emit(H, "room:settings", { settings: { matchSecs: 10, wordSecs: 10 } });
   ok(r.ok === true, "host settings update accepted");
   const sPayload = await iSettings;
-  ok(sPayload.settings.target === 1, "joiner received settings broadcast");
+  ok(sPayload.settings.wordSecs === 10, "joiner received settings broadcast");
   const hReady = once(H, "room:ready");
   await emit(H, "player:ready", {}); await emit(I, "player:ready", {});
   await hReady;
-  const hStart = once(H, "round:start");
+  const hStart = once(H, "match:start");
   await emit(H, "match:begin", {});
-  const hr1 = await hStart;
-  const hEnd = once(H, "match:end", 4000), iEnd = once(I, "match:end", 4000);
+  const hs = await hStart;
+  ok(hs.matchEndsAt - Date.now() <= 10500, "deadline ≈ startAt + 10s");
+  // claim the first word, then let rounds run; the 10s clock must end it
+  const hr1 = await once(H, "round:start");
   await emit(H, "round:claim", { roundId: hr1.roundId });
-  const [endH] = await Promise.all([hEnd, iEnd]);
+  const endH = await once(H, "match:end", 16000);
   const hScore = endH.scores.find(p => p.name === "Hana").score;
-  ok(hScore === 1, `match ended at target score 1 after round 1 (Hana=${hScore})`);
+  ok(hScore >= 1, `match ended by the clock with scores intact (Hana=${hScore})`);
   H.disconnect(); I.disconnect();
 
   console.log("abuse:");

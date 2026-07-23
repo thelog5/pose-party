@@ -161,7 +161,7 @@ ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled),
 
 // ---- party waiting room ----
 console.log("party lobby:");
-await page.click("#logoHome");
+await page.click("#btnExitLobby");
 await page.click("#modeParty");
 ok(await fsmState() === "party", "PARTY card opens the party waiting room");
 ok(await bodyScreen() === "party", "party screen shown");

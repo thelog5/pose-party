@@ -47,9 +47,8 @@ export function createRoomStore({ config, emit }){
       players: [{ id: socketId, name, labels, score: 0, ready: false }],
       /* host-picked, validated in index.js; falls back to server config */
       settings: {
-        rounds: settings?.rounds ?? config.rounds,
+        matchMs: settings?.matchMs ?? config.matchMs,
         wordMs: settings?.wordMs ?? config.wordMs,
-        target: settings?.target ?? Infinity,
       },
       phase: "lobby",              // lobby | starting | round | between | done
       roundNum: 0,
@@ -80,8 +79,7 @@ export function createRoomStore({ config, emit }){
 
   function publicSettings(room){
     const s = room.settings;
-    return { rounds: s.rounds, wordSecs: Math.round(s.wordMs/1000),
-             target: Number.isFinite(s.target) ? s.target : 0 };
+    return { matchSecs: Math.round(s.matchMs/1000), wordSecs: Math.round(s.wordMs/1000) };
   }
 
   /* Host tweaks settings while the room is still in the lobby. */
@@ -90,7 +88,7 @@ export function createRoomStore({ config, emit }){
     if(!room) return { error: "not-in-room" };
     if(room.players[0].id !== socketId) return { error: "not-host" };
     if(room.phase !== "lobby") return { error: "match-in-progress" };
-    room.settings = { rounds: s.rounds, wordMs: s.wordMs, target: s.target };
+    room.settings = { matchMs: s.matchMs, wordMs: s.wordMs };
     const peer = peerOf(room, socketId);
     if(peer) emit(peer.id, "room:settings", { settings: publicSettings(room) });
     return { ok: true };
@@ -142,15 +140,18 @@ export function createRoomStore({ config, emit }){
     room.phase = "starting";
     room.deck = shuffledDeck(room);
     const startAt = Date.now() + config.preCountMs;
+    /* time-based mode: the match clock starts when round 1 does */
+    room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
-      emit(p.id, "match:start", { startAt, rounds: room.settings.rounds, players: scoresPayload(room) });
+      emit(p.id, "match:start", { startAt, matchEndsAt: room.matchEndsAt, players: scoresPayload(room) });
     room.timer = setTimeout(() => startRound(room), config.preCountMs);
   }
 
   function startRound(room){
     if(!rooms.has(room.code)) return;
     room.roundNum++;
-    if(room.roundNum > room.settings.rounds){ return endMatch(room); }
+    /* match ends when its clock runs out (rounds is only a safety cap) */
+    if(Date.now() >= room.matchEndsAt || room.roundNum > config.rounds){ return endMatch(room); }
     if(!room.deck.length) room.deck = shuffledDeck(room);
     room.phase = "round";
     room.word = room.deck.pop();
@@ -160,7 +161,7 @@ export function createRoomStore({ config, emit }){
     for(const p of room.players)
       emit(p.id, "round:start", {
         roundId: room.roundId, word: room.word,
-        roundNum: room.roundNum, rounds: room.settings.rounds,
+        roundNum: room.roundNum,
         endsAt: room.roundEnd, scores: scoresPayload(room),
       });
     room.timer = setTimeout(() => resolveRound(room, null, "timeout"), room.settings.wordMs);
@@ -195,11 +196,7 @@ export function createRoomStore({ config, emit }){
         scores: scoresPayload(room),
       });
     room.roundId = null;
-    /* first to the target score ends the match early */
-    if(winner && winner.score >= room.settings.target)
-      room.timer = setTimeout(() => endMatch(room), config.betweenRoundsMs);
-    else
-      room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
+    room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
   }
 
   function endMatch(room){

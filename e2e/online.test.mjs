@@ -67,26 +67,22 @@ try {
   ok(true, "both players booted against the node server (CSP live)");
 
   console.log("lobby:");
-  await act(A, () => A.evaluate(() => { document.getElementById("lobbyName").value = ""; localStorage.setItem("poseCharadesName", "Alice"); }));
+  await act(A, () => A.evaluate(() => { localStorage.setItem("poseCharadesName", "Alice"); }));
   await act(A, () => A.click("#modeVS"));
-  // room auto-creates; code appears in the boxes
-  await A.waitForFunction(() => {
-    const b = document.getElementById("codeBoxes").children;
-    return [...b].every(x => /^[A-Z2-9]$/.test(x.textContent));
-  }, { timeout: 10000, polling: 300 });
-  const code = await A.evaluate(() => [...document.getElementById("codeBoxes").children].map(b => b.textContent).join(""));
+  // room auto-creates; code appears on the invite card
+  await A.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
+  const code = await txt(A, "#roomCodeText");
   ok(/^[A-Z2-9]{6}$/.test(code), `room auto-created with code ${code}`);
-  const link = await A.evaluate(() => document.getElementById("roomLink").value);
-  ok(link === `${APP}/#join-${code}`, `share link rendered (${link})`);
-  ok(await A.evaluate(() => document.getElementById("btnStartMatch").disabled), "START disabled before rival joins");
+  ok(await A.evaluate(() => document.getElementById("btnStartMatch").disabled), "START faded/disabled before rival joins");
+  ok(await A.evaluate(() => !document.getElementById("lobbyStage").classList.contains("joined")), "waiting robot visible before join");
+  ok(await A.evaluate(() => document.getElementById("lobbyName").value) === "Alice", "name tag prefilled from storage");
 
-  // host tunes settings: rounds 5->2, timer 30->20s, target stays 5
-  await act(A, () => A.click("#roundsMinus"));
-  await act(A, () => A.click("#roundsMinus"));
-  await act(A, () => A.click("#roundsMinus"));
-  await act(A, () => A.click("#timerMinus"));
-  await act(A, () => A.click("#timerMinus"));
-  ok(await txt(A, "#setRounds") === "2" && await txt(A, "#setTimer") === "20s", "host adjusted settings (2 rounds, 20s)");
+  // host tunes the time-based settings: match 3:00 -> 2:00, word 30 -> 20s
+  await act(A, () => A.click("#matchMinus"));
+  await act(A, () => A.click("#matchMinus"));
+  await act(A, () => A.click("#wordMinus"));
+  await act(A, () => A.click("#wordMinus"));
+  ok(await txt(A, "#setMatch") === "2:00" && await txt(A, "#setWord") === "20s", `host adjusted settings (${await txt(A,"#setMatch")}, ${await txt(A,"#setWord")})`);
 
   // B joins via the share LINK (exercises #join-CODE handling)
   await act(B, () => B.evaluate(() => localStorage.setItem("poseCharadesName", "Bob")));
@@ -95,10 +91,11 @@ try {
   await B.waitForFunction(() => document.body.dataset.state === "lobby", { timeout: 20000, polling: 300 });
   await B.waitForFunction(() => /waiting for .{1,20} to start/i.test(document.getElementById("lobbyStatus").textContent), { timeout: 15000, polling: 300 });
   ok(true, "B joined via link, sees waiting-for-host");
-  ok(await txt(B, "#setRounds") === "2", "B received host's settings (2 rounds)");
-  ok(await B.evaluate(() => document.getElementById("roundsMinus").disabled), "B cannot edit settings");
-  const badge = await txt(B, "#rivalBadgeLobby");
-  ok(badge === "ALICE", `B sees host name on rival card (${badge})`);
+  ok(await txt(B, "#setMatch") === "2:00", "B received host's settings (2:00 match)");
+  ok(await B.evaluate(() => document.getElementById("matchMinus").disabled), "B cannot edit settings");
+  ok(await B.evaluate(() => document.getElementById("lobbyStage").classList.contains("joined")), "B's lobby switched to joined state");
+  const badge = await txt(B, "#lobbyOppName");
+  ok(badge === "ALICE", `B sees host name on the opponent chip (${badge})`);
 
   // host START unlocks and begins
   await A.waitForFunction(() => !document.getElementById("btnStartMatch").disabled, { timeout: 10000, polling: 300 });
@@ -112,7 +109,8 @@ try {
   ok(await A.evaluate(() => document.body.dataset.screen) === "match", "match screen shown");
   const wordA = await txt(A, "#vsWord"), wordB = await txt(B, "#vsWord");
   ok(wordA === wordB && wordA.length > 0, `same word on both screens: "${wordA}"`);
-  ok(await A.evaluate(() => document.getElementById("roundDots").children.length) === 2, "round dots match settings (2)");
+  ok(await A.evaluate(() => document.querySelector(".statpill.round .lab").textContent) === "Match", "round pill relabeled to match clock");
+  ok(/^\d+:\d\d$/.test(await txt(A, "#pillRound")), `match clock ticking (${await txt(A, "#pillRound")})`);
 
   // WebRTC both ways
   await A.waitForFunction(() => {
@@ -132,21 +130,25 @@ try {
   ok(/Alice wins/i.test(await txt(B, "#pointHeadline")), `B sees rival banner ("${await txt(B, "#pointHeadline")}")`);
   ok(await txt(A, "#pillScore") === "1", "A score pill = 1 (server points)");
 
-  console.log("round 2 — Bob wins, match ends by rounds:");
+  console.log("round 2 — Bob wins; then leaves:");
   await waitState(B, "playing", 8000);
   await winNow(B);
-  await waitState(A, "results", 8000); await waitState(B, "results", 8000);
-  const titleA = await txt(A, "#rescard h2"), titleB = await txt(B, "#rescard h2");
-  ok(titleA === "YOU 1 — BOB 1", `A results: "${titleA}"`);
-  ok(titleB === "YOU 1 — ALICE 1", `B results: "${titleB}"`);
+  await waitState(A, "word-won", 5000);
+  await waitState(A, "playing", 8000); // time-based mode rolls straight into round 3
+  ok(await txt(A, "#pillScore") === "1" && await txt(B, "#pillScore") === "1", "both players' score pills read 1");
+  await act(B, () => B.click("#btnExitMatch"));
+  await waitState(B, "results", 5000);
+  ok(true, "quitter lands on results");
+  await waitState(A, "results", 6000);
+  ok(/left early/i.test(await txt(A, "#rescard .sub")), `peer sees early end ("${await txt(A, "#rescard .sub")}")`);
 
-  console.log("peer-left handling:");
+  console.log("replay -> fresh lobby + join by typed code:");
   await act(A, () => A.click("#btnAgain")); // online replay -> fresh lobby
-  await A.waitForFunction(() => {
-    const b = document.getElementById("codeBoxes").children;
-    return [...b].every(x => /^[A-Z2-9]$/.test(x.textContent));
-  }, { timeout: 10000, polling: 300 });
-  const code2 = await A.evaluate(() => [...document.getElementById("codeBoxes").children].map(b => b.textContent).join(""));
+  await A.waitForFunction(c => {
+    const t = document.getElementById("roomCodeText").textContent;
+    return /^[A-Z2-9]{6}$/.test(t) && t !== c;
+  }, { timeout: 10000, polling: 300 }, code);
+  const code2 = await txt(A, "#roomCodeText");
   ok(code2 !== code, `replay creates a fresh room (${code2})`);
   await act(B, () => B.click("#btnAgain"));
   await waitState(B, "lobby", 10000);
@@ -154,13 +156,7 @@ try {
   await act(B, () => B.type("#joinCode", code2));
   await act(B, () => B.click("#btnJoinRoom"));
   await A.waitForFunction(() => !document.getElementById("btnStartMatch").disabled, { timeout: 10000, polling: 300 });
-  await act(A, () => A.click("#btnStartMatch"));
-  await waitState(A, "playing", 12000); await waitState(B, "playing", 12000);
-  await act(B, () => B.click("#btnExitMatch"));
-  await waitState(B, "results", 5000);
-  ok(true, "quitter lands on results");
-  await waitState(A, "results", 6000);
-  ok(/left early/i.test(await txt(A, "#rescard .sub")), `peer sees early end ("${await txt(A, "#rescard .sub")}")`);
+  ok(true, "typed-code join unlocked the host's START");
 
   console.log("hygiene:");
   for (const tag of ["A", "B"]) {

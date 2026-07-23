@@ -91,6 +91,7 @@ export function startGame(mode="ai"){
                results:[], bestWrong:{} };
   if(!transition("countdown")){ state.game=null; return; }
   updateHud();
+  document.querySelector(".statpill.round .lab").textContent="Round";
   $("pillRound").textContent="1 / "+ROUNDS;
   runPreCount(()=>{
     if(gameState()!=="countdown" || !state.game) return; // user backed out
@@ -252,6 +253,8 @@ export function gameTick(){
 
   const wLeft=Math.max(0,game.wordEnd-performance.now());
   setTxt("pillTime",fmtTime(wLeft));
+  if(game.mode==="online" && game.matchEndsAt)
+    setTxt("pillRound",fmtTime(Math.max(0,game.matchEndsAt-performance.now())));
 
   if(game.mode==="vs"){
     const rtop=fakeRivalGuesses();
