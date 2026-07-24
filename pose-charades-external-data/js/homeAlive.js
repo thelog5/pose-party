@@ -1,11 +1,12 @@
 /* Makes the v2 home screen feel alive. The robot idles in a constant wave
    (CSS); this module owns the stateful behaviors — the robot's mood, the
    speech-bubble phrase bank, click "shakes", and alpha-aware pointer
-   routing so big transparent PNGs (the robot) never block the paper
-   scraps behind them. */
+   routing so transparent paper art never blocks the pieces beneath it. */
 
 import { $ } from "./dom.js";
 import { blip } from "./audio.js";
+import { wireAlphaHitAreas } from "./alphaHit.js";
+import { onTransition } from "./fsm.js";
 
 /* The bubble keeps the designed voice but never repeats the file's exact
    line twice in a row — tap the bubble (or the robot) to cycle. */
@@ -68,48 +69,39 @@ function react(el){
   blip(notes, 0.06);
 }
 
-/* ---------- alpha-aware pointer routing ----------
-   The robot's body/head are large PNGs whose transparent corners cover the
-   torn paper scraps beneath (bottom-left wave). Sample the pixel under the
-   cursor; when it's transparent, the element goes pointer-transparent so
-   hover/clicks fall through to whatever is really underneath. */
-const alphaMaps = new Map();
-
-function buildAlphaMap(img){
-  const draw = () => {
-    const cv = document.createElement("canvas");
-    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
-    const cx = cv.getContext("2d", { willReadFrequently: true });
-    cx.drawImage(img, 0, 0);
-    alphaMaps.set(img, cx);
-  };
-  if(img.complete && img.naturalWidth) draw();
-  else img.addEventListener("load", draw, { once: true });
+function spinConfetti(){
+  document.querySelectorAll("#homeStage .iv.conf").forEach(el=>{
+    el.classList.remove("shook","spun","popped"); void el.offsetWidth;
+    el.classList.add("spun");
+  });
 }
 
-function routePointer(e){
-  for(const img of alphaMaps.keys()){
-    const cx = alphaMaps.get(img);
-    const r = img.getBoundingClientRect();
-    if(e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom){
-      img.style.pointerEvents = "";
-      continue;
-    }
-    const px = Math.floor((e.clientX - r.left) / r.width * img.naturalWidth);
-    const py = Math.floor((e.clientY - r.top) / r.height * img.naturalHeight);
-    let alpha = 255;
-    try{ alpha = cx.getImageData(px, py, 1, 1).data[3]; }catch(_){}
-    img.style.pointerEvents = alpha > 16 ? "" : "none";
+function spinConfettiWhenHomeIsReady(){
+  const status = $("status");
+  if(!status || status.style.display === "none"){
+    spinConfetti();
+    return;
   }
+
+  const observer = new MutationObserver(()=>{
+    if(status.style.display !== "none") return;
+    observer.disconnect();
+    if(document.body.dataset.screen === "home") spinConfetti();
+  });
+  observer.observe(status, { attributes:true, attributeFilter:["style"] });
 }
 
 export function wireHomeAlive(){
   $("speechBubble").onclick = cyclePhrase;
   $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
   $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
-  document.querySelectorAll("#homeStage .iv").forEach(el => {
+  document.querySelectorAll("#homeStage .iv:not(.wave)").forEach(el => {
     el.addEventListener("click", () => react(el));
   });
-  for(const id of ["robotBody", "robotHead"]) buildAlphaMap($(id));
-  $("homeStage").addEventListener("pointermove", routePointer);
+  wireAlphaHitAreas(
+    $("homeStage"),
+    ".iv, #robotBody, #robotHead, .fh.card, .fh.bubble",
+  );
+  onTransition(to=>{ if(to==="menu") requestAnimationFrame(spinConfetti); });
+  spinConfettiWhenHomeIsReady();
 }

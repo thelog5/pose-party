@@ -26,6 +26,7 @@ const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
 const DEFAULT_SETTINGS = { matchSecs:180, wordSecs:30 };
 const NAME_MAX = 10;
+const LOBBY_NAME_IDS = ["lobbyName", "lobbyYouName", "lobbyOppName"];
 
 let socket = null;
 let peer = null;
@@ -38,9 +39,44 @@ let clockOffset = 0;          // serverNow ≈ Date.now() + clockOffset
 let countdownTimer = null;
 let wired = false;
 let pendingJoin = null;       // code from a #join-XXXXXX link
+let nameFitCanvas = null;
+let nameFitFrame = 0;
 
 const serverNow = () => Date.now() + clockOffset;
 const perfFromServer = tServer => performance.now() + (tServer - serverNow());
+
+/* party.js registers its handlers here; the shared lobby chrome (join
+   input, settings steppers, start, copy) routes by stage mode. */
+export const partyBridge = { create:null, join:null, start:null, settings:null, leave:null, rejoin1v1:null };
+const lobbyMode = () => $("lobbyStage").dataset.mode || "1v1";
+
+/* Preserve the large Figma type for short names, then measure and shrink only
+   when a longer valid name would otherwise escape its paper label. */
+function fitLobbyNameElement(el){
+  if(!el || !el.clientWidth) return;
+  el.style.removeProperty("font-size");
+  const style=getComputedStyle(el);
+  const base=parseFloat(style.fontSize);
+  const raw=("value" in el ? el.value : el.textContent).trim() || "YOU";
+  const text=style.textTransform==="uppercase" ? raw.toUpperCase() : raw;
+  if(!nameFitCanvas) nameFitCanvas=document.createElement("canvas");
+  const ctx=nameFitCanvas.getContext("2d");
+  ctx.font=style.fontStyle+" "+style.fontWeight+" "+base+"px "+style.fontFamily;
+  const spacing=parseFloat(style.letterSpacing)||0;
+  const measured=ctx.measureText(text).width+Math.max(0,text.length-1)*spacing;
+  const available=el.clientWidth-(parseFloat(style.paddingLeft)||0)-
+    (parseFloat(style.paddingRight)||0)-base*.16;
+  const scale=Math.min(1, available/Math.max(measured,1));
+  const fitted=scale<1 ? base*scale*.97 : base;
+  el.style.fontSize=Math.max(base*.36,fitted)+"px";
+}
+
+function fitLobbyNames(){
+  cancelAnimationFrame(nameFitFrame);
+  nameFitFrame=requestAnimationFrame(()=>{
+    for(const id of LOBBY_NAME_IDS) fitLobbyNameElement($(id));
+  });
+}
 
 /* Leaving the lobby or an online match through any exit that isn't the
    results screen tells the server and drops the peer link. Registered at
@@ -53,22 +89,30 @@ onTransition((to, from) => {
     clearInterval(countdownTimer);
   }
   if(from==="lobby" && to!=="countdown" && to!=="lobby") leaveRoom();
+  if(from==="party" && to==="lobby") leaveRoom(); // mode hop cleans 1v1 side too
 });
 
 /* ---------------- lobby ---------------- */
 
 export function setPendingJoin(code){ pendingJoin=code; }
 
-export function enterLobby(){
+export function enterLobby(mode="1v1"){
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
     toast("Train the AI first — record idle plus at least one action word. Tap SETTINGS.");
     transition("training"); return;
   }
-  if(!transition("lobby")) return;
+  if(!transition(mode==="party" ? "party" : "lobby")) return;
+  $("lobbyStage").dataset.mode = mode;
   wireLobby();
   $("lobbyName").value = localStorage.getItem(NAME_KEY) || "";
   resetLobbyUi();
+  fitLobbyNames();
   const joining=pendingJoin; pendingJoin=null;
+  if(mode==="party"){
+    if(joining && partyBridge.join) partyBridge.join(joining);
+    else if(partyBridge.create) partyBridge.create();
+    return;
+  }
   if(joining) joinRoom(joining);
   else createRoom();
 }
@@ -81,6 +125,7 @@ function resetLobbyUi(){
   $("lobbyStage").classList.remove("joined");
   $("lobbyOppName").textContent="RIVAL";
   $("lobbyYouName").textContent=(localStorage.getItem(NAME_KEY)||"YOU").slice(0,NAME_MAX);
+  fitLobbyNames();
   const start=$("btnStartMatch");
   start.disabled=true; start.classList.remove("ready");
   setLobbyStatus("Connecting…");
@@ -102,10 +147,16 @@ function wireLobby(){
   $("btnJoinRoom").onclick=()=>{
     const code=$("joinCode").value.trim().toUpperCase();
     if(code.length!==6) return setLobbyStatus("Codes are 6 letters/numbers, like ABC234");
+    if(lobbyMode()==="party"){
+      partyBridge.leave?.();
+      partyBridge.join?.(code);
+      return;
+    }
     leaveRoom();
     joinRoom(code);
   };
   $("btnStartMatch").onclick=()=>{
+    if(lobbyMode()==="party"){ partyBridge.start?.(); return; }
     if(!socket || !isHost) return;
     socket.emit("match:begin", {}, res=>{
       if(res && res.error) setLobbyStatus(beginError(res.error));
@@ -117,11 +168,14 @@ function wireLobby(){
     const v=e.target.value.slice(0,NAME_MAX);
     e.target.value=v;
     $("lobbyYouName").textContent=v.trim()||"YOU";
+    fitLobbyNames();
   });
   $("lobbyName").onchange=()=>{
     localStorage.setItem(NAME_KEY, $("lobbyName").value.trim().slice(0,NAME_MAX));
     toast("Name saved — it applies to the next room you create or join.");
   };
+  addEventListener("resize", fitLobbyNames);
+  document.fonts?.ready.then(fitLobbyNames);
   wireStepper("match", v=>({...settings, matchSecs:clamp(v,60,600)}), 30);
   wireStepper("word",  v=>({...settings, wordSecs:clamp(v,10,60)}), 5);
 }
@@ -132,6 +186,12 @@ const fmtSecs=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
 function wireStepper(key, apply, step){
   const read=()=> key==="match"?settings.matchSecs:settings.wordSecs;
   const change=delta=>{
+    if(lobbyMode()==="party"){
+      settings=apply(read()+delta*step);
+      renderSettings(true);
+      partyBridge.settings?.(settings);
+      return;
+    }
     if(!isHost) return;
     settings=apply(read()+delta*step);
     renderSettings(isHost);
@@ -154,6 +214,7 @@ function renderCode(code){
 
 function setLobbyStatus(text){
   const el=$("lobbyStatus");
+  el.classList.toggle("compact", Boolean(text && text.length > 34));
   if(!text){
     el.innerHTML='Waiting for friend to join<i id="dotsSmall">...</i>';
     return;
@@ -281,6 +342,13 @@ async function joinRoom(code){
     const s=await ensureSocket();
     setLobbyStatus("Joining "+code+"…");
     s.emit("room:join", { code, name, labels:state.model.labels }, res=>{
+      if(res && res.error==="party-room"){
+        // that code is a party — hop over with the same code
+        $("lobbyStage").dataset.mode="party";
+        transition("party");
+        partyBridge.join?.(code);
+        return;
+      }
       if(!res || res.error) return setLobbyStatus(lobbyError(res));
       isHost=false; roomCode=code;
       peerName=String(res.peerName||"Rival");
@@ -330,6 +398,7 @@ function offlineExplain(e){
 function onPeerHere(){
   $("lobbyOppName").textContent=peerName.slice(0,NAME_MAX).toUpperCase();
   $("lobbyStage").classList.add("joined");
+  fitLobbyNames();
   blip([523,659], 0.08);
 }
 
@@ -503,6 +572,14 @@ export function leaveRoom(){
   const stage=$("lobbyStage");
   if(stage) stage.classList.remove("joined");
 }
+
+/* Shared-chrome helpers for the party controller. */
+export { ensureSocket, myName, setLobbyStatus };
+export const lobbySettings = () => settings;
+export const renderLobbySettings = editable => renderSettings(editable);
+export const setLobbyCode = code => { roomCode = code; renderCode(code); };
+
+partyBridge.rejoin1v1 = code => { transition("lobby"); $("lobbyStage").dataset.mode="1v1"; joinRoom(code); };
 
 /* Quit button during an online match. */
 export function quitOnline(){

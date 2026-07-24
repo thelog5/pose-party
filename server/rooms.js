@@ -43,6 +43,7 @@ export function createRoomStore({ config, emit }){
     const code = randomCode();
     const room = {
       code,
+      kind: "1v1",
       createdAt: Date.now(),
       players: [{ id: socketId, name, labels, score: 0, ready: false }],
       /* host-picked, validated in index.js; falls back to server config */
@@ -68,6 +69,7 @@ export function createRoomStore({ config, emit }){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     const room = rooms.get(code);
     if(!room) return { error: "no-such-room" };
+    if(room.kind === "party") return { error: "party-room" }; // client retries as party
     if(room.players.length >= 2) return { error: "room-full" };
     if(room.phase !== "lobby") return { error: "match-in-progress" };
     room.players.push({ id: socketId, name, labels, score: 0, ready: false });
@@ -207,6 +209,110 @@ export function createRoomStore({ config, emit }){
     destroyRoom(room.code); // players re-lobby with a fresh code for a rematch
   }
 
+  /* ---------------- party rooms (3v3 lobby) ----------------
+     Same store, kind:"party". Up to TEAM_CAP per side; players are
+     auto-balanced on join and may switch while the target team has room.
+     The host may start once both teams have at least MIN_PER_TEAM. The
+     party game itself ships later — the lobby is fully live. */
+  const TEAM_CAP = 3, MIN_PER_TEAM = 2, PARTY_CAP = TEAM_CAP * 2;
+
+  function partyRoster(room){
+    return {
+      hostId: room.players[0] ? room.players[0].id : null,
+      players: room.players.map(p => ({ id: p.id, name: p.name, team: p.team })),
+      settings: publicSettings(room),
+    };
+  }
+  function broadcastRoster(room){
+    for(const p of room.players) emit(p.id, "party:roster", partyRoster(room));
+  }
+  const teamCount = (room, team) => room.players.filter(p => p.team === team).length;
+
+  function partyCreate(socketId, name, settings){
+    if(socketRoom.has(socketId)) return { error: "already-in-room" };
+    if(rooms.size >= config.maxRooms) return { error: "server-full" };
+    const code = randomCode();
+    const room = {
+      code, kind: "party", createdAt: Date.now(),
+      players: [{ id: socketId, name, team: "blue" }],
+      settings: {
+        matchMs: settings?.matchMs ?? config.matchMs,
+        wordMs: settings?.wordMs ?? config.wordMs,
+      },
+      phase: "lobby", timer: null,
+    };
+    rooms.set(code, room);
+    socketRoom.set(socketId, code);
+    return { code, roster: partyRoster(room) };
+  }
+
+  function partyJoin(socketId, code, name){
+    if(socketRoom.has(socketId)) return { error: "already-in-room" };
+    const room = rooms.get(code);
+    if(!room) return { error: "no-such-room" };
+    if(room.kind !== "party") return { error: "1v1-room" }; // client retries as 1v1
+    if(room.players.length >= PARTY_CAP) return { error: "room-full" };
+    if(room.phase !== "lobby") return { error: "match-in-progress" };
+    const blue = teamCount(room, "blue"), orange = teamCount(room, "orange");
+    const team = orange < blue ? "orange" : (blue < orange ? "blue" : (blue < TEAM_CAP ? "blue" : "orange"));
+    room.players.push({ id: socketId, name, team });
+    socketRoom.set(socketId, code);
+    broadcastRoster(room);
+    return { code, roster: partyRoster(room) };
+  }
+
+  function partyTeam(socketId, team){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(team !== "blue" && team !== "orange") return { error: "bad-payload" };
+    const me = playerOf(room, socketId);
+    if(me.team === team) return { ok: true };
+    if(teamCount(room, team) >= TEAM_CAP) return { error: "team-full" };
+    me.team = team;
+    broadcastRoster(room);
+    return { ok: true };
+  }
+
+  function partySettings(socketId, s){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.players[0].id !== socketId) return { error: "not-host" };
+    room.settings = { matchMs: s.matchMs, wordMs: s.wordMs };
+    broadcastRoster(room);
+    return { ok: true };
+  }
+
+  function partyStart(socketId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.players[0].id !== socketId) return { error: "not-host" };
+    if(teamCount(room, "blue") < MIN_PER_TEAM || teamCount(room, "orange") < MIN_PER_TEAM)
+      return { error: "need-teams" };
+    for(const p of room.players) emit(p.id, "party:started", { roster: partyRoster(room) });
+    return { ok: true };
+  }
+
+  /* Targeted mesh signaling: every pair of party members holds its own
+     WebRTC link, so blobs are relayed to one member, not broadcast. */
+  function partySignal(socketId, to, data){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    const dest = room.players.find(p => p.id === to);
+    if(!dest) return { error: "no-such-peer" };
+    emit(dest.id, "party:signal", { from: socketId, data });
+    return { ok: true };
+  }
+
+  function partyLeave(socketId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return;
+    room.players = room.players.filter(p => p.id !== socketId);
+    socketRoom.delete(socketId);
+    if(!room.players.length){ destroyRoom(room.code); return; }
+    for(const p of room.players) emit(p.id, "party:left", { id: socketId });
+    broadcastRoster(room);
+  }
+
   /* ---------------- teardown ---------------- */
 
   function destroyRoom(code){
@@ -220,6 +326,7 @@ export function createRoomStore({ config, emit }){
   function leave(socketId){
     const room = roomOf(socketId);
     if(!room) return;
+    if(room.kind === "party"){ partyLeave(socketId); return; }
     const peer = peerOf(room, socketId);
     if(peer) emit(peer.id, "peer:left", {});
     destroyRoom(room.code);
@@ -242,5 +349,7 @@ export function createRoomStore({ config, emit }){
   }
 
   return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
-           relaySignal, sweep, _rooms: rooms };
+           relaySignal, sweep,
+           partyCreate, partyJoin, partyTeam, partySettings, partyStart, partySignal,
+           _rooms: rooms };
 }

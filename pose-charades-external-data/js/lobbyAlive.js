@@ -4,6 +4,8 @@
 
 import { $ } from "./dom.js";
 import { onTransition } from "./fsm.js";
+import { blip } from "./audio.js";
+import { wireAlphaHitAreas } from "./alphaHit.js";
 
 const WAVE_MS = 1300;
 const DOTS_MS = 450;
@@ -20,7 +22,7 @@ function start(){
   dotsTimer = setInterval(() => {
     dots = (dots % 3) + 1;
     const s = ".".repeat(dots);
-    for(const id of ["dotsSign", "dotsBig", "dotsSmall"]){
+    for(const id of ["dotsBig", "dotsSmall"]){
       const el = $(id);
       if(el) el.textContent = s;
     }
@@ -33,5 +35,14 @@ function stop(){
 }
 
 export function wireLobbyAlive(){
-  onTransition(to => { if(to === "lobby") start(); else stop(); });
+  const stage=$("lobbyStage");
+  stage.querySelectorAll(".lobby-react").forEach(el=>{
+    el.addEventListener("click",()=>{
+      el.classList.remove("lobby-bop"); void el.offsetWidth;
+      el.classList.add("lobby-bop");
+      blip([523,659],.055);
+    });
+  });
+  wireAlphaHitAreas(stage,".lobby-alpha");
+  onTransition(to => { if(to === "lobby" || to === "party") start(); else stop(); });
 }

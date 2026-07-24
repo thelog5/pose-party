@@ -18,7 +18,7 @@ const ok = (cond, msg) => { console.log((cond ? "  ok  " : "  FAIL") + " " + msg
 /* fast match via env defaults; the UI will drive settings down further */
 const server = spawn("node", ["index.js"], {
   cwd: SERVER_DIR,
-  env: { ...process.env, PORT: String(PORT), PRECOUNT_MS: "1500", BETWEEN_ROUNDS_MS: "900" },
+  env: { ...process.env, PORT: String(PORT), PRECOUNT_MS: "1500", BETWEEN_ROUNDS_MS: "900", RATE_CREATE: "30", RATE_JOIN: "60" },
   stdio: "pipe",
 });
 await new Promise((res, rej) => {
@@ -157,6 +157,52 @@ try {
   await act(B, () => B.click("#btnJoinRoom"));
   await A.waitForFunction(() => !document.getElementById("btnStartMatch").disabled, { timeout: 10000, polling: 300 });
   ok(true, "typed-code join unlocked the host's START");
+
+  console.log("party lobby (live):");
+  // A opens a party room from home
+  await act(A, () => A.click("#btnExitLobby"));
+  await A.waitForFunction(() => document.body.dataset.state === "menu", { timeout: 8000, polling: 300 });
+  await act(A, () => A.click("#modeParty"));
+  await A.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
+  const pcode = await txt(A, "#roomCodeText");
+  ok(/^[A-Z2-9]{6}$/.test(pcode), `party room created (${pcode})`);
+  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name')?.textContent) === "YOU", "host camera tile on blue with YOU chip");
+  ok(await A.evaluate(() => document.getElementById("cameraDock").parentElement.id) === "ptB0", "host camera mounted in the team tile");
+
+  // B joins the party by typing the code while in party mode
+  await act(B, () => B.click("#btnExitLobby"));
+  await B.waitForFunction(() => document.body.dataset.state === "menu", { timeout: 8000, polling: 300 });
+  await act(B, () => B.click("#modeParty"));
+  await B.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
+  await act(B, () => B.evaluate(() => { document.getElementById("joinCode").value = ""; }));
+  await act(B, () => B.type("#joinCode", pcode));
+  await act(B, () => B.click("#btnJoinRoom"));
+  await B.waitForFunction(c => document.getElementById("roomCodeText").textContent === c, { timeout: 10000, polling: 300 }, pcode);
+  ok(true, "B joined the party by code");
+  await B.waitForFunction(() => document.querySelector('#ptO0 .pt-name')?.textContent === "YOU", { timeout: 8000, polling: 300 });
+  ok(true, "B auto-balanced onto orange");
+  await A.waitForFunction(() => !!document.querySelector('#ptO0 video'), { timeout: 8000, polling: 300 });
+  ok(true, "A sees B's tile appear (confetti poofed)");
+  // mesh video: B's feed lands in A's orange tile
+  await A.waitForFunction(() => {
+    const v = document.querySelector('#ptO0 video');
+    return v && v.videoWidth > 0;
+  }, { timeout: 15000, polling: 400 }).catch(() => {});
+  ok(await A.evaluate(() => (document.querySelector('#ptO0 video')?.videoWidth || 0) > 0), "mesh video flowing A<-B");
+
+  // gate: 1v1 split cannot start
+  ok(await A.evaluate(() => document.getElementById("btnStartMatch").disabled), "START stays gated below 2v2");
+  ok(/need 2 per team/i.test(await txt(A, "#lobbyStatus")), `host sees the gate hint ("${await txt(A, "#lobbyStatus")}")`);
+
+  // B switches to blue via the JOIN THIS TEAM button
+  await act(B, () => B.click("#btnJoinBlue"));
+  await B.waitForFunction(() => document.querySelector('#ptB1 .pt-name')?.textContent === "YOU", { timeout: 8000, polling: 300 });
+  ok(true, "B switched to blue (second tile)");
+  await A.waitForFunction(() => !!document.querySelector('#ptB1 video'), { timeout: 8000, polling: 300 });
+  ok(await A.evaluate(() => !document.querySelector('#ptO0 video')), "A's orange tile emptied after the switch");
+  ok(await B.evaluate(() => !document.getElementById("btnJoinBlue").disabled), "blue JOIN still visible (room for a third)");
+  await act(B, () => B.click("#btnExitLobby"));
+  await act(A, () => A.click("#btnExitLobby"));
 
   console.log("hygiene:");
   for (const tag of ["A", "B"]) {

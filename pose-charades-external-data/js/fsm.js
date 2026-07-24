@@ -18,9 +18,9 @@
 
 const TRANSITIONS = {
   "menu":      ["menu","training","lobby","countdown","party"],
-  "party":     ["menu","training","party"],
+  "party":     ["menu","training","party","lobby"],
   "training":  ["menu","training","countdown"],
-  "lobby":     ["menu","training","countdown","lobby"],
+  "lobby":     ["menu","training","countdown","lobby","party"],
   "countdown": ["playing","menu","training","results"],
   "playing":   ["word-won","results","menu","training"],
   "word-won":  ["playing","results","menu","training"],

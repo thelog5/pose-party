@@ -42,6 +42,28 @@ ok(await evalApp(`!!${mod("state.js")}.state.model`), "model trained on preload"
 const dockParent = await page.evaluate(() => document.getElementById("cameraDock").parentElement.id);
 ok(dockParent === "slotHomePark", `camera dock parked out of sight on home (${dockParent})`);
 ok(await page.evaluate(() => document.querySelector("header").classList.contains("hidden")), "home is immersive (no global header)");
+const waveProbe = await page.evaluate(() => {
+  const wave=document.querySelector(".iv.wave");
+  const rect=wave.getBoundingClientRect();
+  const visibleBottom=rect.top+rect.height*(437/501);
+  return {
+    x:rect.left+rect.width*.5,
+    y:rect.top+rect.height*.03,
+    bottomBleed:visibleBottom-innerHeight,
+  };
+});
+await page.mouse.move(waveProbe.x,waveProbe.y);
+await sleep(80);
+ok(await page.evaluate(() => document.querySelector(".iv.wave").style.pointerEvents === "none"), "transparent wave pixels fall through the hitbox");
+ok(waveProbe.bottomBleed > 12, `bottom-left wave keeps safe bleed below frame (${Math.round(waveProbe.bottomBleed)}px)`);
+await page.mouse.move(790,10);
+ok(await page.evaluate(() => [...document.querySelectorAll("#homeStage .iv.conf")].every(el => el.classList.contains("spun"))), "confetti spins when the loaded home screen is revealed");
+const waveReacted = await page.evaluate(() => {
+  const middleWave = [...document.querySelectorAll("#homeStage .iv.wave")].at(-1);
+  middleWave.click();
+  return ["shook","spun","popped"].some(cls => middleWave.classList.contains(cls));
+});
+ok(!waveReacted, "middle wave never gets a click-spin reaction");
 
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
@@ -158,29 +180,72 @@ await page.waitForFunction(
 );
 ok(true, "graceful no-server message shown");
 ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "START disabled without a rival");
+const lobbySandwich = await page.evaluate(() => {
+  const slot = document.getElementById("slotLobbyYou");
+  const panel = slot.previousElementSibling;
+  const frame = slot.nextElementSibling;
+  const sr = slot.getBoundingClientRect();
+  const fr = frame.getBoundingClientRect();
+  return {
+    cameraMounted: document.getElementById("cameraDock").parentElement === slot,
+    panelZ: Number(getComputedStyle(panel).zIndex),
+    slotZ: Number(getComputedStyle(slot).zIndex),
+    frameZ: Number(getComputedStyle(frame).zIndex),
+    widthRatio: sr.width / fr.width,
+    heightRatio: sr.height / fr.height,
+  };
+});
+ok(lobbySandwich.cameraMounted, "lobby camera mounted inside the blue paper aperture");
+ok(lobbySandwich.panelZ < lobbySandwich.slotZ && lobbySandwich.slotZ < lobbySandwich.frameZ, "video is sandwiched between paper background and torn overlay");
+ok(lobbySandwich.widthRatio > .94 && lobbySandwich.heightRatio > .92, "video fills the torn-frame opening");
+await page.hover(".settings");
+await sleep(240);
+ok(await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".settings")).translate.split(" ")[1]) < -1), "lobby paper cards lift on hover");
+await page.hover("#slotLobbyYou");
+await sleep(240);
+ok(await page.evaluate(() => [...document.querySelectorAll(".lobby-you-layer")].every(el => parseFloat(getComputedStyle(el).translate.split(" ")[1]) < -1)), "lobby camera layers lift together on hover");
+const lobbyType = await page.evaluate(async () => {
+  const input = document.getElementById("lobbyName");
+  input.value = "WWWWWWWWWW";
+  input.dispatchEvent(new Event("input", { bubbles:true }));
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const fits = el => {
+    const style = getComputedStyle(el);
+    const text = ("value" in el ? el.value : el.textContent).toUpperCase();
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const width = ctx.measureText(text).width;
+    const available = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return width <= available;
+  };
+  return {
+    labels:[...document.querySelectorAll(".settings .set-label")].map(el => el.textContent),
+    editorFits:fits(input),
+    chipFits:fits(document.getElementById("lobbyYouName")),
+  };
+});
+ok(lobbyType.labels.join("|") === "Match Timer|Word Timer", "lobby timer descriptions match their controls");
+ok(lobbyType.editorFits && lobbyType.chipFits, "maximum 10-character name fits the editor and video chip");
 
-// ---- party waiting room ----
+// ---- party lobby (shared stage, party mode; no server on a static host) ----
 console.log("party lobby:");
 await page.click("#btnExitLobby");
+ok(await fsmState() === "menu", "exit lobby -> home");
 await page.click("#modeParty");
-ok(await fsmState() === "party", "PARTY card opens the party waiting room");
-ok(await bodyScreen() === "party", "party screen shown");
-const code = await txt("#partyCode");
-ok(/^[A-Z2-9]{6}$/.test(code), `party room code rendered (${code})`);
-ok(await page.evaluate(() => document.getElementById("cameraDock").parentElement.id) === "partySlot", "your live tile holds the camera");
-ok(await txt("#blueCnt") === "2 / 4", "blue team 2/4 (you + robot)");
-ok(await page.evaluate(() => document.querySelectorAll("#blueGrid .ptile").length === 4 && document.querySelectorAll("#orangeGrid .ptile").length === 4), "party renders exactly four slots per team");
-await page.click("#partyName", { clickCount: 3 });
-await page.type("#partyName", "Logan");
-await page.keyboard.press("Enter");
-ok(await page.evaluate(() => localStorage.getItem("poseCharadesName")) === "Logan", "party name editor persists the player name");
-ok((await txt("#blueGrid .pname")).includes("Logan"), "party tile updates to the edited name");
-await page.click("#btnJoinOrange");
-ok(await txt("#orangeCnt") === "2 / 4", "switched to orange (2/4)");
-ok(await txt("#blueCnt") === "0 / 4", "blue emptied after switch");
-ok(await page.evaluate(() => document.getElementById("cameraDock")?.parentElement?.id) === "partySlot", "camera dock survived the team switch");
-ok(await page.evaluate(() => document.getElementById("btnPartyStart").disabled), "party START locked");
-await page.click("#btnPartyBack");
+ok(await fsmState() === "party", "PARTY card enters the party state");
+ok(await bodyScreen() === "lobby", "party shares the lobby stage");
+ok(await page.evaluate(() => document.getElementById("lobbyStage").dataset.mode) === "party", "stage flipped to party mode");
+ok(await page.evaluate(() => getComputedStyle(document.getElementById("lobbyRobotWait")).display) === "none", "1v1 robot hidden in party mode");
+ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinBlue")).display) !== "none", "blue JOIN THIS TEAM button visible");
+ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinOrange")).display) !== "none", "orange JOIN THIS TEAM button visible");
+ok(await page.evaluate(() => document.querySelectorAll(".pt-tile .pt-empty").length) === 6, "six waiting tiles rendered");
+ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "party START gated");
+await page.waitForFunction(
+  () => /Can’t reach the game server/.test(document.getElementById("lobbyStatus").textContent),
+  { timeout: 20000 }
+);
+ok(true, "graceful no-server message in party mode");
+await page.click("#btnExitLobby");
 ok(await fsmState() === "menu", "back to home");
 
 // ---- console errors ----

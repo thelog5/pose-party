@@ -10,7 +10,7 @@ import { state } from "./state.js";
 import { ROUNDS } from "./constants.js";
 
 const SCREENS = { home:"scrHome", solo:"scrSolo", lobby:"scrLobby", match:"scrMatch",
-                  party:"scrParty", train:"scrTrain", results:"scrResults" };
+                  train:"scrTrain", results:"scrResults" };
 
 /* where the local camera dock lives per screen (party manages its own slot) */
 const CAM_SLOT = { home:"slotHomePark", solo:"slotSolo", lobby:"slotLobbyYou",
@@ -23,7 +23,7 @@ function screenFor(fsmState){
     case "training": return "train";
     case "results": return "results";
     case "lobby": return "lobby";
-    case "party": return "party";
+    case "party": return "lobby"; // party shares the lobby stage (data-mode)
     case "countdown": case "playing": case "word-won":
       return (state.game && state.game.mode!=="ai") ? "match" : "solo";
     default: return "home";
@@ -67,7 +67,9 @@ export function render(fsmState){
   $("roundDots").classList.toggle("hidden", s!=="match" || state.game?.mode==="online");
 
   /* camera docks follow the screen (party places its own slot) */
-  if(CAM_SLOT[s]) mountCamera($(CAM_SLOT[s]));
+  /* in party mode the camera lives in the player's team tile (party.js) */
+  const partyMode = s==="lobby" && $("lobbyStage").dataset.mode==="party";
+  if(CAM_SLOT[s] && !partyMode) mountCamera($(CAM_SLOT[s]));
   /* the rival dock covers its host card edge-to-edge, so it must be hidden
      outright on screens that don't slot it — otherwise it blankets the page */
   $("rivalDock").classList.toggle("hidden", !RIVAL_SLOT[s]);

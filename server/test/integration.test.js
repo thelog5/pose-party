@@ -18,6 +18,8 @@ const ENV = {
   WORD_MS: "1200",
   PRECOUNT_MS: "250",
   BETWEEN_ROUNDS_MS: "150",
+  RATE_JOIN: "50",
+  RATE_CREATE: "8",
 };
 
 let fails = 0;
@@ -185,6 +187,87 @@ try {
   const hScore = endH.scores.find(p => p.name === "Hana").score;
   ok(hScore >= 1, `match ended by the clock with scores intact (Hana=${hScore})`);
   H.disconnect(); I.disconnect();
+
+  // ---- party rooms: 3v3 lobby ----
+  console.log("party rooms:");
+  const P = [];
+  for (let i = 0; i < 6; i++) P.push(connect(URL, { transports: ["websocket"] }));
+  await Promise.all(P.map(s => once(s, "connect")));
+  r = await emit(P[0], "party:create", { name: "Host" });
+  ok(/^[A-Z2-9]{6}$/.test(r.code || ""), `party room created (${r.code})`);
+  ok(r.roster.players[0].team === "blue", "creator lands on blue");
+  const pcode = r.code;
+
+  // cross-type hints
+  r = await emit(P[1], "room:join", { code: pcode, name: "X", labels: ["idle","a"] });
+  ok(r.error === "party-room", `1v1 join on a party code hints party (${r.error})`);
+  r = await emit(P[1], "party:join", { code: "ZZZZZZ", name: "X" });
+  ok(r.error === "no-such-room", "bad party code rejected");
+
+  // joiners auto-balance
+  for (let i = 1; i < 6; i++) {
+    r = await emit(P[i], "party:join", { code: pcode, name: "P" + i });
+    ok(!r.error, `P${i} joined (${JSON.stringify(r.error || r.roster.players.length + " players")})`);
+  }
+  let roster = r.roster;
+  const countTeam = (ros, t) => ros.players.filter(p => p.team === t).length;
+  ok(countTeam(roster, "blue") === 3 && countTeam(roster, "orange") === 3, "auto-balance filled 3v3");
+
+  const seventh = connect(URL, { transports: ["websocket"] });
+  await once(seventh, "connect");
+  r = await emit(seventh, "party:join", { code: pcode, name: "Late" });
+  ok(r.error === "room-full", `7th player rejected (${r.error})`);
+  seventh.disconnect();
+
+  // switching into a full team is refused
+  r = await emit(P[1], "party:team", { team: P[1].team === "blue" ? "orange" : "orange" });
+  // find P1's team from roster
+  const p1 = roster.players.find(p => p.name === "P1");
+  const otherTeam = p1.team === "blue" ? "orange" : "blue";
+  r = await emit(P[1], "party:team", { team: otherTeam });
+  ok(r.error === "team-full", `switch into a full team refused (${r.error})`);
+
+  // start gate: host only + needs 2v2
+  r = await emit(P[1], "party:start", {});
+  ok(r.error === "not-host", `non-host start refused (${r.error})`);
+  const startedAll = P.map(s => once(s, "party:started"));
+  r = await emit(P[0], "party:start", {});
+  ok(r.ok === true, "host start accepted at 3v3");
+  await Promise.all(startedAll);
+  ok(true, "party:started broadcast to all six");
+
+  // targeted signaling
+  const sigTo = roster.players.find(p => p.name === "P2").id;
+  const gotSig = once(P[2], "party:signal");
+  r = await emit(P[0], "party:signal", { to: sigTo, data: { type: "offer", sdp: "v=0 party" } });
+  ok(r.ok === true, "party signal relayed");
+  const psig = await gotSig;
+  ok(psig.data.sdp === "v=0 party" && !!psig.from, "peer got targeted signal with sender id");
+
+  // leave updates roster; below 2v2 the gate closes
+  const rosterAfter = once(P[0], "party:roster");
+  P[5].disconnect();
+  const ros2 = await rosterAfter;
+  ok(ros2.players.length === 5, "roster shrank on disconnect");
+  // drop one team to 1 member: move players until orange has 1
+  // (simplest: everyone on orange except one leaves)
+  const orangeIds = ros2.players.filter(p => p.team === "orange").map(p => p.id);
+  for (const s of P.slice(1)) {
+    if (orangeIds.includes(s.id) && ros2.players.filter(p => p.team === "orange").length > 1) {
+      const upd = once(P[0], "party:roster");
+      s.disconnect();
+      const now = await upd;
+      ros2.players = now.players;
+    }
+  }
+  if (ros2.players.filter(p => p.team === "orange").length < 2) {
+    r = await emit(P[0], "party:start", {});
+    ok(r.error === "need-teams", `start refused below 2v2 (${r.error})`);
+  } else {
+    ok(false, "could not thin orange team for gate test");
+  }
+  for (const s of P) s.disconnect();
+
 
   console.log("abuse:");
   // disjoint labels -> no-shared-words

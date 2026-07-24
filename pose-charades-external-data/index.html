@@ -6,7 +6,7 @@
 <title>Pose Party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='25' width='80' height='62' rx='18' fill='%23fff' stroke='%23152A6E' stroke-width='6'/><rect x='22' y='38' width='56' height='38' rx='10' fill='%23152A6E'/><circle cx='38' cy='55' r='6' fill='%23FFC531'/><circle cx='62' cy='55' r='6' fill='%23FFC531'/><line x1='50' y1='25' x2='50' y2='12' stroke='%23152A6E' stroke-width='6'/><circle cx='50' cy='9' r='7' fill='%23F0512D'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Beiruti:wght@700&family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
@@ -121,7 +121,7 @@
 
       <img class="fh bg" src="assets/ui/figma/home-bg2.jpg" alt="">
 
-      <img class="fh iv wave" style="left:-2.8%;bottom:-5.1%;width:52.2%" src="assets/ui/figma/wave-left.png" alt="">
+      <img class="fh iv wave" style="left:-2.8%;bottom:-7.5%;width:52.2%" src="assets/ui/figma/wave-left.png" alt="">
       <img class="fh iv wave" style="left:53.8%;bottom:-6.3%;width:52.2%" src="assets/ui/figma/wave-right.png" alt="">
       <img class="fh iv wave" style="left:22.2%;bottom:-9.6%;width:57.7%" src="assets/ui/figma/wave-mid.png" alt="">
 
@@ -149,7 +149,7 @@
       <img class="fh iv tape" id="tapeTitleB" style="left:-2.3%;top:-.3%;width:12.9%;z-index:6" src="assets/ui/figma/tape-yl-b.png" alt="">
 
       <img class="fh iv conf" style="left:44.7%;top:3%;width:9.2%;z-index:7"    src="assets/ui/figma/conf-blue-a.png" alt="">
-      <img class="fh iv conf" style="left:34.3%;bottom:-1.5%;width:10.3%;z-index:7" src="assets/ui/figma/conf-blue-b.png" alt="">
+      <img class="fh iv conf" style="left:34.3%;bottom:1.2%;width:10.3%;z-index:7" src="assets/ui/figma/conf-blue-b.png" alt="">
       <img class="fh iv conf" style="left:-1.7%;top:33.8%;width:8.7%;z-index:7"  src="assets/ui/figma/conf-star-a.png" alt="">
       <img class="fh iv conf" style="left:90.3%;top:26.4%;width:9.7%;z-index:7"  src="assets/ui/figma/conf-star-b.png" alt="">
       <img class="fh iv conf" style="left:24.8%;top:67.7%;width:8%;z-index:7"    src="assets/ui/figma/conf-star-c.png" alt="">
@@ -258,87 +258,121 @@
        video mounts BETWEEN each panel background and its torn-frame
        overlay so the border wraps the feed. ============ -->
   <section class="screen hidden" id="scrLobby">
-    <div class="lobbystage" id="lobbyStage">
+    <div class="lobbystage" id="lobbyStage" data-mode="1v1">
       <img class="lb bg" src="assets/ui/figma/home-bg2.jpg" alt="">
 
-      <img class="lb iv2" id="logoLobby" style="left:-.3%;top:-.4%;width:13.8%;z-index:3" src="assets/ui/figma/lb-title.png" alt="Pose Party — home">
-      <img class="lb deco" style="left:-1%;top:-1.1%;width:5%;z-index:4" src="assets/ui/figma/lb-tape-b.png" alt="">
-      <img class="lb deco" style="left:10.2%;top:9%;width:4.4%;z-index:4" src="assets/ui/figma/lb-tape-c.png" alt="">
+      <img class="lb iv2 fig-shadow-lg lobby-alpha lobby-float" id="logoLobby" style="left:-.3%;top:-.4%;width:13.8%;z-index:3" src="assets/ui/figma/lb-title.png" alt="Pose Party — home">
+      <img class="lb deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:-1%;top:-1.1%;width:5%;z-index:4" src="assets/ui/figma/lb-tape-b.png" alt="">
+      <img class="lb deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:10.2%;top:7.2%;width:4.4%;z-index:4" src="assets/ui/figma/lb-tape-c.png" alt="">
 
-      <img class="lb" style="left:40.5%;top:3.3%;width:19%;z-index:3" src="assets/ui/figma/lb-1v1-card.png" alt="1v1 Lobby">
-      <img class="lb deco" style="left:47%;top:.1%;width:6.7%;z-index:4" src="assets/ui/figma/lb-tape-a.png" alt="">
+      <img class="lb m1 lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" style="left:40.5%;top:3.3%;width:19%;z-index:3" src="assets/ui/figma/lb-1v1-card.png" alt="1v1 Lobby">
+      <img class="lb m1 deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:47%;top:.1%;width:6.7%;z-index:4" src="assets/ui/figma/lb-tape-a.png" alt="">
 
       <!-- name tag (click to edit) -->
-      <div class="lb nametag" style="left:61.8%;top:4%;width:14.5%;z-index:3">
+      <div class="lb nametag fig-shadow-xs lobby-alpha lobby-float" style="left:61.8%;top:4%;width:14.5%;z-index:3">
         <img src="assets/ui/figma/lb-nametag.png" alt="">
         <span class="nt-label">Your Name</span>
         <input id="lobbyName" maxlength="10" autocomplete="off" spellcheck="false" placeholder="TAP TO SET">
         <img class="nt-pencil" src="assets/ui/figma/lb-pencil.png" alt="">
       </div>
 
-      <button class="lb pbtn" id="btnExitLobby" style="left:78.1%;top:2.5%;width:22.6%;z-index:3" aria-label="Exit lobby">
+      <button class="lb pbtn fig-shadow-sm lobby-alpha" id="btnExitLobby" style="left:78.1%;top:2.5%;width:22.6%;z-index:3" aria-label="Exit lobby">
         <img src="assets/ui/figma/lb-exit.png" alt="Exit Lobby"></button>
 
       <!-- ===== YOU: bg panel / video / torn frame overlay ===== -->
-      <img class="lb" style="left:1.6%;top:16.2%;width:47.6%;z-index:2" src="assets/ui/figma/lb-panel-blue.png" alt="">
-      <div class="lb vidslot" id="slotLobbyYou" style="left:3.4%;top:19%;width:44%;height:50.6%;z-index:3"></div>
-      <img class="lb passthru" style="left:1.2%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-blue.png" alt="">
-      <div class="lb namechip" style="left:2.9%;top:18.4%;width:10.8%;z-index:5">
+      <img class="lb m1 lobby-you-layer" style="left:1.6%;top:16.2%;width:47.6%;z-index:2" src="assets/ui/figma/lb-panel-blue.png" alt="">
+      <div class="lb m1 vidslot lobby-you-layer" id="slotLobbyYou" style="left:2.4%;top:17.7%;width:46.2%;height:53.5%;z-index:3"></div>
+      <img class="lb m1 passthru lobby-you-layer lobby-panel-art" style="left:1.2%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-blue.png" alt="">
+      <div class="lb m1 namechip lobby-you-layer" style="left:2.9%;top:18.4%;width:10.8%;z-index:5">
         <img src="assets/ui/figma/lb-name-chip.png" alt=""><span id="lobbyYouName">YOU</span>
       </div>
 
       <!-- ===== OPPONENT: bg panel / video / torn frame overlay ===== -->
-      <img class="lb" style="left:50.8%;top:16.9%;width:48.3%;z-index:2" src="assets/ui/figma/lb-panel-orange.png" alt="">
-      <div class="lb vidslot" id="slotLobbyRival" style="left:52.6%;top:19%;width:44.6%;height:50.6%;z-index:3"></div>
-      <img class="lb passthru" style="left:50.5%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-orange.png" alt="">
-      <div class="lb namechip oppchip" style="left:51.9%;top:18.4%;width:10.8%;z-index:6">
+      <img class="lb m1 lobby-rival-layer" style="left:50.8%;top:16.9%;width:48.3%;z-index:2" src="assets/ui/figma/lb-panel-orange.png" alt="">
+      <div class="lb m1 vidslot lobby-rival-layer" id="slotLobbyRival" style="left:51.75%;top:17.65%;width:46.05%;height:53.4%;z-index:3"></div>
+      <img class="lb m1 passthru lobby-rival-layer lobby-panel-art" style="left:50.5%;top:15.8%;width:48.5%;z-index:4" src="assets/ui/figma/lb-frame-orange.png" alt="">
+      <div class="lb m1 namechip oppchip lobby-rival-layer" style="left:51.9%;top:18.4%;width:10.8%;z-index:6">
         <img src="assets/ui/figma/lb-name-chip.png" alt=""><span id="lobbyOppName">RIVAL</span>
       </div>
 
       <!-- waiting robot lives inside the opponent frame until someone joins -->
-      <div class="lb robotwait" id="lobbyRobotWait" style="left:56.5%;top:18.4%;width:39.7%;z-index:5">
+      <div class="lb m1 robotwait lobby-alpha lobby-rival-layer lobby-react" id="lobbyRobotWait" style="left:56.5%;top:18.4%;width:39.7%;z-index:5">
         <img id="robotWaveHigh" src="assets/ui/figma/lb-robot-high.png" alt="">
         <img id="robotWaveLow" class="ghosted" src="assets/ui/figma/lb-robot-low.png" alt="">
-        <span class="signtext">waiting<i id="dotsSign">...</i></span>
+        <span class="signtext">Invite a Friend</span>
       </div>
-      <div class="lb waitbig" id="lobbyWaitBig" style="left:55.3%;top:60.4%;width:44%;z-index:5">
+      <div class="lb m1 waitbig lobby-rival-layer" id="lobbyWaitBig" style="left:55.3%;top:60.4%;width:49.6%;z-index:5">
         WAITING FOR FRIEND<i id="dotsBig">...</i></div>
 
       <!-- vs badge pops when the opponent arrives -->
-      <img class="lb vsbadge" id="lobbyVs" style="left:45.6%;top:36%;width:8.8%;z-index:7" src="assets/ui/figma/lb-vs.png" alt="VS">
+      <img class="lb m1 vsbadge" id="lobbyVs" style="left:45.6%;top:36%;width:8.8%;z-index:7" src="assets/ui/figma/lb-vs.png" alt="VS">
+
+      <!-- ===== PARTY MODE center (Figma frame 137:332): two 3-tile team
+           panels; video sandwiches between the offwhite inner paper and
+           the three-window overlay. Tiles fill from party.js. ===== -->
+      <img class="lb mp lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" style="left:35.1%;top:4.2%;width:24.9%;z-index:3" src="assets/ui/figma/lb-party-card.png" alt="Party Lobby">
+      <img class="lb mp deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:44.7%;top:.1%;width:6.4%;z-index:4" src="assets/ui/figma/lb-tape-party.png" alt="">
+
+      <img class="lb mp fig-shadow-card" style="left:2.1%;top:16.7%;width:43.9%;z-index:2" src="assets/ui/figma/pt-panel-blue.png" alt="">
+      <span class="lb mp pt-teamname" style="left:2.1%;top:17.7%;width:43.9%;z-index:5">BLUE TEAM</span>
+      <img class="lb mp" style="left:3.0%;top:23.9%;width:42.1%;z-index:2" src="assets/ui/figma/pt-inner.png" alt="">
+      <div class="lb mp pt-tile" id="ptB0" style="left:4.1%;top:25.8%;width:39.9%;height:22.4%;z-index:3"></div>
+      <div class="lb mp pt-tile" id="ptB1" style="left:4.1%;top:49.4%;width:19.5%;height:21.2%;z-index:3"></div>
+      <div class="lb mp pt-tile" id="ptB2" style="left:24.2%;top:49.4%;width:19.9%;height:21.2%;z-index:3"></div>
+      <img class="lb mp passthru" style="left:3.3%;top:23.9%;width:41.8%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha" id="btnJoinBlue" style="left:24.2%;top:49.4%;width:19.9%;z-index:6" aria-label="Join the blue team">
+        <img class="pt-join-art" src="assets/ui/figma/pt-join-blue.png" alt="">
+        <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
+        <span>JOIN THIS TEAM</span>
+      </button>
+
+      <img class="lb mp fig-shadow-card" style="left:53.8%;top:16.7%;width:44.1%;z-index:2" src="assets/ui/figma/pt-panel-orange.png" alt="">
+      <span class="lb mp pt-teamname" style="left:53.8%;top:17.7%;width:44.1%;z-index:5">ORANGE TEAM</span>
+      <img class="lb mp" style="left:54.7%;top:24.0%;width:42.2%;z-index:2" src="assets/ui/figma/pt-inner.png" alt="">
+      <div class="lb mp pt-tile" id="ptO0" style="left:55.9%;top:25.9%;width:40.1%;height:22.5%;z-index:3"></div>
+      <div class="lb mp pt-tile" id="ptO1" style="left:55.9%;top:49.5%;width:19.6%;height:21.3%;z-index:3"></div>
+      <div class="lb mp pt-tile" id="ptO2" style="left:75.9%;top:49.5%;width:20.0%;height:21.3%;z-index:3"></div>
+      <img class="lb mp passthru" style="left:55.0%;top:24.0%;width:41.9%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha" id="btnJoinOrange" style="left:75.9%;top:49.5%;width:20.0%;z-index:6" aria-label="Join the orange team">
+        <img class="pt-join-art" src="assets/ui/figma/pt-join-orange.png" alt="">
+        <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
+        <span>JOIN THIS TEAM</span>
+      </button>
+
+      <img class="lb mp fig-shadow-sm" style="left:43.6%;top:37.7%;width:12.3%;z-index:6" src="assets/ui/figma/pt-vs.png" alt="VS">
 
       <!-- ===== invite friend ===== -->
-      <div class="lb invite" style="left:1.7%;top:75.9%;width:29%;z-index:3">
+      <div class="lb invite fig-shadow-card lobby-alpha lobby-float" style="left:1.7%;top:75.9%;width:29%;z-index:3">
         <img class="cardart" src="assets/ui/figma/lb-invite-card.png" alt="">
         <img class="inv-robot" src="assets/ui/figma/lb-robot-icon.png" alt="">
         <span class="inv-title">Invite a Friend</span>
-        <span class="inv-label" style="top:36%">Your Room</span>
-        <span class="inv-label" style="top:69%">Join With Code</span>
+        <span class="inv-label" style="top:35%">Your Room</span>
+        <span class="inv-label" style="top:68%">Join With Code</span>
         <img class="inv-box" style="top:30%" src="assets/ui/figma/lb-code-box.png" alt="">
         <span class="inv-code" id="roomCodeText">······</span>
-        <button class="inv-btn pbtn" id="btnCopyLink" style="top:32%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Copy</b></button>
+        <button class="inv-btn pbtn lobby-alpha" id="btnCopyLink" style="top:33%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Copy</b></button>
         <img class="inv-box" style="top:64%" src="assets/ui/figma/lb-code-box.png" alt="">
         <input id="joinCode" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ABC123">
-        <button class="inv-btn pbtn" id="btnJoinRoom" style="top:66%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Join</b></button>
+        <button class="inv-btn pbtn lobby-alpha" id="btnJoinRoom" style="top:66%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Join</b></button>
       </div>
 
       <!-- ===== match settings (time-based mode) ===== -->
-      <div class="lb settings" style="left:31.9%;top:76%;width:40.1%;z-index:3">
+      <div class="lb settings fig-shadow-card lobby-alpha lobby-float" style="left:31.9%;top:76%;width:40.1%;z-index:3">
         <img class="cardart" src="assets/ui/figma/lb-settings-card.png" alt="">
         <span class="set-title">Match Settings</span>
         <i class="set-divider"></i>
-        <span class="set-label" style="left:8%">Match Time</span>
-        <button class="set-btn pbtn" id="matchPlus"  style="left:7.5%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
+        <span class="set-label" style="left:10.25%;width:32%">Match Timer</span>
+        <button class="set-btn pbtn lobby-alpha" id="matchPlus"  style="left:7.5%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
         <span class="set-badge" style="left:17%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setMatch">3:00</b></span>
-        <button class="set-btn pbtn" id="matchMinus" style="left:37.6%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
-        <span class="set-label" style="left:56.5%">Word Time</span>
-        <button class="set-btn pbtn" id="wordPlus"  style="left:56.3%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
+        <button class="set-btn pbtn lobby-alpha" id="matchMinus" style="left:37.6%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
+        <span class="set-label" style="left:59.05%;width:32%">Word Timer</span>
+        <button class="set-btn pbtn lobby-alpha" id="wordPlus"  style="left:56.3%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
         <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">30s</b></span>
-        <button class="set-btn pbtn" id="wordMinus" style="left:86.3%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
+        <button class="set-btn pbtn lobby-alpha" id="wordMinus" style="left:86.3%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
       </div>
 
       <!-- ===== start ===== -->
-      <button class="lb pbtn startbtn" id="btnStartMatch" style="left:72.8%;top:75.3%;width:25.1%;z-index:3" disabled>
+      <button class="lb pbtn startbtn fig-shadow-card lobby-alpha" id="btnStartMatch" style="left:72.8%;top:75.3%;width:25.1%;z-index:3" disabled>
         <img src="assets/ui/figma/lb-start.png" alt="Start match"></button>
       <div class="lb waitline" id="lobbyStatus" style="left:72.8%;top:91.4%;width:25.1%;z-index:3">Waiting for friend to join<i id="dotsSmall">...</i></div>
     </div>
@@ -396,65 +430,7 @@
     </div>
   </div>
 
-  <!-- ============ PARTY LOBBY (waiting room only) ============ -->
-  <section class="screen hidden" id="scrParty">
-    <div class="inforow">
-      <button class="btn ghost" id="btnPartyBack">← Back to Home</button>
-      <div class="panel partybanner">
-        <svg width="24" height="24"><use href="#icoStar"/></svg>
-        <span><h4>PARTY MODE</h4><small>Waiting for players to join and pick a team!</small></span>
-        <span class="partyname"><label for="partyName">Your name</label><input id="partyName" type="text" maxlength="12" autocomplete="nickname" value="You"></span>
-      </div>
-      <div class="panel roomcodebig"><span><span class="lab">Room code</span><div class="code" id="partyCode">······</div></span>
-        <button class="btn ghost" id="btnPartyCopy" style="padding:8px 12px"><svg width="18" height="18"><use href="#icoCopy"/></svg>COPY</button>
-      </div>
-      <div class="panel playercount"><svg width="30" height="30" style="color:var(--blue)"><use href="#icoUsers"/></svg><span><b id="partyCount">1 / 8</b><br><small>PLAYERS</small></span></div>
-      <div class="panel"><span><b style="font-size:14px">INVITE FRIENDS</b><br><small style="font-size:11.5px;color:var(--ink-soft)">Share the room code!</small></span>
-        <span style="display:flex;gap:8px">
-          <button class="btn blue" style="padding:8px 10px" data-invite><svg width="16" height="16"><use href="#icoLink"/></svg></button>
-          <button class="btn mint" style="padding:8px 10px" data-invite><svg width="16" height="16"><use href="#icoUsers"/></svg></button>
-          <button class="btn ghost" style="padding:8px 10px" data-invite>···</button>
-        </span>
-      </div>
-    </div>
 
-    <div class="teams">
-      <div class="teampanel blue">
-        <div class="teamhead"><h4>Blue Team</h4><span class="cnt" id="blueCnt">1 / 4</span><button class="btn ghost" id="btnJoinBlue">JOIN BLUE</button></div>
-        <div class="teamgrid" id="blueGrid"></div>
-      </div>
-      <svg class="vsburst"><use href="#vsBurst"/></svg>
-      <div class="teampanel orange">
-        <div class="teamhead"><h4>Orange Team</h4><span class="cnt" id="orangeCnt">1 / 4</span><button class="btn ghost" id="btnJoinOrange">JOIN ORANGE</button></div>
-        <div class="teamgrid" id="orangeGrid"></div>
-      </div>
-    </div>
-
-    <div class="botrow">
-      <div class="panel">
-        <h3><svg style="color:var(--blue)"><use href="#icoGear"/></svg>Match Settings <span class="chip blue" style="font-size:10px">HOST ONLY</span></h3>
-        <div class="settingsgrid">
-          <div class="cell"><div class="lab">Rounds</div><b>3</b></div>
-          <div class="cell"><div class="lab">Turn time</div><b>30s</b></div>
-          <div class="cell"><div class="lab">Word pack</div><b>Standard</b><small id="partyWordCount">— words</small></div>
-          <div class="cell"><div class="lab">Target score</div><b>100 <small style="display:inline">pts</small></b></div>
-        </div>
-        <div class="setnote">These settings apply to the entire match.</div>
-      </div>
-      <div class="startcol">
-        <button class="bigbtn yellow" id="btnPartyStart" disabled>Start Game <span class="arrow">→</span></button>
-        <span class="startnote">Game will start when both teams have at least 2 players.</span>
-      </div>
-      <div class="panel">
-        <h3><svg><use href="#botHead"/></svg>How to Play <button class="btn ghost" id="btnPartyGuide" style="margin-left:auto;padding:6px 12px;font-size:11px">VIEW GUIDE</button></h3>
-        <div class="bullets">
-          <div class="bullet"><span class="bic"><svg style="color:var(--blue)"><use href="#icoPose"/></svg></span><span><small>Strike a pose based on the secret word</small></span></div>
-          <div class="bullet"><span class="bic"><svg style="color:var(--blue)"><use href="#icoUsers"/></svg></span><span><small>Your team guesses to earn points</small></span></div>
-          <div class="bullet"><span class="bic"><svg><use href="#icoTrophy"/></svg></span><span><small>Outguess the other team!</small></span></div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- ============ TRAINING ============ -->
   <section class="screen hidden" id="scrTrain">

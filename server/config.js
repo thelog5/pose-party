@@ -19,6 +19,10 @@ export const config = {
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
   betweenRoundsMs: int(process.env.BETWEEN_ROUNDS_MS, 1800),
 
+  /* Rate limits (per minute). */
+  rateCreate: int(process.env.RATE_CREATE, 5),
+  rateJoin: int(process.env.RATE_JOIN, 10),
+
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),
   maxRooms: int(process.env.MAX_ROOMS, 500),

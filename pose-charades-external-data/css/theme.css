@@ -23,6 +23,8 @@
   --sh-big:0 6px 0 rgba(18,52,119,.16);
   --r-sm:12px; --r-md:16px; --r-lg:22px;
   --f-display:'Baloo 2',system-ui,sans-serif;
+  --f-lobby:'Fredoka One','Baloo 2',system-ui,sans-serif;
+  --f-sign:'Beiruti','Baloo 2',system-ui,sans-serif;
   --f-body:'Nunito',system-ui,sans-serif;
   --f-mono:'Courier New',ui-monospace,monospace;
 }

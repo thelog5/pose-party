@@ -64,8 +64,8 @@ const store = createRoomStore({
 });
 
 /* Rate limits (spec: room-creation, join and point-claim). */
-const createLimit = createLimiter({ tokens: 5,   perMs: 60000 });   // per IP
-const joinLimit   = createLimiter({ tokens: 10,  perMs: 60000 });   // per IP
+const createLimit = createLimiter({ tokens: config.rateCreate, perMs: 60000 });   // per IP
+const joinLimit   = createLimiter({ tokens: config.rateJoin,   perMs: 60000 });   // per IP
 const claimLimit  = createLimiter({ tokens: 30,  perMs: 60000 });   // per socket
 const signalLimit = createLimiter({ tokens: 200, perMs: 60000 });   // per socket
 
@@ -143,6 +143,58 @@ io.on("connection", socket => {
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     cb(store.claim(socket.id, payload.roundId));
+  });
+
+  /* ---- party rooms ---- */
+  socket.on("party:create", (payload, cb) => {
+    cb = ack(cb);
+    if(!createLimit.allow(ip)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const name = cleanName(payload.name);
+    const settings = cleanSettings(payload.settings);
+    if(!name || settings === null) return cb({ error: "bad-payload" });
+    const res = store.partyCreate(socket.id, name, settings);
+    log(`party create by "${name}" -> ${res.code || "ERROR " + res.error}`);
+    cb(res);
+  });
+  socket.on("party:join", (payload, cb) => {
+    cb = ack(cb);
+    if(!joinLimit.allow(ip)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const code = cleanCode(payload.code);
+    const name = cleanName(payload.name);
+    if(!code || !name) return cb({ error: "bad-payload" });
+    const res = store.partyJoin(socket.id, code, name);
+    log(`party join ${code} by "${name}" -> ${res.error ? "ERROR " + res.error : "ok (" + res.roster.players.length + " players)"}`);
+    cb(res);
+  });
+  socket.on("party:team", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    cb(store.partyTeam(socket.id, payload.team));
+  });
+  socket.on("party:settings", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const settings = cleanSettings(payload.settings);
+    if(settings === null || !Object.keys(settings).length) return cb({ error: "bad-payload" });
+    cb(store.partySettings(socket.id, settings));
+  });
+  socket.on("party:start", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    const res = store.partyStart(socket.id);
+    log(`party start by ${socket.id.slice(0,6)} -> ${res.error ? "ERROR " + res.error : "ok"}`);
+    cb(res);
+  });
+  socket.on("party:signal", (payload, cb) => {
+    cb = ack(cb);
+    if(!signalLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload) || typeof payload.to !== "string" || !signalOk(payload.data))
+      return cb({ error: "bad-payload" });
+    cb(store.partySignal(socket.id, payload.to, payload.data));
   });
 
   socket.on("rtc:signal", (payload, cb) => {
