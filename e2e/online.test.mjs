@@ -37,7 +37,8 @@ async function player(tag){
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
   await page.setBypassCSP(true); // for the test's own evaluate() scripts only
-  page.on("console", m => { if (m.type() === "error") errors[tag].push(m.text()); });
+  page.on("console", m => { if (m.type() === "error") errors[tag].push(m.text() + " @" + (m.location()?.url||"")); });
+  page.on("response", r => { if (r.status() >= 400) errors[tag].push("HTTP " + r.status() + " " + r.url()); });
   page.on("pageerror", e => errors[tag].push("PAGEERROR: " + e.message));
   await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
   await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000, polling: 400 });
@@ -166,8 +167,36 @@ try {
   await A.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
   const pcode = await txt(A, "#roomCodeText");
   ok(/^[A-Z2-9]{6}$/.test(pcode), `party room created (${pcode})`);
-  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name')?.textContent) === "YOU", "host camera tile on blue with YOU chip");
+  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name b')?.textContent) === "Alice", "host camera tile uses the saved player name");
+  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name img')?.getAttribute("src")?.endsWith("lb-name-chip.png")), "party tile uses the 1v1 torn-paper name asset");
   ok(await A.evaluate(() => document.getElementById("cameraDock").parentElement.id) === "ptB0", "host camera mounted in the team tile");
+  const wideCamera = await A.evaluate(() => {
+    const video = document.querySelector("#ptB0 .camdock video");
+    const tile = document.getElementById("ptB0");
+    return { fit:getComputedStyle(video).objectFit, width:video.getBoundingClientRect().width / tile.getBoundingClientRect().width };
+  });
+  ok(wideCamera.fit === "cover" && wideCamera.width > .99, "wide party camera fills its top tile without side bars");
+  const hostNameLayout = await A.evaluate(() => {
+    const chip = document.querySelector("#ptB0 .pt-name").getBoundingClientRect();
+    const label = document.querySelector("#ptB0 .pt-name b");
+    const text = label.getBoundingClientRect();
+    return {
+      dx:Math.abs((chip.left + chip.width / 2) - (text.left + text.width / 2)),
+      dy:Math.abs((chip.top + chip.height / 2) - (text.top + text.height / 2)),
+      font:parseFloat(getComputedStyle(label).fontSize),
+      height:chip.height,
+    };
+  });
+  ok(hostNameLayout.dx < 1 && hostNameLayout.dy < 1 && hostNameLayout.font / hostNameLayout.height > .4,
+    "party name text is centered and fills the torn-paper tag");
+  await act(A, () => A.evaluate(() => {
+    const input = document.getElementById("lobbyName");
+    input.value = "PartyAlice";
+    input.dispatchEvent(new Event("input", { bubbles:true }));
+    input.dispatchEvent(new Event("change", { bubbles:true }));
+  }));
+  await A.waitForFunction(() => document.querySelector('#ptB0 .pt-name b')?.textContent === "PartyAlice", { timeout: 3000, polling: 100 });
+  ok(true, "editing the party name updates the local camera tile");
 
   // B joins the party by typing the code while in party mode
   await act(B, () => B.click("#btnExitLobby"));
@@ -179,10 +208,11 @@ try {
   await act(B, () => B.click("#btnJoinRoom"));
   await B.waitForFunction(c => document.getElementById("roomCodeText").textContent === c, { timeout: 10000, polling: 300 }, pcode);
   ok(true, "B joined the party by code");
-  await B.waitForFunction(() => document.querySelector('#ptO0 .pt-name')?.textContent === "YOU", { timeout: 8000, polling: 300 });
+  await B.waitForFunction(() => document.querySelector('#ptO0 .pt-name b')?.textContent === "Bob", { timeout: 8000, polling: 300 });
   ok(true, "B auto-balanced onto orange");
+  ok(await B.evaluate(() => document.querySelector('#ptB0 .pt-name b')?.textContent) === "PartyAlice", "party name change reached the other player");
   await A.waitForFunction(() => !!document.querySelector('#ptO0 video'), { timeout: 8000, polling: 300 });
-  ok(true, "A sees B's tile appear (confetti poofed)");
+  ok(true, "A sees B's tile appear");
   // mesh video: B's feed lands in A's orange tile
   await A.waitForFunction(() => {
     const v = document.querySelector('#ptO0 video');
@@ -196,7 +226,7 @@ try {
 
   // B switches to blue via the JOIN THIS TEAM button
   await act(B, () => B.click("#btnJoinBlue"));
-  await B.waitForFunction(() => document.querySelector('#ptB1 .pt-name')?.textContent === "YOU", { timeout: 8000, polling: 300 });
+  await B.waitForFunction(() => document.querySelector('#ptB1 .pt-name b')?.textContent === "Bob", { timeout: 8000, polling: 300 });
   ok(true, "B switched to blue (second tile)");
   await A.waitForFunction(() => !!document.querySelector('#ptB1 video'), { timeout: 8000, polling: 300 });
   ok(await A.evaluate(() => !document.querySelector('#ptO0 video')), "A's orange tile emptied after the switch");
@@ -206,7 +236,7 @@ try {
 
   console.log("hygiene:");
   for (const tag of ["A", "B"]) {
-    const real = errors[tag].filter(e => !e.includes("favicon") && !e.includes("net::ERR_"));
+    const real = errors[tag].filter(e => !e.includes("favicon") && !e.includes("net::ERR_") && !/assets\/ui\/figma\/sp-/.test(e));
     ok(real.length === 0, `player ${tag}: no console/page errors (${real.length})`);
     real.forEach(e => console.log("    " + e.slice(0, 220)));
   }

@@ -35,6 +35,22 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .iv.tape:hover{transform:rotate(-7deg) scale(1.06)}
 .iv.boat{animation:boatrock 3.2s ease-in-out infinite;transform-origin:50% 92%}
 @keyframes boatrock{0%,100%{transform:rotate(-4deg) translateY(0)}33%{transform:rotate(2deg) translateY(-9px)}66%{transform:rotate(4deg) translateY(-3px)}}
+
+/* The page's original confetti is permanent. These are extra scraps tucked
+   behind the PARTY card that spring out and stay for the whole hover. */
+.party-hover-confetti{pointer-events:none;opacity:0;scale:.14;rotate:var(--party-card-r,0deg);
+  translate:var(--party-card-x,0) var(--party-card-y,0);
+  transition:opacity .16s ease,scale .42s cubic-bezier(.18,1.55,.34,1),
+    translate .42s cubic-bezier(.18,1.55,.34,1),rotate .42s cubic-bezier(.18,1.55,.34,1)}
+#partyHoverLeftTop{--party-card-x:120%;--party-card-y:20%;--party-card-r:-14deg;transition-delay:20ms}
+#partyHoverRightTop{--party-card-x:-120%;--party-card-y:20%;--party-card-r:17deg;transition-delay:65ms}
+#partyHoverLeftBottom{--party-card-x:130%;--party-card-y:-100%;--party-card-r:-19deg;transition-delay:105ms}
+#partyHoverRightBottom{--party-card-x:-120%;--party-card-y:-95%;--party-card-r:20deg;transition-delay:145ms}
+.homestage:has(#modeParty:hover) .party-hover-confetti,
+.homestage:has(#modeParty:focus-visible) .party-hover-confetti{
+  opacity:1;scale:1;translate:0 0
+}
+
 .shook{animation:ivshake .55s cubic-bezier(.36,.07,.19,.97)}
 .spun{animation:ivspin .65s cubic-bezier(.3,.8,.4,1)}
 .popped{animation:ivpop .5s cubic-bezier(.2,1.6,.4,1)}
@@ -105,125 +121,125 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .pp-circle:hover{transform:scale(1.08) rotate(12deg)}
 .pp-circle svg{width:24px;height:24px}
 
-/* =================== SOLO PLAY (immersive) =================== */
-/* The camera IS the scene; all HUD floats over it. Stateful elements are
-   gated by #scrSolo[data-rstate=...] so no two states ever co-render. */
+/* =================== SOLO PLAY (Figma "Singe player" 150:454) =================== */
+/* HUD overlay on the full-bleed camera. body[data-screen] hides the header;
+   #scrSolo[data-rstate] gates the award/flash so states never co-render. */
 #scrSolo{position:relative}
-.solostage{position:relative;flex:1;min-height:78vh;border-radius:26px;overflow:hidden;border:3px solid var(--line);box-shadow:var(--sh-big);background:#0E1B4A}
-.solostage .slot{position:absolute;inset:0}
-.cloudcorner{position:absolute;bottom:-2px;width:30%;max-width:430px;z-index:3;pointer-events:none}
-.cloudcorner.bl{left:-2px}
-.cloudcorner.br{right:-2px}
+body[data-screen="solo"] .wrap{max-width:none;padding:0}
+.solostage{position:fixed;inset:0;overflow:hidden;background:#0E1B4A;font-family:var(--f-lobby,'Baloo 2',sans-serif)}
+.solostage .slot{position:absolute;inset:0;z-index:0}
 
-/* brand lockup with overlaid text */
-.sbrand{position:absolute;top:14px;left:18px;z-index:6;width:190px;pointer-events:none}
-.sbrand img{width:100%;display:block}
-.sbrand span{position:absolute;font-family:var(--f-display);font-weight:800;color:#fff;letter-spacing:2px;text-align:center}
-.sbrand .bt1{left:21%;top:13.5%;width:56%;font-size:34px;transform:rotate(-3deg)}
-.sbrand .bt2{left:18%;top:44%;width:62%;font-size:34px;transform:rotate(-1.5deg)}
-.sbrand .bt3{left:43%;top:76%;width:26%;font-size:12.5px;letter-spacing:1.5px;transform:rotate(-2deg)}
+.sp-tape{position:absolute;z-index:2;pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.28))}
 
-/* timer + round tab */
-.stimer{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;width:250px;pointer-events:none}
-.stimer img{width:100%;display:block}
-.stimer .tval{position:absolute;left:10%;top:22%;width:80%;text-align:center;font-family:var(--f-display);font-weight:800;font-size:64px;line-height:1;color:var(--ink)}
-.stimer .tround{position:absolute;left:29%;top:73.5%;width:42%;text-align:center;font-weight:900;font-size:14.5px;letter-spacing:1px;color:#fff}
+/* green win flash */
+.sp-flash{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(63,201,140,.55),rgba(27,117,50,.35) 70%,transparent)}
+.sp-flash.fire{animation:spflash .8s ease-out}
+@keyframes spflash{0%{opacity:1}100%{opacity:0}}
 
-/* score / streak cards */
-.shud{position:absolute;top:16px;right:18px;z-index:6;display:flex;gap:14px}
-.hudcard{position:relative;width:168px}
-.hudcard img{width:100%;display:block}
-.hudcard .htab{position:absolute;left:20%;top:13%;width:60%;text-align:center;font-weight:900;font-size:15px;letter-spacing:1.6px;color:#fff}
-.hudcard .hval{position:absolute;left:8%;top:40%;width:84%;height:38%;display:flex;align-items:center;justify-content:center;gap:8px;font-family:var(--f-display);font-weight:800;font-size:34px;color:var(--ink)}
+/* --- stat cards: img backing + overlaid text --- */
+.sp-card{position:absolute;z-index:4}
+.sp-card>img{width:100%;display:block;aspect-ratio:2/1;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.sp-card span{position:absolute;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;white-space:nowrap}
+.sp-card .sp-clock{position:absolute;left:8%;top:23%;width:24%;filter:none}
+.sp-rtimer>img{aspect-ratio:2.31}
+.sp-rtime{left:34%;top:20%;font-size:clamp(15px,min(2vw,3.6vh),80px);color:#fff;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.4)}
+.sp-wtimer>img{aspect-ratio:2.19}
+.sp-wlabel{left:22%;top:6%;font-size:clamp(9px,min(1.1vw,1.95vh),44px);color:#17356f;letter-spacing:.02em}
+.sp-wtime{left:24%;top:38%;font-size:clamp(15px,min(2vw,3.6vh),80px);color:#17356f}
+.sp-score>img{aspect-ratio:1.63}
+.sp-slabel{left:26%;top:8%;font-size:clamp(9px,min(1.1vw,1.95vh),44px);color:#17356f;letter-spacing:.03em}
+.sp-sval{left:8%;top:44%;width:84%;text-align:center;font-size:clamp(16px,min(2.3vw,4.1vh),92px);color:#17356f}
+.sp-streak>img{aspect-ratio:1.66}
+.sp-stlabel{left:20%;top:9%;font-size:clamp(9px,min(1.05vw,1.86vh),42px);color:#fff;letter-spacing:.03em}
+.sp-stval{left:8%;top:42%;width:70%;text-align:center;font-size:clamp(16px,min(2.3vw,4.1vh),92px);color:#fff;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.35)}
+/* pulse when score/streak change */
+.sp-card.bump{animation:spbump .4s cubic-bezier(.2,1.6,.4,1)}
+@keyframes spbump{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
+/* word-timer runs red in the final seconds */
+.sp-wtime.low{color:#e8402a;animation:sppulse .6s ease-in-out infinite}
+@keyframes sppulse{0%,100%{opacity:1}50%{opacity:.45}}
 
-/* encouragement cloud (guessing only) */
-.cheer{position:absolute;left:26px;top:44%;z-index:5;background:#fff;border:3px solid var(--line);border-radius:26px;padding:16px 20px;font-family:var(--f-display);font-weight:800;font-size:21px;line-height:1.1;letter-spacing:1px;color:var(--blue-deep);text-align:center;box-shadow:var(--sh);transform:rotate(-4deg);display:none}
-#scrSolo[data-rstate="guessing"] .cheer{display:block}
+/* --- guess stack: fades downward, newest green on top --- */
+.sp-guess{position:absolute;z-index:3}
+.sp-guess .gcard{width:100%;display:block;aspect-ratio:1.9;filter:drop-shadow(0 min(.25vw,.44vh) min(.18vw,.32vh) rgba(0,0,0,.28))}
+.sp-guess .grobot{position:absolute;left:2%;top:-34%;width:40%;z-index:1;pointer-events:none}
+.sp-guess .glabel,.sp-guess .gpct{position:absolute;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;z-index:2;white-space:nowrap}
+.sp-guess.top{opacity:1}
+.sp-guess.top .gcard{margin-top:11%}
+.sp-guess.top .glabel{left:12%;top:52%;font-size:clamp(11px,min(1.35vw,2.4vh),56px);color:#1b7532}
+.sp-guess.top .gpct{right:11%;top:74%;font-size:clamp(11px,min(1.35vw,2.4vh),56px);color:#1b7532}
+.sp-guess.mid{opacity:.72}
+.sp-guess.mid .glabel{left:12%;top:44%;font-size:clamp(10px,min(1.25vw,2.22vh),52px);color:#0d6ebb}
+.sp-guess.mid .gpct{right:11%;top:66%;font-size:clamp(10px,min(1.25vw,2.22vh),52px);color:#0d6ebb}
+.sp-guess.bot{opacity:.46}
+.sp-guess.bot .glabel{left:12%;top:42%;font-size:clamp(9px,min(1.15vw,2.04vh),48px);color:#583ca2}
+.sp-guess.bot .gpct{right:11%;top:64%;font-size:clamp(9px,min(1.15vw,2.04vh),48px);color:#583ca2}
+.sp-guess.empty{opacity:0}
+.sp-guess.pop{animation:gpop .42s cubic-bezier(.2,1.6,.4,1)}
+@keyframes gpop{0%{transform:translateY(16%) scale(.82)}60%{transform:translateY(0) scale(1.06)}100%{transform:none}}
+.sp-guess.shift{animation:gshift .34s ease-out}
+@keyframes gshift{0%{transform:translateY(-16%)}100%{transform:none}}
 
-/* ---------- mascot + speech bubble column ---------- */
-.mascotcol{position:absolute;right:12px;bottom:0;z-index:7;display:flex;flex-direction:column;align-items:flex-end;gap:2px;max-width:min(460px,44%)}
-.mascot{width:200px;margin-right:6px;filter:drop-shadow(0 5px 0 rgba(18,52,119,.22))}
-#scrSolo[data-rstate="guessing"] .mascot{animation:mbob 2.6s ease-in-out infinite}
-@keyframes mbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
-.mascot[data-pose="confused"]{transform:rotate(-7deg);filter:drop-shadow(0 5px 0 rgba(18,52,119,.22)) saturate(.55);animation:none!important}
-.mascot[data-pose="excited"]{animation:mpop .5s cubic-bezier(.2,1.6,.4,1)!important}
-@keyframes mpop{0%{transform:scale(.85)}60%{transform:scale(1.1)}100%{transform:scale(1)}}
-/* hitstop: freeze every animation in the column */
-#scrSolo[data-rstate="hitstop"] .mascotcol *{animation-play-state:paused!important;transition:none!important}
+/* --- word card: yellow pill is a filling progress bar --- */
+.sp-word{position:absolute;z-index:4;transform-origin:50% 60%}
+.sp-word .sp-word-bg{width:100%;display:block;aspect-ratio:4.51;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.sp-word .sp-word-fill{position:absolute;left:2%;top:12%;height:76%;width:35%;border-radius:min(1.2vw,2.1vh);
+  background:linear-gradient(180deg,#ffd964,#f5b70f 70%,#e19f0b);
+  box-shadow:inset 0 min(.14vw,.25vh) 0 rgba(255,255,255,.5),0 min(.14vw,.25vh) 0 rgba(0,0,0,.12);
+  transition:width .12s linear}
+.sp-word .sp-word-text{position:absolute;left:0;top:14%;width:100%;text-align:center;
+  font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
+  font-size:clamp(20px,min(3vw,5.3vh),120px);color:#17356f;letter-spacing:.02em;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;
+  text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.18)}
+/* shakes harder as the fill closes on a lock */
+.sp-word.warm{animation:spwordwarm .28s ease-in-out infinite}
+.sp-word.hot{animation:spwordhot .16s ease-in-out infinite}
+@keyframes spwordwarm{0%,100%{transform:translateX(0) rotate(0)}50%{transform:translateX(-.4%) rotate(-.4deg)}}
+@keyframes spwordhot{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-.8%) rotate(-.7deg)}75%{transform:translateX(.8%) rotate(.7deg)}}
+.sp-word.locked .sp-word-fill{background:linear-gradient(180deg,#7fe3ab,#3fc98c 70%,#2fa574)}
+.sp-word.miss{animation:spwordmiss .5s ease-out}
+@keyframes spwordmiss{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-1%);filter:saturate(.4)}75%{transform:translateX(1%)}}
+.sp-word.locked{animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes spwordpop{0%{transform:scale(1)}45%{transform:scale(1.08)}100%{transform:scale(1)}}
 
-/* history stack: small faded previous guesses */
-.bhistory{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
-.gbubble{position:relative;width:340px}
-.gbubble.mini{width:250px;opacity:.62;filter:saturate(.75)}
-.gbubble img.shell{width:100%;display:block}
-.gbubble .btext{position:absolute;inset:12% 10% 24% 7%;display:flex;align-items:center;gap:8px;z-index:2}
-.gbubble .blabel{flex:1;font-family:var(--f-display);font-weight:800;font-size:clamp(15px,1.6vw,26px);letter-spacing:.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.gbubble.mini .blabel{font-size:16px}
-.gbubble .bpct{font-family:var(--f-display);font-weight:800;font-size:clamp(14px,1.4vw,22px);color:var(--ink)}
-.gbubble.mini .bpct{font-size:15px}
+/* --- skip + exit --- */
+.sp-skip{position:absolute;z-index:5;background:none;border:none;padding:0;cursor:pointer}
+.sp-skip img{width:100%;display:block;aspect-ratio:2.35;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.sp-skip span{position:absolute;inset:14% 0 16%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;color:#fff;line-height:1.02;
+  font-size:clamp(13px,min(1.7vw,3vh),68px);text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.4);pointer-events:none}
+.sp-skip span b{font-size:.7em}
+.sp-skip:hover{transform:translateY(-4px) scale(1.02)}
+.sp-skip:active{transform:translateY(1px) scale(.98)}
+#scrSolo:not([data-rstate="guessing"]) .sp-skip{opacity:.55;pointer-events:none}
+.sp-exit{position:absolute;left:2%;top:94%;z-index:5;background:rgba(255,255,255,.9);border:2px solid var(--line-soft,#b9caed);
+  border-radius:min(.9vw,1.6vh);padding:.4% 1.2%;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
+  font-size:clamp(10px,min(1.1vw,1.95vh),44px);color:#49649b;cursor:pointer;letter-spacing:.03em}
+.sp-exit:hover{color:#e8402a;border-color:#e8402a}
 
-/* THE confidence meter: a fill layer inside the live bubble */
-.gbubble .bfillclip{position:absolute;inset:10% 7% 22% 5%;border-radius:999px;overflow:hidden;z-index:1}
-.gbubble .bfillclip i{display:block;height:100%;width:0%;background:linear-gradient(180deg,#FFE9A8,#FFD65E);border-radius:999px 0 0 999px}
-#scrSolo[data-rstate="locked"] .gbubble.live .bfillclip i{background:linear-gradient(180deg,#9FE8BE,#63CE92)}
-#scrSolo[data-rstate="round_end"] .gbubble.live.won .bfillclip i{background:linear-gradient(180deg,#9FE8BE,#63CE92)}
+/* --- points award --- */
+.sp-award{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);z-index:95;
+  width:min(42vw,640px);pointer-events:none;opacity:0}
+.sp-award img{width:100%;display:block;aspect-ratio:2.1;filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
+.sp-award span{position:absolute;left:0;width:100%;text-align:center;font-family:var(--f-lobby,'Baloo 2',sans-serif);
+  font-weight:400;color:#1b7532;letter-spacing:.02em;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.15)}
+.sp-award .aw-got{top:10%;font-size:clamp(20px,min(3vw,5.3vh),120px)}
+.sp-award .aw-pts{top:36%;font-size:clamp(30px,min(4.6vw,8.2vh),180px)}
+.sp-award .aw-lbl{top:66%;font-size:clamp(18px,min(2.8vw,4.98vh),110px)}
+.sp-award.show{animation:awshow 1.5s cubic-bezier(.16,1.4,.32,1) both}
+@keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-6deg)}
+  16%{opacity:1;transform:translate(-50%,-50%) scale(1.08) rotate(2deg)}
+  74%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+  100%{opacity:0;transform:translate(-50%,-58%) scale(.94)}}
 
-/* lock / fail marks — never visible outside their state */
-.gbubble .bmark{display:none;flex:none;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:900;font-size:20px;align-items:center;justify-content:center;border:2.5px solid #fff}
-.gbubble .bmark.ok{background:#2FBF71}
-.gbubble .bmark.bad{background:var(--red)}
-#scrSolo[data-rstate="locked"] .gbubble.live .bmark.ok,
-#scrSolo[data-rstate="round_end"] .won .bmark.ok{display:flex}
-#scrSolo[data-rstate="round_end"] .failed .bmark.bad{display:flex}
-#scrSolo[data-rstate="round_end"] .gbubble.live.failed{filter:saturate(.4)}
+/* points chip flying to the score card (created in JS) */
+.sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
+  background:#ffd964;border:3px solid #17356f;border-radius:999px;padding:.4% 2%;color:#17356f;
+  font-size:clamp(16px,min(2.2vw,3.9vh),88px);box-shadow:0 4px 0 rgba(23,53,111,.25)}
 
-.gbubble.shake{animation:bshake .5s}
-@keyframes bshake{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px) rotate(-1.5deg)}40%{transform:translateX(8px) rotate(1.2deg)}60%{transform:translateX(-6px)}80%{transform:translateX(5px)}}
-
-/* ---------- bottom prompt bar: target word only, no percentage ---------- */
-.promptbar{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);z-index:6;width:min(760px,54%);pointer-events:none}
-.promptbar img.shell{width:100%;display:block}
-.promptbar .pstar{position:absolute;left:3.5%;top:26%;transform:rotate(-12deg)}
-.promptbar .pword{position:absolute;inset:16% 12% 22% 9%;display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:800;font-size:clamp(26px,3.2vw,52px);letter-spacing:2px;text-transform:uppercase;color:var(--ink);white-space:nowrap;overflow:hidden}
-.promptbar .pmark{position:absolute;right:8%;top:22%;display:none;width:44px;height:44px;border-radius:50%;background:#2FBF71;border:3px solid #fff;color:#fff;font-weight:900;font-size:26px;align-items:center;justify-content:center;box-shadow:var(--sh)}
-/* matched state flips WITH the bubble lock (same data-rstate beat) */
-#scrSolo[data-rstate="locked"] .promptbar img.shell,
-#scrSolo[data-rstate="round_end"].wonround .promptbar img.shell{filter:hue-rotate(75deg) saturate(.85)}
-#scrSolo[data-rstate="locked"] .promptbar .pmark,
-#scrSolo[data-rstate="round_end"].wonround .promptbar .pmark{display:flex}
-
-/* skip + exit */
-.sactions{position:absolute;left:20px;bottom:20px;z-index:7;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
-.skipbtn{position:relative;width:190px;padding:0;filter:drop-shadow(0 4px 0 rgba(18,52,119,.25))}
-.skipbtn img{width:100%;display:block}
-.skipbtn span{position:absolute;inset:18% 12%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:800;font-size:21px;line-height:1.15;letter-spacing:1px;color:#fff}
-.skipbtn span b{font-size:19px}
-.skipbtn:active{transform:translateY(3px)}
-.skipbtn:disabled{opacity:.55}
-#scrSolo:not([data-rstate="guessing"]) .skipbtn{pointer-events:none;opacity:.6}
-.exitbtn{background:rgba(255,255,255,.92);border:2.5px solid var(--line-soft);border-radius:12px;padding:8px 16px;font-weight:900;font-size:13px;letter-spacing:1px;color:var(--ink-soft);box-shadow:var(--sh)}
-.exitbtn:hover{color:var(--red);border-color:var(--red)}
-
-/* celebration particles + points chip (created by soloRound.js) */
-.burstwrap{position:fixed;inset:0;z-index:96;pointer-events:none}
-.burstwrap i{position:fixed;width:14px;height:14px;animation:burstfly .85s cubic-bezier(.15,.6,.4,1) forwards}
-.burstwrap i.star{background:var(--yellow);clip-path:polygon(50% 0,63% 35%,98% 35%,70% 57%,82% 91%,50% 70%,18% 91%,30% 57%,2% 35%,37% 35%)}
-.burstwrap i.dot{border-radius:50%;background:var(--blue)}
-.burstwrap i.spark{background:var(--orange);clip-path:polygon(50% 0,65% 50%,50% 100%,35% 50%)}
-@keyframes burstfly{0%{opacity:1;transform:translate(0,0) rotate(0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.4)}}
-.ptschip{position:fixed;z-index:97;pointer-events:none;background:var(--yellow);border:3px solid var(--ink);border-radius:999px;padding:10px 22px;font-family:var(--f-display);font-weight:800;font-size:26px;color:var(--ink);box-shadow:var(--sh);transform:translate(-0%,-0%)}
-
-@media(max-width:1100px){
-  .mascot{width:140px}
-  .gbubble{width:260px}
-  .gbubble.mini{width:200px}
-  .stimer{width:190px}
-  .stimer .tval{font-size:48px}
-  .hudcard{width:128px}
-  .hudcard .hval{font-size:25px}
-  .sbrand{width:150px}
-  .sbrand .bt1,.sbrand .bt2{font-size:26px}
-  .cheer{display:none!important}
+@media(max-width:900px){
+  .sp-card span,.sp-word-text,.sp-guess .glabel{letter-spacing:0}
 }
 
 /* =================== 1v1 LOBBY (Figma frame 111:82) =================== */
@@ -334,37 +350,63 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 
 /* ---------- party team panels ---------- */
 .pt-teamname{color:#FBF6EC;font-family:var(--f-lobby);font-weight:400;text-align:center;
-  font-size:clamp(20px,min(2.9vw,5.2vh),130px);letter-spacing:.02em;pointer-events:none;
+  font-size:clamp(20px,min(2.73vw,4.85vh),126px);letter-spacing:.01em;pointer-events:none;
   text-shadow:min(.28vw,.5vh) min(.28vw,.5vh) 0 rgba(0,0,0,.45)}
-.pt-tile{overflow:hidden}
+.party-team-layer{transition:translate .22s cubic-bezier(.2,1.2,.35,1),filter .2s ease}
+.lobbystage:has(.party-blue-hit:hover) .party-blue-layer,
+.lobbystage:has(.party-blue-hit:focus-visible) .party-blue-layer,
+.lobbystage:has(.party-orange-hit:hover) .party-orange-layer,
+.lobbystage:has(.party-orange-hit:focus-visible) .party-orange-layer{translate:0 calc(var(--lb-lift) * 1.45)}
+.lobbystage:has(.party-blue-hit:hover) .party-blue-layer.party-panel-art,
+.lobbystage:has(.party-orange-hit:hover) .party-orange-layer.party-panel-art{
+  filter:brightness(1.035) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.27))}
+.pt-tile{overflow:hidden;cursor:pointer;background:#eee5d8 url("../assets/ui/figma/pt-inner.png") center/cover no-repeat;
+  box-shadow:0 0 0 min(.35vw,.62vh) #eee5d8}
 .pt-tile video,.pt-tile .camdock{width:100%;height:100%;object-fit:cover}
 .pt-tile video{display:block;transform:scaleX(-1)}
-.pt-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6%}
-.pt-empty img{width:14%;min-width:26px;opacity:.9}
-.pt-tile.wide .pt-empty img{width:8%}
-.pt-empty span{color:#0c418b;font-family:var(--f-lobby);font-weight:400;font-size:clamp(9px,min(1.05vw,1.85vh),46px);letter-spacing:.06em;opacity:.85}
-.pt-name{position:absolute;left:4%;top:5%;max-width:70%;background:rgba(18,76,157,.85);color:#fff;
-  font-family:var(--f-lobby);font-weight:400;font-size:clamp(10px,min(1.15vw,2.05vh),52px);
-  padding:.5% 5%;border-radius:min(.4vw,.7vh);letter-spacing:.03em;text-transform:uppercase;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.pt-tile.wide .camdock{background:transparent}
+.pt-tile.wide > video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pt-tile.wide .camdock video,
+.pt-tile.wide .camdock canvas{inset:0;width:100%;height:100%;object-fit:cover}
+.pt-empty{position:absolute;inset:0}
+.pt-empty img{position:absolute;left:50%;top:15.3%;width:20.3%;height:43.7%;min-width:26px;
+  object-fit:contain;translate:-50% 0;opacity:.9}
+.pt-tile.wide .pt-empty img{top:17.6%;width:9.3%;height:41.2%}
+.pt-empty span{position:absolute;left:0;top:73.9%;width:100%;text-align:center;color:#0c418b;
+  font-family:var(--f-sign);font-weight:800;font-size:clamp(12px,min(1.706vw,3.034vh),78px);
+  line-height:.45;letter-spacing:.04em;white-space:nowrap;opacity:.9}
+.pt-name{position:absolute;left:3.2%;top:4.5%;width:min(44%,11.5vw);aspect-ratio:1200/338;
+  display:block;filter:drop-shadow(0 min(.16vw,.28vh) min(.1vw,.18vh) rgba(0,0,0,.28));
+  transition:translate .18s ease,scale .18s ease,filter .18s ease;pointer-events:none}
+.pt-tile.wide .pt-name{width:min(28%,11.5vw)}
+.pt-name img{position:absolute;inset:0;width:100%;height:100%}
+.pt-name b{position:absolute;inset:0;display:grid;place-items:center;padding:0 6%;
+  color:#fff;font-family:var(--f-lobby);font-weight:400;
+  font-size:clamp(12px,min(1.52vw,2.7vh),70px);line-height:1;letter-spacing:.02em;text-align:center;
+  text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-shadow:min(.1vw,.18vh) min(.1vw,.18vh) 0 rgba(0,0,0,.5)}
-.pt-tile[data-team="orange"] .pt-name{background:rgba(222,114,52,.88)}
+.pt-tile:hover .pt-name{translate:0 -7%;scale:1.025;filter:brightness(1.04) drop-shadow(0 min(.23vw,.41vh) min(.15vw,.27vh) rgba(0,0,0,.32))}
 
 /* the JOIN card is unmistakably a button: lift, wobble hint, press */
 .pt-join{cursor:pointer}
 .pt-join .pt-join-art{width:100%;display:block}
-.pt-join .pt-join-icon{position:absolute;left:29%;top:14%;width:42%;pointer-events:none;
+.pt-join .pt-join-icon{position:absolute;left:28.75%;top:15.36%;width:42.49%;pointer-events:none;
   transition:transform .18s ease}
-.pt-join span{position:absolute;left:0;bottom:9%;width:100%;text-align:center;color:#fff;
-  font-family:var(--f-lobby);font-weight:400;font-size:clamp(9px,min(1.1vw,1.95vh),48px);
-  letter-spacing:.05em;text-shadow:min(.12vw,.21vh) min(.12vw,.21vh) 0 rgba(0,0,0,.5);pointer-events:none}
+.pt-join span{position:absolute;left:22.53%;top:73.93%;width:55.2%;height:7%;
+  display:block;text-align:center;color:#fff;white-space:nowrap;
+  font-family:var(--f-sign);font-weight:800;font-size:clamp(12px,min(1.706vw,3.034vh),78px);
+  line-height:.45;letter-spacing:.04em;
+  text-shadow:min(.128vw,.228vh) min(.128vw,.228vh) 0 rgba(0,0,0,.5);pointer-events:none}
 .pt-join:hover .pt-join-icon{transform:translateY(-6%) scale(1.06)}
 .pt-join:not(:hover) .pt-join-icon{animation:joinNudge 3.4s ease-in-out infinite}
 @keyframes joinNudge{0%,84%,100%{transform:translateY(0)}90%{transform:translateY(-4%)}96%{transform:translateY(1%)}}
 .pt-join[disabled]{display:none}
 
-/* confetti poof when someone joins (reuses the solo burst particles) */
-.pt-poof{position:fixed;z-index:96;pointer-events:none}
+/* Teams and VS still feel tactile, but party-lobby hover is motion-only. */
+.party-vs{pointer-events:auto;cursor:pointer;
+  transition:translate .2s ease,scale .2s cubic-bezier(.2,1.35,.35,1),rotate .2s ease,filter .2s ease}
+.party-vs:hover{translate:0 calc(var(--lb-lift) * 1.8);scale:1.045;rotate:-2deg;
+  filter:brightness(1.045) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
 
 /* =================== 1v1 MATCH =================== */
 #scrMatch .board{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:68px}

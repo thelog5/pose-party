@@ -148,13 +148,20 @@
       <img class="fh iv tape" id="tapeTitleA" style="left:31.9%;top:24.5%;width:14.2%;z-index:6" src="assets/ui/figma/tape-cream-b.png" alt="">
       <img class="fh iv tape" id="tapeTitleB" style="left:-2.3%;top:-.3%;width:12.9%;z-index:6" src="assets/ui/figma/tape-yl-b.png" alt="">
 
-      <img class="fh iv conf" style="left:44.7%;top:3%;width:9.2%;z-index:7"    src="assets/ui/figma/conf-blue-a.png" alt="">
+      <img class="fh iv conf" id="partyConfBlue" style="left:44.7%;top:3%;width:9.2%;z-index:7" src="assets/ui/figma/conf-blue-a.png" alt="">
       <img class="fh iv conf" style="left:34.3%;bottom:1.2%;width:10.3%;z-index:7" src="assets/ui/figma/conf-blue-b.png" alt="">
       <img class="fh iv conf" style="left:-1.7%;top:33.8%;width:8.7%;z-index:7"  src="assets/ui/figma/conf-star-a.png" alt="">
-      <img class="fh iv conf" style="left:90.3%;top:26.4%;width:9.7%;z-index:7"  src="assets/ui/figma/conf-star-b.png" alt="">
+      <img class="fh iv conf" id="partyConfStar" style="left:91.8%;top:27%;width:7.3%;z-index:7" src="assets/ui/figma/conf-star-b.png" alt="">
       <img class="fh iv conf" style="left:24.8%;top:67.7%;width:8%;z-index:7"    src="assets/ui/figma/conf-star-c.png" alt="">
-      <img class="fh iv conf" style="left:83.8%;top:4.3%;width:11.2%;z-index:7"  src="assets/ui/figma/conf-red-a.png" alt="">
-      <img class="fh iv conf" style="left:50.6%;top:26.4%;width:6.7%;z-index:7"  src="assets/ui/figma/conf-red-b.png" alt="">
+      <img class="fh iv conf" id="partyConfRedA" style="left:88.2%;top:.8%;width:6.3%;z-index:7" src="assets/ui/figma/conf-red-a.png" alt="">
+      <img class="fh iv conf" id="partyConfRedB" style="left:50.6%;top:26.4%;width:6.7%;z-index:7" src="assets/ui/figma/conf-red-b.png" alt="">
+
+      <!-- The original page confetti stays visible; this smaller second set
+           springs out from behind the PARTY card only while it is hovered. -->
+      <img class="fh iv conf party-hover-confetti" id="partyHoverLeftTop" style="left:56%;top:10%;width:3.4%;z-index:7" src="assets/ui/figma/conf-star-a.png" alt="">
+      <img class="fh iv conf party-hover-confetti" id="partyHoverRightTop" style="left:84.6%;top:14.5%;width:3.4%;z-index:7" src="assets/ui/figma/conf-blue-b.png" alt="">
+      <img class="fh iv conf party-hover-confetti" id="partyHoverLeftBottom" style="left:56%;top:39%;width:3.2%;z-index:7" src="assets/ui/figma/conf-blue-a.png" alt="">
+      <img class="fh iv conf party-hover-confetti" id="partyHoverRightBottom" style="left:84.8%;top:39%;width:3.2%;z-index:7" src="assets/ui/figma/conf-red-b.png" alt="">
 
       <img class="fh rpart" id="robotHead" data-mood="happy" style="left:-2%;top:37.5%;width:26.8%;z-index:8" src="assets/ui/figma/robot-head-happy.png" alt="Robot">
 
@@ -175,79 +182,92 @@
     </div>
   </section>
 
-  <!-- ============ SOLO PLAY (immersive: camera is the scene) ============
-       Every stateful element renders off data-rstate on this section:
-       idle | guessing | hitstop | locked | round_end  (see soloRound.js) -->
+  <!-- ============ SOLO PLAY — Figma "Singe player" 150:454.
+       HUD overlay on the full-bleed camera. Timed sprint: Round Timer =
+       whole run, Word Timer = current word. The Word card's yellow pill IS
+       a progress bar driven by target-word confidence; the bottom-right
+       guess stack fades downward (newest green on top). See CLAUDE.md. -->
   <section class="screen hidden" id="scrSolo" data-rstate="idle">
     <div class="solostage" id="soloStage">
       <div class="slot" id="slotSolo"></div>
+      <div class="sp-flash" id="soloFlash"></div>
 
-      <!-- decorative frame clouds (pointer-transparent) -->
-      <img class="cloudcorner bl" src="assets/ui/cloud-bl.png" alt="">
-      <img class="cloudcorner br" src="assets/ui/cloud-br.png" alt="">
+      <!-- decorative tapes -->
+      <img class="sp-tape" style="left:5.5%;top:.4%;width:7.5%" src="assets/ui/figma/sp-tp5.png" alt="">
+      <img class="sp-tape" style="left:54.2%;top:-2.6%;width:6.7%" src="assets/ui/figma/sp-tp6.png" alt="">
+      <img class="sp-tape" style="left:80.3%;top:-2.6%;width:8.6%" src="assets/ui/figma/sp-tp2.png" alt="">
+      <img class="sp-tape" style="left:94.6%;top:17.2%;width:5.7%" src="assets/ui/figma/sp-tp3.png" alt="">
+      <img class="sp-tape" style="left:75.7%;top:61.6%;width:7.4%" src="assets/ui/figma/sp-tp8.png" alt="">
+      <img class="sp-tape" style="left:66.4%;top:79.3%;width:5.8%" src="assets/ui/figma/sp-tp1.png" alt="">
+      <img class="sp-tape" style="left:91.6%;top:77.5%;width:6%" src="assets/ui/figma/sp-tp7.png" alt="">
+      <img class="sp-tape" style="left:27.4%;top:91.7%;width:6.8%" src="assets/ui/figma/sp-tp4.png" alt="">
 
-      <!-- brand lockup, top-left -->
-      <div class="sbrand">
-        <img src="assets/ui/brand-lockup.png" alt="Pose Party">
-        <span class="bt1">POSE</span><span class="bt2">PARTY</span><span class="bt3">LIVE</span>
+      <!-- Round Timer (blue, top-left) -->
+      <div class="sp-card sp-rtimer" style="left:1.5%;top:2.7%;width:16%">
+        <img src="assets/ui/figma/sp-rtimer.png" alt="">
+        <img class="sp-clock" src="assets/ui/figma/sp-clock.png" alt="">
+        <span class="sp-rtime" id="soloRoundTime">2:00</span>
       </div>
 
-      <!-- timer + round, top-center -->
-      <div class="stimer">
-        <img src="assets/ui/hud-timer.png" alt="">
-        <span class="tval" id="soloTime">00:30</span>
-        <span class="tround" id="soloRoundLab">ROUND 1/5</span>
+      <!-- Word Timer (cream, top-center) -->
+      <div class="sp-card sp-wtimer" style="left:41%;top:.9%;width:17.5%">
+        <img src="assets/ui/figma/sp-wtimer.png" alt="">
+        <span class="sp-wlabel">WORD TIME</span>
+        <span class="sp-wtime" id="soloWordTime">0:20</span>
       </div>
 
-      <!-- score + streak cards, top-right -->
-      <div class="shud">
-        <div class="hudcard" id="soloScoreCard">
-          <img src="assets/ui/hud-score.png" alt="">
-          <span class="htab">SCORE</span>
-          <span class="hval"><svg width="22" height="22"><use href="#icoStar"/></svg><b id="soloScoreVal">0</b></span>
-        </div>
-        <div class="hudcard">
-          <img src="assets/ui/hud-streak.png" alt="">
-          <span class="htab">STREAK</span>
-          <span class="hval"><svg width="22" height="22"><use href="#icoFire"/></svg><b id="soloStreakVal">x1</b></span>
-        </div>
+      <!-- Score (yellow, top-right) -->
+      <div class="sp-card sp-score" id="soloScoreCard" style="left:83.2%;top:1.9%;width:15.8%">
+        <img src="assets/ui/figma/sp-score.png" alt="">
+        <span class="sp-slabel">SCORE</span>
+        <span class="sp-sval" id="soloScoreVal">0</span>
       </div>
 
-      <!-- encouragement cloud, mid-left (guessing only) -->
-      <div class="cheer">KEEP<br>IT UP!</div>
-
-      <!-- mascot + its speech bubble column, bottom-right.
-           ONE bubble; the fill inside it is the confidence meter. -->
-      <div class="mascotcol">
-        <div class="bhistory" id="bubbleHistory"></div>
-        <div class="gbubble live" id="guessBubble">
-          <img class="shell" src="assets/ui/bubble-white.png" alt="">
-          <span class="bfillclip"><i id="bubbleFill"></i></span>
-          <span class="btext">
-            <span class="blabel" id="bubbleLabel">…</span>
-            <span class="bpct" id="bubblePct">0%</span>
-            <span class="bmark ok">✓</span>
-            <span class="bmark bad">✗</span>
-          </span>
-        </div>
-        <img class="mascot" id="mascotImg" src="assets/ui/robot-wave.png" data-pose="thinking" alt="AI mascot">
+      <!-- Streak (orange, right) -->
+      <div class="sp-card sp-streak" id="soloStreakCard" style="left:84%;top:19.6%;width:14.6%">
+        <img src="assets/ui/figma/sp-streak.png" alt="">
+        <span class="sp-stlabel">STREAK</span>
+        <span class="sp-stval" id="soloStreakVal">x1</span>
       </div>
 
-      <!-- bottom prompt bar: the target word ONLY — never a percentage -->
-      <div class="promptbar" id="promptBar">
-        <img class="shell" src="assets/ui/bubble-yellow.png" alt="">
-        <svg class="pstar" width="40" height="40"><use href="#icoStar"/></svg>
-        <span class="pword" id="promptWord">—</span>
-        <span class="pmark">✓</span>
+      <!-- guess stack (bottom-right): newest green on top, fading down -->
+      <div class="sp-guess top" id="spGuessTop" style="left:78%;top:47%;width:17.4%">
+        <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
+        <img class="gcard" src="assets/ui/figma/sp-guess1.png" alt="">
+        <span class="glabel" id="spGuessTopLabel">…</span>
+        <span class="gpct" id="spGuessTopPct"></span>
+      </div>
+      <div class="sp-guess mid" id="spGuessMid" style="left:78.8%;top:65.3%;width:17%">
+        <img class="gcard" src="assets/ui/figma/sp-guess2.png" alt="">
+        <span class="glabel" id="spGuessMidLabel"></span>
+        <span class="gpct" id="spGuessMidPct"></span>
+      </div>
+      <div class="sp-guess bot" id="spGuessBot" style="left:79.6%;top:80.7%;width:15.6%">
+        <img class="gcard" src="assets/ui/figma/sp-guess3.png" alt="">
+        <span class="glabel" id="spGuessBotLabel"></span>
+        <span class="gpct" id="spGuessBotPct"></span>
+      </div>
+
+      <!-- Word card (bottom-center): the yellow pill is a progress bar -->
+      <div class="sp-word" id="soloWordCard" style="left:29.9%;top:82.6%;width:40.1%">
+        <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
+        <span class="sp-word-fill" id="soloWordFill"></span>
+        <span class="sp-word-text" id="soloWord">—</span>
       </div>
 
       <!-- skip + exit, bottom-left -->
-      <div class="sactions">
-        <button class="skipbtn" id="btnSkipSolo">
-          <img src="assets/ui/btn-skip.png" alt="">
-          <span>SKIP WORD<br><b>−500</b> <svg width="15" height="15" style="display:inline"><use href="#icoStar"/></svg></span>
-        </button>
-        <button class="exitbtn" id="btnExitSolo" title="End game">✕ EXIT</button>
+      <button class="sp-skip pbtn" id="btnSkipSolo" style="left:2%;top:82%;width:15%">
+        <img src="assets/ui/figma/sp-skip.png" alt="">
+        <span>SKIP<br><b id="soloSkipCost">−250</b></span>
+      </button>
+      <button class="sp-exit" id="btnExitSolo" title="End game">✕ EXIT</button>
+
+      <!-- points award (hidden; shown on a correct catch) -->
+      <div class="sp-award" id="soloAward">
+        <img src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got">GOT IT!</span>
+        <span class="aw-pts" id="soloAwardPts">+0</span>
+        <span class="aw-lbl">POINTS!</span>
       </div>
     </div>
   </section>
@@ -310,36 +330,34 @@
       <!-- ===== PARTY MODE center (Figma frame 137:332): two 3-tile team
            panels; video sandwiches between the offwhite inner paper and
            the three-window overlay. Tiles fill from party.js. ===== -->
-      <img class="lb mp lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" style="left:35.1%;top:4.2%;width:24.9%;z-index:3" src="assets/ui/figma/lb-party-card.png" alt="Party Lobby">
+      <img class="lb mp lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" id="partyLobbyTitle" style="left:35.1%;top:4.2%;width:24.9%;z-index:3" src="assets/ui/figma/lb-party-card.png" alt="Party Lobby">
       <img class="lb mp deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:44.7%;top:.1%;width:6.4%;z-index:4" src="assets/ui/figma/lb-tape-party.png" alt="">
 
-      <img class="lb mp fig-shadow-card" style="left:2.1%;top:16.7%;width:43.9%;z-index:2" src="assets/ui/figma/pt-panel-blue.png" alt="">
-      <span class="lb mp pt-teamname" style="left:2.1%;top:17.7%;width:43.9%;z-index:5">BLUE TEAM</span>
-      <img class="lb mp" style="left:3.0%;top:23.9%;width:42.1%;z-index:2" src="assets/ui/figma/pt-inner.png" alt="">
-      <div class="lb mp pt-tile" id="ptB0" style="left:4.1%;top:25.8%;width:39.9%;height:22.4%;z-index:3"></div>
-      <div class="lb mp pt-tile" id="ptB1" style="left:4.1%;top:49.4%;width:19.5%;height:21.2%;z-index:3"></div>
-      <div class="lb mp pt-tile" id="ptB2" style="left:24.2%;top:49.4%;width:19.9%;height:21.2%;z-index:3"></div>
-      <img class="lb mp passthru" style="left:3.3%;top:23.9%;width:41.8%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
-      <button class="lb mp pt-join pbtn lobby-alpha" id="btnJoinBlue" style="left:24.2%;top:49.4%;width:19.9%;z-index:6" aria-label="Join the blue team">
+      <img class="lb mp fig-shadow-card party-panel-art party-team-layer party-blue-layer party-blue-hit lobby-alpha" style="left:2.1%;top:16.7%;width:43.9%;z-index:2" src="assets/ui/figma/pt-panel-blue.png" alt="">
+      <span class="lb mp pt-teamname party-team-layer party-blue-layer" style="left:2.1%;top:17.7%;width:43.9%;z-index:5">BLUE TEAM</span>
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB0" style="left:4.1%;top:25.8%;width:39.9%;height:22.4%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB1" style="left:4.1%;top:49.4%;width:19.5%;height:21.2%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB2" style="left:24.2%;top:49.4%;width:19.9%;height:21.2%;z-index:3"></div>
+      <img class="lb mp passthru party-team-layer party-blue-layer" style="left:3.3%;top:23.9%;width:41.8%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-blue-layer party-blue-hit" id="btnJoinBlue" style="left:24.2%;top:49.4%;width:19.9%;z-index:6" aria-label="Join the blue team">
         <img class="pt-join-art" src="assets/ui/figma/pt-join-blue.png" alt="">
         <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
         <span>JOIN THIS TEAM</span>
       </button>
 
-      <img class="lb mp fig-shadow-card" style="left:53.8%;top:16.7%;width:44.1%;z-index:2" src="assets/ui/figma/pt-panel-orange.png" alt="">
-      <span class="lb mp pt-teamname" style="left:53.8%;top:17.7%;width:44.1%;z-index:5">ORANGE TEAM</span>
-      <img class="lb mp" style="left:54.7%;top:24.0%;width:42.2%;z-index:2" src="assets/ui/figma/pt-inner.png" alt="">
-      <div class="lb mp pt-tile" id="ptO0" style="left:55.9%;top:25.9%;width:40.1%;height:22.5%;z-index:3"></div>
-      <div class="lb mp pt-tile" id="ptO1" style="left:55.9%;top:49.5%;width:19.6%;height:21.3%;z-index:3"></div>
-      <div class="lb mp pt-tile" id="ptO2" style="left:75.9%;top:49.5%;width:20.0%;height:21.3%;z-index:3"></div>
-      <img class="lb mp passthru" style="left:55.0%;top:24.0%;width:41.9%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
-      <button class="lb mp pt-join pbtn lobby-alpha" id="btnJoinOrange" style="left:75.9%;top:49.5%;width:20.0%;z-index:6" aria-label="Join the orange team">
+      <img class="lb mp fig-shadow-card party-panel-art party-team-layer party-orange-layer party-orange-hit lobby-alpha" style="left:53.8%;top:16.7%;width:44.1%;z-index:2" src="assets/ui/figma/pt-panel-orange.png" alt="">
+      <span class="lb mp pt-teamname party-team-layer party-orange-layer" style="left:53.8%;top:17.7%;width:44.1%;z-index:5">ORANGE TEAM</span>
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO0" style="left:55.9%;top:25.9%;width:40.1%;height:22.5%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO1" style="left:55.9%;top:49.5%;width:19.6%;height:21.3%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO2" style="left:75.9%;top:49.5%;width:20.0%;height:21.3%;z-index:3"></div>
+      <img class="lb mp passthru party-team-layer party-orange-layer" style="left:55.0%;top:24.0%;width:41.9%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-orange-layer party-orange-hit" id="btnJoinOrange" style="left:75.9%;top:49.5%;width:20.0%;z-index:6" aria-label="Join the orange team">
         <img class="pt-join-art" src="assets/ui/figma/pt-join-orange.png" alt="">
         <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
         <span>JOIN THIS TEAM</span>
       </button>
 
-      <img class="lb mp fig-shadow-sm" style="left:43.6%;top:37.7%;width:12.3%;z-index:6" src="assets/ui/figma/pt-vs.png" alt="VS">
+      <img class="lb mp fig-shadow-sm party-vs lobby-alpha" style="left:43.6%;top:37.7%;width:12.3%;z-index:6" src="assets/ui/figma/pt-vs.png" alt="VS">
 
       <!-- ===== invite friend ===== -->
       <div class="lb invite fig-shadow-card lobby-alpha lobby-float" style="left:1.7%;top:75.9%;width:29%;z-index:3">

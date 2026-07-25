@@ -25,6 +25,17 @@ export const ROUNDS = 5, WORD_MS = 30000;
    Skipping costs 500 and breaks the streak. */
 export const PTS_CORRECT = 100, PTS_FAST_BONUS = 100, FAST_WINDOW_MS = 15000, PTS_SKIP = 500;
 
+/* Solo "Play with AI" is a timed sprint. Single source of truth for the HUD
+   timers and scoring — the Round Timer, Word Timer and points all read from
+   here (see CLAUDE.md). A future solo-settings screen writes to this block. */
+export const SOLO = {
+  roundMs: 120000,        // Round Timer: total run; at 0 the game ends
+  wordMs: 20000,          // Word Timer: per word; at 0 the word is skipped
+  base: 100,              // points floor for a correct word
+  speedBonusMax: 300,     // extra points for catching it instantly (scales with word time left)
+  skipPenalty: 250,       // cost of pressing Skip (streak also resets)
+};
+
 export const STARTERS = ["idle","jumping jacks","swimming","boxing","guitar","archery","basketball shot","golf swing","sleeping","driving","rowing","climbing","disco dance","hula hoop","skiing","chicken dance","weightlifting","tennis serve","marching","bowling","t-rex","robot"];
 
 export const BUNDLED_DATA_URL = "assets/data/pose-charades-data.json";

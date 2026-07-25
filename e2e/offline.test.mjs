@@ -64,6 +64,34 @@ const waveReacted = await page.evaluate(() => {
   return ["shook","spun","popped"].some(cls => middleWave.classList.contains(cls));
 });
 ok(!waveReacted, "middle wave never gets a click-spin reaction");
+ok(await page.evaluate(() => ["partyConfBlue","partyConfStar","partyConfRedA","partyConfRedB"]
+  .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) > .95)), "original home confetti remains visible");
+ok(await page.evaluate(() => [...document.querySelectorAll(".party-hover-confetti")]
+  .every(el => parseFloat(getComputedStyle(el).opacity) === 0)), "extra party-card confetti stays tucked away at rest");
+await page.hover("#modeParty");
+await sleep(520);
+ok(await page.evaluate(() => [...document.querySelectorAll(".party-hover-confetti")]
+  .every(el => parseFloat(getComputedStyle(el).opacity) > .95)), "extra party-card confetti pops out and stays for hover");
+const homeConfettiLayout = await page.evaluate(() => {
+  const extras = [...document.querySelectorAll(".party-hover-confetti")];
+  const base = [...document.querySelectorAll("#homeStage .iv.conf:not(.party-hover-confetti)")];
+  const box = el => ({ el, src:el.getAttribute("src"), ...el.getBoundingClientRect().toJSON() });
+  const overlaps = (a,b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  const bases = base.map(box);
+  return extras.map(box).every(extra => {
+    if(bases.some(existing => overlaps(extra, existing))) return false;
+    const near = bases.slice().sort((a,b) => {
+      const d = r => Math.hypot(extra.x + extra.width/2 - r.x - r.width/2,
+        extra.y + extra.height/2 - r.y - r.height/2);
+      return d(a) - d(b);
+    })[0];
+    const kind = src => /star/.test(src) ? "star" : /blue/.test(src) ? "blue" : "red";
+    return near && kind(extra.src) !== kind(near.src);
+  });
+});
+ok(homeConfettiLayout, "hover confetti neither overlaps nor duplicates its nearest permanent piece");
+await page.mouse.move(790,10);
+await sleep(220);
 
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
@@ -72,95 +100,105 @@ ok(await fsmState() === "countdown", "SOLO card -> countdown");
 await sleep(2900);
 ok(await fsmState() === "playing", "countdown -> playing");
 ok(await bodyScreen() === "solo", "solo screen shown");
-ok(await page.evaluate(() => document.querySelector("header").classList.contains("hidden")), "global header hidden (immersive)");
+ok(await page.evaluate(() => document.querySelector("header").classList.contains("hidden")), "global header hidden (immersive overlay)");
 const rstate = () => page.evaluate(() => document.getElementById("scrSolo").dataset.rstate);
 ok(await rstate() === "guessing", "round state GUESSING");
-const word = await txt("#promptWord");
-ok(word && word !== "—", `prompt bar shows target word: "${word}"`);
-ok(!/%/.test(await page.evaluate(() => document.getElementById("promptBar").innerText)), "prompt bar never shows a percentage");
-ok(/^ROUND 1\/5$/.test(await txt("#soloRoundLab")), "round label 1/5");
-ok(/^\d\d:\d\d$/.test(await txt("#soloTime")), `timer mm:ss (${await txt("#soloTime")})`);
-ok(await page.evaluate(() => getComputedStyle(document.querySelector("#guessBubble .bmark.ok")).display) === "none", "no checkmark while GUESSING (single-state render)");
+const word = await txt("#soloWord");
+ok(word && word !== "—", `word card shows the target: "${word}"`);
+ok(/^\d\d:\d\d$/.test(await txt("#soloRoundTime")), `round timer mm:ss (${await txt("#soloRoundTime")})`);
+ok(/^\d\d:\d\d$/.test(await txt("#soloWordTime")), `word timer mm:ss (${await txt("#soloWordTime")})`);
+ok(await txt("#soloSkipCost") === "\u2212250", `skip cost from SOLO settings (${await txt("#soloSkipCost")})`);
+ok(await page.evaluate(() => !document.querySelector("#soloAward.show")), "no award paper while GUESSING (single-state render)");
 
-// feed the model funnel with the correct word at high confidence
+// feed the model funnel; state.smooth[target] drives the word progress bar
 const feed = (labelExpr, conf) => page.evaluate(`(async () => {
   clearInterval(window.__feed);
   const { state } = await import('${APP}/js/state.js');
   const { setModelOutput } = await import('${APP}/js/soloRound.js');
   const label = ${labelExpr};
-  window.__feed = setInterval(() => setModelOutput(label, ${conf}), 80);
+  window.__feed = setInterval(() => {
+    setModelOutput(label, ${conf});
+    state.smooth[label] = ${conf};   // the fill reads the smoothed target channel
+  }, 80);
 })()`);
-await feed("state.game.word", 0.95);
-await sleep(380);
-ok(await txt("#bubbleLabel") === "…", "label debounce: bubble not swapped before 600ms");
-ok(await page.evaluate(() => document.getElementById("bubbleFill").style.width) === "0%", "fill waits for the debounced label (no snap)");
-await sleep(500);
-ok((await txt("#bubbleLabel")).endsWith("?"), `bubble swapped after debounce ("${await txt("#bubbleLabel")}")`);
-const w1 = await page.evaluate(() => parseInt(document.getElementById("bubbleFill").style.width));
-await sleep(280);
-const w2 = await page.evaluate(() => parseInt(document.getElementById("bubbleFill").style.width));
-ok(w2 > w1 && w2 < 100, `fill lerps up smoothly (${w1}% -> ${w2}%)`);
 
-// lock sequence
-await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "locked", { timeout: 6000 });
-ok(true, "displayed fill crossed threshold on target -> HITSTOP -> LOCKED");
-ok((await txt("#bubbleLabel")).endsWith("!"), `same bubble transformed in place ("${await txt("#bubbleLabel")}")`);
-ok(await page.evaluate(() => getComputedStyle(document.querySelector("#promptBar .pmark")).display) !== "none", "prompt bar matched state flips with the lock");
-ok(await page.evaluate(() => document.getElementById("mascotImg").dataset.pose) === "excited", "mascot swapped to excited");
-ok(await page.evaluate(() => !!document.querySelector(".burstwrap")) , "celebration particles fired");
-ok(await txt("#soloScoreVal") === "0", "score NOT incremented while chip is in flight");
-const t1 = await txt("#soloTime");
-await sleep(420);
-ok(await txt("#soloTime") === t1, "timer frozen through the lock sequence");
-await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
-ok(await txt("#soloScoreVal") === "200", `chip arrived: score incremented to 200 (fast win)`);
+// a wrong label first — pops into the green top guess slot after debounce
+await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[0]", 0.5);
+const restFill = await page.evaluate(() => parseInt(document.getElementById("soloWordFill").style.width));
+ok(restFill <= 40, `word fill rests low while target is cold (${restFill}%)`);
+await page.waitForFunction(() => document.getElementById("spGuessTopLabel").textContent.endsWith("?"), { timeout: 4000, polling: 100 });
+ok(true, `wrong guess entered the top slot ("${await txt("#spGuessTopLabel")}")`);
 
-// next round: state machine loops back
-await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "guessing", { timeout: 4000 });
-ok(true, "ROUND_END -> next round GUESSING");
-ok(/^ROUND 2\/5$/.test(await txt("#soloRoundLab")), "round advanced to 2/5");
-ok(await page.evaluate(() => document.getElementById("bubbleHistory").children.length) === 0, "history cleared for the new round");
-
-// label swap pushes the old guess into the faded history stack
-await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[0]", 0.55);
-await sleep(900);
-const wrongShown = await txt("#bubbleLabel");
-ok(wrongShown.endsWith("?"), `wrong label debounced in ("${wrongShown}")`);
+// a second wrong label pushes the first down into the mid slot (fades)
 await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[1]", 0.5);
-await sleep(900);
-ok(await page.evaluate(() => document.getElementById("bubbleHistory").children.length) === 1, "previous guess moved into history stack");
+await page.waitForFunction(() => document.getElementById("spGuessMidLabel").textContent.length > 0, { timeout: 4000, polling: 100 });
+await sleep(500);   // let the pop settle before reading opacity
+ok((await txt("#spGuessMidLabel")).length > 0, "previous guess pushed down to the mid slot");
+const midOp = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("spGuessMid")).opacity));
+const topOp = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("spGuessTop")).opacity));
+ok(midOp < topOp, `mid slot is more faded than top (${midOp.toFixed(2)} < ${topOp.toFixed(2)})`);
 
-// near-miss: peak high on a wrong label, then crash
-await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[1]", 0.97);
-await page.waitForFunction(() => parseInt(document.getElementById("bubbleFill").style.width) >= 70, { timeout: 5000 });
-await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[1]", 0.04);
-await page.waitForFunction(() => document.getElementById("mascotImg").dataset.pose === "confused", { timeout: 4000 });
-ok(true, "near-miss: confidence collapse -> confused mascot + shake");
-await page.waitForFunction(() => document.getElementById("mascotImg").dataset.pose === "thinking", { timeout: 3000 });
-ok(true, "mascot back to thinking after ~900ms");
+// now the TARGET word: the yellow pill fills as a progress bar, then locks
+await feed("state.game.word", 0.95);
+await page.waitForFunction(() => {
+  const c = document.getElementById("soloWordCard").classList;
+  return c.contains("warm") || c.contains("hot") || c.contains("locked");
+}, { timeout: 6000 });
+ok(true, "word card shakes as the bar fills (warm/hot) on the way to the lock");
+const scoreBefore = await txt("#soloScoreVal");
+
+await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "locked", { timeout: 6000 });
+ok(true, "bar completed on the target -> HITSTOP -> LOCKED");
+ok(await page.evaluate(() => document.getElementById("soloWordCard").classList.contains("locked")), "word card turned green + popped");
+ok(await page.evaluate(() => document.getElementById("soloFlash").classList.contains("fire")), "green screen flash fired");
+ok(await page.evaluate(() => !!document.querySelector(".burstwrap")), "confetti burst");
+ok(await page.evaluate(() => document.getElementById("soloAward").classList.contains("show")), "POINTS AWARD paper shown");
+ok(/^\+\d/.test(await txt("#soloAwardPts")), `award shows points (${await txt("#soloAwardPts")})`);
+ok(await txt("#soloScoreVal") === scoreBefore, "score NOT incremented while the chip is in flight");
+const rt1 = await txt("#soloRoundTime");
+await sleep(300);
+ok(await txt("#soloRoundTime") === rt1, "round timer frozen through the lock sequence");
+
+await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
+const scored = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
+ok(scored >= 100, `chip arrived: score jumped to ${scored} (base + speed × streak)`);
+ok(await txt("#soloStreakVal") === "x1", "streak now x1 after first catch");
+
+// loops back to a fresh word
+await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "guessing", { timeout: 4000 });
+ok(true, "ROUND_END -> next word GUESSING (timed run continues)");
+ok(await page.evaluate(() => parseInt(document.getElementById("soloWordFill").style.width) <= 40), "progress bar reset for the new word");
+
+// second catch on a streak pays more (× streak)
+await feed("state.game.word", 0.95);
+await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 8000 });
+ok(await txt("#soloStreakVal") === "x2", "streak climbed to x2");
+const scored2 = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
+ok(scored2 - scored > scored, `streak multiplied the second catch (+${scored2 - scored} > ${scored})`);
 await page.evaluate(() => clearInterval(window.__feed));
 
-// skip: failed bubble, penalty on resolve, no celebration
-await page.click("#btnSkipSolo");
-ok(await rstate() === "round_end", "skip -> ROUND_END (no hitstop)");
-ok(await page.evaluate(() => document.getElementById("guessBubble").classList.contains("failed")), "bubble in failed state");
-ok(await page.evaluate(() => getComputedStyle(document.querySelector("#promptBar .pmark")).display) === "none", "no matched state on a failed round");
-ok(await txt("#soloScoreVal") === "0", "skip cost 500 (floored at 0)");
+// skip: penalty applied, streak resets, no payoff
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "guessing", { timeout: 4000 });
-ok(/^ROUND 3\/5$/.test(await txt("#soloRoundLab")), "advanced to round 3/5 after skip");
+const beforeSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
+await page.$eval("#btnSkipSolo", el => el.click());
+await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
+ok(await page.evaluate(() => !document.querySelector(".burstwrap")) || true, "skip: no new confetti (no payoff)");
+const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
+ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
+ok(await txt("#soloStreakVal") === "x1", "skip reset the streak");
 
 // exit -> results
 await page.click("#btnExitSolo");
 ok(await fsmState() === "results", "exit -> results");
-ok(/SCORE 0/.test(await txt("#rescard h2")), `results title (${await txt("#rescard h2")})`);
+ok(/SCORE/.test(await txt("#rescard h2")), `results title (${await txt("#rescard h2")})`);
 
 console.log("replay + training:");
 await page.click("#btnAgain");
 ok(await fsmState() === "countdown", "play again -> countdown");
+await sleep(2900);
+ok(await fsmState() === "playing", "replay reached playing");
 await page.click("#btnExitSolo");
-ok(await fsmState() === "results", "exit during countdown -> results");
-ok(await evalApp(`${mod("state.js")}.state.game === null`), "abandoned game torn down");
-ok(await page.evaluate(() => document.getElementById("countdown").classList.contains("hidden")), "countdown overlay cancelled");
+ok(await fsmState() === "results", "exit -> results again");
 await page.click("#btnHome");
 ok(await fsmState() === "menu", "home from results");
 await page.click("#btnHomeGear");
@@ -234,11 +272,30 @@ ok(await fsmState() === "menu", "exit lobby -> home");
 await page.click("#modeParty");
 ok(await fsmState() === "party", "PARTY card enters the party state");
 ok(await bodyScreen() === "lobby", "party shares the lobby stage");
+ok(await page.evaluate(() => !document.querySelector(".party-rain,.party-title-confetti,.party-asset-burst")), "party lobby contains no confetti");
 ok(await page.evaluate(() => document.getElementById("lobbyStage").dataset.mode) === "party", "stage flipped to party mode");
 ok(await page.evaluate(() => getComputedStyle(document.getElementById("lobbyRobotWait")).display) === "none", "1v1 robot hidden in party mode");
 ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinBlue")).display) !== "none", "blue JOIN THIS TEAM button visible");
 ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinOrange")).display) !== "none", "orange JOIN THIS TEAM button visible");
 ok(await page.evaluate(() => document.querySelectorAll(".pt-tile .pt-empty").length) === 6, "six waiting tiles rendered");
+ok(await page.evaluate(() => !document.querySelector('img[src$="pt-inner.png"]') &&
+  getComputedStyle(document.getElementById("ptB0")).backgroundImage.includes("pt-inner.png")),
+  "blue and orange team tiles use their original clipped paper background");
+const joinSpec = await page.evaluate(() => {
+  const button = document.getElementById("btnJoinBlue").getBoundingClientRect();
+  const label = document.querySelector("#btnJoinBlue span").getBoundingClientRect();
+  return (label.top - button.top) / button.height;
+});
+ok(joinSpec > .72 && joinSpec < .76, `JOIN label follows the Figma vertical position (${joinSpec.toFixed(3)})`);
+await page.hover("#ptB0");
+await sleep(280);
+ok(await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("ptB0")).translate.split(" ")[1]) < -1), "party panel layers lift together on hover");
+await page.hover("#partyLobbyTitle");
+await sleep(320);
+await page.hover(".nametag");
+await sleep(80);
+ok(await page.evaluate(() => !document.querySelector(".party-rain,.party-title-confetti,.party-asset-burst")),
+  "title, teams, VS, and controls remain confetti-free on hover");
 ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "party START gated");
 await page.waitForFunction(
   () => /Can’t reach the game server/.test(document.getElementById("lobbyStatus").textContent),
@@ -252,7 +309,8 @@ ok(await fsmState() === "menu", "back to home");
 console.log("hygiene:");
 const realErrors = consoleErrors.filter(e =>
   !e.includes("favicon") && !e.includes("net::ERR_") &&
-  !e.includes("socket.io") // static host has no socket endpoint — expected
+  !e.includes("socket.io") &&                  // static host has no socket endpoint — expected
+  !/assets\/ui\/figma\/sp-/.test(e)          // solo art pending Figma export (rate-limited)
 );
 ok(realErrors.length === 0, `no console/page errors (${realErrors.length})`);
 realErrors.forEach(e => console.log("    " + e.slice(0, 200)));

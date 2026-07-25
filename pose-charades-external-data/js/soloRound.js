@@ -1,201 +1,196 @@
-/* Solo-round guess mechanic: the mascot's speech bubble IS the confidence
-   meter. One bubble at a time; its fill width lerps toward the model's
-   confidence; superseded guesses fade into a small history stack above it.
+/* Solo-round mechanic for the Figma "Singe player" HUD.
 
-   All model output funnels through setModelOutput(label, confidence) — the
-   UI never binds to raw model output directly.
+   The Word card's yellow pill is a PROGRESS BAR driven by the smoothed
+   confidence for the round's TARGET word. It completes exactly at the lock
+   point; the card shakes harder as it closes in. Separately, the bottom-
+   right guess stack is a rolling history of the AI's live top guess —
+   newest pops into the green top slot, older ones fade down through blue
+   then purple.
 
-   Round state machine (explicit; elements render off this state ONLY):
+   All model output funnels through setModelOutput(label, confidence) (the
+   current top guess, for the stack). The target-word fill reads the app's
+   smoothed scores (state.smooth[target]) each animation frame — same
+   funnelled model output, just the target's channel.
+
+   Round state machine (elements render off #scrSolo[data-rstate] only):
      IDLE → GUESSING → HITSTOP → LOCKED → ROUND_END
-   plus the failure edge GUESSING → ROUND_END (timeout/skip: no hitstop,
-   no celebration).
+   plus the failure edge GUESSING → ROUND_END (timeout/skip: no payoff).
 
-   Lock-on sequence, in order:
-     1. HITSTOP: everything (fill, timer, mascot bounce) freezes ~180ms.
-     2. LOCKED: the SAME bubble element transforms in place — "WORD?"
-        becomes "WORD!", the fill stops updating.
-     3. The bottom prompt bar flips to its matched state in the same frame.
-     4. Celebration particles fire from the bubble (event-triggered only).
-     5. A points chip flies bubble → score card; score and streak increment
-        only when it arrives.
-     6. ROUND_END, then game.js advances to the next word. */
+   Lock-on payoff, in order: hitstop → word turns green/pops → green screen
+   flash → confetti from the word → POINTS AWARD paper → points chip flies
+   to the Score card (score/streak apply on arrival) → ROUND_END. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { blip } from "./audio.js";
 
-/* ---------------- tuning constants (match against real model logs) ---------------- */
-export const LOCK_THRESHOLD    = 0.85;  // displayed fill needed to lock (configurable)
-export const LABEL_DEBOUNCE_MS = 600;   // new top label must persist this long to swap the bubble
-export const FILL_LERP         = 0.09;  // displayed fill -> raw confidence, per animation frame
-export const NEARMISS_PEAK_MIN = 0.65;  // near-miss only armed above this displayed peak
-export const NEARMISS_DROP     = 0.22;  // ...and fires after dropping this many points
-export const HITSTOP_MS        = 180;   // freeze duration on lock
-export const CHIP_FLIGHT_MS    = 700;   // points chip travel time; score increments on arrival
-export const CONFUSED_MS       = 900;   // how long the mascot stays confused after a near-miss
-export const HISTORY_MAX       = 3;     // faded previous-guess bubbles kept above the live one
-export const ROUND_END_PAUSE_MS = 900;  // linger on the resolved bubble before the next word
+/* ---------------- tuning (against real model logs) ---------------- */
+export const LOCK_THRESHOLD    = 0.80;  // smoothed target confidence that completes the bar & locks
+export const LOCK_HOLD_MS      = 160;   // must stay at/over threshold this long to lock
+export const FILL_LERP         = 0.16;  // displayed fill -> target each frame (never snaps)
+export const LABEL_DEBOUNCE_MS = 550;   // a new top label must persist this long to enter the stack
+export const WARM_AT           = 0.55;  // fill fraction where the word starts shaking
+export const HOT_AT            = 0.82;  // fill fraction where it shakes hard
+export const HITSTOP_MS        = 180;   // freeze on lock
+export const CHIP_FLIGHT_MS    = 650;   // points chip travel; score applies on arrival
+export const AWARD_MS          = 1500;  // POINTS AWARD paper on screen
+export const ROUND_END_PAUSE_MS = 1100; // linger before the next word
+
+const FILL_MIN = 35, FILL_MAX = 97;     // resting pill % → full-bar %
 
 /* ---------------- state ---------------- */
-let rstate = "idle";            // idle | guessing | hitstop | locked | round_end
-let target = null;              // this round's word
-let rawLabel = null,  rawConf = 0;      // latest model output (via setModelOutput)
-let candLabel = null, candSince = 0;    // debounce candidate
-let shownLabel = null;          // label currently in the bubble
-let shownConf = 0;              // displayed (lerped) fill 0..1
-let peakConf = 0;               // peak displayed confidence for the current label
-let history = [];               // [{label, pct}] oldest first
-let rafId = null;
-let confusedTimer = null;
-let resolveCb = null;           // game.js callback: ({won, skip})
+let rstate = "idle";
+let target = null;
+let shownFill = 0;          // 0..1 displayed progress toward the lock
+let overSince = 0;          // when the smoothed conf first crossed threshold
+let resolveCb = null;
 
+/* debounced guess stack: [top, mid, bot] of {label, pct}; top is live */
+let stack = [];
+let candLabel = null, candSince = 0, topLabel = null;
+
+let rafId = null;
 const el = id => $(id);
 
 function setState(s){
   rstate = s;
   const scr = el("scrSolo");
-  if(scr) scr.dataset.rstate = s;   // CSS gates every stateful element off this
+  if(scr) scr.dataset.rstate = s;
 }
 export const roundState = () => rstate;
-
-/* ---------------- mascot ---------------- */
-/* Exactly one mascot instance (#mascotImg); the bubble is anchored to it.
-   Poses: thinking (default), confused (near-miss), excited (locked).
-   NOTE: no confused art was uploaded — the thinking pose gets a CSS
-   "dizzy" treatment until a real asset lands (see ASSETS-NEEDED.md). */
-const POSES = {
-  thinking: "assets/ui/robot-wave.png",
-  confused: "assets/ui/robot-wave.png",
-  excited:  "assets/ui/mascot-thumbs.png",
-};
-function setMascot(pose){
-  const img = el("mascotImg");
-  if(!img) return;
-  img.src = POSES[pose];
-  img.dataset.pose = pose;
-}
-
-/* ---------------- model funnel ---------------- */
-/* Called every inference frame by the engine. The only entry point for
-   model output; everything the player sees derives from here. */
-export function setModelOutput(label, confidence){
-  if(rstate !== "guessing") return;      // frozen during hitstop/locked/round_end
-  if(typeof label !== "string" || !label) return;
-  rawLabel = label;
-  rawConf = Math.max(0, Math.min(1, +confidence || 0));
-
-  const now = performance.now();
-  if(label !== candLabel){ candLabel = label; candSince = now; }
-
-  /* debounce: only swap the bubble after 600ms of a stable new top label */
-  if(label !== shownLabel && now - candSince >= LABEL_DEBOUNCE_MS){
-    if(shownLabel !== null) pushHistory(shownLabel, shownConf);
-    shownLabel = label;
-    peakConf = shownConf;                // reset near-miss peak on swap
-    renderBubbleLabel();
-  }
-}
-
-function pushHistory(label, conf){
-  history.push({ label, pct: Math.round(conf * 100) });
-  while(history.length > HISTORY_MAX) history.shift();
-  const stack = el("bubbleHistory");
-  if(!stack) return;
-  stack.innerHTML = history.map(h =>
-    '<div class="gbubble mini"><img class="shell" src="assets/ui/bubble-white.png" alt="">' +
-    '<span class="btext"><span class="blabel">' + esc(disp(h.label)) + '?</span>' +
-    '<span class="bpct">' + h.pct + '%</span></span></div>'
-  ).join("");
-}
+export const timerFrozen = () => rstate !== "guessing" && rstate !== "idle";
 
 const disp = l => (l === "idle" ? "just standing" : l).toUpperCase();
 
-function renderBubbleLabel(){
-  const lab = el("bubbleLabel");
-  if(lab) lab.textContent = shownLabel ? disp(shownLabel) + "?" : "…";
+/* ---------------- model funnel (guess stack) ---------------- */
+export function setModelOutput(label, confidence){
+  if(rstate !== "guessing") return;
+  if(typeof label !== "string" || !label) return;
+  const now = performance.now();
+  if(label !== candLabel){ candLabel = label; candSince = now; }
+
+  /* live-update the current top card's percentage every frame */
+  if(label === topLabel && stack[0]){
+    stack[0].pct = Math.round((confidence || 0) * 100);
+    if(el("spGuessTopPct")) el("spGuessTopPct").textContent = stack[0].pct + "%";
+  }
+
+  /* a new label that has been top for long enough enters the stack on top */
+  if(label !== topLabel && now - candSince >= LABEL_DEBOUNCE_MS){
+    topLabel = label;
+    stack.unshift({ label, pct: Math.round((confidence || 0) * 100) });
+    stack = stack.slice(0, 3);
+    renderStack(true);
+  }
 }
 
-/* ---------------- per-frame animation ---------------- */
+function renderStack(popped){
+  const slots = [
+    { box: "spGuessTop", lab: "spGuessTopLabel", pct: "spGuessTopPct" },
+    { box: "spGuessMid", lab: "spGuessMidLabel", pct: "spGuessMidPct" },
+    { box: "spGuessBot", lab: "spGuessBotLabel", pct: "spGuessBotPct" },
+  ];
+  slots.forEach((s, i) => {
+    const box = el(s.box);
+    const entry = stack[i];
+    if(!box) return;
+    if(entry){
+      box.classList.remove("empty");
+      el(s.lab).textContent = disp(entry.label) + "?";
+      el(s.pct).textContent = entry.pct + "%";
+    }else{
+      box.classList.add("empty");
+      el(s.lab).textContent = "";
+      el(s.pct).textContent = "";
+    }
+  });
+  if(popped){
+    const top = el("spGuessTop");
+    top.classList.remove("pop"); void top.offsetWidth; top.classList.add("pop");
+    for(const id of ["spGuessMid", "spGuessBot"]){
+      const b = el(id);
+      b.classList.remove("shift"); void b.offsetWidth; b.classList.add("shift");
+    }
+    blip([494, 622], 0.045);
+  }
+}
+
+/* ---------------- per-frame: the word progress bar ---------------- */
 function frame(){
   rafId = requestAnimationFrame(frame);
-  if(rstate !== "guessing") return;       // hitstop freezes everything
+  if(rstate !== "guessing") return;
 
-  /* smoothing: never snap the fill to raw values */
-  const targetConf = (rawLabel === shownLabel) ? rawConf : 0;
-  shownConf += (targetConf - shownConf) * FILL_LERP;
+  const raw = target ? (state.smooth?.[target] || 0) : 0;
+  const wantFill = Math.max(0, Math.min(1, raw / LOCK_THRESHOLD));
+  shownFill += (wantFill - shownFill) * FILL_LERP;
 
-  const pct = Math.round(shownConf * 100);
-  const fill = el("bubbleFill");
-  const pctEl = el("bubblePct");
-  if(fill) fill.style.width = pct + "%";
-  if(pctEl) pctEl.textContent = pct + "%";
+  const fillEl = el("soloWordFill");
+  if(fillEl) fillEl.style.width = (FILL_MIN + shownFill * (FILL_MAX - FILL_MIN)) + "%";
 
-  /* near-miss: peaked high, then slid back down */
-  if(shownConf > peakConf) peakConf = shownConf;
-  if(peakConf >= NEARMISS_PEAK_MIN && peakConf - shownConf >= NEARMISS_DROP){
-    peakConf = shownConf;                 // re-arm from the new floor
-    nearMiss();
+  const card = el("soloWordCard");
+  if(card){
+    card.classList.toggle("warm", shownFill >= WARM_AT && shownFill < HOT_AT);
+    card.classList.toggle("hot", shownFill >= HOT_AT);
   }
 
-  /* lock: DISPLAYED fill crosses the threshold on the matching label —
-     raw spikes can't trigger it */
-  if(shownConf >= LOCK_THRESHOLD && shownLabel === target){
-    beginLockSequence(pct);
+  /* lock when the smoothed confidence holds at/over threshold */
+  if(raw >= LOCK_THRESHOLD){
+    if(!overSince) overSince = performance.now();
+    if(performance.now() - overSince >= LOCK_HOLD_MS) beginLock();
+  }else{
+    overSince = 0;
   }
 }
 
-function nearMiss(){
-  const bubble = el("guessBubble");
-  if(bubble){
-    bubble.classList.remove("shake"); void bubble.offsetWidth;
-    bubble.classList.add("shake");
-  }
-  setMascot("confused");
-  blip([330, 262]);
-  clearTimeout(confusedTimer);
-  confusedTimer = setTimeout(() => {
-    if(rstate === "guessing") setMascot("thinking");
-  }, CONFUSED_MS);
-}
-
-/* ---------------- lock sequence ---------------- */
-function beginLockSequence(pct){
-  setState("hitstop");                    // freezes frame() and the game timer
-  clearTimeout(confusedTimer);
+/* ---------------- lock payoff ---------------- */
+function beginLock(){
+  setState("hitstop");                 // freezes the game timers (timerFrozen)
+  const card = el("soloWordCard");
+  if(card){ card.classList.remove("warm", "hot"); card.classList.add("locked"); }
+  const fillEl = el("soloWordFill");
+  if(fillEl) fillEl.style.width = FILL_MAX + "%";
   blip([523]);
 
   setTimeout(() => {
-    if(rstate !== "hitstop") return;      // round was torn down mid-hitstop
+    if(rstate !== "hitstop") return;
     setState("locked");
-
-    /* the SAME bubble transforms: "WORD?" -> "WORD!", fill stops updating */
-    const lab = el("bubbleLabel");
-    if(lab) lab.textContent = disp(target) + "!";
-    if(el("bubblePct")) el("bubblePct").textContent = pct + "%";
-
-    /* prompt bar flips to matched in the same beat (CSS via data-rstate) */
-    setMascot("excited");
-    fireParticles();
-    blip([523, 659, 784]);
+    greenFlash();
+    confettiFrom(card);
+    showAward();
+    blip([523, 659, 784, 1047], 0.08);
     flyPointsChip();
   }, HITSTOP_MS);
 }
 
-/* celebration particles — event-triggered only, self-removing */
-function fireParticles(){
-  const bubble = el("guessBubble");
-  if(!bubble) return;
-  const r = bubble.getBoundingClientRect();
+function greenFlash(){
+  const f = el("soloFlash");
+  if(!f) return;
+  f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
+}
+
+function showAward(){
+  const a = el("soloAward");
+  if(!a) return;
+  const pts = state.game ? state.game.pendingPts : 0;
+  el("soloAwardPts").textContent = "+" + (pts || 0).toLocaleString("en-US");
+  a.classList.remove("show"); void a.offsetWidth; a.classList.add("show");
+  setTimeout(() => a.classList.remove("show"), AWARD_MS);
+}
+
+function confettiFrom(node){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const r = node ? node.getBoundingClientRect()
+                 : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   const wrap = document.createElement("div");
   wrap.className = "burstwrap";
-  for(let i = 0; i < 16; i++){
+  for(let i = 0; i < 26; i++){
     const p = document.createElement("i");
-    const ang = (i / 16) * Math.PI * 2 + Math.random() * 0.5;
-    const dist = 70 + Math.random() * 110;
+    const ang = (i / 26) * Math.PI * 2 + Math.random() * 0.6;
+    const dist = 90 + Math.random() * 160;
     p.style.left = cx + "px"; p.style.top = cy + "px";
     p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
-    p.style.setProperty("--dy", Math.sin(ang) * dist - 40 + "px");
+    p.style.setProperty("--dy", Math.sin(ang) * dist - 60 + "px");
     p.style.setProperty("--rot", (Math.random() * 540 - 270) + "deg");
     p.className = ["star", "dot", "spark"][i % 3];
     wrap.appendChild(p);
@@ -204,83 +199,70 @@ function fireParticles(){
   setTimeout(() => wrap.remove(), 950);
 }
 
-/* points chip: bubble -> score card; the score changes only on arrival */
 function flyPointsChip(){
-  const bubble = el("guessBubble"), scoreCard = el("soloScoreCard");
+  const from = el("soloWordCard"), to = el("soloScoreCard");
   const pts = state.game ? state.game.pendingPts : 0;
   const chip = document.createElement("div");
-  chip.className = "ptschip";
+  chip.className = "sp-chip";
   chip.textContent = "+" + (pts || 0).toLocaleString("en-US");
-  const from = bubble ? bubble.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
-  const to = scoreCard ? scoreCard.getBoundingClientRect() : { left: innerWidth - 160, top: 40, width: 120, height: 60 };
-  chip.style.left = (from.left + from.width / 2) + "px";
-  chip.style.top = (from.top + from.height / 2) + "px";
+  const fr = from ? from.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+  const tr = to ? to.getBoundingClientRect() : { left: innerWidth - 160, top: 40, width: 120, height: 60 };
+  chip.style.left = (fr.left + fr.width / 2) + "px";
+  chip.style.top = (fr.top + fr.height / 2) + "px";
   document.body.appendChild(chip);
   requestAnimationFrame(() => {
-    chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.2,.6,1), opacity 120ms " + (CHIP_FLIGHT_MS - 100) + "ms";
+    chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.15,.5,1), opacity 140ms " + (CHIP_FLIGHT_MS - 120) + "ms";
     chip.style.transform = "translate(" +
-      (to.left + to.width / 2 - (from.left + from.width / 2)) + "px," +
-      (to.top + to.height / 2 - (from.top + from.height / 2)) + "px) scale(.55)";
+      (tr.left + tr.width / 2 - (fr.left + fr.width / 2)) + "px," +
+      (tr.top + tr.height / 2 - (fr.top + fr.height / 2)) + "px) scale(.5)";
     chip.style.opacity = "0";
   });
   setTimeout(() => {
     chip.remove();
     if(rstate !== "locked") return;
-    const b = el("guessBubble"), scr = el("scrSolo");
-    if(b) b.classList.add("won");
-    if(scr) scr.classList.add("wonround");    // keeps the prompt bar matched through round_end
     setState("round_end");
     blip([880]);
-    if(resolveCb) resolveCb({ won: true });   // game.js increments score+streak NOW
+    if(resolveCb) resolveCb({ won: true });    // score+streak apply NOW
   }, CHIP_FLIGHT_MS);
 }
 
-/* ---------------- failure paths ---------------- */
-/* Timer expired or player skipped: bubble transitions to its failed state.
-   No celebration, no hitstop. */
+/* ---------------- failure (timeout / skip) ---------------- */
 export function failRound(skipped){
   if(rstate !== "guessing") return false;
-  clearTimeout(confusedTimer);
-  const b = el("guessBubble");
-  if(b) b.classList.add("failed");
   setState("round_end");
-  const lab = el("bubbleLabel");
-  if(lab && !shownLabel) lab.textContent = "…";
-  setMascot("thinking");
+  const card = el("soloWordCard");
+  if(card){
+    card.classList.remove("warm", "hot");
+    card.classList.add("miss");
+    setTimeout(() => card.classList.remove("miss"), 500);
+  }
   blip(skipped ? [294, 220] : [220, 165]);
   if(resolveCb) resolveCb({ won: false, skip: !!skipped });
   return true;
 }
 
-/* ---------------- round lifecycle (driven by game.js) ---------------- */
+/* ---------------- lifecycle (from game.js) ---------------- */
 export function beginRound(word, onResolve){
   target = word;
   resolveCb = onResolve;
-  rawLabel = null; rawConf = 0;
-  candLabel = null; candSince = 0;
-  shownLabel = null; shownConf = 0; peakConf = 0;
-  history = [];
-  const stack = el("bubbleHistory");
-  if(stack) stack.innerHTML = "";
-  const b = el("guessBubble"), scr = el("scrSolo");
-  if(b) b.classList.remove("won", "failed", "shake");
-  if(scr) scr.classList.remove("wonround");
-  renderBubbleLabel();
-  if(el("bubbleFill")) el("bubbleFill").style.width = "0%";
-  if(el("bubblePct")) el("bubblePct").textContent = "0%";
-  if(el("promptWord")) el("promptWord").textContent = word; // word only — never a percentage
-  setMascot("thinking");
+  shownFill = 0; overSince = 0;
+  stack = []; candLabel = null; topLabel = null;
+  renderStack(false);
+  const fillEl = el("soloWordFill");
+  if(fillEl) fillEl.style.width = FILL_MIN + "%";
+  const card = el("soloWordCard");
+  if(card) card.classList.remove("warm", "hot", "locked", "miss");
+  setTxt("soloWord", word);
   setState("guessing");
   if(!rafId) rafId = requestAnimationFrame(frame);
 }
 
 export function endRound(){
   setState("idle");
-  clearTimeout(confusedTimer);
   resolveCb = null;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  const card = el("soloWordCard");
+  if(card) card.classList.remove("warm", "hot", "locked", "miss");
 }
 
-/* The game timer freezes whenever the round isn't actively guessing
-   (hitstop and everything after). game.js consults this. */
-export const timerFrozen = () => rstate !== "guessing" && rstate !== "idle";
+function setTxt(id, v){ const e = el(id); if(e) e.textContent = v; }
