@@ -27,10 +27,13 @@ let roster = null;            // {hostId, players:[{id,name,team}], settings}
 let myId = null;
 const peers = new Map();      // peerId -> {peer, stream}
 let wired = false;
+let nameFitCanvas = null;
+let renameTimer = null;
 
 const myTeam = () => roster?.players.find(p => p.id === myId)?.team;
 const teamOf = t => roster ? roster.players.filter(p => p.team === t) : [];
 const isHost = () => roster && roster.hostId === myId;
+const displayName = member => (member?.name || "Player").trim().slice(0, 10) || "Player";
 
 /* ---------------- entry ---------------- */
 
@@ -46,8 +49,11 @@ export function wireParty(){
   partyBridge.start = startParty;
   partyBridge.settings = sendSettings;
   partyBridge.leave = leaveParty;
+  partyBridge.rename = renameParty;
   $("btnJoinBlue").onclick = () => requestTeam("blue");
   $("btnJoinOrange").onclick = () => requestTeam("orange");
+  addEventListener("resize", fitAllPartyNames);
+  document.fonts?.ready.then(fitAllPartyNames);
   onTransition((to, from) => {
     if(from === "party" && to !== "party") leaveParty();
   });
@@ -130,8 +136,22 @@ function sendSettings(settings){
   if(socket && roster) socket.emit("party:settings", { settings }, () => {});
 }
 
+function renameParty(name){
+  const clean = String(name || "").trim().slice(0, 10) || "Player";
+  const me = roster?.players.find(p => p.id === myId);
+  if(me && me.name !== clean){
+    me.name = clean;
+    renderTiles();
+  }
+  clearTimeout(renameTimer);
+  renameTimer = setTimeout(()=>{
+    if(socket?.connected && roster) socket.emit("party:name", { name:clean }, () => {});
+  }, 180);
+}
+
 export function leaveParty(){
   if(socket && socket.connected && roster) socket.emit("room:leave", {}, () => {});
+  clearTimeout(renameTimer);
   for(const [, entry] of peers) entry.peer.close();
   peers.clear();
   roster = null;
@@ -147,7 +167,6 @@ function wirePartySocket(s){
     if(entry){ entry.peer.close(); peers.delete(id); }
   });
   s.on("party:started", () => {
-    bigPoof();
     blip([523, 659, 784, 1047], 0.09);
     toast("Everyone’s in! Party matches are coming soon — this lobby is ready for them.");
   });
@@ -186,11 +205,6 @@ function applyRoster(payload){
   syncPeers();
   updateGate();
 
-  /* new arrivals get a confetti poof at their tile */
-  for(const p of newcomers){
-    const ix = teamOf(p.team).findIndex(q => q.id === p.id);
-    if(ix >= 0) poofAt($(TILES[p.team][ix]));
-  }
   if(newcomers.length && prevIds.length) blip([659, 784], 0.07);
 }
 
@@ -204,6 +218,47 @@ function renderEmptyTile(tile){
   delete tile.dataset.pid;
 }
 
+function fitPartyName(chip){
+  const label = chip?.querySelector("b");
+  if(!label || !label.clientWidth) return;
+  requestAnimationFrame(()=>{
+    label.style.removeProperty("font-size");
+    const style = getComputedStyle(label);
+    const base = parseFloat(style.fontSize);
+    if(!nameFitCanvas) nameFitCanvas = document.createElement("canvas");
+    const ctx = nameFitCanvas.getContext("2d");
+    ctx.font = style.fontStyle + " " + style.fontWeight + " " + base + "px " + style.fontFamily;
+    const spacing = parseFloat(style.letterSpacing) || 0;
+    const measured = ctx.measureText(label.textContent).width +
+      Math.max(0, label.textContent.length - 1) * spacing;
+    const available = label.clientWidth - (parseFloat(style.paddingLeft) || 0) -
+      (parseFloat(style.paddingRight) || 0);
+    if(measured > available)
+      label.style.fontSize = Math.max(base * .48, base * available / measured * .96) + "px";
+  });
+}
+
+function fitAllPartyNames(){
+  document.querySelectorAll(".pt-name").forEach(fitPartyName);
+}
+
+function setTileName(tile, name){
+  let chip = tile.querySelector(".pt-name");
+  if(!chip){
+    chip = document.createElement("span");
+    chip.className = "pt-name";
+    const art = document.createElement("img");
+    art.src = "assets/ui/figma/lb-name-chip.png";
+    art.alt = "";
+    const label = document.createElement("b");
+    chip.append(art, label);
+    tile.appendChild(chip);
+  }
+  chip.title = name;
+  chip.querySelector("b").textContent = name;
+  fitPartyName(chip);
+}
+
 function renderTiles(){
   for(const team of ["blue", "orange"]){
     const members = teamOf(team);
@@ -214,8 +269,7 @@ function renderTiles(){
       const member = members[ix];
       if(!member){ renderEmptyTile(tile); return; }
       if(tile.dataset.pid === member.id){
-        const nameEl = tile.querySelector(".pt-name");
-        if(nameEl) nameEl.textContent = member.id === myId ? "YOU" : member.name;
+        setTileName(tile, displayName(member));
         return;
       }
       renderEmptyTile(tile);       // safely clears (parks the dock if present)
@@ -236,10 +290,7 @@ function renderTiles(){
           tile.appendChild(ph);
         }
       }
-      const chip = document.createElement("span");
-      chip.className = "pt-name";
-      chip.textContent = member.id === myId ? "YOU" : member.name;
-      tile.appendChild(chip);
+      setTileName(tile, displayName(member));
     });
     /* the JOIN card occupies the third tile only while there's room */
     const joinBtn = team === "blue" ? $("btnJoinBlue") : $("btnJoinOrange");
@@ -289,35 +340,4 @@ function syncPeers(){
   for(const [id, entry] of peers){
     if(!others.find(p => p.id === id)){ entry.peer.close(); peers.delete(id); }
   }
-}
-
-/* ---------------- celebration ---------------- */
-
-function poofAt(el){
-  if(!el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const r = el.getBoundingClientRect();
-  burst(r.left + r.width / 2, r.top + r.height / 2, 14);
-}
-
-function bigPoof(){
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  burst(innerWidth / 2, innerHeight * 0.45, 26);
-}
-
-function burst(cx, cy, n){
-  const wrap = document.createElement("div");
-  wrap.className = "burstwrap";
-  for(let i = 0; i < n; i++){
-    const p = document.createElement("i");
-    const ang = (i / n) * Math.PI * 2 + Math.random() * 0.6;
-    const dist = 60 + Math.random() * 120;
-    p.style.left = cx + "px"; p.style.top = cy + "px";
-    p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
-    p.style.setProperty("--dy", Math.sin(ang) * dist - 40 + "px");
-    p.style.setProperty("--rot", (Math.random() * 540 - 270) + "deg");
-    p.className = ["star", "dot", "spark"][i % 3];
-    wrap.appendChild(p);
-  }
-  document.body.appendChild(wrap);
-  setTimeout(() => wrap.remove(), 950);
 }

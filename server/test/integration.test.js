@@ -198,6 +198,11 @@ try {
   ok(r.roster.players[0].team === "blue", "creator lands on blue");
   const pcode = r.code;
 
+  const renamedRoster = once(P[0], "party:roster");
+  r = await emit(P[0], "party:name", { name: "Party Host" });
+  const renamed = await renamedRoster;
+  ok(r.ok === true && renamed.players[0].name === "Party Host", "party name edits broadcast through the roster");
+
   // cross-type hints
   r = await emit(P[1], "room:join", { code: pcode, name: "X", labels: ["idle","a"] });
   ok(r.error === "party-room", `1v1 join on a party code hints party (${r.error})`);

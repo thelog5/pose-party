@@ -47,7 +47,9 @@ const perfFromServer = tServer => performance.now() + (tServer - serverNow());
 
 /* party.js registers its handlers here; the shared lobby chrome (join
    input, settings steppers, start, copy) routes by stage mode. */
-export const partyBridge = { create:null, join:null, start:null, settings:null, leave:null, rejoin1v1:null };
+export const partyBridge = {
+  create:null, join:null, start:null, settings:null, leave:null, rename:null, rejoin1v1:null,
+};
 const lobbyMode = () => $("lobbyStage").dataset.mode || "1v1";
 
 /* Preserve the large Figma type for short names, then measure and shrink only
@@ -168,6 +170,7 @@ function wireLobby(){
     const v=e.target.value.slice(0,NAME_MAX);
     e.target.value=v;
     $("lobbyYouName").textContent=v.trim()||"YOU";
+    if(lobbyMode()==="party") partyBridge.rename?.(v);
     fitLobbyNames();
   });
   $("lobbyName").onchange=()=>{

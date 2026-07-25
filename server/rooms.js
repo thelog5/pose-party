@@ -273,6 +273,19 @@ export function createRoomStore({ config, emit }){
     return { ok: true };
   }
 
+  function partyName(socketId, name){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.phase !== "lobby") return { error: "match-in-progress" };
+    const me = playerOf(room, socketId);
+    if(!me) return { error: "not-in-room" };
+    if(me.name !== name){
+      me.name = name;
+      broadcastRoster(room);
+    }
+    return { ok: true };
+  }
+
   function partySettings(socketId, s){
     const room = roomOf(socketId);
     if(!room || room.kind !== "party") return { error: "not-in-room" };
@@ -350,6 +363,6 @@ export function createRoomStore({ config, emit }){
 
   return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
            relaySignal, sweep,
-           partyCreate, partyJoin, partyTeam, partySettings, partyStart, partySignal,
+           partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart, partySignal,
            _rooms: rooms };
 }

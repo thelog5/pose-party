@@ -174,6 +174,14 @@ io.on("connection", socket => {
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     cb(store.partyTeam(socket.id, payload.team));
   });
+  socket.on("party:name", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const name = cleanName(payload.name);
+    if(!name) return cb({ error: "bad-payload" });
+    cb(store.partyName(socket.id, name));
+  });
   socket.on("party:settings", (payload, cb) => {
     cb = ack(cb);
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
