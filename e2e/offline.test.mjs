@@ -166,8 +166,10 @@ ok(await txt("#soloStreakVal") === "x1", "streak now x1 after first catch");
 
 // loops back to a fresh word
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "guessing", { timeout: 4000 });
+await page.evaluate(() => clearInterval(window.__feed));   // stop feeding the previous word
 ok(true, "ROUND_END -> next word GUESSING (timed run continues)");
-ok(await page.evaluate(() => parseInt(document.getElementById("soloWordFill").style.width) <= 40), "progress bar reset for the new word");
+await page.waitForFunction(() => parseInt(document.getElementById("soloWordFill").style.width) <= 40, { timeout: 2000, polling: 80 });
+ok(true, "progress bar reset for the new word");
 
 // second catch on a streak pays more (× streak)
 await feed("state.game.word", 0.95);
