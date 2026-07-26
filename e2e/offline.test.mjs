@@ -109,6 +109,41 @@ ok(/^\d\d:\d\d$/.test(await txt("#soloRoundTime")), `round timer mm:ss (${await 
 ok(/^\d\d:\d\d$/.test(await txt("#soloWordTime")), `word timer mm:ss (${await txt("#soloWordTime")})`);
 ok(await txt("#soloSkipCost") === "\u2212250", `skip cost from SOLO settings (${await txt("#soloSkipCost")})`);
 ok(await page.evaluate(() => !document.querySelector("#soloAward.show")), "no award paper while GUESSING (single-state render)");
+const soloVisual = await page.evaluate(() => {
+  const exit = document.getElementById("btnExitSolo");
+  const historyOpacity = id => {
+    const node = document.getElementById(id);
+    const wasEmpty = node.classList.contains("empty");
+    const transition = node.style.transition;
+    node.style.transition = "none";
+    node.classList.remove("empty");
+    void node.offsetWidth;
+    const value = parseFloat(getComputedStyle(node).opacity);
+    if(wasEmpty) node.classList.add("empty");
+    node.style.transition = transition;
+    return value;
+  };
+  return {
+    exitSrc: exit.querySelector("img")?.getAttribute("src") || "",
+    exitText: exit.textContent.trim(),
+    wordShadow: getComputedStyle(document.getElementById("soloWord")).textShadow,
+    midOpacity: historyOpacity("spGuessMid"),
+    botOpacity: historyOpacity("spGuessBot"),
+    exactTapes: [...document.querySelectorAll(".sp-tape")]
+      .every(node => /assets\/ui\/figma\/sp-tape-/.test(node.getAttribute("src") || "")
+        && getComputedStyle(node).rotate === "none"),
+    emptyHistoryTapesHidden: ["spTapeGuessMid", "spTapeGuessBottom"]
+      .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) === 0),
+  };
+});
+ok(soloVisual.exitSrc.endsWith("/lb-exit.png") && soloVisual.exitText === "",
+  "Solo exit uses the existing exported paper-button asset");
+ok(/255,\s*255,\s*255/.test(soloVisual.wordShadow),
+  `Solo navy type uses the Figma white offset (${soloVisual.wordShadow})`);
+ok(soloVisual.midOpacity <= .7 && soloVisual.botOpacity <= .4,
+  `past guesses visibly recede (${soloVisual.midOpacity.toFixed(2)} / ${soloVisual.botOpacity.toFixed(2)})`);
+ok(soloVisual.exactTapes, "Solo uses the eight exact tape exports without a second CSS rotation");
+ok(soloVisual.emptyHistoryTapesHidden, "empty guess slots do not leave floating tape on the camera");
 
 // feed the model funnel; state.smooth[target] drives the word progress bar
 const feed = (labelExpr, conf) => page.evaluate(`(async () => {

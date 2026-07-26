@@ -36,7 +36,9 @@ export const CHIP_FLIGHT_MS    = 650;   // points chip travel; score applies on 
 export const AWARD_MS          = 1500;  // POINTS AWARD paper on screen
 export const ROUND_END_PAUSE_MS = 1100; // linger before the next word
 
-const FILL_MIN = 35, FILL_MAX = 97;     // resting pill % → full-bar %
+/* Figma resting pill = 35.4% of the word card; the bar grows to just short of
+   the card's torn right edge so the paper still reads as paper. */
+const FILL_MIN = 35.4, FILL_MAX = 95;
 
 /* ---------------- state ---------------- */
 let rstate = "idle";
@@ -84,6 +86,21 @@ export function setModelOutput(label, confidence){
   }
 }
 
+/* Figma sizes its type against one sample word ("JUMPING", "JUMPING?"), but
+   real decks carry longer labels ("basketball shot"). Card geometry is the
+   design and must not move, so the type bends to fit instead of clipping.
+   Sizes stay in cqw, so a fitted size survives any resize. */
+const WORD_FS_CQW = 14.69, GUESS_FS_CQW = 17.21;
+function fitText(node, baseCqw){
+  if(!node) return;
+  node.style.fontSize = baseCqw + "cqw";
+  const avail = node.clientWidth;
+  if(!avail) return;                       // screen not laid out yet
+  const want = node.scrollWidth;
+  if(want > avail) node.style.fontSize = (baseCqw * (avail / want) * .97) + "cqw";
+}
+const fitWord = () => fitText(el("soloWord"), WORD_FS_CQW);
+
 function renderStack(popped){
   const slots = [
     { box: "spGuessTop", lab: "spGuessTopLabel", pct: "spGuessTopPct" },
@@ -91,17 +108,18 @@ function renderStack(popped){
     { box: "spGuessBot", lab: "spGuessBotLabel", pct: "spGuessBotPct" },
   ];
   slots.forEach((s, i) => {
-    const box = el(s.box);
+    const box = el(s.box), lab = el(s.lab), pct = el(s.pct);
     const entry = stack[i];
-    if(!box) return;
+    if(!box || !lab || !pct) return;
     if(entry){
       box.classList.remove("empty");
-      el(s.lab).textContent = disp(entry.label) + "?";
-      el(s.pct).textContent = entry.pct + "%";
+      lab.textContent = disp(entry.label) + "?";
+      pct.textContent = entry.pct + "%";
+      fitText(lab, GUESS_FS_CQW);
     }else{
       box.classList.add("empty");
-      el(s.lab).textContent = "";
-      el(s.pct).textContent = "";
+      lab.textContent = "";
+      pct.textContent = "";
     }
   });
   if(popped){
@@ -246,6 +264,12 @@ export function beginRound(word, onResolve){
   target = word;
   resolveCb = onResolve;
   shownFill = 0; overSince = 0;
+  /* Confidence has to be EARNED for this word. state.smooth carries over from
+     the previous round, so if the new word is one the AI was already sure of,
+     the bar would start full and lock instantly — a point for doing nothing.
+     Zeroing the target's channel makes the classifier re-prove it; live
+     inference refills it within a few frames. */
+  if(state.smooth) state.smooth[word] = 0;
   stack = []; candLabel = null; topLabel = null;
   renderStack(false);
   const fillEl = el("soloWordFill");
@@ -253,6 +277,7 @@ export function beginRound(word, onResolve){
   const card = el("soloWordCard");
   if(card) card.classList.remove("warm", "hot", "locked", "miss");
   setTxt("soloWord", word);
+  fitWord();
   setState("guessing");
   if(!rafId) rafId = requestAnimationFrame(frame);
 }

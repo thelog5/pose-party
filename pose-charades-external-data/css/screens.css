@@ -129,75 +129,117 @@ body[data-screen="solo"] .wrap{max-width:none;padding:0}
 .solostage{position:fixed;inset:0;overflow:hidden;background:#0E1B4A;font-family:var(--f-lobby,'Baloo 2',sans-serif)}
 .solostage .slot{position:absolute;inset:0;z-index:0}
 
-.sp-tape{position:absolute;z-index:2;pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.28))}
+/* Camera fills the stage; the HUD is pure paper on top, so the dock's own
+   chrome (brackets, live badge, AI pill) would just be noise here. */
+body[data-screen="solo"] .camdock .livebadge,
+body[data-screen="solo"] .camdock .aipill,
+body[data-screen="solo"] .camdock .brackets{display:none}
+.solostage .slot .camdock,.solostage .slot video{width:100%;height:100%}
+.solostage .slot video{object-fit:cover}
+
+/* These are exported from each Solo tape node, including the rotated canvas.
+   Keeping the outer Figma bounds prevents generic tape art from being rotated
+   a second time or exposing the wrong transparent padding. */
+.sp-tape{position:absolute;z-index:6;pointer-events:none}
+.sp-tape-history{transition:opacity .3s ease}
+.solostage:has(#spGuessMid.empty) #spTapeGuessMid,
+.solostage:has(#spGuessBot.empty) #spTapeGuessBottom{opacity:0}
 
 /* green win flash */
 .sp-flash{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(63,201,140,.55),rgba(27,117,50,.35) 70%,transparent)}
 .sp-flash.fire{animation:spflash .8s ease-out}
 @keyframes spflash{0%{opacity:1}100%{opacity:0}}
 
-/* --- stat cards: img backing + overlaid text --- */
+/* --- paper cards -------------------------------------------------------
+   Each card is an inline-size container, so `cqw` == 1% of the card width.
+   Every font-size / offset / shadow below is the Figma value divided by that
+   card's Figma width — which is why the three guess cards, being one scaled
+   component, share a single rule. Paper art carries no CSS shadow of its own
+   in Figma; the soft one here is what lifts it off the live camera. */
+.sp-card,.sp-guess,.sp-word,.sp-skip,.sp-award{container-type:inline-size}
+.sp-art,.gcard,.sp-word-bg{width:100%;display:block;
+  filter:drop-shadow(0 min(.292vw,.519vh) min(.167vw,.296vh) rgba(0,0,0,.35))}
+
 .sp-card{position:absolute;z-index:4}
-.sp-card>img{width:100%;display:block;aspect-ratio:2/1;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
-.sp-card span{position:absolute;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;white-space:nowrap}
-.sp-card .sp-clock{position:absolute;left:8%;top:23%;width:24%;filter:none}
-.sp-rtimer>img{aspect-ratio:2.31}
-.sp-rtime{left:34%;top:20%;font-size:clamp(15px,min(2vw,3.6vh),80px);color:#fff;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.4)}
-.sp-wtimer>img{aspect-ratio:2.19}
-.sp-wlabel{left:22%;top:6%;font-size:clamp(9px,min(1.1vw,1.95vh),44px);color:#17356f;letter-spacing:.02em}
-.sp-wtime{left:24%;top:38%;font-size:clamp(15px,min(2vw,3.6vh),80px);color:#17356f}
-.sp-score>img{aspect-ratio:1.63}
-.sp-slabel{left:26%;top:8%;font-size:clamp(9px,min(1.1vw,1.95vh),44px);color:#17356f;letter-spacing:.03em}
-.sp-sval{left:8%;top:44%;width:84%;text-align:center;font-size:clamp(16px,min(2.3vw,4.1vh),92px);color:#17356f}
-.sp-streak>img{aspect-ratio:1.66}
-.sp-stlabel{left:20%;top:9%;font-size:clamp(9px,min(1.05vw,1.86vh),42px);color:#fff;letter-spacing:.03em}
-.sp-stval{left:8%;top:42%;width:70%;text-align:center;font-size:clamp(16px,min(2.3vw,4.1vh),92px);color:#fff;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.35)}
+.sp-card>span{position:absolute;left:0;width:100%;text-align:center;white-space:nowrap;overflow:hidden}
+.sp-lab{font-family:var(--f-sign);font-weight:800;word-spacing:.12em}
+.sp-val{font-family:var(--f-lobby);font-weight:400}
+
+/* Round Timer — Figma card 231px wide */
+.sp-rtimer .sp-art{aspect-ratio:2.319}
+.sp-rtimer .sp-clock{position:absolute;left:7.8%;top:22.9%;width:23.4%;aspect-ratio:1;
+  filter:drop-shadow(1.149cqw 1.149cqw 0 rgba(0,0,0,.5))}
+.sp-rtimer .sp-val{top:19.7%;left:31.3%;width:61.5%;color:#fff;
+  font-size:24.63cqw;line-height:26.15cqw;text-shadow:1.609cqw 1.609cqw 0 rgba(0,0,0,.5)}
+
+/* Word Timer — 252px */
+.sp-wtimer .sp-art{aspect-ratio:2.250}
+.sp-wtimer .sp-lab{top:-2.7%;color:#17356f;font-size:11.87cqw;line-height:23.41cqw;
+  text-shadow:1.188cqw 1.188cqw 0 rgba(255,255,255,.9)}
+.sp-wtimer .sp-val{top:35.8%;color:#17356f;font-size:22.06cqw;line-height:23.41cqw;
+  text-shadow:1.188cqw 1.188cqw 0 rgba(255,255,255,.9)}
+
+/* Score — 227.7px */
+.sp-score .sp-art{aspect-ratio:1.634}
+.sp-score .sp-lab{top:.9%;color:#17356f;font-size:17.35cqw;line-height:26.31cqw;
+  text-shadow:1.333cqw 1.333cqw 0 rgba(255,255,255,.9)}
+.sp-score .sp-val{top:41%;color:#17356f;font-size:31.97cqw;line-height:26.31cqw;
+  text-shadow:1.333cqw 1.333cqw 0 rgba(255,255,255,.9)}
+
+/* Streak — 210px */
+.sp-streak .sp-art{aspect-ratio:1.662}
+.sp-streak .sp-lab{top:0;color:#fff;font-size:20.19cqw;line-height:30.63cqw;
+  text-shadow:1.553cqw 1.553cqw 0 rgba(0,0,0,.5)}
+.sp-streak .sp-val{top:35.6%;color:#fff;font-size:27.96cqw;line-height:30.63cqw;
+  text-shadow:1.553cqw 1.553cqw 0 rgba(0,0,0,.5)}
+
 /* pulse when score/streak change */
 .sp-card.bump{animation:spbump .4s cubic-bezier(.2,1.6,.4,1)}
 @keyframes spbump{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
 /* word-timer runs red in the final seconds */
-.sp-wtime.low{color:#e8402a;animation:sppulse .6s ease-in-out infinite}
+.sp-wtimer .sp-val.low{color:#e8402a;animation:sppulse .6s ease-in-out infinite}
 @keyframes sppulse{0%,100%{opacity:1}50%{opacity:.45}}
 
-/* --- guess stack: fades downward, newest green on top --- */
-.sp-guess{position:absolute;z-index:3}
-.sp-guess .gcard{width:100%;display:block;aspect-ratio:1.9;filter:drop-shadow(0 min(.25vw,.44vh) min(.18vw,.32vh) rgba(0,0,0,.28))}
-.sp-guess .grobot{position:absolute;left:2%;top:-34%;width:40%;z-index:1;pointer-events:none}
-.sp-guess .glabel,.sp-guess .gpct{position:absolute;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;z-index:2;white-space:nowrap}
+/* --- guess stack: one component at three scales, newest green on top --- */
+.sp-guess{position:absolute;z-index:3;transition:opacity .3s ease}
+.sp-guess .gcard{aspect-ratio:1.906}
+.sp-guess .grobot{position:absolute;left:3.3%;top:-62.3%;width:40%;aspect-ratio:1.103;
+  z-index:1;pointer-events:none;
+  filter:drop-shadow(0 min(.24vw,.42vh) min(.31vw,.55vh) rgba(0,0,0,.32))}
+.sp-guess .glabel,.sp-guess .gpct{position:absolute;left:0;width:100%;text-align:center;
+  z-index:2;white-space:nowrap;overflow:hidden;
+  text-shadow:.956cqw .956cqw 0 rgba(255,255,255,.9)}
+.sp-guess .glabel{top:10%;font-family:var(--f-sign);font-weight:800;font-size:17.21cqw;line-height:18.84cqw;word-spacing:.1em}
+.sp-guess .gpct{top:49%;font-family:var(--f-lobby);font-weight:400;font-size:22.94cqw;line-height:18.84cqw}
+/* The stack sinks by shrinking, cooling green -> blue -> purple, and clearly
+   fading. That separation keeps the current guess dominant at a glance. */
 .sp-guess.top{opacity:1}
-.sp-guess.top .gcard{margin-top:11%}
-.sp-guess.top .glabel{left:12%;top:52%;font-size:clamp(11px,min(1.35vw,2.4vh),56px);color:#1b7532}
-.sp-guess.top .gpct{right:11%;top:74%;font-size:clamp(11px,min(1.35vw,2.4vh),56px);color:#1b7532}
-.sp-guess.mid{opacity:.72}
-.sp-guess.mid .glabel{left:12%;top:44%;font-size:clamp(10px,min(1.25vw,2.22vh),52px);color:#0d6ebb}
-.sp-guess.mid .gpct{right:11%;top:66%;font-size:clamp(10px,min(1.25vw,2.22vh),52px);color:#0d6ebb}
-.sp-guess.bot{opacity:.46}
-.sp-guess.bot .glabel{left:12%;top:42%;font-size:clamp(9px,min(1.15vw,2.04vh),48px);color:#583ca2}
-.sp-guess.bot .gpct{right:11%;top:64%;font-size:clamp(9px,min(1.15vw,2.04vh),48px);color:#583ca2}
+.sp-guess.top .glabel,.sp-guess.top .gpct{color:#1b7532}
+.sp-guess.mid{opacity:.68}
+.sp-guess.mid .glabel,.sp-guess.mid .gpct{color:#0d6ebb}
+.sp-guess.bot{opacity:.38}
+.sp-guess.bot .glabel,.sp-guess.bot .gpct{color:#583ca2}
 .sp-guess.empty{opacity:0}
 .sp-guess.pop{animation:gpop .42s cubic-bezier(.2,1.6,.4,1)}
 @keyframes gpop{0%{transform:translateY(16%) scale(.82)}60%{transform:translateY(0) scale(1.06)}100%{transform:none}}
 .sp-guess.shift{animation:gshift .34s ease-out}
 @keyframes gshift{0%{transform:translateY(-16%)}100%{transform:none}}
 
-/* --- word card: yellow pill is a filling progress bar --- */
+/* --- word card: the yellow paper IS the progress bar (578px) --- */
 .sp-word{position:absolute;z-index:4;transform-origin:50% 60%}
-.sp-word .sp-word-bg{width:100%;display:block;aspect-ratio:4.51;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
-.sp-word .sp-word-fill{position:absolute;left:2%;top:12%;height:76%;width:35%;border-radius:min(1.2vw,2.1vh);
-  background:linear-gradient(180deg,#ffd964,#f5b70f 70%,#e19f0b);
-  box-shadow:inset 0 min(.14vw,.25vh) 0 rgba(255,255,255,.5),0 min(.14vw,.25vh) 0 rgba(0,0,0,.12);
-  transition:width .12s linear}
-.sp-word .sp-word-text{position:absolute;left:0;top:14%;width:100%;text-align:center;
-  font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
-  font-size:clamp(20px,min(3vw,5.3vh),120px);color:#17356f;letter-spacing:.02em;
-  text-transform:uppercase;white-space:nowrap;overflow:hidden;
-  text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.18)}
+.sp-word .sp-word-bg{aspect-ratio:4.507}
+.sp-word .sp-word-fill{position:absolute;left:1.7%;top:11.6%;height:76.8%;width:35.4%;
+  object-fit:fill;filter:none;transition:width .12s linear}
+.sp-word .sp-word-text{position:absolute;left:0;top:22.6%;width:100%;text-align:center;
+  font-family:var(--f-lobby);font-weight:400;font-size:14.69cqw;line-height:12.08cqw;
+  color:#17356f;text-transform:uppercase;white-space:nowrap;overflow:hidden;
+  text-shadow:.612cqw .612cqw 0 rgba(255,255,255,.9)}
 /* shakes harder as the fill closes on a lock */
 .sp-word.warm{animation:spwordwarm .28s ease-in-out infinite}
 .sp-word.hot{animation:spwordhot .16s ease-in-out infinite}
 @keyframes spwordwarm{0%,100%{transform:translateX(0) rotate(0)}50%{transform:translateX(-.4%) rotate(-.4deg)}}
 @keyframes spwordhot{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-.8%) rotate(-.7deg)}75%{transform:translateX(.8%) rotate(.7deg)}}
-.sp-word.locked .sp-word-fill{background:linear-gradient(180deg,#7fe3ab,#3fc98c 70%,#2fa574)}
+.sp-word.locked .sp-word-fill{filter:hue-rotate(78deg) saturate(.85) brightness(1.02)}
 .sp-word.miss{animation:spwordmiss .5s ease-out}
 @keyframes spwordmiss{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-1%);filter:saturate(.4)}75%{transform:translateX(1%)}}
 .sp-word.locked{animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
@@ -205,28 +247,30 @@ body[data-screen="solo"] .wrap{max-width:none;padding:0}
 
 /* --- skip + exit --- */
 .sp-skip{position:absolute;z-index:5;background:none;border:none;padding:0;cursor:pointer}
-.sp-skip img{width:100%;display:block;aspect-ratio:2.35;filter:drop-shadow(0 min(.3vw,.53vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
-.sp-skip span{position:absolute;inset:14% 0 16%;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;color:#fff;line-height:1.02;
-  font-size:clamp(13px,min(1.7vw,3vh),68px);text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.4);pointer-events:none}
-.sp-skip span b{font-size:.7em}
-.sp-skip:hover{transform:translateY(-4px) scale(1.02)}
-.sp-skip:active{transform:translateY(1px) scale(.98)}
+.sp-skip .sp-art{aspect-ratio:1.04}
+.sp-skip span{position:absolute;left:0;width:100%;text-align:center;color:#17356f;
+  font-family:var(--f-lobby);font-weight:400;white-space:nowrap;pointer-events:none;
+  text-shadow:1.4cqw 1.4cqw 0 rgba(0,0,0,.18)}
+.sp-skip .sk-word{top:26%;font-size:24cqw;line-height:26cqw}
+.sp-skip .sk-cost{top:54%;font-size:17cqw;line-height:26cqw;opacity:.8}
 #scrSolo:not([data-rstate="guessing"]) .sp-skip{opacity:.55;pointer-events:none}
-.sp-exit{position:absolute;left:2%;top:94%;z-index:5;background:rgba(255,255,255,.9);border:2px solid var(--line-soft,#b9caed);
-  border-radius:min(.9vw,1.6vh);padding:.4% 1.2%;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
-  font-size:clamp(10px,min(1.1vw,1.95vh),44px);color:#49649b;cursor:pointer;letter-spacing:.03em}
-.sp-exit:hover{color:#e8402a;border-color:#e8402a}
+.sp-exit{position:absolute;left:1.55%;top:17.5%;width:14%;z-index:7;background:none;border:0;padding:0;cursor:pointer}
+.sp-exit img{width:100%;display:block}
+.sp-exit:hover:not([disabled]){translate:0 calc(-1 * min(.28vw,.5vh));scale:1.025;
+  filter:brightness(1.04) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+.sp-exit:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.208vw,.37vh)}
 
-/* --- points award --- */
+/* --- points award (Figma "POINTS AWARD", 898px) --- */
 .sp-award{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);z-index:95;
   width:min(42vw,640px);pointer-events:none;opacity:0}
-.sp-award img{width:100%;display:block;aspect-ratio:2.1;filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
-.sp-award span{position:absolute;left:0;width:100%;text-align:center;font-family:var(--f-lobby,'Baloo 2',sans-serif);
-  font-weight:400;color:#1b7532;letter-spacing:.02em;text-shadow:min(.14vw,.25vh) min(.14vw,.25vh) 0 rgba(0,0,0,.15)}
-.sp-award .aw-got{top:10%;font-size:clamp(20px,min(3vw,5.3vh),120px)}
-.sp-award .aw-pts{top:36%;font-size:clamp(30px,min(4.6vw,8.2vh),180px)}
-.sp-award .aw-lbl{top:66%;font-size:clamp(18px,min(2.8vw,4.98vh),110px)}
+.sp-award .sp-art{aspect-ratio:2.098;
+  filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
+.sp-award span{position:absolute;left:0;width:100%;text-align:center;translate:0 -50%;
+  font-family:var(--f-lobby);font-weight:400;line-height:1;color:#1b7532;white-space:nowrap;
+  text-shadow:.6cqw .6cqw 0 rgba(0,0,0,.18)}
+.sp-award .aw-got{top:19.8%;font-size:7.8cqw}
+.sp-award .aw-pts{top:47.3%;font-size:18.93cqw}
+.sp-award .aw-lbl{top:75.6%;font-size:7.8cqw}
 .sp-award.show{animation:awshow 1.5s cubic-bezier(.16,1.4,.32,1) both}
 @keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-6deg)}
   16%{opacity:1;transform:translate(-50%,-50%) scale(1.08) rotate(2deg)}
@@ -234,12 +278,16 @@ body[data-screen="solo"] .wrap{max-width:none;padding:0}
   100%{opacity:0;transform:translate(-50%,-58%) scale(.94)}}
 
 /* points chip flying to the score card (created in JS) */
-.sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby,'Baloo 2',sans-serif);font-weight:400;
+.sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby);font-weight:400;
   background:#ffd964;border:3px solid #17356f;border-radius:999px;padding:.4% 2%;color:#17356f;
   font-size:clamp(16px,min(2.2vw,3.9vh),88px);box-shadow:0 4px 0 rgba(23,53,111,.25)}
 
-@media(max-width:900px){
-  .sp-card span,.sp-word-text,.sp-guess .glabel{letter-spacing:0}
+/* theme.css kills every animation under reduced motion, which would leave the
+   award paper stuck at opacity:0 — the payoff, and the points it reports,
+   would silently never appear. Show it plainly instead of animating it. The
+   screen flash stays suppressed: that one is pure motion, and unwelcome. */
+@media (prefers-reduced-motion: reduce){
+  .sp-award.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 }
 
 /* =================== 1v1 LOBBY (Figma frame 111:82) =================== */

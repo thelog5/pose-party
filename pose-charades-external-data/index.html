@@ -6,7 +6,7 @@
 <title>Pose Party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='25' width='80' height='62' rx='18' fill='%23fff' stroke='%23152A6E' stroke-width='6'/><rect x='22' y='38' width='56' height='38' rx='10' fill='%23152A6E'/><circle cx='38' cy='55' r='6' fill='%23FFC531'/><circle cx='62' cy='55' r='6' fill='%23FFC531'/><line x1='50' y1='25' x2='50' y2='12' stroke='%23152A6E' stroke-width='6'/><circle cx='50' cy='9' r='7' fill='%23F0512D'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Beiruti:wght@700&family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Beiruti:wght@700;800&family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
@@ -186,85 +186,96 @@
        HUD overlay on the full-bleed camera. Timed sprint: Round Timer =
        whole run, Word Timer = current word. The Word card's yellow pill IS
        a progress bar driven by target-word confidence; the bottom-right
-       guess stack fades downward (newest green on top). See CLAUDE.md. -->
+       guess stack fades downward (newest green on top). See CLAUDE.md.
+
+       Every left/top/width below is the Figma frame percentage. Each card is
+       a container (container-type:inline-size) so its text scales in `cqw`
+       off the card itself — that reproduces Figma exactly at any viewport,
+       because in Figma the type is likewise fixed relative to its card. -->
   <section class="screen hidden" id="scrSolo" data-rstate="idle">
     <div class="solostage" id="soloStage">
       <div class="slot" id="slotSolo"></div>
       <div class="sp-flash" id="soloFlash"></div>
 
-      <!-- decorative tapes -->
-      <img class="sp-tape" style="left:5.5%;top:.4%;width:7.5%" src="assets/ui/figma/tape-cream-a.png" alt="">
-      <img class="sp-tape" style="left:54.2%;top:-2.6%;width:6.7%" src="assets/ui/figma/tape-blue.png" alt="">
-      <img class="sp-tape" style="left:80.3%;top:-2.6%;width:8.6%" src="assets/ui/figma/tape-cream-b.png" alt="">
-      <img class="sp-tape" style="left:94.6%;top:17.2%;width:5.7%" src="assets/ui/figma/tape-blue.png" alt="">
-      <img class="sp-tape" style="left:75.7%;top:61.6%;width:7.4%" src="assets/ui/figma/tape-yl-a.png" alt="">
-      <img class="sp-tape" style="left:66.4%;top:79.3%;width:5.8%" src="assets/ui/figma/tape-yl-b.png" alt="">
-      <img class="sp-tape" style="left:91.6%;top:77.5%;width:6%" src="assets/ui/figma/tape-yl-a.png" alt="">
-      <img class="sp-tape" style="left:27.4%;top:91.7%;width:6.8%" src="assets/ui/figma/tape-cream-a.png" alt="">
+      <!-- Exact Solo-frame tape exports. Their PNG bounds already include the
+           Figma angle, texture, and per-layer opacity — do not rotate again. -->
+      <img class="sp-tape" style="left:5.49%;top:.37%;width:7.50%" src="assets/ui/figma/sp-tape-top-left.png" alt="">
+      <img class="sp-tape" style="left:54.17%;top:-2.59%;width:6.70%" src="assets/ui/figma/sp-tape-word-timer.png" alt="">
+      <img class="sp-tape" style="left:80.28%;top:-2.59%;width:8.63%" src="assets/ui/figma/sp-tape-score.png" alt="">
+      <img class="sp-tape" style="left:94.58%;top:17.16%;width:5.70%" src="assets/ui/figma/sp-tape-streak.png" alt="">
+      <img class="sp-tape sp-tape-history" id="spTapeGuessMid" style="left:75.69%;top:61.60%;width:7.41%" src="assets/ui/figma/sp-tape-guess-mid.png" alt="">
+      <img class="sp-tape" style="left:66.39%;top:79.26%;width:5.81%" src="assets/ui/figma/sp-tape-word-right.png" alt="">
+      <img class="sp-tape sp-tape-history" id="spTapeGuessBottom" style="left:91.60%;top:77.53%;width:5.97%" src="assets/ui/figma/sp-tape-guess-bottom.png" alt="">
+      <img class="sp-tape" style="left:27.43%;top:91.73%;width:6.77%" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
 
       <!-- Round Timer (blue, top-left) -->
-      <div class="sp-card sp-rtimer" style="left:1.5%;top:2.7%;width:16%">
-        <img src="assets/ui/figma/sp-rtimer.png" alt="">
+      <div class="sp-card sp-rtimer" style="left:1.46%;top:2.72%;width:16.04%">
+        <img class="sp-art" src="assets/ui/figma/sp-rtimer.png" alt="">
         <img class="sp-clock" src="assets/ui/figma/sp-clock.png" alt="">
-        <span class="sp-rtime" id="soloRoundTime">2:00</span>
+        <span class="sp-val" id="soloRoundTime">2:00</span>
       </div>
 
       <!-- Word Timer (cream, top-center) -->
-      <div class="sp-card sp-wtimer" style="left:41%;top:.9%;width:17.5%">
-        <img src="assets/ui/figma/sp-wtimer.png" alt="">
-        <span class="sp-wlabel">WORD TIME</span>
-        <span class="sp-wtime" id="soloWordTime">0:20</span>
+      <div class="sp-card sp-wtimer" style="left:40.97%;top:1.23%;width:17.50%">
+        <img class="sp-art" src="assets/ui/figma/sp-wtimer.png" alt="">
+        <span class="sp-lab">WORD TIME</span>
+        <span class="sp-val" id="soloWordTime">0:20</span>
       </div>
 
       <!-- Score (yellow, top-right) -->
-      <div class="sp-card sp-score" id="soloScoreCard" style="left:83.2%;top:1.9%;width:15.8%">
-        <img src="assets/ui/figma/sp-score.png" alt="">
-        <span class="sp-slabel">SCORE</span>
-        <span class="sp-sval" id="soloScoreVal">0</span>
+      <div class="sp-card sp-score" id="soloScoreCard" style="left:83.22%;top:1.85%;width:15.81%">
+        <img class="sp-art" src="assets/ui/figma/sp-score.png" alt="">
+        <span class="sp-lab">SCORE</span>
+        <span class="sp-val" id="soloScoreVal">0</span>
       </div>
 
       <!-- Streak (orange, right) -->
-      <div class="sp-card sp-streak" id="soloStreakCard" style="left:84%;top:19.6%;width:14.6%">
-        <img src="assets/ui/figma/sp-streak.png" alt="">
-        <span class="sp-stlabel">STREAK</span>
-        <span class="sp-stval" id="soloStreakVal">x1</span>
+      <div class="sp-card sp-streak" id="soloStreakCard" style="left:84.03%;top:19.63%;width:14.58%">
+        <img class="sp-art" src="assets/ui/figma/sp-streak.png" alt="">
+        <span class="sp-lab">STREAK</span>
+        <span class="sp-val" id="soloStreakVal">x1</span>
       </div>
 
-      <!-- guess stack (bottom-right): newest green on top, fading down -->
-      <div class="sp-guess top" id="spGuessTop" style="left:78%;top:47%;width:17.4%">
+      <!-- guess stack (bottom-right): newest green on top, fading down.
+           All three are the same paper (robot-guess-card-primary-cream),
+           scaled — so one rule in cqw lays out all three identically. -->
+      <div class="sp-guess top" id="spGuessTop" style="left:75.42%;top:43.38%;width:23.40%">
         <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
-        <img class="gcard" src="assets/ui/figma/sp-guess1.png" alt="">
-        <span class="glabel" id="spGuessTopLabel">…</span>
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="spGuessTopLabel"></span>
         <span class="gpct" id="spGuessTopPct"></span>
       </div>
-      <div class="sp-guess mid" id="spGuessMid" style="left:78.8%;top:65.3%;width:17%">
-        <img class="gcard" src="assets/ui/figma/sp-guess2.png" alt="">
+      <div class="sp-guess mid" id="spGuessMid" style="left:78.75%;top:65.31%;width:16.95%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
         <span class="glabel" id="spGuessMidLabel"></span>
         <span class="gpct" id="spGuessMidPct"></span>
       </div>
-      <div class="sp-guess bot" id="spGuessBot" style="left:79.6%;top:80.7%;width:15.6%">
-        <img class="gcard" src="assets/ui/figma/sp-guess3.png" alt="">
+      <div class="sp-guess bot" id="spGuessBot" style="left:79.58%;top:80.74%;width:15.56%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
         <span class="glabel" id="spGuessBotLabel"></span>
         <span class="gpct" id="spGuessBotPct"></span>
       </div>
 
-      <!-- Word card (bottom-center): the yellow pill is a progress bar -->
-      <div class="sp-word" id="soloWordCard" style="left:29.9%;top:82.6%;width:40.1%">
+      <!-- Word card (bottom-center): the yellow paper pill is a progress bar -->
+      <div class="sp-word" id="soloWordCard" style="left:29.93%;top:82.59%;width:40.14%">
         <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
-        <span class="sp-word-fill" id="soloWordFill"></span>
+        <img class="sp-word-fill" id="soloWordFill" src="assets/ui/figma/sp-pill.png" alt="">
         <span class="sp-word-text" id="soloWord">—</span>
       </div>
 
-      <!-- skip + exit, bottom-left -->
-      <button class="sp-skip pbtn" id="btnSkipSolo" style="left:2%;top:82%;width:15%">
-        <img src="assets/ui/figma/sp-skip.png" alt="">
-        <span>SKIP<br><b id="soloSkipCost">−250</b></span>
+      <!-- skip (Figma "skip-button-card-cream", placed per the design render) -->
+      <button class="sp-skip pbtn" id="btnSkipSolo" style="left:2.1%;top:83.3%;width:8%">
+        <img class="sp-art" src="assets/ui/figma/sp-skip.png" alt="">
+        <span class="sk-word">SKIP</span>
+        <span class="sk-cost" id="soloSkipCost">−250</span>
       </button>
-      <button class="sp-exit" id="btnExitSolo" title="End game">✕ EXIT</button>
+      <button class="sp-exit pbtn" id="btnExitSolo" title="End game" aria-label="Exit game">
+        <img src="assets/ui/figma/lb-exit.png" alt="">
+      </button>
 
       <!-- points award (hidden; shown on a correct catch) -->
       <div class="sp-award" id="soloAward">
-        <img src="assets/ui/figma/sp-award.png" alt="">
+        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
         <span class="aw-got">GOT IT!</span>
         <span class="aw-pts" id="soloAwardPts">+0</span>
         <span class="aw-lbl">POINTS!</span>
