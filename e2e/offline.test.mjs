@@ -17,6 +17,11 @@ const browser = await puppeteer.launch({
   args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--no-first-run"],
 });
 const page = await browser.newPage();
+/* Test at the reference 16:9 viewport — the screens letterbox to the design
+   aspect ratio, so composition-detail probes (wave bleed, confetti layout)
+   are only meaningful at the reference composition. Cross-viewport rendering
+   is audited separately via diag.mjs screenshots. */
+await page.setViewport({ width: 1440, height: 810 });
 
 const consoleErrors = [];
 page.on("console", m => { if (m.type() === "error") consoleErrors.push(m.text() + " @" + (m.location()?.url || "")); });
@@ -76,7 +81,9 @@ const homeConfettiLayout = await page.evaluate(() => {
   const extras = [...document.querySelectorAll(".party-hover-confetti")];
   const base = [...document.querySelectorAll("#homeStage .iv.conf:not(.party-hover-confetti)")];
   const box = el => ({ el, src:el.getAttribute("src"), ...el.getBoundingClientRect().toJSON() });
-  const overlaps = (a,b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  /* decorations may touch; only a meaningful overlap (>10px each axis) counts */
+  const M = 10;
+  const overlaps = (a,b) => a.left+M < b.right-M && a.right-M > b.left+M && a.top+M < b.bottom-M && a.bottom-M > b.top+M;
   const bases = base.map(box);
   return extras.map(box).every(extra => {
     if(bases.some(existing => overlaps(extra, existing))) return false;

@@ -2,16 +2,48 @@
 
 .screen{flex:1;display:flex;flex-direction:column;min-height:0}
 
+/* ============================================================
+   SHARED RESPONSIVE PRIMITIVES
+   The three immersive screens (home, solo, lobby/party) place their
+   components as percentages of a fixed 1440×810 design box. To keep those
+   percentages coherent at every viewport, the box is LETTERBOXED to the
+   design aspect ratio and centred; the paper background fills any margin.
+   This is why one set of %-coordinates renders identically at 16:9, 4:3,
+   ultrawide and portrait — the box is always 1440:810.
+   ============================================================ */
+:root{
+  --pp-ar: 1440 / 810;            /* design aspect ratio (16:9) */
+  --pp-maxw: 2200px;              /* sanity cap on very large displays */
+  --pp-gap: clamp(6px, 1.2vmin, 18px);
+}
+/* the fixed viewport frame that centres a stage and holds the wallpaper */
+.pp-frame{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center}
+.pp-wall{position:absolute;inset:0;z-index:0;background-position:center;background-size:cover}
+/* the centred, fixed-aspect content stage — everything inside is % of THIS */
+.pp-stage{position:relative;z-index:1;overflow:hidden;
+  width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
+  aspect-ratio:var(--pp-ar);}
+/* portrait / very narrow: use the full width as a horizontal band rather
+   than shrinking the whole 16:9 box into a tiny letterbox */
+@media (max-aspect-ratio: 1/1){
+  .pp-stage{width:100dvw;}
+}
+
 /* =================== HOME (Figma "Screen / Home / Desktop v2", 50:72) =================== */
 :root{
   --fig-navy:#3172C3; --fig-blue:#124C9D; --fig-red:#DE7234;
   --fig-yellow:#EFB43F; --fig-cream:#F1E5D3; --fig-muted:#DAD3CA;
   --fig-ink:#17356F;
 }
-#scrHome{position:relative}
-/* home is full-bleed: the stage IS the screen, no frame */
+/* home: fixed frame + letterboxed 16:9 stage; paper wallpaper fills margins */
 body[data-screen="home"] .wrap{max-width:none;padding:0}
-.homestage{position:fixed;inset:0;overflow:hidden;background:var(--fig-cream)}
+#scrHome{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:var(--fig-cream)}
+#scrHome::before{content:"";position:absolute;inset:0;z-index:0;
+  background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
+.homestage{position:relative;z-index:1;overflow:hidden;background:none;
+  width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
+  aspect-ratio:var(--pp-ar)}
+@media (max-aspect-ratio: 1/1){ .homestage{width:100dvw} }
 .campark{position:absolute;left:4px;top:4px;width:2px;height:2px;overflow:hidden;opacity:.04;pointer-events:none;z-index:0}
 .campark .slot{width:2px;height:2px}
 
@@ -124,9 +156,14 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 /* =================== SOLO PLAY (Figma "Singe player" 150:454) =================== */
 /* HUD overlay on the full-bleed camera. body[data-screen] hides the header;
    #scrSolo[data-rstate] gates the award/flash so states never co-render. */
-#scrSolo{position:relative}
+/* solo: camera + HUD share the letterboxed 16:9 stage so the HUD always
+   aligns to the camera edges; navy fills any margin */
 body[data-screen="solo"] .wrap{max-width:none;padding:0}
-.solostage{position:fixed;inset:0;overflow:hidden;background:#0E1B4A;font-family:var(--f-lobby,'Baloo 2',sans-serif)}
+#scrSolo{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:#0E1B4A}
+.solostage{position:relative;z-index:1;overflow:hidden;background:#0E1B4A;font-family:var(--f-lobby,'Baloo 2',sans-serif);
+  width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
+  aspect-ratio:var(--pp-ar)}
+@media (max-aspect-ratio: 1/1){ .solostage{width:100dvw} }
 .solostage .slot{position:absolute;inset:0;z-index:0}
 
 /* Camera fills the stage; the HUD is pure paper on top, so the dock's own
@@ -292,7 +329,13 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 
 /* =================== 1v1 LOBBY (Figma frame 111:82) =================== */
 body[data-screen="lobby"] .wrap{max-width:none;padding:0}
-.lobbystage{--lb-lift:calc(-1 * min(.28vw,.5vh));position:fixed;inset:0;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby)}
+#scrLobby{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:var(--fig-cream)}
+#scrLobby::before{content:"";position:absolute;inset:0;z-index:0;
+  background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
+.lobbystage{--lb-lift:calc(-1 * min(.28vw,.5vh));position:relative;z-index:1;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby);
+  width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
+  aspect-ratio:var(--pp-ar)}
+@media (max-aspect-ratio: 1/1){ .lobbystage{width:100dvw} }
 .lb{position:absolute}
 .lb.bg{inset:0;width:100%;height:100%;object-fit:cover;z-index:1}
 .lb img{width:100%;display:block}
