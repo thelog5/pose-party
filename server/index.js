@@ -3,7 +3,8 @@
    Express serves the game itself (so localhost:PORT is the whole app) and
    Socket.IO carries signaling + authoritative game events. Video travels
    peer-to-peer over WebRTC and never touches this process; neither do
-   landmarks or training data. */
+   landmarks or training data. During a match, only the already-computed
+   top guess label and confidence are relayed so the rival paper can update. */
 
 import path from "path";
 import os from "os";
@@ -68,10 +69,12 @@ const createLimit = createLimiter({ tokens: config.rateCreate, perMs: 60000 }); 
 const joinLimit   = createLimiter({ tokens: config.rateJoin,   perMs: 60000 });   // per IP
 const claimLimit  = createLimiter({ tokens: 30,  perMs: 60000 });   // per socket
 const signalLimit = createLimiter({ tokens: 200, perMs: 60000 });   // per socket
+const guessLimit  = createLimiter({ tokens: 360, perMs: 60000 });   // per socket
 
 setInterval(() => {
   store.sweep();
-  createLimit.sweep(); joinLimit.sweep(); claimLimit.sweep(); signalLimit.sweep();
+  createLimit.sweep(); joinLimit.sweep(); claimLimit.sweep();
+  signalLimit.sweep(); guessLimit.sweep();
 }, 60000).unref();
 
 /* Support log: connection + room events only — never landmarks or video
@@ -142,7 +145,14 @@ io.on("connection", socket => {
     cb = ack(cb);
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
-    cb(store.claim(socket.id, payload.roundId));
+    cb(store.claim(socket.id, payload.roundId, payload.recognizedAt));
+  });
+
+  socket.on("round:guess", (payload, cb) => {
+    cb = ack(cb);
+    if(!guessLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    cb(store.relayGuess(socket.id,payload.roundId,payload.label,payload.confidence));
   });
 
   /* ---- party rooms ---- */
@@ -152,8 +162,9 @@ io.on("connection", socket => {
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     const name = cleanName(payload.name);
     const settings = cleanSettings(payload.settings);
-    if(!name || settings === null) return cb({ error: "bad-payload" });
-    const res = store.partyCreate(socket.id, name, settings);
+    const labels = cleanLabels(payload.labels);
+    if(!name || settings === null || !labels) return cb({ error: "bad-payload" });
+    const res = store.partyCreate(socket.id, name, settings, labels);
     log(`party create by "${name}" -> ${res.code || "ERROR " + res.error}`);
     cb(res);
   });
@@ -163,8 +174,9 @@ io.on("connection", socket => {
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     const code = cleanCode(payload.code);
     const name = cleanName(payload.name);
-    if(!code || !name) return cb({ error: "bad-payload" });
-    const res = store.partyJoin(socket.id, code, name);
+    const labels = cleanLabels(payload.labels);
+    if(!code || !name || !labels) return cb({ error: "bad-payload" });
+    const res = store.partyJoin(socket.id, code, name, labels);
     log(`party join ${code} by "${name}" -> ${res.error ? "ERROR " + res.error : "ok (" + res.roster.players.length + " players)"}`);
     cb(res);
   });
@@ -203,6 +215,18 @@ io.on("connection", socket => {
     if(!isPlainObject(payload) || typeof payload.to !== "string" || !signalOk(payload.data))
       return cb({ error: "bad-payload" });
     cb(store.partySignal(socket.id, payload.to, payload.data));
+  });
+  socket.on("party:guess", (payload, cb) => {
+    cb = ack(cb);
+    if(!guessLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    cb(store.relayPartyGuess(socket.id, payload.roundId, payload.label, payload.confidence));
+  });
+  socket.on("party:claim", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    cb(store.partyClaim(socket.id, payload.roundId, payload.recognizedAt));
   });
 
   socket.on("rtc:signal", (payload, cb) => {

@@ -7,21 +7,24 @@
    Scoring is only accepted in "playing", which makes the per-word scoring
    lock structural rather than a boolean flag.
 
-   Scoring (see constants.js): (100 + fast bonus) × streak per word;
-   skip costs 500 and breaks the streak; a miss just breaks the streak. */
+   Solo and online 1v1 use the shared 300–500 time-scaled point formula.
+   The Solo streak remains a run indicator; it no longer multiplies points. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
-import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore } from "./ui.js";
+import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore,
+         localMatchGuessIs } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
+import { partyCheck } from "./partyMatch.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
          ROUND_END_PAUSE_MS } from "./soloRound.js";
+import { calculateFirstPoints } from "./scoring.js";
 
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
 const WORD_WON_PAUSE_MS = 1050;
@@ -135,7 +138,7 @@ function nextWord(){
   setTxt("soloWord",game.word);
   updateHud();
   if(ai){
-    game.pendingPts=pointsForCurrentWord(true);
+    game.pendingPts=pointsForCurrentWord();
     soloBegin(game.word, onSoloResolve);
   }
   animateWordChange();
@@ -169,18 +172,14 @@ function onSoloResolve({won, skip}){
   }, ROUND_END_PAUSE_MS);
 }
 
-/* nextStreak=true prices the word as if the CURRENT attempt wins (used for
-   the solo pending-points chip, computed before the streak increments).
-   Solo (ai): (base + speed bonus scaled by word time left) × streak.
-   Other modes keep the fixed fast-bonus scheme. */
-function pointsForCurrentWord(nextStreak=false){
+/* Solo and 1v1 share the exact 300–500 curve. A streak is still celebrated
+   in Solo, but never changes the points awarded for a recognition. */
+function pointsForCurrentWord(){
   const game=state.game;
-  const streak = Math.max(1, game.streak + (nextStreak?1:0));
   if(game.mode==="ai"){
-    const leftFrac = Math.max(0, Math.min(1, (game.wordEnd-performance.now())/SOLO.wordMs));
-    const speed = Math.round(leftFrac * SOLO.speedBonusMax);
-    return (SOLO.base + speed) * streak;
+    return calculateFirstPoints(game.wordEnd-performance.now(), SOLO.wordMs);
   }
+  const streak = Math.max(1, game.streak);
   const fast = performance.now()-game.wordStart <= FAST_WINDOW_MS;
   return (PTS_CORRECT + (fast?PTS_FAST_BONUS:0)) * streak;
 }
@@ -235,12 +234,16 @@ export function gameCheck(){
   if(game.mode==="ai") return; // solo locking lives in soloRound.js
   const t=topGuesses(1)[0]; if(!t) return;
   const [topLab, topP]=t;
+  if(game.mode==="party") return partyCheck(topLab, topP); // party claims live in partyMatch.js
 
   if(topLab && topLab!==game.word && topLab!=="idle"){
     if((game.bestWrong.p||0)<topP) game.bestWrong={lab:topLab, p:topP};
   }
 
-  if(topLab===game.word && topP>=THRESH){
+  /* renderGuesses() runs immediately before this check. Requiring its local
+     paper to show the target keeps the visible robot, progress bar and score
+     claim in one order even when a previous label is being debounced out. */
+  if(topLab===game.word && localMatchGuessIs(game.word) && topP>=THRESH){
     if(!game.holdSince) game.holdSince=performance.now();
     if(performance.now()-game.holdSince>=HOLD_MS){
       if(game.mode==="online"){
@@ -271,7 +274,7 @@ export function gameTick(){
     const wt=$("soloWordTime"); if(wt) wt.classList.toggle("low", wordLeft<=5000 && wordLeft>0);
     if(roundLeft<=0){ if(gameState()==="playing") endGame(); return; }
     if(soloState()==="guessing"){
-      game.pendingPts=pointsForCurrentWord(true);
+      game.pendingPts=pointsForCurrentWord();
       if(wordLeft<=0 && gameState()==="playing") missWord(false);
     }
     return;
@@ -279,8 +282,41 @@ export function gameTick(){
 
   const wLeft=Math.max(0,game.wordEnd-performance.now());
   setTxt("pillTime",fmtTime(wLeft));
-  if(game.mode==="online" && game.matchEndsAt)
-    setTxt("pillRound",fmtTime(Math.max(0,game.matchEndsAt-performance.now())));
+  setTxt("v1WordTime",fmtTime(wLeft));
+  const v1WordTime=$("v1WordTime");
+  if(v1WordTime) v1WordTime.classList.toggle("low",wLeft<=5000&&wLeft>0);
+  const matchStage=$("matchStage");
+  const inChase=game.mode==="online" && game.roundPhase==="chase";
+  if(matchStage){
+    if(inChase){
+      const second=Math.max(0,Math.ceil(wLeft/1000));
+      setTxt("v1WordTimerLabel",
+        second+" SECOND"+(second===1?"":"S")+" LEFT");
+      matchStage.dataset.chaseSecond=String(second);
+      matchStage.classList.toggle("chase-urgent",second<=3);
+      matchStage.classList.toggle("chase-final",second<=1);
+      if(game.chaseSecond!==second){
+        game.chaseSecond=second;
+        const card=$("v1WordTimerCard");
+        if(card){
+          card.classList.remove("tick-pop"); void card.offsetWidth;
+          card.classList.add("tick-pop");
+        }
+        if(second>0) blip([second<=2?880:660],.035);
+      }
+    }else{
+      game.chaseSecond=null;
+      matchStage.classList.remove("chase-urgent","chase-final");
+      delete matchStage.dataset.chaseSecond;
+    }
+  }
+  if(game.mode==="online" && game.matchEndsAt){
+    const matchLeft=Math.max(0,game.matchEndsAt-performance.now());
+    setTxt("pillRound",fmtTime(matchLeft));
+    setTxt("v1MatchTime",fmtTime(matchLeft));
+  }else if(game.mode==="vs"){
+    setTxt("v1MatchTime",game.round+" / "+game.rounds);
+  }
 
   if(game.mode==="vs"){
     const rtop=fakeRivalGuesses();

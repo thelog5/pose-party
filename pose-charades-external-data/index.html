@@ -392,11 +392,11 @@
         <i class="set-divider"></i>
         <span class="set-label" style="left:10.25%;width:32%">Match Timer</span>
         <button class="set-btn pbtn lobby-alpha" id="matchPlus"  style="left:7.5%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
-        <span class="set-badge" style="left:17%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setMatch">3:00</b></span>
+        <span class="set-badge" style="left:17%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setMatch">2:00</b></span>
         <button class="set-btn pbtn lobby-alpha" id="matchMinus" style="left:37.6%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
         <span class="set-label" style="left:59.05%;width:32%">Word Timer</span>
         <button class="set-btn pbtn lobby-alpha" id="wordPlus"  style="left:56.3%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
-        <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">30s</b></span>
+        <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">20s</b></span>
         <button class="set-btn pbtn lobby-alpha" id="wordMinus" style="left:86.3%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
       </div>
 
@@ -407,46 +407,236 @@
     </div>
   </section>
 
-  <!-- ============ 1v1 MATCH ============ -->
+  <!-- ============ 1v1 MATCH — Figma "1v1 In Game" 175:265 ============
+       The cameras are one uninterrupted split-screen layer. Every paper
+       element below is an overlay at its exact 1440×810 Figma coordinate. -->
   <section class="screen hidden" id="scrMatch">
-    <div class="board">
-      <div class="camcard"><div class="slot" id="slotMatchYou"></div></div>
-      <div class="camcard">
+    <div class="matchstage" id="matchStage" data-phase="waiting">
+      <div class="v1-video-side you">
+        <div class="slot" id="slotMatchYou"></div>
+        <img class="v1-crown" id="v1YouCrown" src="assets/ui/figma/leader-crown.png" alt="Leading">
+      </div>
+      <div class="v1-video-side rival">
         <div class="slot" id="slotMatchRival"></div>
-        <span class="livebadge left"><i></i>LIVE</span>
+        <img class="v1-crown" id="v1RivalCrown" src="assets/ui/figma/leader-crown.png" alt="Leading">
       </div>
-      <div class="vsword" id="vsWordCard">
-        <span class="chip orange">ACTION WORD</span>
-        <div class="word" id="vsWord">—</div>
+
+      <img class="v1-divider" src="assets/ui/figma/v1-divider.png" alt="">
+
+      <!-- Figma tape layer -->
+      <img class="v1-tape" style="left:5.49%;top:.37%;width:7.50%" src="assets/ui/figma/sp-tape-top-left.png" alt="">
+      <img class="v1-tape" style="left:46.39%;top:-2.22%;width:6.96%" src="assets/ui/figma/v1-tape-word-timer.png" alt="">
+      <img class="v1-tape" style="left:23.82%;top:-3.58%;width:6.82%" src="assets/ui/figma/v1-tape-score-blue.png" alt="">
+      <img class="v1-tape" style="left:68.96%;top:-3.33%;width:7.02%" src="assets/ui/figma/v1-tape-score-orange.png" alt="">
+      <img class="v1-tape" style="left:14.85%;top:65.30%;width:5.84%" src="assets/ui/figma/v1-tape-left-top.png" alt="">
+      <img class="v1-tape v1-tape-history" id="myGuessPastTape" style="left:-1.94%;top:83.21%;width:5.92%" src="assets/ui/figma/v1-tape-left-mid.png" alt="">
+      <img class="v1-tape" style="left:79.31%;top:66.54%;width:5.94%" src="assets/ui/figma/v1-tape-right-top.png" alt="">
+      <img class="v1-tape v1-tape-history" id="rivalGuessPastTape" style="left:94.63%;top:84.07%;width:5.83%" src="assets/ui/figma/v1-tape-right-mid.png" alt="">
+      <img class="v1-tape" style="left:66.39%;top:79.26%;width:5.81%" src="assets/ui/figma/sp-tape-word-right.png" alt="">
+      <img class="v1-tape" style="left:27.43%;top:91.73%;width:6.77%" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
+
+      <!-- match clock, word/chase clock, and total scores -->
+      <div class="sp-card sp-rtimer v1-matchtimer" style="left:1.46%;top:2.72%;width:16.04%">
+        <img class="sp-art" src="assets/ui/figma/sp-rtimer.png" alt="">
+        <img class="sp-clock" src="assets/ui/figma/sp-clock.png" alt="">
+        <span class="sp-val" id="v1MatchTime">02:00</span>
+      </div>
+      <div class="sp-card sp-wtimer v1-wordtimer" id="v1WordTimerCard" style="left:40.97%;top:.86%;width:17.50%">
+        <img class="sp-art" src="assets/ui/figma/sp-wtimer.png" alt="">
+        <img class="v1-chase-clock" src="assets/ui/figma/sp-clock.png" alt="">
+        <span class="sp-lab" id="v1WordTimerLabel">WORD TIMER</span>
+        <span class="sp-val" id="v1WordTime">00:20</span>
+      </div>
+      <div class="v1-scorecard you" style="left:25.90%;top:.25%;width:13.33%">
+        <img src="assets/ui/figma/v1-score-blue.png" alt="">
+        <span class="v1-player-name" id="v1YouName">YOU</span>
+        <span class="v1-player-score" id="v1YouScore">0</span>
+      </div>
+      <div class="v1-scorecard rival" style="left:60.21%;top:.25%;width:13.68%">
+        <img src="assets/ui/figma/v1-score-orange.png" alt="">
+        <span class="v1-player-name" id="v1RivalName">RIVAL</span>
+        <span class="v1-player-score" id="v1RivalScore">0</span>
+      </div>
+
+      <!-- rolling local guesses, mirrored rival state -->
+      <div class="sp-guess v1-guess current you" id="myGuessTop" style="left:0;top:57.43%;width:18.69%">
+        <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="myTopWord">GUESSING…</span>
+        <span class="gpct" id="myTopPct">0%</span>
+      </div>
+      <div class="sp-guess v1-guess past you empty" id="myGuessPast" style="left:.50%;top:86.17%;width:13.54%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="myPastWord"></span>
+        <span class="gpct" id="myPastPct"></span>
+      </div>
+      <div class="sp-guess v1-guess current rival" id="rivalGuessTop" style="left:80.97%;top:58.77%;width:18.69%">
+        <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="rivalTopWord">GUESSING…</span>
+        <span class="gpct" id="rivalTopPct">0%</span>
+      </div>
+      <div class="sp-guess v1-guess past rival empty" id="rivalGuessPast" style="left:84.58%;top:87.15%;width:13.54%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="rivalPastWord"></span>
+        <span class="gpct" id="rivalPastPct"></span>
+      </div>
+
+      <!-- same live word/progress component as Solo -->
+      <div class="sp-word v1-word" id="vsWordCard" style="left:29.93%;top:82.59%;width:40.14%">
+        <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
+        <img class="sp-word-fill" id="v1WordFill" src="assets/ui/figma/sp-pill.png" alt="">
+        <span class="sp-word-text" id="vsWord">—</span>
+      </div>
+
+      <!-- Reuse Solo's exact GOT IT paper and payoff animation in 1v1. -->
+      <div class="sp-award v1-award" id="v1Award">
+        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got">GOT IT!</span>
+        <span class="aw-pts" id="v1AwardPts">+0</span>
+        <span class="aw-lbl">POINTS!</span>
+      </div>
+      <div class="sp-award v1-award v1-rival-award" id="v1RivalAward" aria-live="polite">
+        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got" id="v1RivalAwardTitle">RIVAL GOT IT!</span>
+        <span class="aw-pts" id="v1RivalAwardPts">+0</span>
+        <span class="aw-lbl">POINTS!</span>
       </div>
     </div>
-    <div class="panels">
-      <div class="guesspanel">
-        <span class="paneltag">AI’s Top Guess</span>
-        <div class="topguess">
-          <span class="word" id="myTopWord">…</span>
-          <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="myTopPct">0%</span></span>
-        </div>
-        <div class="meter">
-          <div class="segs" id="myMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
-        </div>
-        <div class="glist" id="myGuessList"></div>
+  </section>
+
+  <!-- ============ PARTY MATCH — Figma "Party Mode" 189:273 ============
+       Every player performs the same word at once. Each team's featured
+       player fills their half of the split; the remaining team-mates sit in
+       torn-paper tiles flanking the divider. Seats are assigned in party.js;
+       the markup only pins the Figma geometry. `data-size="2"` drops the
+       bottom pair so a 2v2 keeps just the top centre cards. -->
+  <section class="screen hidden" id="scrPartyMatch">
+    <div class="pmstage" id="pmStage" data-phase="waiting" data-size="3">
+      <div class="pm-side blue"  data-seat="blue0">
+        <div class="slot"></div>
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
       </div>
-      <div class="guesspanel">
-        <span class="paneltag">AI’s Top Guess</span>
-        <div class="topguess">
-          <span class="word" id="rivalTopWord">…</span>
-          <span class="botpct"><span class="ant"></span><span class="head"></span><span class="pct" id="rivalTopPct">0%</span></span>
-        </div>
-        <div class="meter">
-          <div class="segs" id="rivalMeter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="labs"><span>COLD</span><span>WARM</span><span class="hot">HOT!</span></div>
-        </div>
-        <div class="glist" id="rivalGuessList"></div>
+      <div class="pm-side orange" data-seat="orange0">
+        <div class="slot"></div>
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+      </div>
+      <!-- Exact blue/orange strip exported from the Party Match frame. -->
+      <div class="pm-divider" aria-hidden="true">
+        <img src="assets/ui/figma/pm-divider.png" alt="">
+      </div>
+
+      <!-- centre tiles: two per team, hugging the divider -->
+      <div class="pm-tile blue" data-seat="blue1"
+           style="left:31.92%;top:14.65%;width:16.21%;aspect-ratio:.807;--rot:-1.2deg">
+        <div class="slot"></div>
+        <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
+        <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+      </div>
+      <div class="pm-tile blue" data-seat="blue2"
+           style="left:32.57%;top:50.86%;width:15.86%;aspect-ratio:.817;--rot:2.8deg">
+        <div class="slot"></div>
+        <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
+        <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+      </div>
+      <div class="pm-tile orange" data-seat="orange1"
+           style="left:51.39%;top:14.07%;width:16.32%;aspect-ratio:.813;--rot:2.2deg">
+        <div class="slot"></div>
+        <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
+        <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+      </div>
+      <div class="pm-tile orange" data-seat="orange2"
+           style="left:51.39%;top:50.00%;width:15.14%;aspect-ratio:.801;--rot:-0.2deg">
+        <div class="slot"></div>
+        <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
+        <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
+        <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+      </div>
+
+      <!-- Exact rendered tape nodes from the 1440×810 Party Figma frame.
+           Each export already contains the intended angle and transparent
+           bounds, so these use the parent node's coordinates verbatim. -->
+      <img class="pm-tape" id="pmMatchTimerTape" style="left:4.722%;top:-.617%;width:6.071%" src="assets/ui/figma/pm-tape-match-timer.png" alt="">
+      <img class="pm-tape" id="pmBlueScoreTape" style="left:25.625%;top:-3.704%;width:6.244%" src="assets/ui/figma/pm-tape-blue-score.png" alt="">
+      <img class="pm-tape" id="pmWordTimerTape" style="left:46.297%;top:-2.448%;width:6.374%" src="assets/ui/figma/pm-tape-word-timer.png" alt="">
+      <img class="pm-tape" id="pmOrangeScoreTape" style="left:66.969%;top:-3.465%;width:6.433%" src="assets/ui/figma/pm-tape-orange-score.png" alt="">
+      <img class="pm-tape" id="pmMyTopTape" style="left:12.779%;top:70.910%;width:4.716%" src="assets/ui/figma/pm-tape-my-top.png" alt="">
+      <img class="pm-tape pm-tape-history" id="pmMyPastTape" style="left:-.764%;top:85.369%;width:4.779%" src="assets/ui/figma/pm-tape-my-past.png" alt="">
+      <img class="pm-tape" id="pmFoeTopTape" style="left:81.672%;top:71.263%;width:5.139%" src="assets/ui/figma/pm-tape-foe-top.png" alt="">
+      <img class="pm-tape pm-tape-history" id="pmFoePastTape" style="left:94.928%;top:86.435%;width:5.047%" src="assets/ui/figma/pm-tape-foe-past.png" alt="">
+      <img class="pm-tape" id="pmWordRightTape" style="left:66.389%;top:79.259%;width:5.808%" src="assets/ui/figma/pm-tape-word-right.png" alt="">
+      <img class="pm-tape" id="pmWordLeftTape" style="left:27.431%;top:91.728%;width:6.773%" src="assets/ui/figma/pm-tape-word-left.png" alt="">
+
+      <!-- match clock, word clock, team scores -->
+      <div class="sp-card sp-rtimer" id="pmMatchTimerCard" style="left:1.18%;top:1.23%;width:12.99%">
+        <img class="sp-art" src="assets/ui/figma/sp-rtimer.png" alt="">
+        <img class="sp-clock" src="assets/ui/figma/sp-clock.png" alt="">
+        <span class="sp-val" id="pmMatchTime">02:00</span>
+      </div>
+      <div class="sp-card sp-wtimer" id="pmWordTimerCard" style="left:41.34%;top:.72%;width:16.03%">
+        <img class="sp-art" src="assets/ui/figma/sp-wtimer.png" alt="">
+        <img class="pm-chase-clock" src="assets/ui/figma/sp-clock.png" alt="">
+        <span class="sp-lab" id="pmWordTimerLabel">WORD TIME</span>
+        <span class="sp-val" id="pmWordTime">00:20</span>
+      </div>
+      <div class="v1-scorecard pm-score blue" id="pmScoreBlue" style="left:27.53%;top:-.19%;width:12.21%">
+        <img src="assets/ui/figma/v1-score-blue.png" alt="">
+        <span class="v1-player-name" id="pmBlueName">Blue</span>
+        <span class="v1-player-score" id="pmBlueScore">0</span>
+      </div>
+      <div class="v1-scorecard pm-score orange" id="pmScoreOrange" style="left:58.95%;top:-.19%;width:12.53%">
+        <img src="assets/ui/figma/v1-score-orange.png" alt="">
+        <span class="v1-player-name" id="pmOrangeName">Orange</span>
+        <span class="v1-player-score" id="pmOrangeScore">0</span>
+      </div>
+
+      <!-- your live read on the left, the rival team's featured player right -->
+      <div class="sp-guess pm-guess mine current" id="pmMyTop" style="left:.81%;top:73.33%;width:15.09%">
+        <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="pmMyTopWord">GUESSING…</span>
+        <span class="gpct" id="pmMyTopPct">0%</span>
+      </div>
+      <div class="sp-guess pm-guess mine past empty" id="pmMyPast" style="left:1.21%;top:87.76%;width:10.93%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="pmMyPastWord"></span>
+        <span class="gpct" id="pmMyPastPct"></span>
+      </div>
+      <div class="sp-guess pm-guess theirs current" id="pmFoeTop" style="left:83.11%;top:73.94%;width:16.18%">
+        <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="pmFoeTopWord">GUESSING…</span>
+        <span class="gpct" id="pmFoeTopPct">0%</span>
+      </div>
+      <div class="sp-guess pm-guess theirs past empty" id="pmFoePast" style="left:86.24%;top:89.09%;width:11.72%">
+        <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="glabel" id="pmFoePastWord"></span>
+        <span class="gpct" id="pmFoePastPct"></span>
+      </div>
+
+      <!-- the same live word/progress component as Solo and 1v1 -->
+      <div class="sp-word pm-word" id="pmWordCard" style="left:29.93%;top:82.59%;width:40.14%">
+        <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
+        <img class="sp-word-fill" id="pmWordFill" src="assets/ui/figma/sp-pill.png" alt="">
+        <span class="sp-word-text" id="pmWord">—</span>
+      </div>
+
+      <div class="sp-award pm-award" id="pmAward">
+        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got" id="pmAwardTitle">GOT IT!</span>
+        <span class="aw-pts" id="pmAwardPts">+0</span>
+        <span class="aw-lbl" id="pmAwardLabel">POINTS!</span>
       </div>
     </div>
-    <div class="exitrow"><button class="btn ghost" id="btnExitMatch">✕ &nbsp;End Game</button></div>
   </section>
 
   <!-- rival video dock: reparented between lobby + match rival slots -->

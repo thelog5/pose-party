@@ -53,11 +53,19 @@ const waitState = (page, st, t=10000) => page.waitForFunction(
 const winNow = page => page.evaluate(`(async () => {
   const { state } = await import('${APP}/js/state.js');
   const { gameCheck } = await import('${APP}/js/game.js');
+  const { renderGuesses } = await import('${APP}/js/ui.js');
   const w = state.game.word;
   for (const l of state.model.labels) state.smooth[l] = 0.01;
   state.smooth[w] = 0.9;
+  /* Mirror the real inference order: paint/debounce the robot paper first,
+     then let scoring inspect that same displayed state. */
+  renderGuesses();
+  gameCheck();
+  await new Promise(r => setTimeout(r, 500));
+  renderGuesses();
   gameCheck();
   await new Promise(r => setTimeout(r, 300));
+  renderGuesses();
   gameCheck();
   return w;
 })()`);
@@ -78,12 +86,14 @@ try {
   ok(await A.evaluate(() => !document.getElementById("lobbyStage").classList.contains("joined")), "waiting robot visible before join");
   ok(await A.evaluate(() => document.getElementById("lobbyName").value) === "Alice", "name tag prefilled from storage");
 
-  // host tunes the time-based settings: match 3:00 -> 2:00, word 30 -> 20s
+  // the requested scoring format now defaults to 2:00 / 20s
+  ok(await txt(A, "#setMatch") === "2:00" && await txt(A, "#setWord") === "20s",
+    `default settings are 2:00 / 20s (${await txt(A,"#setMatch")}, ${await txt(A,"#setWord")})`);
+  // controls still round-trip to the defaults
   await act(A, () => A.click("#matchMinus"));
-  await act(A, () => A.click("#matchMinus"));
+  await act(A, () => A.click("#matchPlus"));
   await act(A, () => A.click("#wordMinus"));
-  await act(A, () => A.click("#wordMinus"));
-  ok(await txt(A, "#setMatch") === "2:00" && await txt(A, "#setWord") === "20s", `host adjusted settings (${await txt(A,"#setMatch")}, ${await txt(A,"#setWord")})`);
+  await act(A, () => A.click("#wordPlus"));
 
   // B joins via the share LINK (exercises #join-CODE handling)
   await act(B, () => B.evaluate(() => localStorage.setItem("poseCharadesName", "Bob")));
@@ -110,8 +120,27 @@ try {
   ok(await A.evaluate(() => document.body.dataset.screen) === "match", "match screen shown");
   const wordA = await txt(A, "#vsWord"), wordB = await txt(B, "#vsWord");
   ok(wordA === wordB && wordA.length > 0, `same word on both screens: "${wordA}"`);
-  ok(await A.evaluate(() => document.querySelector(".statpill.round .lab").textContent) === "Match", "round pill relabeled to match clock");
-  ok(/^\d+:\d\d$/.test(await txt(A, "#pillRound")), `match clock ticking (${await txt(A, "#pillRound")})`);
+  ok(await A.evaluate(() => document.querySelector("header").classList.contains("hidden")),
+    "new Figma 1v1 screen owns the full viewport");
+  ok(/^\d+:\d\d$/.test(await txt(A, "#v1MatchTime")), `paper match clock ticking (${await txt(A, "#v1MatchTime")})`);
+  await sleep(650); // let the Figma word-card entrance settle before measuring
+  const figmaLayout = await A.evaluate(() => {
+    const stage=document.getElementById("matchStage").getBoundingClientRect();
+    const divider=document.querySelector(".v1-divider").getBoundingClientRect();
+    const word=document.getElementById("vsWordCard").getBoundingClientRect();
+    const left=document.querySelector(".v1-video-side.you").getBoundingClientRect();
+    const right=document.querySelector(".v1-video-side.rival").getBoundingClientRect();
+    return {
+      dividerX:(divider.left-stage.left)/stage.width,
+      wordX:(word.left-stage.left)/stage.width,
+      wordY:(word.top-stage.top)/stage.height,
+      leftWidth:left.width/stage.width,
+      rightWidth:right.width/stage.width,
+    };
+  });
+  ok(Math.abs(figmaLayout.dividerX-.48333)<.003 && Math.abs(figmaLayout.wordX-.2993)<.003 &&
+    Math.abs(figmaLayout.wordY-.8259)<.003 && Math.abs(figmaLayout.leftWidth-.5)<.002 &&
+    Math.abs(figmaLayout.rightWidth-.5)<.002, "1v1 overlay geometry matches the 1440×810 Figma frame");
 
   // WebRTC both ways
   await A.waitForFunction(() => {
@@ -123,23 +152,113 @@ try {
   ok(rtcA > 0, `A sees B's video (${rtcA}px)`);
   ok(rtcB > 0, `B sees A's video (${rtcB}px)`);
 
-  console.log("round 1 — Alice performs the word:");
-  await winNow(A);
-  await waitState(A, "word-won", 5000);
-  ok(true, "A: claim accepted -> word-won");
-  await waitState(B, "word-won", 5000);
-  ok(/Alice wins/i.test(await txt(B, "#pointHeadline")), `B sees rival banner ("${await txt(B, "#pointHeadline")}")`);
-  ok(await txt(A, "#pillScore") === "1", "A score pill = 1 (server points)");
+  ok(await A.evaluate(() => !document.getElementById("btnExitMatch")),
+    "1v1 has no in-match exit control");
+  ok(await A.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("myGuessPastTape")).opacity)===0 &&
+    parseFloat(getComputedStyle(document.getElementById("rivalGuessPastTape")).opacity)===0),
+    "history tape stays hidden until a previous guess paper exists");
+  const firstLiveGuess=await A.evaluate(async () => {
+    const {state}=await import("/js/state.js");
+    const {renderGuesses}=await import("/js/ui.js");
+    const label=state.model.labels.find(l=>l!=="idle"&&l!==state.game.word);
+    for(const key of state.model.labels) state.smooth[key]=.01;
+    state.smooth[label]=.74;
+    renderGuesses();
+    await new Promise(r=>setTimeout(r,180));
+    renderGuesses();
+    return label;
+  });
+  await B.waitForFunction(label =>
+    document.getElementById("rivalTopWord").textContent.includes(label.toUpperCase()),
+    {timeout:3000,polling:100},firstLiveGuess);
+  ok(await txt(B,"#rivalTopPct")==="74%",
+    `opponent's live top guess and confidence appear (${firstLiveGuess}, 74%)`);
+  ok(await A.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("myGuessPastTape")).opacity)===0),
+    "one current guess does not reveal an empty history tape");
+  await A.evaluate(async first => {
+    const {state}=await import("/js/state.js");
+    const {renderGuesses}=await import("/js/ui.js");
+    const next=state.model.labels.find(l=>l!=="idle"&&l!==state.game.word&&l!==first);
+    for(const key of state.model.labels) state.smooth[key]=.01;
+    state.smooth[next]=.7;
+    renderGuesses();
+    await new Promise(r=>setTimeout(r,480));
+    renderGuesses();
+  },firstLiveGuess);
+  await A.waitForFunction(() =>
+    !document.getElementById("myGuessPast").classList.contains("empty"),
+    {timeout:2500,polling:100});
+  await sleep(300); // history tape deliberately fades in with its paper
+  ok(await A.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("myGuessPastTape")).opacity)>.9),
+    "history tape appears together with the previous-guess paper");
 
-  console.log("round 2 — Bob wins; then leaves:");
-  await waitState(B, "playing", 8000);
+  console.log("round 1 — Alice first, Bob chases:");
+  await winNow(A);
+  await A.waitForFunction(() => document.getElementById("matchStage").dataset.phase === "chase",
+    {timeout:5000,polling:100});
+  await B.waitForFunction(() => document.getElementById("matchStage").dataset.phase === "chase",
+    {timeout:5000,polling:100});
+  const immediateA=parseInt((await txt(A,"#v1YouScore")).replace(/[^0-9]/g,""));
+  ok(immediateA>=300 && immediateA<=500 &&
+    /5 SECONDS LEFT/.test(await txt(A,"#v1WordTimerLabel")),
+    `first recognition scored immediately and opened chase (${immediateA})`);
+  ok(await A.evaluate(() =>
+    document.getElementById("v1Award").classList.contains("show") &&
+    document.getElementById("v1Award").querySelector("img").src.includes("sp-award.png")),
+    "1v1 reuses Solo's GOT IT paper and animation");
+  ok(await A.evaluate(() =>
+    parseFloat(document.getElementById("v1WordFill").style.width)>=94),
+    "first recognizer's meter locks full for the chase");
+  ok(await B.evaluate(() =>
+    document.getElementById("v1RivalAward").classList.contains("show") &&
+    document.getElementById("v1RivalAwardTitle").textContent==="ALICE GOT IT!" &&
+    document.getElementById("v1RivalAward").querySelector("img").src.includes("sp-award.png")),
+    "the opponent's recognition animates the same GOT IT paper on their side");
+  await sleep(650);
   await winNow(B);
   await waitState(A, "word-won", 5000);
+  await waitState(B, "word-won", 5000);
+  ok(await A.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("v1WordFill")).width) /
+      document.getElementById("vsWordCard").getBoundingClientRect().width > .9) &&
+    await B.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById("v1WordFill")).width) /
+      document.getElementById("vsWordCard").getBoundingClientRect().width > .9),
+    "both successful players keep a full meter through the result beat");
+  const round1A=parseInt((await txt(A,"#v1YouScore")).replace(/[^0-9]/g,""));
+  const round1B=parseInt((await txt(A,"#v1RivalScore")).replace(/[^0-9]/g,""));
+  ok(round1A>round1B && round1B>0,
+    `continuous chaser decay awarded both players (${round1A} / ${round1B})`);
+  ok(parseInt((await txt(B,"#v1AwardPts")).replace(/[^0-9]/g,""))===round1B,
+    `chaser sees the shared paper point award (+${round1B})`);
+
+  console.log("round 2 — Bob first, Alice misses the chase:");
+  await waitState(B, "playing", 8000);
+  await winNow(B);
+  await B.waitForFunction(() => document.getElementById("matchStage").dataset.phase === "chase",
+    {timeout:5000,polling:100});
+  await waitState(A, "word-won", 8000);
   await waitState(A, "playing", 8000); // time-based mode rolls straight into round 3
-  ok(await txt(A, "#pillScore") === "1" && await txt(B, "#pillScore") === "1", "both players' score pills read 1");
-  await act(B, () => B.click("#btnExitMatch"));
-  await waitState(B, "results", 5000);
-  ok(true, "quitter lands on results");
+  const totalA=parseInt((await txt(A,"#v1YouScore")).replace(/[^0-9]/g,""));
+  const totalB=parseInt((await txt(A,"#v1RivalScore")).replace(/[^0-9]/g,""));
+  ok(totalA===round1A && totalB>round1B && totalB>totalA,
+    `total points, not rounds won, choose the leader (${totalA} / ${totalB})`);
+  ok(await A.evaluate(() => {
+    const stage=document.getElementById("matchStage");
+    const crown=document.getElementById("v1RivalCrown");
+    return stage.classList.contains("rival-leading") &&
+      parseFloat(getComputedStyle(crown).opacity)>.9;
+  }), "the current leader wears the angled paper crown");
+  // There is deliberately no in-match exit UI. Simulate a tab/navigation
+  // loss through the lifecycle itself so peer-left cleanup remains covered.
+  await act(B, () => B.evaluate(async () => {
+    const {transition}=await import("/js/fsm.js");
+    transition("menu");
+  }));
+  await waitState(B, "menu", 10000);
   await waitState(A, "results", 6000);
   ok(/left early/i.test(await txt(A, "#rescard .sub")), `peer sees early end ("${await txt(A, "#rescard .sub")}")`);
 
@@ -151,8 +270,10 @@ try {
   }, { timeout: 10000, polling: 300 }, code);
   const code2 = await txt(A, "#roomCodeText");
   ok(code2 !== code, `replay creates a fresh room (${code2})`);
-  await act(B, () => B.click("#btnAgain"));
-  await waitState(B, "lobby", 10000);
+  await act(B, () => B.click("#modeVS"));
+  await B.waitForFunction(() =>
+    /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent),
+    {timeout:10000,polling:300});
   await act(B, () => B.evaluate(() => { document.getElementById("joinCode").value = ""; }));
   await act(B, () => B.type("#joinCode", code2));
   await act(B, () => B.click("#btnJoinRoom"));
@@ -236,13 +357,19 @@ try {
 
   console.log("hygiene:");
   for (const tag of ["A", "B"]) {
-    const real = errors[tag].filter(e => !e.includes("favicon") && !e.includes("net::ERR_") && !/assets\/ui\/figma\/sp-/.test(e));
+    const real = errors[tag].filter(e => !e.includes("favicon") &&
+      !e.includes("net::ERR_") &&
+      !e.includes("Created TensorFlow Lite XNNPACK delegate") &&
+      !/assets\/ui\/figma\/sp-/.test(e));
     ok(real.length === 0, `player ${tag}: no console/page errors (${real.length})`);
     real.forEach(e => console.log("    " + e.slice(0, 220)));
   }
 } catch (e) {
   fails++;
   console.log("  FAIL (exception):", e.message);
+  for(const tag of ["A","B"])
+    for(const error of errors[tag])
+      console.log(`    ${tag}: ${error.slice(0,300)}`);
 } finally {
   await browser.close();
   server.kill();

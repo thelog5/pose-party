@@ -10,7 +10,7 @@ import { exportData, importData, preloadBundledDataset } from "./data.js";
 import { render } from "./screens.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
-import { enterLobby, quitOnline, leaveRoom, setPendingJoin } from "./online.js";
+import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty } from "./party.js";
 import { wireHomeAlive } from "./homeAlive.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
@@ -48,10 +48,6 @@ function wireControls(){
   /* in-game */
   $("btnExitSolo").onclick=()=>state.game&&endGame();
   $("btnSkipSolo").onclick=()=>missWord(true);
-  $("btnExitMatch").onclick=()=>{
-    if(state.game?.mode==="online") quitOnline();
-    else if(state.game) endGame();
-  };
 
   /* results */
   $("btnAgain").onclick=()=>{

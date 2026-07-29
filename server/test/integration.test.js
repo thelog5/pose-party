@@ -6,6 +6,10 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import path from "path";
 import { io as connect } from "socket.io-client";
+import {
+  calculateFirstPoints,
+  calculateChaserPoints,
+} from "../../pose-charades-external-data/js/scoring.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3789;
@@ -41,6 +45,15 @@ await new Promise((resolve, reject) => {
 });
 
 try {
+  console.log("scoring:");
+  ok(calculateFirstPoints(20000,20000) === 500, "first player gets 500 with the full word clock");
+  ok(calculateFirstPoints(10000,20000) === 400, "first-player score reaches 400 at half time");
+  ok(calculateFirstPoints(0,20000) === 300, "first-player score floors at 300");
+  ok(calculateChaserPoints(500,.5) === 497, "half-second chase penalty rounds to 3 points");
+  ok(calculateChaserPoints(500,3) === 374, "quadratic decay reaches 374 at three seconds");
+  ok(calculateChaserPoints(500,5) === 150 && calculateChaserPoints(500,5.001) === 0,
+    "five seconds earns 150; anything later earns zero");
+
   const A = connect(URL, { transports: ["websocket"] });
   const B = connect(URL, { transports: ["websocket"] });
   const C = connect(URL, { transports: ["websocket"] });
@@ -101,21 +114,50 @@ try {
   ok(r1a.word !== "idle", "idle never dealt");
   ok(r1a.roundNum === 1, "round 1");
 
+  const liveGuessB = once(B, "round:guess");
+  r = await emit(A, "round:guess", {
+    roundId:r1a.roundId, label:"BOXING", confidence:.7344,
+  });
+  const relayedGuess = await liveGuessB;
+  ok(r.ok === true && relayedGuess.label === "boxing" &&
+    relayedGuess.confidence === .734,
+    "validated top guess/confidence relays ephemerally to the opponent");
+  r = await emit(A, "round:guess", {
+    roundId:r1a.roundId, label:"not in the model", confidence:.8,
+  });
+  ok(r.error === "bad-payload", "untrained live guess labels are rejected");
+  r = await emit(A, "round:guess", {
+    roundId:r1a.roundId, label:"boxing", confidence:4,
+  });
+  ok(r.error === "bad-payload", "out-of-range live guess confidence is rejected");
+
   // duplicate + garbage claims
   r = await emit(A, "round:claim", "not-an-object");
   ok(r.error === "bad-payload", `garbage claim payload rejected (${r.error})`);
   r = await emit(A, "round:claim", { roundId: "0123456789abcdef" });
   ok(r.error === "stale-round", `wrong roundId rejected (${r.error})`);
+  r = await emit(A, "round:claim", { roundId: r1a.roundId });
+  ok(r.error === "out-of-window", `claim without recognition timestamp rejected (${r.error})`);
+
+  const chaseB = once(B, "round:chase");
+  const firstAt1 = r1a.endsAt - 1200;
+  r = await emit(A, "round:claim", { roundId: r1a.roundId, recognizedAt:firstAt1 });
+  ok(r.ok === true && r.phase === "chase", "first recognition starts the chase");
+  const chase1 = await chaseB;
+  ok(chase1.firstId === A.id && chase1.firstPoints === 500, "first player immediately receives 500");
+  ok(chase1.chaseEndsAt === firstAt1 + 5000, "chase cutoff is exactly five seconds after recognition");
 
   const resB = once(B, "round:result");
-  r = await emit(A, "round:claim", { roundId: r1a.roundId });
-  ok(r.ok === true, "valid claim accepted");
+  r = await emit(B, "round:claim", { roundId:r1a.roundId, recognizedAt:firstAt1+650 });
+  ok(r.ok === true && r.phase === "resolved", "chaser timestamp accepted");
   const res1 = await resB;
-  ok(res1.winnerId === A.id, "A won the word");
-  ok(res1.scores.find(p => p.id === A.id).score === 1, "server score A=1");
-  ok(res1.scores.find(p => p.id === B.id).score === 0, "server score B=0");
+  const expectedChaser = calculateChaserPoints(500, .65);
+  ok(res1.winnerId === A.id && res1.chaserId === B.id, "timestamp order identifies first player and chaser");
+  ok(res1.chaserPoints === expectedChaser, `quadratic .65s chase score is ${expectedChaser}`);
+  ok(res1.scores.find(p => p.id === A.id).score === 500, "server score A=500");
+  ok(res1.scores.find(p => p.id === B.id).score === expectedChaser, `server score B=${expectedChaser}`);
 
-  r = await emit(B, "round:claim", { roundId: r1a.roundId });
+  r = await emit(B, "round:claim", { roundId: r1a.roundId, recognizedAt:Date.now() });
   ok(!!r.error, `late claim on resolved round rejected (${r.error})`);
 
   // round 2: nobody claims -> timeout result
@@ -124,16 +166,35 @@ try {
   const res2 = await once(A, "round:result", 3000);
   ok(res2.winnerId === null && res2.reason === "timeout", "unclaimed round times out with no winner");
 
-  // round 3: B wins, then match ends
+  // round 3 mirrors round 1 but the later recognition packet arrives first:
+  // timestamps must correct the order and still create the score tie.
   const [r3] = await Promise.all([once(A, "round:start"), once(B, "round:start")]);
+  const suddenA = once(A, "match:sudden", 4000);
+  const firstAt3 = r3.endsAt - 1200;
+  await emit(A, "round:claim", { roundId:r3.roundId, recognizedAt:firstAt3+650 });
+  const res3a = once(A, "round:result");
+  r = await emit(B, "round:claim", { roundId:r3.roundId, recognizedAt:firstAt3 });
+  ok(r.ok === true, "earlier synchronized timestamp accepted after the later packet");
+  const result3 = await res3a;
+  ok(result3.firstId===B.id && result3.chaserId===A.id,
+    "recognition timestamps, not network arrival order, determine placement");
+  const sudden = await suddenA;
+  const tied = sudden.scores.map(p=>p.score);
+  ok(tied[0] === tied[1], `equal totals trigger sudden death (${tied.join("-")})`);
+
+  const sdA = once(A, "round:start", 4000), sdB = once(B, "round:start", 4000);
+  const [sd] = await Promise.all([sdA, sdB]);
+  ok(sd.suddenDeath === true, "server deals exactly one sudden-death word");
   const endA = once(A, "match:end", 4000), endB = once(B, "match:end", 4000);
-  const res3a = once(A, "round:result"); // attach before claiming — events don't buffer
-  r = await emit(B, "round:claim", { roundId: r3.roundId });
-  ok(r.ok === true, "B claim accepted in round 3");
-  await res3a;
+  r = await emit(A, "round:claim", {
+    roundId:sd.roundId,
+    recognizedAt:sd.endsAt-1200,
+  });
+  ok(r.ok === true && r.phase === "sudden-death", "first sudden-death recognition wins immediately");
   const [endPayload] = await Promise.all([endA, endB]);
   const fin = Object.fromEntries(endPayload.scores.map(p => [p.name, p.score]));
-  ok(fin["Alice"] === 1 && fin["Bobscript"] === 1, `final scores 1-1 (${JSON.stringify(fin)})`);
+  ok(fin["Alice"] === fin["Bobscript"], `sudden death preserves tied point totals (${JSON.stringify(fin)})`);
+  ok(endPayload.winnerId === A.id && endPayload.suddenDeath === true, "match winner is the sudden-death first recognizer");
 
   console.log("signaling:");
   // room is destroyed after match end — signaling should fail now
@@ -180,20 +241,31 @@ try {
   await emit(H, "match:begin", {});
   const hs = await hStart;
   ok(hs.matchEndsAt - Date.now() <= 10500, "deadline ≈ startAt + 10s");
-  // claim the first word, then let rounds run; the 10s clock must end it
+  // Trigger a chase just before the 10s match deadline. It must own its full
+  // five seconds, then end the match without dealing another word.
   const hr1 = await once(H, "round:start");
-  await emit(H, "round:claim", { roundId: hr1.roundId });
+  const lateChaseEvent = once(H, "round:chase", 12000);
+  await sleep(8850);
+  r = await emit(H, "round:claim", {
+    roundId:hr1.roundId,
+    recognizedAt:hr1.endsAt-500,
+  });
+  ok(r.ok === true, "recognition before the overall deadline starts a chase");
+  const lateChase = await lateChaseEvent;
+  ok(lateChase.chaseEndsAt > hs.matchEndsAt,
+    "chase triggered before zero continues past the overall match clock");
   const endH = await once(H, "match:end", 16000);
   const hScore = endH.scores.find(p => p.name === "Hana").score;
-  ok(hScore >= 1, `match ended by the clock with scores intact (Hana=${hScore})`);
+  ok(hScore >= 300, `match ended after the chase with scores intact (Hana=${hScore})`);
   H.disconnect(); I.disconnect();
 
   // ---- party rooms: 3v3 lobby ----
   console.log("party rooms:");
+  const PARTY_LABELS = ["idle", "boxing", "archery", "guitar"];
   const P = [];
   for (let i = 0; i < 6; i++) P.push(connect(URL, { transports: ["websocket"] }));
   await Promise.all(P.map(s => once(s, "connect")));
-  r = await emit(P[0], "party:create", { name: "Host" });
+  r = await emit(P[0], "party:create", { name: "Host", labels: PARTY_LABELS });
   ok(/^[A-Z2-9]{6}$/.test(r.code || ""), `party room created (${r.code})`);
   ok(r.roster.players[0].team === "blue", "creator lands on blue");
   const pcode = r.code;
@@ -206,12 +278,12 @@ try {
   // cross-type hints
   r = await emit(P[1], "room:join", { code: pcode, name: "X", labels: ["idle","a"] });
   ok(r.error === "party-room", `1v1 join on a party code hints party (${r.error})`);
-  r = await emit(P[1], "party:join", { code: "ZZZZZZ", name: "X" });
+  r = await emit(P[1], "party:join", { code: "ZZZZZZ", name: "X", labels: PARTY_LABELS });
   ok(r.error === "no-such-room", "bad party code rejected");
 
   // joiners auto-balance
   for (let i = 1; i < 6; i++) {
-    r = await emit(P[i], "party:join", { code: pcode, name: "P" + i });
+    r = await emit(P[i], "party:join", { code: pcode, name: "P" + i, labels: PARTY_LABELS });
     ok(!r.error, `P${i} joined (${JSON.stringify(r.error || r.roster.players.length + " players")})`);
   }
   let roster = r.roster;
@@ -220,7 +292,7 @@ try {
 
   const seventh = connect(URL, { transports: ["websocket"] });
   await once(seventh, "connect");
-  r = await emit(seventh, "party:join", { code: pcode, name: "Late" });
+  r = await emit(seventh, "party:join", { code: pcode, name: "Late", labels: PARTY_LABELS });
   ok(r.error === "room-full", `7th player rejected (${r.error})`);
   seventh.disconnect();
 
@@ -249,29 +321,94 @@ try {
   const psig = await gotSig;
   ok(psig.data.sdp === "v=0 party" && !!psig.from, "peer got targeted signal with sender id");
 
-  // leave updates roster; below 2v2 the gate closes
+  // leave updates roster
   const rosterAfter = once(P[0], "party:roster");
   P[5].disconnect();
   const ros2 = await rosterAfter;
   ok(ros2.players.length === 5, "roster shrank on disconnect");
-  // drop one team to 1 member: move players until orange has 1
-  // (simplest: everyone on orange except one leaves)
-  const orangeIds = ros2.players.filter(p => p.team === "orange").map(p => p.id);
-  for (const s of P.slice(1)) {
-    if (orangeIds.includes(s.id) && ros2.players.filter(p => p.team === "orange").length > 1) {
-      const upd = once(P[0], "party:roster");
-      s.disconnect();
-      const now = await upd;
-      ros2.players = now.players;
-    }
-  }
-  if (ros2.players.filter(p => p.team === "orange").length < 2) {
-    r = await emit(P[0], "party:start", {});
-    ok(r.error === "need-teams", `start refused below 2v2 (${r.error})`);
-  } else {
-    ok(false, "could not thin orange team for gate test");
-  }
   for (const s of P) s.disconnect();
+
+  /* The 2v2 gate needs its own room: the six-player room above has already
+     started, so its phase is no longer "lobby". Two players auto-balance to
+     one per side, which is exactly one short on both teams. */
+  const GATE = [connect(URL, { transports: ["websocket"] }), connect(URL, { transports: ["websocket"] })];
+  await Promise.all(GATE.map(s => once(s, "connect")));
+  r = await emit(GATE[0], "party:create", { name: "G0", labels: PARTY_LABELS });
+  const gcode = r.code;
+  await emit(GATE[1], "party:join", { code: gcode, name: "G1", labels: PARTY_LABELS });
+  r = await emit(GATE[0], "party:start", {});
+  ok(r.error === "need-teams", `start refused below 2v2 (${r.error})`);
+  for (const s of GATE) s.disconnect();
+
+  // ---- party match: simultaneous play, placement, completion bonus, chase ----
+  console.log("party match:");
+  const M = [];
+  for (let i = 0; i < 4; i++) M.push(connect(URL, { transports: ["websocket"] }));
+  await Promise.all(M.map(s => once(s, "connect")));
+  r = await emit(M[0], "party:create",
+    { name: "M0", labels: PARTY_LABELS, settings: { matchSecs: 10, wordSecs: 6 } });
+  const mcode = r.code;
+  for (let i = 1; i < 4; i++)
+    await emit(M[i], "party:join", { code: mcode, name: "M" + i, labels: PARTY_LABELS });
+
+  const matchAll = M.map(s => once(s, "party:match"));
+  r = await emit(M[0], "party:start", {});
+  ok(r.ok === true, "host started a 2v2 party match");
+  const pm = await matchAll[0];
+  await Promise.all(matchAll);
+  ok(pm.matchEndsAt > pm.startAt, "party:match carries the match clock");
+  const byId = Object.fromEntries(pm.roster.players.map(p => [p.id, p]));
+  const teamOfSocket = s => byId[s.id].team;
+  const blueSockets = M.filter(s => teamOfSocket(s) === "blue");
+  const orangeSockets = M.filter(s => teamOfSocket(s) === "orange");
+  ok(blueSockets.length === 2 && orangeSockets.length === 2, "2v2 teams formed");
+
+  const round = await once(M[0], "party:round", 8000);
+  ok(!!round.roundId && !!round.word, `party round dealt "${round.word}"`);
+  ok(PARTY_LABELS.includes(round.word), "dealt word is shared by every player");
+
+  // first blue player is recognized
+  const gotFirst = once(M[1], "party:got");
+  r = await emit(blueSockets[0], "party:claim",
+    { roundId: round.roundId, recognizedAt: Date.now() });
+  ok(r.ok === true && r.place === 0, `first recognition placed 1st (place=${r.place})`);
+  const gotEvt = await gotFirst;
+  ok(gotEvt.id === blueSockets[0].id && gotEvt.place === 0,
+    "party:got broadcast so every client can green-border that player");
+  r = await emit(blueSockets[0], "party:claim",
+    { roundId: round.roundId, recognizedAt: Date.now() });
+  ok(r.error === "already-claimed", `a second claim cannot score twice (${r.error})`);
+
+  // second blue completes the team -> bonus + five-second chase for orange
+  const chaseAll = M.map(s => once(s, "party:chase"));
+  await emit(blueSockets[1], "party:claim",
+    { roundId: round.roundId, recognizedAt: Date.now() });
+  const chase = await chaseAll[0];
+  await Promise.all(chaseAll);
+  ok(chase.team === "blue" && chase.bonus === 150,
+    `blue completed first: +${chase.bonus} team bonus`);
+  ok(chase.chaseEndsAt - Date.now() > 3500 && chase.chaseEndsAt - Date.now() <= 5200,
+    "a five-second final chase opened for the other team");
+
+  // one orange player lands inside the window, the other never does
+  await emit(orangeSockets[0], "party:claim",
+    { roundId: round.roundId, recognizedAt: Date.now() });
+  const result = await once(M[0], "party:result", 9000);
+  ok(result.completedTeam === "blue", "result names the completing team");
+  ok(result.results.length === 3, `three of four finished (${result.results.length})`);
+  const places = result.results.map(x => x.place);
+  ok(places.join() === "0,1,2", `placement is dense and timestamp-ordered (${places.join()})`);
+  const pts = result.results.map(x => x.points);
+  ok(pts[0] > pts[1] && pts[1] > pts[2], `placement points descend (${pts.join(" > ")})`);
+  ok(pts[0] >= 100, `1st place scored placement + time bonus (${pts[0]})`);
+  ok(result.roundTeam.blue === pts[0] + pts[1] + 150,
+    `blue round score includes the completion bonus (${result.roundTeam.blue})`);
+  ok(result.winner === "blue", `higher team score won the round (${result.winner})`);
+  ok(result.scores.teams.blue > result.scores.teams.orange, "match totals track the round");
+
+  const ended = await once(M[0], "party:end", 15000);
+  ok(ended.winner === "blue", `match decided on total score, not rounds (${ended.winner})`);
+  for (const s of M) s.disconnect();
 
 
   console.log("abuse:");

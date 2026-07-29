@@ -3,6 +3,8 @@
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { fakeRivalGuesses } from "./rival.js";
+import { THRESH } from "./constants.js";
+import { setWordRecognitionMotion } from "./soloRound.js";
 
 /* ---------------- transient feedback ---------------- */
 export function showStatus(msg){
@@ -52,10 +54,11 @@ const displayName = lab => lab==="idle" ? "just standing" : lab;
 export function fillGuessPanel(prefix, top, rows=4){
   const best=top[0];
   const pct=best?Math.round(best[1]*100):0;
-  $(prefix+"TopWord").textContent = best ? displayName(best[0]).toUpperCase() : "…";
-  $(prefix+"TopPct").textContent = pct+"%";
-  const segs=$(prefix+"Meter").children;
-  const on=Math.round(pct/100*segs.length);
+  const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct"), meter=$(prefix+"Meter");
+  if(topWord) topWord.textContent = best ? displayName(best[0]).toUpperCase() : "…";
+  if(topPct) topPct.textContent = pct+"%";
+  const segs=meter ? meter.children : [];
+  const on=Math.round(pct/100*Math.max(1,segs.length));
   [...segs].forEach((seg,i)=>seg.classList.toggle("on", i<on));
   const html=[];
   for(let i=1;i<Math.min(1+rows,top.length);i++){
@@ -65,7 +68,124 @@ export function fillGuessPanel(prefix, top, rows=4){
       '<span class="gbar"><i style="width:'+p+'%"></i></span>'+
       '<span class="gpct">'+p+'%</span></div>');
   }
-  $(prefix+"GuessList").innerHTML=html.join("");
+  const list=$(prefix+"GuessList");
+  if(list) list.innerHTML=html.join("");
+}
+
+/* Figma 1v1 carries one current paper and one faded previous paper per side.
+   Keep the existing classifier output funnel, but render it through that
+   smaller rolling stack rather than the old dashboard panels. */
+const matchGuess = {
+  my:{ key:null,current:null,past:null,candidate:null,since:0 },
+  rival:{ key:null,current:null,past:null,candidate:null,since:0 },
+};
+
+function resetMatchSide(prefix, key){
+  const slot=matchGuess[prefix];
+  if(slot.key===key) return slot;
+  Object.assign(slot,{key,current:null,past:null,candidate:null,since:0});
+  const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct");
+  const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"), pastBox=$(prefix+"GuessPast");
+  if(topWord) topWord.textContent="GUESSING…";
+  if(topPct) topPct.textContent="0%";
+  if(pastWord) pastWord.textContent="";
+  if(pastPct) pastPct.textContent="";
+  if(pastBox) pastBox.classList.add("empty");
+  return slot;
+}
+
+function fitMatchGuess(node, text, base=17.21){
+  if(!node) return;
+  const compact=Math.min(1, 11/Math.max(8,text.length));
+  node.style.fontSize=Math.max(9.5,base*compact)+"cqw";
+}
+
+function fitCqwText(node, base, minimum){
+  if(!node) return;
+  node.style.fontSize=base+"cqw";
+  const style=getComputedStyle(node);
+  const available=node.clientWidth-(parseFloat(style.paddingLeft)||0)-
+    (parseFloat(style.paddingRight)||0);
+  if(!available) return;
+  const range=document.createRange();
+  range.selectNodeContents(node);
+  const wanted=Math.max(node.scrollWidth,range.getBoundingClientRect().width);
+  range.detach?.();
+  if(wanted>available)
+    node.style.fontSize=Math.max(minimum,base*(available/wanted)*.96)+"cqw";
+}
+
+export function fitMatchPaperText(){
+  fitCqwText($("vsWord"),14.69,7.5);
+  fitCqwText($("v1YouName"),17.15,9);
+  fitCqwText($("v1RivalName"),17.15,9);
+}
+
+function paintMatchSide(prefix, slot, popped=false){
+  const word=$(prefix+"TopWord"), pct=$(prefix+"TopPct"), topBox=$(prefix+"GuessTop");
+  const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"), pastBox=$(prefix+"GuessPast");
+  if(slot.current){
+    const label=displayName(slot.current.label).toUpperCase()+(slot.current.locked?"":"?");
+    if(word){ word.textContent=label; fitMatchGuess(word,label); }
+    if(pct) pct.textContent=Math.round(slot.current.pct*100)+"%";
+  }
+  if(slot.past){
+    const label=displayName(slot.past.label).toUpperCase()+"?";
+    if(pastWord){ pastWord.textContent=label; fitMatchGuess(pastWord,label); }
+    if(pastPct) pastPct.textContent=Math.round(slot.past.pct*100)+"%";
+    pastBox?.classList.remove("empty");
+  }else{
+    pastBox?.classList.add("empty");
+  }
+  if(popped && topBox){
+    topBox.classList.remove("pop"); void topBox.offsetWidth; topBox.classList.add("pop");
+  }
+}
+
+function renderMatchSide(prefix, top, key, locked=false){
+  const slot=resetMatchSide(prefix,key);
+  if(locked && state.game?.word){
+    const target=state.game.word;
+    const changed=slot.current?.label!==target || !slot.current?.locked;
+    if(changed && slot.current?.label!==target) slot.past=slot.current;
+    slot.current={label:target,pct:1,locked:true};
+    paintMatchSide(prefix,slot,changed);
+    return slot;
+  }
+  const best=top?.[0];
+  if(!best) return slot;
+  const [label,confidence]=best;
+  const now=performance.now();
+  if(label!==slot.candidate){
+    slot.candidate=label;
+    slot.since=now;
+  }
+  if(!slot.current || (label!==slot.current.label && now-slot.since>=420)){
+    if(slot.current && slot.current.label!==label) slot.past=slot.current;
+    slot.current={label,pct:confidence||0,locked:false};
+    paintMatchSide(prefix,slot,true);
+  }else if(label===slot.current.label){
+    slot.current.pct=confidence||0;
+    paintMatchSide(prefix,slot,false);
+  }
+  return slot;
+}
+
+/* gameCheck uses this same displayed state, so neither a fill nor a win can
+   race ahead while the robot paper is still showing the previous label. */
+export function localMatchGuessIs(label){
+  return !!label && matchGuess.my.current?.label===label;
+}
+
+/* Online 1v1 relays only the opponent's already-computed label + confidence.
+   Render it through the exact same rolling paper stack as the local side. */
+export function renderRemoteMatchGuess(roundId,label,confidence){
+  const game=state.game;
+  if(!game || game.mode!=="online" || game.roundId!==roundId) return;
+  if(typeof label!=="string" || !Number.isFinite(confidence)) return;
+  const stage=$("matchStage");
+  renderMatchSide("rival",[[label,Math.max(0,Math.min(1,confidence))]],
+    roundId,stage?.classList.contains("rival-locked"));
 }
 
 /* rows-only variant (training panel live list) */
@@ -96,11 +216,39 @@ export function renderGuesses(){
   if(s==="lobby"){
     fillAiPill(top);
   } else if(s==="match"){
-    fillGuessPanel("my", top, 2);
+    const g=state.game;
+    const key=g?.roundId || "between-"+(g?.round||0);
+    const stage=$("matchStage");
+    const localLocked=stage?.classList.contains("you-locked");
+    const rivalLocked=stage?.classList.contains("rival-locked");
+    const mySlot=renderMatchSide("my",top,key,localLocked);
     if(state.game?.mode==="vs"){
       // practice mode: the robot rival's "AI" runs right here
-      fillGuessPanel("rival", fakeRivalGuesses(), 2);
+      renderMatchSide("rival",fakeRivalGuesses(),key,rivalLocked);
+    }else{
+      /* Keep the rival stack initialized for this round; incoming
+         round:guess events paint it through renderRemoteMatchGuess(). A
+         successful rival remains painted through the between-word pause. */
+      renderMatchSide("rival",[],key,rivalLocked);
+      if(g?.mode==="online" && state.onlineGuess && top[0])
+        state.onlineGuess(top[0][0],top[0][1]);
     }
+    const fill=$("v1WordFill");
+    if(fill && g?.word){
+      const targetIsDisplayed=mySlot?.current?.label===g.word;
+      const displayedConfidence=targetIsDisplayed
+        ? Math.max(0,Math.min(1,mySlot.current?.pct||0))
+        : 0;
+      const progress=localLocked
+        ? 1
+        : Math.max(0,Math.min(1,displayedConfidence/THRESH));
+      fill.style.width=(progress*95)+"%";
+      const card=$("vsWordCard");
+      const canShake=stage?.dataset.phase!=="chase" &&
+        !localLocked;
+      setWordRecognitionMotion(card,displayedConfidence,THRESH,canShake);
+    }
+    fitMatchPaperText();
   } else if(s==="train"){
     guessRowsInto("trainGuessList", top, 0, 5);
   }

@@ -5,7 +5,7 @@
 
    States:
      menu      — home screen, picking a mode
-     party     — party-mode waiting room (teams; game itself not built yet)
+     party     — party-mode waiting room (teams); starting enters countdown
      training  — record/import/train panel
      lobby     — online 1v1: create/join a private room
      countdown — pre-game 3-2-1 (a game object exists, rounds not started)
@@ -18,7 +18,7 @@
 
 const TRANSITIONS = {
   "menu":      ["menu","training","lobby","countdown","party"],
-  "party":     ["menu","training","party","lobby"],
+  "party":     ["menu","training","party","lobby","countdown"],
   "training":  ["menu","training","countdown"],
   "lobby":     ["menu","training","countdown","lobby","party"],
   "countdown": ["playing","menu","training","results"],

@@ -1,18 +1,26 @@
 /* Room store and the authoritative match loop.
 
    The server owns: room membership, the shared word deck, round timing,
-   claim validation, and scores. Clients only ever send *claims*; the first
-   valid claim per round wins the word. No landmarks, video, or training
-   data ever reach this process — the only classifier-adjacent thing the
-   server sees is each player's word list, which it needs to deal words
-   both sides can actually play.
+   claim validation, and scores. Clients only ever send synchronized
+   recognition timestamps. No landmarks, video, or training data ever reach
+   this process. The server sees each player's word list to deal shared words,
+   and relays the current top label/confidence so the opponent's guess paper
+   can update; that ephemeral guess is never stored.
 
    All notifications go through the `emit(socketId, event, payload)`
    callback injected at construction, so this module has no socket.io
    dependency and the whole match loop is unit-testable with fake clocks. */
 
 import crypto from "crypto";
-import { CODE_ALPHABET } from "./validate.js";
+import { CODE_ALPHABET, cleanLabels } from "./validate.js";
+import {
+  CHASE_WINDOW_MS,
+  calculateFirstPoints,
+  calculateChaserPoints,
+  PARTY_TEAM_BONUS,
+  PARTY_CHASE_WINDOW_MS,
+  calculatePartyPlayerPoints,
+} from "../pose-charades-external-data/js/scoring.js";
 
 export function createRoomStore({ config, emit }){
   const rooms = new Map();          // code -> room
@@ -51,14 +59,19 @@ export function createRoomStore({ config, emit }){
         matchMs: settings?.matchMs ?? config.matchMs,
         wordMs: settings?.wordMs ?? config.wordMs,
       },
-      phase: "lobby",              // lobby | starting | round | between | done
+      phase: "lobby",              // lobby | starting | round | chase | sudden | between | done
       roundNum: 0,
       roundId: null,
       word: null,
       roundStart: 0,
       roundEnd: 0,
+      matchEndsAt: 0,
+      matchExpired: false,
+      suddenDeath: false,
+      firstClaim: null,
       deck: [],
       timer: null,
+      matchTimer: null,
     };
     rooms.set(code, room);
     socketRoom.set(socketId, code);
@@ -141,71 +154,247 @@ export function createRoomStore({ config, emit }){
   function startMatch(room){
     room.phase = "starting";
     room.deck = shuffledDeck(room);
+    room.matchExpired = false;
+    room.suddenDeath = false;
+    room.firstClaim = null;
     const startAt = Date.now() + config.preCountMs;
     /* time-based mode: the match clock starts when round 1 does */
     room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
       emit(p.id, "match:start", { startAt, matchEndsAt: room.matchEndsAt, players: scoresPayload(room) });
     room.timer = setTimeout(() => startRound(room), config.preCountMs);
+    room.matchTimer = setTimeout(() => onMatchDeadline(room),
+      Math.max(0, room.matchEndsAt - Date.now()));
   }
 
   function startRound(room){
     if(!rooms.has(room.code)) return;
+    if(room.matchExpired && !room.suddenDeath) return finishMatchOrSuddenDeath(room);
     room.roundNum++;
-    /* match ends when its clock runs out (rounds is only a safety cap) */
-    if(Date.now() >= room.matchEndsAt || room.roundNum > config.rounds){ return endMatch(room); }
+    /* rounds is only a safety cap; the two-minute match clock is decisive */
+    if(!room.suddenDeath && (Date.now() >= room.matchEndsAt || room.roundNum > config.rounds)){
+      room.matchExpired = true;
+      return finishMatchOrSuddenDeath(room);
+    }
     if(!room.deck.length) room.deck = shuffledDeck(room);
-    room.phase = "round";
+    room.phase = room.suddenDeath ? "sudden" : "round";
     room.word = room.deck.pop();
     room.roundId = crypto.randomBytes(8).toString("hex");
     room.roundStart = Date.now();
-    room.roundEnd = room.roundStart + room.settings.wordMs;
+    room.roundEnd = room.suddenDeath
+      ? room.roundStart + room.settings.wordMs
+      : Math.min(room.roundStart + room.settings.wordMs, room.matchEndsAt);
+    room.firstClaim = null;
     for(const p of room.players)
       emit(p.id, "round:start", {
         roundId: room.roundId, word: room.word,
         roundNum: room.roundNum,
         endsAt: room.roundEnd, scores: scoresPayload(room),
+        suddenDeath: room.suddenDeath,
       });
-    room.timer = setTimeout(() => resolveRound(room, null, "timeout"), room.settings.wordMs);
+    room.timer = setTimeout(() => resolveNoClaim(room),
+      Math.max(0, room.roundEnd - Date.now()) + config.claimGraceMs);
   }
 
-  /* The heart of the authority: accept or reject a point claim. */
-  function claim(socketId, roundId){
+  function validRecognitionTime(room, at, cutoff){
+    if(!Number.isFinite(at)) return false;
+    if(at < room.roundStart || at > cutoff) return false;
+    /* A client clock is synchronized to server time. A little future skew is
+       tolerated, but a fabricated timestamp well ahead of the server is not. */
+    return at <= Date.now() + config.claimFutureSkewMs;
+  }
+
+  /* The heart of the authority: accept or reject a timestamped recognition.
+     Scores are calculated from `recognizedAt`; packet arrival never enters
+     either formula. */
+  function claim(socketId, roundId, recognizedAt){
     const room = roomOf(socketId);
     if(!room) return { error: "not-in-room" };
-    if(room.phase !== "round") return { error: "no-active-round" };
+    if(!["round", "chase", "sudden"].includes(room.phase))
+      return { error: "no-active-round" };
     if(typeof roundId !== "string" || roundId !== room.roundId)
       return { error: "stale-round" };
-    const now = Date.now();
-    if(now < room.roundStart || now > room.roundEnd) return { error: "out-of-window" };
     const me = playerOf(room, socketId);
     if(!me) return { error: "not-in-room" };
-    resolveRound(room, me, "claim");
-    return { ok: true };
+    const at = Number(recognizedAt);
+
+    if(room.phase === "sudden"){
+      if(!validRecognitionTime(room, at, room.roundEnd))
+        return { error: "out-of-window" };
+      endMatch(room, me.id, true);
+      return { ok: true, phase: "sudden-death" };
+    }
+
+    if(room.phase === "round"){
+      if(!validRecognitionTime(room, at, room.roundEnd))
+        return { error: "out-of-window" };
+      const points = calculateFirstPoints(room.roundEnd - at, room.settings.wordMs);
+      me.score += points;
+      room.firstClaim = { id: me.id, at, points };
+      room.phase = "chase";
+      room.chaseEndsAt = at + CHASE_WINDOW_MS;
+      clearTimeout(room.timer);
+      for(const p of room.players)
+        emit(p.id, "round:chase", {
+          roundId: room.roundId,
+          firstId: me.id,
+          firstAt: at,
+          firstPoints: points,
+          chaseEndsAt: room.chaseEndsAt,
+          scores: scoresPayload(room),
+        });
+      room.timer = setTimeout(() => resolveChaseTimeout(room),
+        Math.max(0, room.chaseEndsAt - Date.now()) + config.claimGraceMs);
+      return { ok: true, phase: "chase", points };
+    }
+
+    /* Chase phase. The first player's repeat claim cannot score twice. */
+    if(room.firstClaim?.id === me.id) return { error: "already-claimed" };
+    if(!room.firstClaim || !validRecognitionTime(room, at, room.chaseEndsAt))
+      return { error: "out-of-window" };
+    resolveChaser(room, me, at);
+    return { ok: true, phase: "resolved" };
   }
 
-  function resolveRound(room, winner, reason){
-    if(room.phase !== "round") return;   // already resolved — duplicate/late
+  function resolveChaser(room, claimant, at){
+    if(room.phase !== "chase" || !room.firstClaim) return;
+    clearTimeout(room.timer);
+    let first = room.firstClaim;
+    let chaserId = claimant.id;
+    let chaserPoints;
+    let delaySeconds;
+
+    /* Timestamp ordering, rather than message ordering, determines who was
+       actually first. This also makes near-simultaneous packets fair when
+       they take different network paths. */
+    if(at < first.at){
+      const provisional = playerOf(room, first.id);
+      provisional.score -= first.points;
+
+      const correctedFirstPoints =
+        calculateFirstPoints(room.roundEnd - at, room.settings.wordMs);
+      claimant.score += correctedFirstPoints;
+      delaySeconds = (first.at - at) / 1000;
+      chaserPoints = calculateChaserPoints(correctedFirstPoints, delaySeconds);
+      provisional.score += chaserPoints;
+
+      chaserId = first.id;
+      first = { id: claimant.id, at, points: correctedFirstPoints };
+    }else{
+      delaySeconds = (at - first.at) / 1000;
+      chaserPoints = calculateChaserPoints(first.points, delaySeconds);
+      claimant.score += chaserPoints;
+    }
+
+    finishRound(room, {
+      reason: "chase-success",
+      winnerId: first.id,
+      firstId: first.id,
+      chaserId,
+      firstPoints: first.points,
+      chaserPoints,
+      delaySeconds,
+    });
+  }
+
+  function resolveChaseTimeout(room){
+    if(room.phase !== "chase" || !room.firstClaim) return;
+    const chaser = room.players.find(p => p.id !== room.firstClaim.id);
+    finishRound(room, {
+      reason: "chase-timeout",
+      winnerId: room.firstClaim.id,
+      firstId: room.firstClaim.id,
+      chaserId: chaser?.id || null,
+      firstPoints: room.firstClaim.points,
+      chaserPoints: 0,
+      delaySeconds: CHASE_WINDOW_MS / 1000,
+    });
+  }
+
+  function resolveNoClaim(room){
+    if(room.phase === "sudden"){
+      for(const p of room.players)
+        emit(p.id, "round:result", {
+          roundId: room.roundId, word: room.word,
+          winnerId: null, reason: "sudden-timeout",
+          suddenDeath: true, scores: scoresPayload(room),
+        });
+      return endMatch(room, null, true);
+    }
+    if(room.phase !== "round") return;
+    finishRound(room, {
+      reason: room.matchExpired ? "match-timeout" : "timeout",
+      winnerId: null,
+      firstId: null,
+      chaserId: null,
+      firstPoints: 0,
+      chaserPoints: 0,
+      delaySeconds: null,
+    });
+  }
+
+  function finishRound(room, result){
+    if(!["round", "chase"].includes(room.phase)) return;
     clearTimeout(room.timer);
     room.phase = "between";
-    if(winner) winner.score += 1;        // exactly one point per word, spec'd
     for(const p of room.players)
       emit(p.id, "round:result", {
         roundId: room.roundId,
         word: room.word,
-        winnerId: winner ? winner.id : null,
-        reason,
+        ...result,
         scores: scoresPayload(room),
       });
     room.roundId = null;
+    room.firstClaim = null;
+
+    if(room.matchExpired || Date.now() >= room.matchEndsAt){
+      room.matchExpired = true;
+      return finishMatchOrSuddenDeath(room);
+    }
     room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
   }
 
-  function endMatch(room){
+  function onMatchDeadline(room){
+    if(!rooms.has(room.code) || room.phase === "done" || room.suddenDeath) return;
+    room.matchExpired = true;
+    room.matchTimer = null;
+    /* A chase that began before zero owns its full five seconds. A live word
+       owns only the tiny network-arrival grace already on its round timer. */
+    if(room.phase === "chase" || room.phase === "round") return;
+    finishMatchOrSuddenDeath(room);
+  }
+
+  function finishMatchOrSuddenDeath(room){
+    if(!rooms.has(room.code) || room.phase === "done") return;
+    clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
+    room.matchTimer = null;
+    const [a, b] = room.players;
+    if(!a || !b) return endMatch(room);
+    if(a.score === b.score && !room.suddenDeath) return startSuddenDeath(room);
+    const winnerId = a.score === b.score ? null : (a.score > b.score ? a.id : b.id);
+    endMatch(room, winnerId, room.suddenDeath);
+  }
+
+  function startSuddenDeath(room){
+    room.suddenDeath = true;
+    room.matchExpired = true;
+    room.phase = "between";
+    for(const p of room.players)
+      emit(p.id, "match:sudden", { scores: scoresPayload(room) });
+    room.timer = setTimeout(() => startRound(room), config.betweenRoundsMs);
+  }
+
+  function endMatch(room, winnerId=null, suddenDeath=false){
     room.phase = "done";
     clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
     for(const p of room.players)
-      emit(p.id, "match:end", { scores: scoresPayload(room) });
+      emit(p.id, "match:end", {
+        scores: scoresPayload(room),
+        winnerId,
+        suddenDeath,
+      });
     destroyRoom(room.code); // players re-lobby with a fresh code for a rematch
   }
 
@@ -228,13 +417,13 @@ export function createRoomStore({ config, emit }){
   }
   const teamCount = (room, team) => room.players.filter(p => p.team === team).length;
 
-  function partyCreate(socketId, name, settings){
+  function partyCreate(socketId, name, settings, labels){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     if(rooms.size >= config.maxRooms) return { error: "server-full" };
     const code = randomCode();
     const room = {
       code, kind: "party", createdAt: Date.now(),
-      players: [{ id: socketId, name, team: "blue" }],
+      players: [{ id: socketId, name, team: "blue", labels: labels || [], score: 0 }],
       settings: {
         matchMs: settings?.matchMs ?? config.matchMs,
         wordMs: settings?.wordMs ?? config.wordMs,
@@ -246,7 +435,7 @@ export function createRoomStore({ config, emit }){
     return { code, roster: partyRoster(room) };
   }
 
-  function partyJoin(socketId, code, name){
+  function partyJoin(socketId, code, name, labels){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     const room = rooms.get(code);
     if(!room) return { error: "no-such-room" };
@@ -255,7 +444,7 @@ export function createRoomStore({ config, emit }){
     if(room.phase !== "lobby") return { error: "match-in-progress" };
     const blue = teamCount(room, "blue"), orange = teamCount(room, "orange");
     const team = orange < blue ? "orange" : (blue < orange ? "blue" : (blue < TEAM_CAP ? "blue" : "orange"));
-    room.players.push({ id: socketId, name, team });
+    room.players.push({ id: socketId, name, team, labels: labels || [], score: 0 });
     socketRoom.set(socketId, code);
     broadcastRoster(room);
     return { code, roster: partyRoster(room) };
@@ -299,10 +488,218 @@ export function createRoomStore({ config, emit }){
     const room = roomOf(socketId);
     if(!room || room.kind !== "party") return { error: "not-in-room" };
     if(room.players[0].id !== socketId) return { error: "not-host" };
+    if(room.phase !== "lobby") return { error: "match-in-progress" };
     if(teamCount(room, "blue") < MIN_PER_TEAM || teamCount(room, "orange") < MIN_PER_TEAM)
       return { error: "need-teams" };
+
+    /* Every player must be able to perform every dealt word, so the deck is
+       the intersection across all six lists — not just the host's. */
+    const lists = room.players.map(p => p.labels || []);
+    const shared = (lists[0] || []).filter(l =>
+      l !== "idle" && lists.every(list => list.includes(l)));
+    if(!shared.length){
+      for(const p of room.players) emit(p.id, "party:error", { error: "no-shared-words" });
+      return { error: "no-shared-words" };
+    }
+    room.sharedWords = shared;
     for(const p of room.players) emit(p.id, "party:started", { roster: partyRoster(room) });
+    startPartyMatch(room);
     return { ok: true };
+  }
+
+  /* ---------------- party match (authoritative) ----------------
+     Everyone performs the same word simultaneously. Placement is decided by
+     synchronized recognition timestamps across BOTH teams; the first team to
+     get all of its members recognized banks a completion bonus and opens a
+     short final window for the other team's stragglers. The match itself is
+     decided on total score when the match clock expires — round wins are
+     reported for feedback but never end the match. */
+
+  function partyTeamScore(room, team){
+    return room.players
+      .filter(p => p.team === team)
+      .reduce((sum, p) => sum + (p.score || 0), 0) + (room.teamBonus?.[team] || 0);
+  }
+
+  function partyScores(room){
+    return {
+      players: room.players.map(p =>
+        ({ id: p.id, name: p.name, team: p.team, score: p.score || 0 })),
+      teams: { blue: partyTeamScore(room, "blue"), orange: partyTeamScore(room, "orange") },
+      roundWins: { ...(room.roundWins || { blue: 0, orange: 0 }) },
+    };
+  }
+
+  function startPartyMatch(room){
+    room.phase = "starting";
+    room.deck = shuffledDeck(room);
+    room.roundNum = 0;
+    room.matchExpired = false;
+    room.teamBonus = { blue: 0, orange: 0 };
+    room.roundWins = { blue: 0, orange: 0 };
+    for(const p of room.players) p.score = 0;
+    const startAt = Date.now() + config.preCountMs;
+    room.matchEndsAt = startAt + room.settings.matchMs;
+    for(const p of room.players)
+      emit(p.id, "party:match", {
+        startAt, matchEndsAt: room.matchEndsAt,
+        wordMs: room.settings.wordMs,
+        roster: partyRoster(room), scores: partyScores(room),
+      });
+    room.timer = setTimeout(() => startPartyRound(room), config.preCountMs);
+    room.matchTimer = setTimeout(() => {
+      room.matchExpired = true;
+      room.matchTimer = null;
+      /* a live word (or its chase) owns its remaining time; the deadline is
+         applied when that round resolves */
+      if(room.phase === "round" || room.phase === "chase") return;
+      endPartyMatch(room);
+    }, Math.max(0, room.matchEndsAt - Date.now()));
+  }
+
+  function startPartyRound(room){
+    if(!rooms.has(room.code) || room.phase === "done") return;
+    if(room.matchExpired || Date.now() >= room.matchEndsAt) return endPartyMatch(room);
+    if(!room.deck.length) room.deck = shuffledDeck(room);
+    room.roundNum++;
+    room.phase = "round";
+    room.word = room.deck.pop();
+    room.roundId = crypto.randomBytes(8).toString("hex");
+    room.roundStart = Date.now();
+    room.roundEnd = Math.min(room.roundStart + room.settings.wordMs, room.matchEndsAt);
+    room.finishes = [];            // [{id, at}] in arrival order; sorted at resolve
+    room.completedTeam = null;
+    room.chaseEndsAt = 0;
+    for(const p of room.players)
+      emit(p.id, "party:round", {
+        roundId: room.roundId, word: room.word, roundNum: room.roundNum,
+        endsAt: room.roundEnd, scores: partyScores(room),
+      });
+    room.timer = setTimeout(() => resolvePartyRound(room, "timeout"),
+      Math.max(0, room.roundEnd - Date.now()) + config.claimGraceMs);
+  }
+
+  const partyFinished = (room, id) => (room.finishes || []).some(f => f.id === id);
+
+  function partyClaim(socketId, roundId, recognizedAt){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.phase !== "round" && room.phase !== "chase")
+      return { error: "no-active-round" };
+    if(typeof roundId !== "string" || roundId !== room.roundId)
+      return { error: "stale-round" };
+    const me = playerOf(room, socketId);
+    if(!me) return { error: "not-in-room" };
+    if(partyFinished(room, me.id)) return { error: "already-claimed" };
+
+    const at = Number(recognizedAt);
+    const cutoff = room.phase === "chase" ? room.chaseEndsAt : room.roundEnd;
+    if(!validRecognitionTime(room, at, cutoff)) return { error: "out-of-window" };
+
+    room.finishes.push({ id: me.id, at });
+    /* provisional placement for instant feedback; resolvePartyRound re-sorts
+       by timestamp so a late packet with an earlier stamp still scores right */
+    const place = room.finishes.filter(f => f.at < at).length;
+    for(const p of room.players)
+      emit(p.id, "party:got", {
+        roundId: room.roundId, id: me.id, team: me.team, place,
+      });
+
+    /* first team to have every current member recognized banks the bonus and
+       starts the final chase for the other side */
+    const mates = room.players.filter(p => p.team === me.team);
+    if(!room.completedTeam && mates.every(p => partyFinished(room, p.id))){
+      room.completedTeam = me.team;
+      room.teamBonus[me.team] += PARTY_TEAM_BONUS;
+      room.phase = "chase";
+      room.chaseEndsAt = at + PARTY_CHASE_WINDOW_MS;
+      clearTimeout(room.timer);
+      for(const p of room.players)
+        emit(p.id, "party:chase", {
+          roundId: room.roundId, team: me.team,
+          chaseEndsAt: room.chaseEndsAt, bonus: PARTY_TEAM_BONUS,
+        });
+      room.timer = setTimeout(() => resolvePartyRound(room, "chase-timeout"),
+        Math.max(0, room.chaseEndsAt - Date.now()) + config.claimGraceMs);
+    }
+
+    if(room.players.every(p => partyFinished(room, p.id)))
+      resolvePartyRound(room, "all-in");
+
+    return { ok: true, place };
+  }
+
+  function resolvePartyRound(room, reason){
+    if(room.phase !== "round" && room.phase !== "chase") return;
+    clearTimeout(room.timer);
+    room.phase = "between";
+
+    /* Authoritative placement: timestamp order, never arrival order. */
+    const ordered = (room.finishes || []).slice().sort((a, b) => a.at - b.at);
+    const roundTeam = { blue: 0, orange: 0 };
+    const results = ordered.map((f, place) => {
+      const player = playerOf(room, f.id);
+      const points = calculatePartyPlayerPoints(place, room.roundEnd - f.at);
+      if(player){
+        player.score += points;
+        roundTeam[player.team] += points;
+      }
+      return { id: f.id, place, points, at: f.at };
+    });
+    if(room.completedTeam) roundTeam[room.completedTeam] += PARTY_TEAM_BONUS;
+
+    const winner = roundTeam.blue === roundTeam.orange
+      ? null : (roundTeam.blue > roundTeam.orange ? "blue" : "orange");
+    if(winner) room.roundWins[winner]++;
+
+    for(const p of room.players)
+      emit(p.id, "party:result", {
+        roundId: room.roundId, word: room.word, reason,
+        results, completedTeam: room.completedTeam,
+        roundTeam, winner, scores: partyScores(room),
+      });
+    room.roundId = null;
+
+    if(room.matchExpired || Date.now() >= room.matchEndsAt) return endPartyMatch(room);
+    room.timer = setTimeout(() => startPartyRound(room), config.betweenRoundsMs);
+  }
+
+  /* Same ephemeral relay as 1v1, fanned out to the rest of the party so any
+     client can render any player's live read. Nothing is stored. */
+  function relayPartyGuess(socketId, roundId, label, confidence){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.phase !== "round" && room.phase !== "chase")
+      return { error: "no-active-round" };
+    if(typeof roundId !== "string" || roundId !== room.roundId)
+      return { error: "stale-round" };
+    const me = playerOf(room, socketId);
+    const cleanLabel = cleanLabels([label])?.[0];
+    if(!me || !cleanLabel || !me.labels.includes(cleanLabel))
+      return { error: "bad-payload" };
+    if(!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
+      return { error: "bad-payload" };
+    if(partyFinished(room, socketId)) return { ok: true };
+    for(const p of room.players){
+      if(p.id === socketId) continue;
+      emit(p.id, "party:guess", {
+        roundId, id: socketId, label: cleanLabel,
+        confidence: Math.round(confidence * 1000) / 1000,
+      });
+    }
+    return { ok: true };
+  }
+
+  function endPartyMatch(room){
+    if(!rooms.has(room.code) || room.phase === "done") return;
+    room.phase = "done";
+    clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
+    const scores = partyScores(room);
+    const winner = scores.teams.blue === scores.teams.orange
+      ? null : (scores.teams.blue > scores.teams.orange ? "blue" : "orange");
+    for(const p of room.players) emit(p.id, "party:end", { scores, winner });
+    destroyRoom(room.code);
   }
 
   /* Targeted mesh signaling: every pair of party members holds its own
@@ -323,7 +720,38 @@ export function createRoomStore({ config, emit }){
     socketRoom.delete(socketId);
     if(!room.players.length){ destroyRoom(room.code); return; }
     for(const p of room.players) emit(p.id, "party:left", { id: socketId });
+
+    if(room.phase === "lobby"){ broadcastRoster(room); return; }
+
+    /* Mid-match: a side that empties ends the match. Otherwise the leaver may
+       have been the only one holding up a team, so re-test completion —
+       without this the round would stall until the word timer expired. */
+    if(!teamCount(room, "blue") || !teamCount(room, "orange")) return endPartyMatch(room);
     broadcastRoster(room);
+    if(room.phase !== "round" && room.phase !== "chase") return;
+    if(room.finishes) room.finishes = room.finishes.filter(f => f.id !== socketId);
+    if(room.players.every(p => partyFinished(room, p.id)))
+      return resolvePartyRound(room, "all-in");
+    if(!room.completedTeam){
+      for(const team of ["blue", "orange"]){
+        const mates = room.players.filter(p => p.team === team);
+        if(mates.length && mates.every(p => partyFinished(room, p.id))){
+          room.completedTeam = team;
+          room.teamBonus[team] += PARTY_TEAM_BONUS;
+          room.phase = "chase";
+          room.chaseEndsAt = Date.now() + PARTY_CHASE_WINDOW_MS;
+          clearTimeout(room.timer);
+          for(const p of room.players)
+            emit(p.id, "party:chase", {
+              roundId: room.roundId, team,
+              chaseEndsAt: room.chaseEndsAt, bonus: PARTY_TEAM_BONUS,
+            });
+          room.timer = setTimeout(() => resolvePartyRound(room, "chase-timeout"),
+            PARTY_CHASE_WINDOW_MS + config.claimGraceMs);
+          break;
+        }
+      }
+    }
   }
 
   /* ---------------- teardown ---------------- */
@@ -332,6 +760,7 @@ export function createRoomStore({ config, emit }){
     const room = rooms.get(code);
     if(!room) return;
     clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
     for(const p of room.players) socketRoom.delete(p.id);
     rooms.delete(code);
   }
@@ -361,8 +790,36 @@ export function createRoomStore({ config, emit }){
     return { ok: true };
   }
 
+  /* Ephemeral UI-only classifier relay. Labels must come from the sender's
+     validated training list and match the active round; no pose/face data is
+     accepted, persisted, or broadcast beyond the one opponent. */
+  function relayGuess(socketId,roundId,label,confidence){
+    const room=roomOf(socketId);
+    if(!room || room.kind!=="1v1") return { error:"not-in-room" };
+    if(!["round","chase","sudden"].includes(room.phase))
+      return { error:"no-active-round" };
+    if(typeof roundId!=="string" || roundId!==room.roundId)
+      return { error:"stale-round" };
+    const me=playerOf(room,socketId);
+    const cleanLabel=cleanLabels([label])?.[0];
+    if(!me || !cleanLabel || !me.labels.includes(cleanLabel))
+      return { error:"bad-payload" };
+    if(!Number.isFinite(confidence) || confidence<0 || confidence>1)
+      return { error:"bad-payload" };
+    if(room.firstClaim?.id===socketId) return { ok:true };
+    const peer=peerOf(room,socketId);
+    if(!peer) return { error:"no-peer" };
+    emit(peer.id,"round:guess",{
+      roundId,
+      label:cleanLabel,
+      confidence:Math.round(confidence*1000)/1000,
+    });
+    return { ok:true };
+  }
+
   return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
-           relaySignal, sweep,
-           partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart, partySignal,
+           relaySignal, relayGuess, sweep,
+           partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart,
+           partySignal, partyClaim, relayPartyGuess,
            _rooms: rooms };
 }

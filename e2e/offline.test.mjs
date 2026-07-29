@@ -99,6 +99,16 @@ const homeConfettiLayout = await page.evaluate(() => {
 ok(homeConfettiLayout, "hover confetti neither overlaps nor duplicates its nearest permanent piece");
 await page.mouse.move(790,10);
 await sleep(220);
+await page.setViewport({ width:1024,height:768 });
+await sleep(180);
+const homeAnchor = await page.evaluate(() => {
+  const r=document.getElementById("homeStage").getBoundingClientRect();
+  return {gap:innerHeight-r.bottom,top:r.top};
+});
+ok(Math.abs(homeAnchor.gap)<1 && homeAnchor.top>0,
+  `tall-window letterbox stays above the home waves (bottom gap ${homeAnchor.gap.toFixed(1)}px)`);
+await page.setViewport({ width:1440,height:810 });
+await sleep(180);
 
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
@@ -167,7 +177,7 @@ const feed = (labelExpr, conf) => page.evaluate(`(async () => {
 // a wrong label first — pops into the green top guess slot after debounce
 await feed("state.model.labels.filter(l=>l!==state.game.word&&l!=='idle')[0]", 0.5);
 const restFill = await page.evaluate(() => parseInt(document.getElementById("soloWordFill").style.width));
-ok(restFill <= 40, `word fill rests low while target is cold (${restFill}%)`);
+ok(restFill <= 2, `word fill genuinely starts at zero while target is cold (${restFill}%)`);
 await page.waitForFunction(() => document.getElementById("spGuessTopLabel").textContent.endsWith("?"), { timeout: 4000, polling: 100 });
 ok(true, `wrong guess entered the top slot ("${await txt("#spGuessTopLabel")}")`);
 
@@ -180,7 +190,48 @@ const midOp = await page.evaluate(() => parseFloat(getComputedStyle(document.get
 const topOp = await page.evaluate(() => parseFloat(getComputedStyle(document.getElementById("spGuessTop")).opacity));
 ok(midOp < topOp, `mid slot is more faded than top (${midOp.toFixed(2)} < ${topOp.toFixed(2)})`);
 
-// now the TARGET word: the yellow pill fills as a progress bar, then locks
+// now the TARGET word: its channel must not move the bar until the matching
+// robot paper has actually survived debounce and popped into the top slot
+await feed("state.game.word", 0.4);
+await sleep(180);
+const beforeTargetPaper = await page.evaluate(target => ({
+  guess:document.getElementById("spGuessTopLabel").textContent,
+  fill:parseFloat(document.getElementById("soloWordFill").style.width)||0,
+  tracking:document.getElementById("soloWordCard").classList.contains("tracking"),
+  target:target.toUpperCase()+"?",
+}), word);
+ok(beforeTargetPaper.guess !== beforeTargetPaper.target &&
+  beforeTargetPaper.fill <= 2 && !beforeTargetPaper.tracking,
+  "target confidence waits for the matching robot paper before fill/shake");
+await page.waitForFunction(target =>
+  document.getElementById("spGuessTopLabel").textContent===target.toUpperCase()+"?",
+  { timeout:4000,polling:80 },word);
+await page.waitForFunction(() =>
+  document.getElementById("soloWordCard").classList.contains("tracking") &&
+  parseFloat(document.getElementById("soloWordFill").style.width)>4,
+  { timeout:2500,polling:50 });
+const lowMotion=await page.evaluate(() => {
+  const card=document.getElementById("soloWordCard");
+  return {
+    x:parseFloat(card.style.getPropertyValue("--shake-x")),
+    speed:parseFloat(card.style.getPropertyValue("--shake-speed")),
+  };
+});
+
+// confidence grows continuously: higher recognition means wider, faster shake
+await feed("state.game.word", 0.6);
+await sleep(360);
+const highMotion=await page.evaluate(() => {
+  const card=document.getElementById("soloWordCard");
+  return {
+    x:parseFloat(card.style.getPropertyValue("--shake-x")),
+    speed:parseFloat(card.style.getPropertyValue("--shake-speed")),
+  };
+});
+ok(highMotion.x>lowMotion.x && highMotion.speed<lowMotion.speed,
+  `shake intensifies continuously with confidence (${lowMotion.x.toFixed(2)}→${highMotion.x.toFixed(2)})`);
+
+// crossing the threshold completes and locks the same paper
 await feed("state.game.word", 0.95);
 await page.waitForFunction(() => {
   const c = document.getElementById("soloWordCard").classList;
@@ -191,34 +242,41 @@ const scoreBefore = await txt("#soloScoreVal");
 
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "locked", { timeout: 6000 });
 ok(true, "bar completed on the target -> HITSTOP -> LOCKED");
+ok(await page.evaluate(() => parseFloat(document.getElementById("soloWordFill").style.width)>=94),
+  "successful Solo meter stays full during the GOT IT payoff");
+ok(await txt("#soloScoreVal") === scoreBefore, "score NOT incremented while the chip is in flight");
 ok(await page.evaluate(() => document.getElementById("soloWordCard").classList.contains("locked")), "word card turned green + popped");
 ok(await page.evaluate(() => document.getElementById("soloFlash").classList.contains("fire")), "green screen flash fired");
 ok(await page.evaluate(() => !!document.querySelector(".burstwrap")), "confetti burst");
 ok(await page.evaluate(() => document.getElementById("soloAward").classList.contains("show")), "POINTS AWARD paper shown");
 ok(/^\+\d/.test(await txt("#soloAwardPts")), `award shows points (${await txt("#soloAwardPts")})`);
-ok(await txt("#soloScoreVal") === scoreBefore, "score NOT incremented while the chip is in flight");
+const awardExpanded = await page.waitForFunction(() =>
+  document.getElementById("soloAward").getBoundingClientRect().width / innerWidth > .55,
+  { timeout:1000, polling:25 }).then(() => true, () => false);
+ok(awardExpanded, "GOT IT award expands into a full, celebratory payoff");
 const rt1 = await txt("#soloRoundTime");
 await sleep(300);
 ok(await txt("#soloRoundTime") === rt1, "round timer frozen through the lock sequence");
 
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
 const scored = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
-ok(scored >= 100, `chip arrived: score jumped to ${scored} (base + speed × streak)`);
+ok(scored >= 300 && scored <= 500, `chip arrived: first catch scored on the 300–500 time curve (${scored})`);
 ok(await txt("#soloStreakVal") === "x1", "streak now x1 after first catch");
 
 // loops back to a fresh word
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "guessing", { timeout: 4000 });
 await page.evaluate(() => clearInterval(window.__feed));   // stop feeding the previous word
 ok(true, "ROUND_END -> next word GUESSING (timed run continues)");
-await page.waitForFunction(() => parseInt(document.getElementById("soloWordFill").style.width) <= 40, { timeout: 2000, polling: 80 });
+await page.waitForFunction(() => parseInt(document.getElementById("soloWordFill").style.width) <= 2, { timeout: 2000, polling: 80 });
 ok(true, "progress bar reset for the new word");
 
-// second catch on a streak pays more (× streak)
+// second catch keeps the streak indicator but uses the same 300–500 curve
 await feed("state.game.word", 0.95);
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 8000 });
 ok(await txt("#soloStreakVal") === "x2", "streak climbed to x2");
 const scored2 = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
-ok(scored2 - scored > scored, `streak multiplied the second catch (+${scored2 - scored} > ${scored})`);
+ok(scored2 - scored >= 300 && scored2 - scored <= 500,
+  `streak is cosmetic; second catch remains on the 300–500 curve (+${scored2-scored})`);
 await page.evaluate(() => clearInterval(window.__feed));
 
 // skip: penalty applied, streak resets, no payoff
@@ -262,6 +320,16 @@ await page.waitForFunction(
 );
 ok(true, "graceful no-server message shown");
 ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "START disabled without a rival");
+await page.setViewport({ width:1024,height:768 });
+await sleep(180);
+const lobbyAnchor = await page.evaluate(() => {
+  const r=document.getElementById("lobbyStage").getBoundingClientRect();
+  return {gap:innerHeight-r.bottom,top:r.top};
+});
+ok(Math.abs(lobbyAnchor.gap)<1 && lobbyAnchor.top>0,
+  `tall-window letterbox stays above the lobby paper (bottom gap ${lobbyAnchor.gap.toFixed(1)}px)`);
+await page.setViewport({ width:1440,height:810 });
+await sleep(180);
 const lobbySandwich = await page.evaluate(() => {
   const slot = document.getElementById("slotLobbyYou");
   const panel = slot.previousElementSibling;

@@ -22,7 +22,7 @@ function drawHand(hand, color, c, canvas, subtle){
 
 export function drawSkeleton(lm, handRes, c, canvas){
   const W=canvas.width, H=canvas.height;
-  const subtle = (state.screen==="solo" || state.screen==="match");
+  const subtle = (state.screen==="solo" || state.screen==="match" || state.screen==="pmatch");
   c.save();
   c.strokeStyle=subtle ? "rgba(250,243,227,.42)" : "rgba(250,243,227,.95)";
   c.lineWidth=subtle ? 2.4 : 4;

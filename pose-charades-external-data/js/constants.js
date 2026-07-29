@@ -13,8 +13,9 @@ export const LEFT_HAND_OFFSET = JOINTS.length;
 export const RIGHT_HAND_OFFSET = JOINTS.length + HAND_LANDMARKS;
 export const HAND_BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]];
 
-// Hand landmarks are tracked and exported, but the live/kNN AI uses body landmarks only.
-// This keeps finger dots visible without letting noisy hands tank accuracy.
+// Hand landmarks are tracked/drawn/exported in Training, but live kNN uses
+// body landmarks only. Matches skip the hand model entirely to preserve the
+// pose cadence while multiple Party videos are encoding/decoding.
 export const MODEL_POINTS = JOINTS.length;
 
 export const SAMPLE_MS = 66, WIN = 30, STRIDE = 8, K = 7;
@@ -31,8 +32,6 @@ export const PTS_CORRECT = 100, PTS_FAST_BONUS = 100, FAST_WINDOW_MS = 15000, PT
 export const SOLO = {
   roundMs: 120000,        // Round Timer: total run; at 0 the game ends
   wordMs: 20000,          // Word Timer: per word; at 0 the word is skipped
-  base: 100,              // points floor for a correct word
-  speedBonusMax: 300,     // extra points for catching it instantly (scales with word time left)
   skipPenalty: 250,       // cost of pressing Skip (streak also resets)
 };
 
@@ -55,3 +54,4 @@ const MEDIAPIPE_VERSION = "0.10.14";
 export const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
 export const POSE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 export const HAND_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+export const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";

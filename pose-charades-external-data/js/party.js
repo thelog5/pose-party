@@ -7,7 +7,8 @@
    a WebRTC mesh — one peer link per pair — with every feed sandwiched
    between the panel's offwhite paper and its three-window overlay.
 
-   The party GAME isn't built yet; starting celebrates and says so. */
+   Starting hands the same mesh straight to partyMatch.js, which owns the
+   in-game screen; the peer links are never renegotiated. */
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
@@ -17,7 +18,11 @@ import { gameState, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { createPeer } from "./webrtc.js";
 import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
-         lobbySettings, renderLobbySettings, setLobbyCode } from "./online.js";
+         lobbySettings, renderLobbySettings, setLobbyCode,
+         serverNow, perfFromServer } from "./online.js";
+import { startPartyMatch, wirePartyMatch, attachPartyStream, onPartyRound,
+         onPartyGot, onPartyChase, onPartyResult, onPartyEnd,
+         onPartyGuess } from "./partyMatch.js";
 
 const TEAM_CAP = 3, MIN_PER_TEAM = 2;
 const TILES = { blue: ["ptB0", "ptB1", "ptB2"], orange: ["ptO0", "ptO1", "ptO2"] };
@@ -52,10 +57,14 @@ export function wireParty(){
   partyBridge.rename = renameParty;
   $("btnJoinBlue").onclick = () => requestTeam("blue");
   $("btnJoinOrange").onclick = () => requestTeam("orange");
+  wirePartyMatch();
   addEventListener("resize", fitAllPartyNames);
   document.fonts?.ready.then(fitAllPartyNames);
   onTransition((to, from) => {
-    if(from === "party" && to !== "party") leaveParty();
+    /* Starting the match leaves "party" for "countdown" but keeps the room
+       AND the mesh — partyMatch.js takes over the same peer links. */
+    if(from === "party" && to !== "party" && to !== "countdown") leaveParty();
+    if(to === "menu" || to === "results") leaveParty();
   });
 }
 
@@ -76,7 +85,7 @@ async function createParty(){
     wirePartySocket(socket);
     myId = socket.id;
     setLobbyStatus("Opening a party room…");
-    socket.emit("party:create", { name: myName(), settings: lobbySettings() }, res => {
+    socket.emit("party:create", { name: myName(), settings: lobbySettings(), labels: state.model.labels }, res => {
       if(!res || res.error) return setLobbyStatus(partyError(res));
       setLobbyCode(res.code);
       applyRoster(res.roster);
@@ -92,7 +101,7 @@ async function joinParty(code){
     wirePartySocket(socket);
     myId = socket.id;
     setLobbyStatus("Joining party " + code + "…");
-    socket.emit("party:join", { code, name: myName() }, res => {
+    socket.emit("party:join", { code, name: myName(), labels: state.model.labels }, res => {
       if(!res || res.error){
         if(res && res.error === "1v1-room"){
           partyBridge.rejoin1v1?.(code);   // typed a 1v1 code — hop over
@@ -166,10 +175,26 @@ function wirePartySocket(s){
     const entry = peers.get(id);
     if(entry){ entry.peer.close(); peers.delete(id); }
   });
-  s.on("party:started", () => {
-    blip([523, 659, 784, 1047], 0.09);
-    toast("Everyone’s in! Party matches are coming soon — this lobby is ready for them.");
+  s.on("party:started", () => { blip([523, 659, 784, 1047], 0.09); });
+  s.on("party:error", ({error} = {}) => {
+    setLobbyStatus(error === "no-shared-words"
+      ? "No word is trained on every player’s device — train a shared word and try again."
+      : partyError({error}));
   });
+
+  /* in-game: partyMatch.js owns the screen, this module owns the mesh */
+  s.on("party:match", payload => {
+    startPartyMatch({
+      socket: s, myId, peers, roster,
+      serverNow, perfFromServer, toast,
+    }, payload);
+  });
+  s.on("party:round",  p => onPartyRound(p));
+  s.on("party:got",    p => onPartyGot(p));
+  s.on("party:chase",  p => onPartyChase(p));
+  s.on("party:result", p => onPartyResult(p));
+  s.on("party:end",    p => onPartyEnd(p));
+  s.on("party:guess",  p => onPartyGuess(p));
 }
 
 function partyError(res){
@@ -324,9 +349,18 @@ function syncPeers(){
     entry.peer = createPeer({
       initiator: myId < p.id,
       stream: state.mediaStream,
+      /* One Party client can encode this camera for five peers. A modest
+         sender cap protects the local pose loop while staying sharp enough
+         for both the half-screen feed and portrait tiles. */
+      videoEncoding:{
+        maxBitrate: 500_000,
+        maxFramerate: 24,
+        scaleResolutionDownBy: 1.25,
+      },
       sendSignal: data => socket && socket.emit("party:signal", { to: p.id, data }),
       onRemoteStream: stream => {
         entry.stream = stream;
+        attachPartyStream(p.id, stream);
         const tile = document.querySelector('.pt-tile[data-pid="' + CSS.escape(p.id) + '"]');
         if(tile){
           tile.querySelector(".pt-empty")?.remove();

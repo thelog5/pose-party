@@ -37,7 +37,7 @@
 }
 /* home: fixed frame + letterboxed 16:9 stage; paper wallpaper fills margins */
 body[data-screen="home"] .wrap{max-width:none;padding:0}
-#scrHome{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:var(--fig-cream)}
+#scrHome{position:fixed;inset:0;overflow:hidden;display:grid;place-items:end center;background:var(--fig-cream)}
 #scrHome::before{content:"";position:absolute;inset:0;z-index:0;
   background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
 .homestage{position:relative;z-index:1;overflow:hidden;background:none;
@@ -265,18 +265,40 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 /* --- word card: the yellow paper IS the progress bar (578px) --- */
 .sp-word{position:absolute;z-index:4;transform-origin:50% 60%}
 .sp-word .sp-word-bg{aspect-ratio:4.507}
-.sp-word .sp-word-fill{position:absolute;left:1.7%;top:11.6%;height:76.8%;width:35.4%;
+.sp-word .sp-word-fill{position:absolute;left:1.7%;top:11.6%;height:76.8%;width:0;
   object-fit:fill;filter:none;transition:width .12s linear}
 .sp-word .sp-word-text{position:absolute;left:0;top:22.6%;width:100%;text-align:center;
   font-family:var(--f-lobby);font-weight:400;font-size:14.69cqw;line-height:12.08cqw;
   color:#17356f;text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-shadow:.612cqw .612cqw 0 rgba(255,255,255,.9)}
-/* shakes harder as the fill closes on a lock */
-.sp-word.warm{animation:spwordwarm .28s ease-in-out infinite}
-.sp-word.hot{animation:spwordhot .16s ease-in-out infinite}
-@keyframes spwordwarm{0%,100%{transform:translateX(0) rotate(0)}50%{transform:translateX(-.4%) rotate(-.4deg)}}
-@keyframes spwordhot{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-.8%) rotate(-.7deg)}75%{transform:translateX(.8%) rotate(.7deg)}}
+/* Recognition urgency is continuous rather than three abrupt presets. JS
+   derives these variables from the displayed target confidence, so 40%
+   visibly shakes harder/faster than 30%, and the motion keeps building all
+   the way to the lock threshold. warm/hot/critical remain as semantic hooks
+   for tests and future sound/color treatment. */
+.sp-word.tracking{
+  animation:spwordtracking var(--shake-speed,220ms) linear infinite
+}
+@keyframes spwordtracking{
+  0%,100%{
+    transform:translate(var(--shake-x-neg,-.22%),var(--shake-y-neg,-.12%))
+      rotate(var(--shake-r-neg,-.2deg)) scale(var(--shake-scale,1))
+  }
+  25%{
+    transform:translate(var(--shake-x,.22%),var(--shake-y,.1%))
+      rotate(var(--shake-r,.2deg)) scale(var(--shake-scale,1))
+  }
+  50%{
+    transform:translate(var(--shake-x-neg,-.22%),var(--shake-y,.1%))
+      rotate(var(--shake-r-neg,-.2deg)) scale(var(--shake-scale,1))
+  }
+  75%{
+    transform:translate(var(--shake-x,.22%),var(--shake-y-neg,-.12%))
+      rotate(var(--shake-r,.2deg)) scale(var(--shake-scale,1))
+  }
+}
 .sp-word.locked .sp-word-fill{filter:hue-rotate(78deg) saturate(.85) brightness(1.02)}
+.matchstage.you-locked #v1WordFill{width:95%!important}
 .sp-word.miss{animation:spwordmiss .5s ease-out}
 @keyframes spwordmiss{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-1%);filter:saturate(.4)}75%{transform:translateX(1%)}}
 .sp-word.locked{animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
@@ -298,8 +320,13 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .sp-exit:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.208vw,.37vh)}
 
 /* --- points award (Figma "POINTS AWARD", 898px) --- */
-.sp-award{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.6);z-index:95;
-  width:min(42vw,640px);pointer-events:none;opacity:0}
+.sp-award{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%) scale(.6);z-index:95;
+  width:min(62vw,900px);pointer-events:none;opacity:0}
+.sp-award::before{content:"";position:absolute;left:50%;top:50%;width:122%;aspect-ratio:1;
+  translate:-50% -50%;z-index:-1;opacity:0;
+  background:repeating-conic-gradient(from 4deg,rgba(255,211,64,.9) 0 3deg,transparent 3deg 13deg);
+  mask:radial-gradient(circle,transparent 0 32%,#000 33% 55%,transparent 56%);
+  filter:drop-shadow(0 0 min(1vw,1.78vh) rgba(255,205,43,.6))}
 .sp-award .sp-art{aspect-ratio:2.098;
   filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
 .sp-award span{position:absolute;left:0;width:100%;text-align:center;translate:0 -50%;
@@ -308,11 +335,16 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .sp-award .aw-got{top:19.8%;font-size:7.8cqw}
 .sp-award .aw-pts{top:47.3%;font-size:18.93cqw}
 .sp-award .aw-lbl{top:75.6%;font-size:7.8cqw}
-.sp-award.show{animation:awshow 1.5s cubic-bezier(.16,1.4,.32,1) both}
-@keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.4) rotate(-6deg)}
-  16%{opacity:1;transform:translate(-50%,-50%) scale(1.08) rotate(2deg)}
-  74%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
-  100%{opacity:0;transform:translate(-50%,-58%) scale(.94)}}
+.sp-award.show{animation:awshow 1.85s cubic-bezier(.16,1.4,.32,1) both}
+.sp-award.show::before{animation:awburst 1.85s ease-out both}
+@keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.18) rotate(-11deg)}
+  13%{opacity:1;transform:translate(-50%,-50%) scale(1.16) rotate(3deg)}
+  28%{transform:translate(-50%,-50%) scale(.96) rotate(-1.2deg)}
+  42%{transform:translate(-50%,-50%) scale(1.045) rotate(.5deg)}
+  78%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-61%) scale(.9)}}
+@keyframes awburst{0%{opacity:0;scale:.25;rotate:-18deg}12%{opacity:.85;scale:1.02}
+  62%{opacity:.42;scale:1.2;rotate:22deg}100%{opacity:0;scale:1.34;rotate:30deg}}
 
 /* points chip flying to the score card (created in JS) */
 .sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby);font-weight:400;
@@ -329,7 +361,7 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 
 /* =================== 1v1 LOBBY (Figma frame 111:82) =================== */
 body[data-screen="lobby"] .wrap{max-width:none;padding:0}
-#scrLobby{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:var(--fig-cream)}
+#scrLobby{position:fixed;inset:0;overflow:hidden;display:grid;place-items:end center;background:var(--fig-cream)}
 #scrLobby::before{content:"";position:absolute;inset:0;z-index:0;
   background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
 .lobbystage{--lb-lift:calc(-1 * min(.28vw,.5vh));position:relative;z-index:1;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby);
@@ -500,15 +532,127 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
   filter:brightness(1.045) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
 
 /* =================== 1v1 MATCH =================== */
-#scrMatch .board{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:68px}
-#scrMatch .camcard{aspect-ratio:16/9.3}
-#scrMatch .vsword{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:9;background:var(--card);border:2.5px solid var(--line-soft);border-radius:18px;box-shadow:var(--sh-big);padding:22px 34px 18px;text-align:center;min-width:320px;max-width:44%}
-#scrMatch .vsword .chip{position:absolute;top:-15px;left:50%;transform:translateX(-50%)}
-#scrMatch .vsword .word{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,2.8vw,44px);letter-spacing:1px;text-transform:uppercase;color:var(--ink);line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#scrMatch .vsword.wordswap{animation:vsPop .6s cubic-bezier(.18,1.45,.32,1)}
-@keyframes vsPop{0%{transform:translate(-50%,-42%) scale(.88);opacity:.3}55%{transform:translate(-50%,-54%) scale(1.06);opacity:1}100%{transform:translate(-50%,-50%)}}
-#scrMatch .panels{display:grid;grid-template-columns:1fr 1fr;gap:58px;margin-top:28px}
-#scrMatch .exitrow{display:flex;justify-content:center;margin-top:18px}
+body[data-screen="match"] .wrap{max-width:none;padding:0}
+#scrMatch{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:#0e1b4a}
+.matchstage{position:relative;z-index:1;overflow:hidden;background:#0e1b4a;
+  width:min(100dvw,calc(100dvh * var(--pp-ar)),var(--pp-maxw));aspect-ratio:var(--pp-ar);
+  font-family:var(--f-lobby)}
+@media (max-aspect-ratio:1/1){.matchstage{width:100dvw}}
+.v1-video-side{position:absolute;top:0;bottom:0;width:50%;overflow:hidden;background:#13245e;z-index:0}
+.v1-video-side.you{left:0}.v1-video-side.rival{right:0}
+.v1-video-side .slot,.v1-video-side .camdock,
+.v1-video-side video,.v1-video-side canvas{position:absolute;inset:0;width:100%;height:100%}
+.v1-video-side video,.v1-video-side canvas{object-fit:cover}
+.v1-divider{position:absolute;left:48.333%;top:-19.753%;width:1.806%;height:139.506%;
+  z-index:3;pointer-events:none;object-fit:fill;
+  filter:drop-shadow(0 min(.2vw,.36vh) min(.18vw,.32vh) rgba(0,0,0,.25))}
+.v1-tape{position:absolute;z-index:7;pointer-events:none}
+.v1-tape-history{transition:opacity .22s ease}
+.matchstage:has(#myGuessPast.empty) #myGuessPastTape,
+.matchstage:has(#rivalGuessPast.empty) #rivalGuessPastTape{opacity:0}
+
+/* Scores are the exact exported blue/orange paper. Figma centres the name
+   in its top 40% and the large total in the lower half. */
+.v1-scorecard{position:absolute;z-index:5;container-type:inline-size}
+.v1-scorecard>img{display:block;width:100%;
+  filter:drop-shadow(0 min(.292vw,.519vh) min(.167vw,.296vh) rgba(0,0,0,.35))}
+.v1-scorecard>span{position:absolute;left:0;width:100%;display:flex;justify-content:center;
+  text-align:center;white-space:nowrap;overflow:hidden;color:#fff;
+  text-shadow:1.2cqw 1.2cqw 0 rgba(0,0,0,.5)}
+.v1-player-name{top:0;height:40.5%;align-items:center;padding:0 5%;font-family:var(--f-sign);
+  font-weight:800;font-size:17.15cqw;line-height:1}
+.v1-player-score{top:39%;height:47%;align-items:center;font-family:'Fredoka One',var(--f-display);
+  font-size:31.7cqw;line-height:1}
+.v1-scorecard.bump{animation:spbump .4s cubic-bezier(.2,1.6,.4,1)}
+
+/* The current guess instances include the robot above the paper. Their outer
+   bounds, text baselines and percentage positions are copied from Figma. */
+.v1-guess{z-index:4;container-type:inline-size}
+.v1-guess.current{aspect-ratio:269.181/229.551}
+.v1-guess.current .gcard{position:absolute;left:0;top:38.34%;width:100%}
+.v1-guess.current .grobot{left:3.25%;top:0;width:39.96%;z-index:2}
+.v1-guess.current.rival .grobot{left:50.15%}
+.v1-guess.current .glabel{top:44.62%;font-size:17.21cqw}
+.v1-guess.current .gpct{top:68.61%;font-size:22.94cqw}
+.v1-guess.past{opacity:.56}
+.v1-guess.past .glabel,.v1-guess.past .gpct{color:#0d6ebb}
+.v1-guess.rival.current .glabel,.v1-guess.rival.current .gpct{color:#fd6030}
+.v1-guess.rival.past .glabel,.v1-guess.rival.past .gpct{color:#a90307}
+.v1-guess.empty{opacity:0}
+.v1-guess.current.pop{animation:v1guesspop .42s cubic-bezier(.2,1.6,.4,1)}
+@keyframes v1guesspop{0%{translate:0 12%;scale:.84}62%{translate:0 0;scale:1.055}100%{scale:1}}
+.matchstage.you-locked .v1-guess.you.current,
+.matchstage.rival-locked .v1-guess.rival.current{filter:brightness(1.09) saturate(1.1);
+  animation:v1locked .72s cubic-bezier(.2,1.6,.4,1)}
+@keyframes v1locked{0%{scale:1}42%{scale:1.11;rotate:-2deg}100%{scale:1}}
+
+.v1-word{z-index:5}
+.v1-word .sp-word-text{font-family:'Fredoka One',var(--f-display);font-weight:400}
+.v1-word.wordswap{animation:v1wordpop .55s cubic-bezier(.18,1.45,.32,1)}
+@keyframes v1wordpop{0%{scale:.86;translate:0 8%;opacity:.35}58%{scale:1.06;translate:0 -2%;opacity:1}100%{scale:1}}
+.matchstage[data-phase="chase"] .v1-word{animation:v1chaseword .24s ease-in-out infinite}
+.matchstage.chase-urgent .v1-word{animation-duration:.16s}
+.matchstage.chase-final .v1-word{animation-duration:.11s;filter:saturate(1.25) brightness(1.06)}
+@keyframes v1chaseword{
+  0%,100%{translate:0 0;rotate:-.35deg;scale:1}
+  33%{translate:-.42% -.8%;rotate:.65deg;scale:1.014}
+  66%{translate:.42% .25%;rotate:-.7deg;scale:1.008}
+}
+.matchstage[data-phase="sudden"] .v1-word{filter:saturate(1.25);
+  animation:v1sudden .7s ease-in-out infinite alternate}
+@keyframes v1sudden{to{scale:1.035;filter:saturate(1.35) brightness(1.06)}}
+
+/* The chase reuses the existing word-timer paper and Solo clock art. Its
+   actual remaining second is repeated in the paper label, while the clock
+   and word physically get more urgent as the five-second window closes. */
+.v1-wordtimer{transform-origin:50% 0;transition:scale .18s ease,filter .18s ease}
+.v1-chase-clock{position:absolute;left:7.5%;top:36%;width:20%;z-index:2;opacity:0;
+  pointer-events:none;filter:drop-shadow(1.1cqw 1.1cqw 0 rgba(0,0,0,.42))}
+.matchstage[data-phase="chase"] .v1-wordtimer{z-index:10;scale:1.16;
+  filter:drop-shadow(0 min(.55vw,.98vh) min(.35vw,.62vh) rgba(14,27,74,.42))}
+.matchstage[data-phase="chase"] .v1-wordtimer .sp-art{
+  animation:v1chasepaper .42s ease-in-out infinite}
+.matchstage[data-phase="chase"] .v1-wordtimer .sp-lab{top:-1.5%;font-size:9.7cqw}
+.matchstage[data-phase="chase"] .v1-wordtimer .sp-val{left:20%;width:76%;font-size:23.5cqw}
+.matchstage[data-phase="chase"] .v1-chase-clock{opacity:1;
+  animation:v1clockshake .22s ease-in-out infinite}
+.matchstage.chase-urgent .v1-wordtimer{scale:1.24}
+.matchstage.chase-final .v1-wordtimer{scale:1.32;filter:brightness(1.08)
+  drop-shadow(0 min(.75vw,1.33vh) min(.48vw,.85vh) rgba(232,64,42,.48))}
+.v1-wordtimer.tick-pop{animation:v1tickpop .32s cubic-bezier(.18,1.65,.32,1)}
+@keyframes v1tickpop{0%{scale:1.5;rotate:-2deg}58%{rotate:1deg}100%{rotate:0}}
+@keyframes v1chasepaper{
+  0%,100%{translate:0 0;rotate:-.35deg}
+  50%{translate:0 -1.7%;rotate:.45deg}
+}
+@keyframes v1clockshake{
+  0%,100%{rotate:-8deg;scale:1}
+  50%{rotate:8deg;scale:1.08}
+}
+
+/* When the other player recognizes the word, the exact same GOT IT paper
+   celebrates on their camera half rather than implying the local player won. */
+.v1-rival-award{position:absolute;left:75%;top:45%;width:34%;z-index:94}
+.v1-rival-award .aw-got{font-size:6.8cqw}
+
+/* The local crown follows the already-local nose landmark; the remote crown
+   uses the centred camera framing as a privacy-safe fallback. No landmarks
+   are transmitted across the network. */
+.v1-crown{position:absolute;left:50%;top:5.5%;width:14%;height:auto;z-index:4;
+  opacity:0;pointer-events:none;translate:-50% -50%;rotate:-11deg;scale:.45;
+  filter:drop-shadow(0 min(.35vw,.62vh) min(.25vw,.44vh) rgba(0,0,0,.4));
+  transition:left .055s linear,top .055s linear,opacity .18s ease,
+    width .055s linear,scale .28s cubic-bezier(.2,1.65,.4,1)}
+.matchstage.you-leading .v1-video-side.you .v1-crown,
+.matchstage.rival-leading .v1-video-side.rival .v1-crown{opacity:1;scale:1;
+  animation:v1crownarrive .3s cubic-bezier(.18,1.55,.32,1) both}
+.v1-video-side.rival .v1-crown{rotate:10deg}
+@keyframes v1crownarrive{
+  0%{translate:-50% -40%;scale:.58}
+  68%{translate:-50% -54%;scale:1.08}
+  100%{translate:-50% -50%;scale:1}
+}
+
 .vsplaceholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(160deg,#20348B,#111F5E);color:#C9D4F2;font-weight:900;font-size:17px;letter-spacing:1px;text-transform:uppercase;text-align:center;padding:20px}
 .vsplaceholder svg{width:110px;height:110px}
 .vsplaceholder small{font-size:12.5px;letter-spacing:.5px;text-transform:none;color:#8A97C8}
@@ -602,11 +746,15 @@ body[data-screen="home"] .camdock .aipill,
 body[data-screen="home"] .camdock .brackets,
 body[data-screen="solo"] .camdock .livebadge,
 body[data-screen="solo"] .camdock .aipill,
+body[data-screen="match"] .camdock .livebadge,
 body[data-screen="match"] .camdock .aipill,
+body[data-screen="pmatch"] .camdock .livebadge,
+body[data-screen="pmatch"] .camdock .aipill,
 body[data-screen="party"] .camdock .aipill,
 body[data-screen="train"] .camdock .aipill{display:none}
 body[data-screen="lobby"] .camdock .brackets,
 body[data-screen="match"] .camdock .brackets,
+body[data-screen="pmatch"] .camdock .brackets,
 body[data-screen="party"] .camdock .brackets{display:none}
 body[data-screen="lobby"] .camdock .livebadge{display:none} /* card supplies its own */
 body[data-screen="party"] .camdock .livebadge{display:none}
@@ -650,3 +798,175 @@ body[data-screen="lobby"] #rivalDock{background:transparent}
   #scrLobby .midrow{grid-template-columns:1fr 1fr 1fr;gap:20px}
   #scrParty .inforow{grid-template-columns:auto 1fr auto auto auto;gap:14px}
 }
+
+/* =================== PARTY MATCH (Figma "Party Mode" 189:273) ===================
+   Six players, one word. Each team's featured player fills their half of the
+   split; the other two ride in torn-paper tiles hugging the divider. Timers,
+   guess papers, word card and score cards are the same components as Solo and
+   1v1 — only the seating and the recognition feedback are new here. */
+body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
+#scrPartyMatch{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;
+  background:#0e1b4a}
+.pmstage{position:relative;z-index:1;overflow:hidden;background:#13245e;
+  width:min(100dvw,calc(100dvh * var(--pp-ar)),var(--pp-maxw));
+  aspect-ratio:var(--pp-ar);font-family:var(--f-lobby,'Baloo 2',sans-serif)}
+@media (max-aspect-ratio:1/1){.pmstage{width:100dvw}}
+
+/* the two featured feeds are one uninterrupted split layer */
+.pm-side{position:absolute;top:0;bottom:0;width:50.28%;overflow:hidden;z-index:0;
+  background:#13245e;transition:box-shadow .25s ease}
+.pm-side.blue{left:0}
+.pm-side.orange{right:0}
+.pm-side .slot,.pm-side .camdock,.pm-side video,.pm-side canvas{
+  position:absolute;inset:0;width:100%;height:100%}
+.pm-side video,.pm-side canvas{object-fit:cover}
+.pm-divider{position:absolute;left:49.51%;top:-2.35%;width:1.53%;height:109.01%;
+  z-index:6;pointer-events:none;
+  filter:drop-shadow(0 min(.2vw,.36vh) min(.18vw,.32vh) rgba(0,0,0,.25))}
+.pm-divider img{width:100%;height:100%;object-fit:fill;display:block}
+
+/* --- centre tiles --- */
+.pm-tile{position:absolute;z-index:5;rotate:var(--rot,0deg);container-type:inline-size;
+  cursor:pointer;transform-origin:50% 54%;
+  transition:translate .2s cubic-bezier(.2,1.35,.35,1),
+    scale .2s cubic-bezier(.2,1.35,.35,1),filter .2s ease;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.36vw,.64vh) rgba(0,0,0,.38))}
+.pm-tile:hover{translate:0 calc(-1 * min(.42vw,.75vh));scale:1.027;
+  filter:brightness(1.04)
+    drop-shadow(0 min(.55vw,.98vh) min(.48vw,.85vh) rgba(0,0,0,.42))}
+.pm-tile .slot{position:absolute;inset:1.8% 2.25%;overflow:hidden;background:#0e1b4a}
+.pm-tile .slot video,.pm-tile .slot canvas,.pm-tile .camdock{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* Exact 400×500 transparent portrait borders exported from Figma. */
+.pm-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  pointer-events:none;z-index:2;transition:opacity .18s ease}
+.pm-border-got{opacity:0;z-index:3}
+.pmstage[data-size="2"] [data-seat="blue2"],
+.pmstage[data-size="2"] [data-seat="orange2"]{display:none}
+.pm-tile.vacant{display:none}
+
+/* --- recognition: the frame goes green and a sticker lands on the player --- */
+.pm-tile.got .pm-border-team{opacity:0}
+.pm-tile.got .pm-border-got{opacity:1}
+.pm-tile.got{animation:pmseatgot .52s cubic-bezier(.18,1.55,.32,1)}
+@keyframes pmseatgot{
+  0%{scale:.96}
+  52%{scale:1.075}
+  100%{scale:1}
+}
+.pm-side.got::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;
+  border:min(.72vw,1.28vh) solid #62b53c;
+  box-shadow:inset 0 0 min(2.4vw,4.3vh) rgba(98,181,60,.5);
+  animation:pmsidegot .48s cubic-bezier(.18,1.45,.32,1)}
+@keyframes pmsidegot{
+  0%{opacity:0;scale:1.05}
+  60%{opacity:1;scale:1}
+  100%{opacity:1}
+}
+
+.pm-nametag,.pm-gotit{position:absolute;z-index:3;container-type:inline-size;
+  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.4))}
+.pm-nametag{pointer-events:auto;cursor:pointer;
+  transition:translate .18s ease,scale .18s ease,filter .18s ease}
+.pm-nametag:hover{translate:0 calc(-1 * min(.25vw,.44vh));scale:1.04;
+  filter:brightness(1.08)
+    drop-shadow(0 min(.3vw,.53vh) min(.22vw,.39vh) rgba(0,0,0,.34))}
+.pm-gotit{pointer-events:none}
+.pm-nametag img{display:block;width:100%;aspect-ratio:3.55;object-fit:fill}
+.pm-gotit img{display:block;width:100%;aspect-ratio:4.2;object-fit:fill}
+.pm-nametag b,.pm-gotit b{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;padding:0 7%;font-family:var(--f-lobby);font-weight:400;
+  color:#fff;white-space:nowrap;overflow:hidden;letter-spacing:.01em;
+  text-shadow:1.6cqw 1.6cqw 0 rgba(0,0,0,.45)}
+.pm-nametag b{font-size:20.9cqw}
+.pm-gotit b{font-size:13.17cqw}
+/* orange seats reuse the blue chip paper, warmed to the team colour */
+.pm-tile.orange .pm-nametag img,.pm-side.orange .pm-nametag img{
+  filter:hue-rotate(158deg) saturate(1.5) brightness(1.12)}
+.pm-gotit{opacity:0;scale:.55;transition:opacity .16s ease,
+  scale .24s cubic-bezier(.2,1.6,.4,1)}
+.pm-tile.got .pm-gotit,.pm-side.got .pm-gotit{
+  opacity:1;scale:1;animation:pmsticker .52s cubic-bezier(.16,1.55,.32,1)}
+@keyframes pmsticker{
+  0%{opacity:0;scale:.25;rotate:-8deg}
+  58%{opacity:1;scale:1.13;rotate:2deg}
+  100%{opacity:1;scale:1;rotate:0}
+}
+
+/* tile seating: blue tags hug the outer edge, orange mirror them */
+.pm-tile .pm-nametag{top:3.4%;width:35%}
+.pm-tile.blue .pm-nametag{left:4%}
+.pm-tile.orange .pm-nametag{right:4%}
+.pm-tile .pm-gotit{left:50%;width:72%;top:13%;translate:-50% 0}
+/* the featured players get the frame-level Figma positions */
+.pm-side .pm-nametag{top:13.33%;width:15.75%}
+.pm-side.blue .pm-nametag{left:2.35%}
+.pm-side.orange .pm-nametag{right:3.05%}
+.pm-side .pm-gotit{width:24%;left:50%;top:14%;translate:-50% 0}
+/* while we can see the local player's head, the sticker rides their forehead */
+.pm-side .pm-gotit.tracked,.pm-tile .pm-gotit.tracked{
+  transition:opacity .16s ease,scale .24s cubic-bezier(.2,1.6,.4,1),
+             left .07s linear,top .07s linear,width .07s linear}
+
+.pm-tape{position:absolute;z-index:9;pointer-events:none;
+  transition:opacity .2s ease,translate .18s ease,
+    scale .18s cubic-bezier(.2,1.35,.35,1),filter .18s ease;
+  filter:drop-shadow(0 min(.21vw,.37vh) min(.28vw,.49vh) rgba(0,0,0,.26))}
+.pmstage:has(#pmMyPast.empty) #pmMyPastTape,
+.pmstage:has(#pmFoePast.empty) #pmFoePastTape{opacity:0}
+.pmstage:has(#pmMatchTimerCard:hover) #pmMatchTimerTape,
+.pmstage:has(#pmScoreBlue:hover) #pmBlueScoreTape,
+.pmstage:has(#pmWordTimerCard:hover) #pmWordTimerTape,
+.pmstage:has(#pmScoreOrange:hover) #pmOrangeScoreTape,
+.pmstage:has(#pmMyTop:hover) #pmMyTopTape,
+.pmstage:has(#pmMyPast:hover) #pmMyPastTape,
+.pmstage:has(#pmFoeTop:hover) #pmFoeTopTape,
+.pmstage:has(#pmFoePast:hover) #pmFoePastTape,
+.pmstage:has(#pmWordCard:hover) #pmWordRightTape,
+.pmstage:has(#pmWordCard:hover) #pmWordLeftTape{
+  translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
+  filter:brightness(1.04)
+    drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+.pm-score{z-index:8}
+#pmWordTimerCard{z-index:8}
+.pmstage :is(.sp-card,.pm-score,.pm-guess,.pm-word){
+  transition:translate .18s ease,scale .18s cubic-bezier(.2,1.35,.35,1),
+    rotate .18s ease,filter .18s ease}
+.pmstage :is(.sp-card,.pm-score,.pm-guess,.pm-word):hover{
+  translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
+  filter:brightness(1.04)
+    drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+/* guess papers: your read on the left, the rival team's featured player right */
+.pm-guess{z-index:7;container-type:inline-size}
+.pm-guess.mine.current .glabel,.pm-guess.mine.current .gpct{color:#1b7532}
+.pm-guess.mine.past .glabel,.pm-guess.mine.past .gpct{color:#0d6ebb}
+.pm-guess.theirs.current .glabel,.pm-guess.theirs.current .gpct{color:#fd602f}
+.pm-guess.theirs.past .glabel,.pm-guess.theirs.past .gpct{color:#a90307}
+.pm-guess.past{opacity:.92}
+.pm-guess.empty{opacity:0}
+.pm-word{z-index:8}
+.pm-award{position:absolute;z-index:95}
+
+/* the word clock turns into the chase clock once a team is complete */
+.pm-chase-clock{position:absolute;left:7.5%;top:36%;width:20%;z-index:2;opacity:0;
+  pointer-events:none;filter:drop-shadow(1.1cqw 1.1cqw 0 rgba(0,0,0,.42))}
+.pmstage[data-phase="chase"] #pmWordTimerCard{z-index:12;scale:1.16;
+  filter:drop-shadow(0 min(.55vw,.98vh) min(.35vw,.62vh) rgba(14,27,74,.42))}
+.pmstage[data-phase="chase"] #pmWordTimerCard .sp-art{
+  animation:v1chasepaper .42s ease-in-out infinite}
+.pmstage[data-phase="chase"] #pmWordTimerCard .sp-lab{
+  top:-1.5%;font-size:9.7cqw}
+.pmstage[data-phase="chase"] #pmWordTimerCard .sp-val{
+  left:20%;width:76%;font-size:23.5cqw;color:#e8402a}
+.pmstage[data-phase="chase"] .pm-chase-clock{
+  opacity:1;animation:v1clockshake .22s ease-in-out infinite}
+.pmstage[data-phase="chase"] .pm-word{
+  animation:v1chaseword .24s ease-in-out infinite}
+.pmstage.chase-urgent #pmWordTimerCard{scale:1.24}
+.pmstage.chase-urgent .pm-word{animation-duration:.16s}
+.pmstage.chase-final #pmWordTimerCard{scale:1.32;
+  filter:brightness(1.08)
+    drop-shadow(0 min(.75vw,1.33vh) min(.48vw,.85vh) rgba(232,64,42,.48))}
+.pmstage.chase-final .pm-word{animation-duration:.11s;
+  filter:saturate(1.25) brightness(1.06)}
+#pmWordTimerCard.tick-pop{animation:v1tickpop .32s cubic-bezier(.18,1.65,.32,1)}

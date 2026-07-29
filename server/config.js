@@ -14,10 +14,15 @@ export const config = {
 
   /* Match shape. rounds is a safety cap; matchMs governs time-based play. */
   rounds: int(process.env.ROUNDS, 999),
-  matchMs: int(process.env.MATCH_MS, 180000),
+  matchMs: int(process.env.MATCH_MS, 120000),
   wordMs: int(process.env.WORD_MS, 20000),
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
   betweenRoundsMs: int(process.env.BETWEEN_ROUNDS_MS, 1800),
+  /* A claim is scored from its synchronized recognition timestamp, not its
+     arrival time. This short grace only lets an in-flight claim arrive; it
+     never extends the timestamp cutoff shown to players. */
+  claimGraceMs: int(process.env.CLAIM_GRACE_MS, 600),
+  claimFutureSkewMs: int(process.env.CLAIM_FUTURE_SKEW_MS, 900),
 
   /* Rate limits (per minute). */
   rateCreate: int(process.env.RATE_CREATE, 5),

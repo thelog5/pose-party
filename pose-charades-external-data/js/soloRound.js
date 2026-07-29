@@ -23,22 +23,25 @@
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { blip } from "./audio.js";
+import { SOLO } from "./constants.js";
+import { calculateFirstPoints } from "./scoring.js";
 
 /* ---------------- tuning (against real model logs) ---------------- */
 export const LOCK_THRESHOLD    = 0.80;  // smoothed target confidence that completes the bar & locks
 export const LOCK_HOLD_MS      = 160;   // must stay at/over threshold this long to lock
 export const FILL_LERP         = 0.16;  // displayed fill -> target each frame (never snaps)
 export const LABEL_DEBOUNCE_MS = 550;   // a new top label must persist this long to enter the stack
-export const WARM_AT           = 0.55;  // fill fraction where the word starts shaking
-export const HOT_AT            = 0.82;  // fill fraction where it shakes hard
+export const WARM_AT           = 0.01;  // semantic stages of the continuous shake intensity
+export const HOT_AT            = 0.42;
+export const CRITICAL_AT       = 0.78;
 export const HITSTOP_MS        = 180;   // freeze on lock
 export const CHIP_FLIGHT_MS    = 650;   // points chip travel; score applies on arrival
-export const AWARD_MS          = 1500;  // POINTS AWARD paper on screen
-export const ROUND_END_PAUSE_MS = 1100; // linger before the next word
+export const AWARD_MS          = 1850;  // POINTS AWARD paper on screen
+export const ROUND_END_PAUSE_MS = 1250; // linger before the next word
 
 /* Figma resting pill = 35.4% of the word card; the bar grows to just short of
    the card's torn right edge so the paper still reads as paper. */
-const FILL_MIN = 35.4, FILL_MAX = 95;
+const FILL_MIN = 0, FILL_MAX = 95;
 
 /* ---------------- state ---------------- */
 let rstate = "idle";
@@ -133,12 +136,50 @@ function renderStack(popped){
   }
 }
 
+/* Apply one continuous confidence-to-motion curve to both Solo and 1v1.
+   Confidence begins giving feedback around 28%, then amplitude, speed and
+   scale all intensify smoothly until the mode's real lock threshold. */
+export function setWordRecognitionMotion(card, confidence, threshold, enabled=true){
+  if(!card) return 0;
+  const limit=Math.max(.01,Number(threshold)||1);
+  const value=Math.max(0,Math.min(limit,Number(confidence)||0));
+  const start=Math.min(.28,limit*.45);
+  const intensity=enabled
+    ? Math.max(0,Math.min(1,(value-start)/Math.max(.01,limit-start)))
+    : 0;
+  const active=intensity>0;
+
+  card.classList.toggle("tracking",active);
+  card.classList.toggle("warm",active&&intensity>=WARM_AT&&intensity<HOT_AT);
+  card.classList.toggle("hot",active&&intensity>=HOT_AT&&intensity<CRITICAL_AT);
+  card.classList.toggle("critical",active&&intensity>=CRITICAL_AT);
+
+  if(active){
+    const x=.20+1.35*intensity;
+    const y=.10+.50*intensity;
+    const r=.16+1.12*intensity;
+    card.style.setProperty("--shake-x",x.toFixed(3)+"%");
+    card.style.setProperty("--shake-x-neg",(-x).toFixed(3)+"%");
+    card.style.setProperty("--shake-y",(y*.72).toFixed(3)+"%");
+    card.style.setProperty("--shake-y-neg",(-y).toFixed(3)+"%");
+    card.style.setProperty("--shake-r",r.toFixed(3)+"deg");
+    card.style.setProperty("--shake-r-neg",(-r).toFixed(3)+"deg");
+    card.style.setProperty("--shake-scale",(1+.014*intensity).toFixed(4));
+    card.style.setProperty("--shake-speed",Math.round(240-160*intensity)+"ms");
+  }
+  return intensity;
+}
+
 /* ---------------- per-frame: the word progress bar ---------------- */
 function frame(){
   rafId = requestAnimationFrame(frame);
   if(rstate !== "guessing") return;
 
-  const raw = target ? (state.smooth?.[target] || 0) : 0;
+  /* Do not let the target channel get ahead of the visible robot. A target
+     can already have confidence while another debounced label is still on
+     the paper; its bar and lock begin only once that target paper pops in. */
+  const targetIsDisplayed=!!target && topLabel===target && stack[0]?.label===target;
+  const raw = targetIsDisplayed ? (state.smooth?.[target] || 0) : 0;
   const wantFill = Math.max(0, Math.min(1, raw / LOCK_THRESHOLD));
   shownFill += (wantFill - shownFill) * FILL_LERP;
 
@@ -146,10 +187,7 @@ function frame(){
   if(fillEl) fillEl.style.width = (FILL_MIN + shownFill * (FILL_MAX - FILL_MIN)) + "%";
 
   const card = el("soloWordCard");
-  if(card){
-    card.classList.toggle("warm", shownFill >= WARM_AT && shownFill < HOT_AT);
-    card.classList.toggle("hot", shownFill >= HOT_AT);
-  }
+  setWordRecognitionMotion(card,shownFill*LOCK_THRESHOLD,LOCK_THRESHOLD,true);
 
   /* lock when the smoothed confidence holds at/over threshold */
   if(raw >= LOCK_THRESHOLD){
@@ -162,9 +200,15 @@ function frame(){
 
 /* ---------------- lock payoff ---------------- */
 function beginLock(){
+  if(state.game?.mode==="ai")
+    state.game.pendingPts=calculateFirstPoints(
+      state.game.wordEnd-performance.now(),SOLO.wordMs);
   setState("hitstop");                 // freezes the game timers (timerFrozen)
   const card = el("soloWordCard");
-  if(card){ card.classList.remove("warm", "hot"); card.classList.add("locked"); }
+  if(card){
+    setWordRecognitionMotion(card,0,LOCK_THRESHOLD,false);
+    card.classList.add("locked");
+  }
   const fillEl = el("soloWordFill");
   if(fillEl) fillEl.style.width = FILL_MAX + "%";
   blip([523]);
@@ -186,13 +230,21 @@ function greenFlash(){
   f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
 }
 
-function showAward(){
-  const a = el("soloAward");
+/* The 1v1 match deliberately calls this same helper with its own instance of
+   the Solo paper. That keeps the asset, timing and motion completely shared. */
+export function showPointsAward(awardId, pointsId, points){
+  const a = el(awardId);
   if(!a) return;
-  const pts = state.game ? state.game.pendingPts : 0;
-  el("soloAwardPts").textContent = "+" + (pts || 0).toLocaleString("en-US");
+  const value = el(pointsId);
+  if(value) value.textContent = "+" + (points || 0).toLocaleString("en-US");
+  clearTimeout(a._awardTimer);
   a.classList.remove("show"); void a.offsetWidth; a.classList.add("show");
-  setTimeout(() => a.classList.remove("show"), AWARD_MS);
+  a._awardTimer=setTimeout(() => a.classList.remove("show"), AWARD_MS);
+}
+
+function showAward(){
+  showPointsAward("soloAward", "soloAwardPts",
+    state.game ? state.game.pendingPts : 0);
 }
 
 function confettiFrom(node){
@@ -250,7 +302,7 @@ export function failRound(skipped){
   setState("round_end");
   const card = el("soloWordCard");
   if(card){
-    card.classList.remove("warm", "hot");
+    setWordRecognitionMotion(card,0,LOCK_THRESHOLD,false);
     card.classList.add("miss");
     setTimeout(() => card.classList.remove("miss"), 500);
   }
@@ -275,7 +327,10 @@ export function beginRound(word, onResolve){
   const fillEl = el("soloWordFill");
   if(fillEl) fillEl.style.width = FILL_MIN + "%";
   const card = el("soloWordCard");
-  if(card) card.classList.remove("warm", "hot", "locked", "miss");
+  if(card){
+    setWordRecognitionMotion(card,0,LOCK_THRESHOLD,false);
+    card.classList.remove("locked", "miss");
+  }
   setTxt("soloWord", word);
   fitWord();
   setState("guessing");
@@ -287,7 +342,10 @@ export function endRound(){
   resolveCb = null;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   const card = el("soloWordCard");
-  if(card) card.classList.remove("warm", "hot", "locked", "miss");
+  if(card){
+    setWordRecognitionMotion(card,0,LOCK_THRESHOLD,false);
+    card.classList.remove("locked", "miss");
+  }
 }
 
 function setTxt(id, v){ const e = el(id); if(e) e.textContent = v; }

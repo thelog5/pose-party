@@ -2,9 +2,11 @@
 
    The server is authoritative: it deals words, times rounds, validates
    point claims, and keeps scores. This module mirrors its events into the
-   local FSM/UI. Classification stays 100% local — the only things sent are
-   the player's name, word labels, match settings, point claims, and opaque
-   WebRTC blobs.
+   local FSM/UI. Classification still runs locally. The network sees the
+   player's name, trained word labels, match settings, timestamped recognition
+   claims, and an ephemeral top-label/confidence update for the rival paper.
+   Video remains peer-to-peer through opaque WebRTC signaling blobs; landmarks
+   and training clips never leave the browser.
 
    Lobby flow (Figma "1v1 Lobby" frame): opening 1v1 auto-creates a room
    and shows the code. A friend joins via code or link. The host picks the
@@ -16,15 +18,17 @@
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
-import { toast, flash, pointBurst, fmtTime, fmtScore } from "./ui.js";
+import { toast, flash, pointBurst, fmtTime, fmtScore, fitMatchPaperText,
+         renderRemoteMatchGuess } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
+import { showPointsAward } from "./soloRound.js";
 
 const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
-const DEFAULT_SETTINGS = { matchSecs:180, wordSecs:30 };
+const DEFAULT_SETTINGS = { matchSecs:120, wordSecs:20 };
 const NAME_MAX = 10;
 const LOBBY_NAME_IDS = ["lobbyName", "lobbyYouName", "lobbyOppName"];
 
@@ -41,6 +45,9 @@ let wired = false;
 let pendingJoin = null;       // code from a #join-XXXXXX link
 let nameFitCanvas = null;
 let nameFitFrame = 0;
+let lastGuessSentAt = 0;
+let lastGuessLabel = "";
+let lastGuessConfidence = -1;
 
 const serverNow = () => Date.now() + clockOffset;
 const perfFromServer = tServer => performance.now() + (tServer - serverNow());
@@ -80,14 +87,15 @@ function fitLobbyNames(){
   });
 }
 
-/* Leaving the lobby or an online match through any exit that isn't the
-   results screen tells the server and drops the peer link. Registered at
-   import time, before game.js's lifecycle listener. */
+/* Leaving the lobby or an online match through navigation or connection
+   teardown tells the server and drops the peer link. Registered at import
+   time, before game.js's lifecycle listener. */
 const inGame = s => s==="countdown"||s==="playing"||s==="word-won";
 onTransition((to, from) => {
   if(state.game?.mode==="online" && inGame(from) && !inGame(to) && to!=="results"){
     leaveRoom();
     state.onlineClaim=null;
+    state.onlineGuess=null;
     clearInterval(countdownTimer);
   }
   if(from==="lobby" && to!=="countdown" && to!=="lobby") leaveRoom();
@@ -300,7 +308,11 @@ function wireSocket(s){
 
   s.on("match:start", payload => onMatchStart(payload));
   s.on("round:start", payload => onRoundStart(payload));
+  s.on("round:guess", ({roundId,label,confidence}={}) =>
+    renderRemoteMatchGuess(roundId,label,confidence));
+  s.on("round:chase", payload => onRoundChase(payload));
   s.on("round:result", payload => onRoundResult(payload));
+  s.on("match:sudden", payload => onMatchSudden(payload));
   s.on("match:end", payload => onMatchEnd(payload));
 
   s.on("room:error", ({error}={}) => {
@@ -437,10 +449,12 @@ function closePeer(){
 /* ---------------- match flow (server-driven) ---------------- */
 
 function resetRivalPanel(){
-  $("rivalTopWord").textContent="GUESSING…";
-  $("rivalTopPct").textContent="?";
-  [...$("rivalMeter").children].forEach(seg=>seg.classList.remove("on"));
-  $("rivalGuessList").innerHTML='<div class="grow"><span class="gname" style="white-space:normal;text-transform:none">'+
+  const word=$("rivalTopWord"), pct=$("rivalTopPct");
+  const meter=$("rivalMeter"), list=$("rivalGuessList");
+  if(word) word.textContent="GUESSING…";
+  if(pct) pct.textContent="?";
+  if(meter) [...meter.children].forEach(seg=>seg.classList.remove("on"));
+  if(list) list.innerHTML='<div class="grow"><span class="gname" style="white-space:normal;text-transform:none">'+
     esc(peerName)+"’s AI runs on their device — first to convince their AI wins the word!</span></div>";
 }
 
@@ -451,8 +465,11 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
 
   state.game={ mode:"online", word:null, round:0, rounds:0,
                matchEndsAt:perfFromServer(matchEndsAt),
-               wordEnd:0, wordStart:0, holdSince:0, score:0, rivalScore:0, streak:0,
-               results:[], roundId:null, claimed:false, bestWrong:{} };
+               wordEnd:0, wordStart:0, wordLimitMs:settings.wordSecs*1000,
+               holdSince:0, score:0, rivalScore:0, streak:0,
+               results:[], roundId:null, claimed:false, bestWrong:{},
+               roundPhase:"waiting", firstId:null, firstPoints:0,
+               suddenDeath:false };
   if(!transition("countdown")){ state.game=null; return; }
 
   resetRivalPanel();
@@ -461,6 +478,10 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   /* time-based mode: the round pill becomes the match clock */
   document.querySelector(".statpill.round .lab").textContent="Match";
   $("pillRound").textContent=fmtTime(state.game.matchEndsAt-performance.now());
+  if($("v1YouName")) $("v1YouName").textContent=myName();
+  if($("v1RivalName")) $("v1RivalName").textContent=peerName;
+  requestAnimationFrame(fitMatchPaperText);
+  applyScores(players);
 
   const cd=$("countdown");
   cd.classList.remove("hidden");
@@ -476,11 +497,37 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
     const g=state.game;
     if(!g || g.mode!=="online" || g.claimed || !g.roundId || !socket) return;
     g.claimed=true;
-    socket.emit("round:claim", { roundId:g.roundId }, ()=>{ /* result arrives as round:result */ });
+    const recognizedAt=Math.round(serverNow());
+    socket.emit("round:claim", { roundId:g.roundId, recognizedAt }, res=>{
+      if(res?.error==="already-claimed") g.claimed=true;
+      else if(res?.error && g.roundId) g.claimed=false;
+    });
+  };
+
+  /* Four small label/confidence updates per second make the rival paper feel
+     live without sending video frames, landmarks, or training data. */
+  state.onlineGuess = (label,confidence) => {
+    const g=state.game;
+    if(!g || g.mode!=="online" || !g.roundId || g.claimed || !socket) return;
+    if(g.roundPhase!=="word" && g.roundPhase!=="chase" && g.roundPhase!=="sudden") return;
+    if(typeof label!=="string" || !Number.isFinite(confidence)) return;
+    const now=performance.now();
+    const changed=label!==lastGuessLabel ||
+      Math.abs(confidence-lastGuessConfidence)>=.035;
+    if(now-lastGuessSentAt<240 && !changed) return;
+    if(now-lastGuessSentAt<140) return;
+    lastGuessSentAt=now;
+    lastGuessLabel=label;
+    lastGuessConfidence=confidence;
+    socket.emit("round:guess",{
+      roundId:g.roundId,
+      label,
+      confidence:Math.round(Math.max(0,Math.min(1,confidence))*1000)/1000,
+    });
   };
 }
 
-function onRoundStart({roundId, word, roundNum, endsAt}={}){
+function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
   if(gameState()!=="playing" && !transition("playing")) return;
@@ -489,30 +536,124 @@ function onRoundStart({roundId, word, roundNum, endsAt}={}){
   game.round=roundNum||game.round+1;
   game.claimed=false;
   game.holdSince=0;
+  lastGuessSentAt=0;
+  lastGuessLabel="";
+  lastGuessConfidence=-1;
+  game.roundPhase=suddenDeath?"sudden":"word";
+  game.suddenDeath=!!suddenDeath;
+  game.firstId=null;
+  game.firstPoints=0;
+  game.chaseSecond=null;
   game.wordStart=performance.now();
   game.wordEnd=perfFromServer(endsAt);
+  if(state.smooth) state.smooth[game.word]=0;
+  if($("v1WordFill")) $("v1WordFill").style.width="0%";
   $("vsWord").textContent=game.word;
+  requestAnimationFrame(fitMatchPaperText);
+  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIMER";
+  const stage=$("matchStage");
+  if(stage){
+    stage.dataset.phase=suddenDeath?"sudden":"word";
+    stage.classList.remove("you-locked","rival-locked","chase-urgent","chase-final");
+    delete stage.dataset.chaseSecond;
+  }
   const vw=$("vsWordCard");
-  if(vw){ vw.classList.remove("wordswap"); void vw.offsetWidth; vw.classList.add("wordswap"); }
+  if(vw){
+    vw.classList.remove("tracking","warm","hot","critical","wordswap");
+    void vw.offsetWidth; vw.classList.add("wordswap");
+  }
+  resetRivalPanel();
   if(!game.timer) game.timer=setInterval(gameTick,100);
 }
 
-function onRoundResult({winnerId, word, scores}={}){
+/* Both halves use Solo's existing award paper. Only the latest recognition
+   stays on screen, so a quick chase reads as a clean handoff from the first
+   player to the chaser instead of two overlapping papers. */
+function showMatchAward(side, points){
+  const rival=side==="rival";
+  const awardId=rival?"v1RivalAward":"v1Award";
+  const pointsId=rival?"v1RivalAwardPts":"v1AwardPts";
+  const other=$(rival?"v1Award":"v1RivalAward");
+  if(other){
+    clearTimeout(other._awardTimer);
+    other.classList.remove("show");
+  }
+  if(rival && $("v1RivalAwardTitle"))
+    $("v1RivalAwardTitle").textContent=peerName.toUpperCase()+" GOT IT!";
+  showPointsAward(awardId, pointsId, points);
+}
+
+function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
+  const game=state.game;
+  if(!game || game.mode!=="online") return;
+  const mine=firstId===socket.id;
+  applyScores(scores);
+  game.firstId=firstId;
+  game.firstPoints=firstPoints|0;
+  game.roundPhase="chase";
+  game.wordEnd=perfFromServer(chaseEndsAt);
+  game.claimed=mine;
+  game.chaseSecond=5;
+  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent="5 SECONDS LEFT";
+  if($("v1WordTime")) $("v1WordTime").textContent="00:05";
+  const stage=$("matchStage");
+  if(stage){
+    stage.dataset.phase="chase";
+    stage.dataset.chaseSecond="5";
+    stage.classList.toggle("you-locked",mine);
+    stage.classList.toggle("rival-locked",!mine);
+  }
+  const prefix=mine?"my":"rival";
+  const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct"), topBox=$(prefix+"GuessTop");
+  if(topWord) topWord.textContent=String(game.word||"").toUpperCase();
+  if(topPct) topPct.textContent="100%";
+  if(topBox){ topBox.classList.remove("pop"); void topBox.offsetWidth; topBox.classList.add("pop"); }
+  if(mine && $("v1WordFill")) $("v1WordFill").style.width="95%";
+  if(mine){
+    showMatchAward("you", firstPoints);
+    flash("good"); blip([523,659,784]);
+  }else{
+    showMatchAward("rival", firstPoints);
+    blip([392,523,659]);
+  }
+}
+
+function onRoundResult({
+  winnerId, firstId, chaserId, firstPoints=0, chaserPoints=0,
+  delaySeconds=null, reason, word, scores,
+}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
   const myId=socket.id;
   applyScores(scores);
   game.roundId=null;
+  game.roundPhase="between";
 
-  if(winnerId===myId){
+  const iWasFirst=firstId===myId;
+  const iWasChaser=chaserId===myId;
+  const caught=reason==="chase-success";
+  if(caught){
+    for(const id of [firstId,chaserId]){
+      if(!id) continue;
+      const prefix=id===myId?"my":"rival";
+      if($(prefix+"TopWord")) $(prefix+"TopWord").textContent=String(word||"").toUpperCase();
+      if($(prefix+"TopPct")) $(prefix+"TopPct").textContent="100%";
+    }
+  }
+  if(iWasFirst){
     game.streak++;
-    game.results.push({word, ok:true});
-    pointBurst("You win!", word+" · +1"+(game.streak>1?" · streak x"+game.streak:""), "good");
+    game.results.push({word, ok:true, pts:firstPoints, rivalPts:chaserPoints, first:true});
+    if(caught) showMatchAward("rival", chaserPoints);
+    blip(caught?[523,659]:[523,659,784]);
+  }else if(iWasChaser && caught){
+    game.streak++;
+    game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true});
+    showMatchAward("you", chaserPoints);
     flash("good"); blip([523,659,784]);
   }else if(winnerId){
     game.streak=0;
-    game.results.push({word, ok:false, rival:true});
-    pointBurst(peerName+" wins!", word+" · +1", "rival");
+    game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
+    pointBurst("Chase missed", peerName+" +"+fmtScore(firstPoints)+" · you 0", "rival");
     flash("bad"); blip([330,247]);
   }else{
     game.streak=0;
@@ -521,6 +662,19 @@ function onRoundResult({winnerId, word, scores}={}){
     flash("bad"); blip([220,165]);
   }
   $("pillStreak").textContent="x"+Math.max(1,game.streak);
+  const stage=$("matchStage");
+  if(stage){
+    stage.dataset.phase="between";
+    stage.classList.remove("chase-urgent","chase-final");
+    delete stage.dataset.chaseSecond;
+    /* Both successful players keep their word paper and local meter full
+       through the between-word beat, including a successful chaser. */
+    const youSucceeded=iWasFirst || (caught&&iWasChaser);
+    const rivalSucceeded=(!!firstId&&firstId!==myId) ||
+      (caught&&!!chaserId&&chaserId!==myId);
+    stage.classList.toggle("you-locked",youSucceeded);
+    stage.classList.toggle("rival-locked",rivalSucceeded);
+  }
   if(gameState()==="playing") transition("word-won");
 }
 
@@ -533,15 +687,32 @@ function applyScores(scores){
     else game.rivalScore=p.score|0;
   }
   $("pillScore").textContent=fmtScore(game.score);
+  if($("v1YouScore")) $("v1YouScore").textContent=fmtScore(game.score);
+  if($("v1RivalScore")) $("v1RivalScore").textContent=fmtScore(game.rivalScore);
+  const stage=$("matchStage");
+  if(stage){
+    stage.classList.toggle("you-leading", game.score>game.rivalScore);
+    stage.classList.toggle("rival-leading", game.rivalScore>game.score);
+  }
 }
 
-function onMatchEnd({scores}={}){
+function onMatchSudden({scores}={}){
+  const game=state.game;
+  if(!game || game.mode!=="online") return;
   applyScores(scores);
-  endOnline(scores, "finished");
+  game.suddenDeath=true;
+  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent="SUDDEN DEATH";
+  pointBurst("SUDDEN DEATH", "First player recognized wins the match", "rival");
+  blip([392,523,659,784]);
+}
+
+function onMatchEnd({scores, winnerId, suddenDeath=false}={}){
+  applyScores(scores);
+  endOnline(scores, "finished", {winnerId, suddenDeath});
 }
 
 /* Build the results card from what the server told us and clean up. */
-function endOnline(scores, why){
+function endOnline(scores, why, outcome={}){
   const g=state.game;
   if(!g) return;
   clearInterval(g.timer);
@@ -549,17 +720,22 @@ function endOnline(scores, why){
   $("countdown").classList.add("hidden");
   state.game=null;
   state.onlineClaim=null;
+  state.onlineGuess=null;
   closePeer();
 
   const rows=g.results.map(r=>{
-    const right='<span class="ok">You +1</span>';
-    const rival='<span class="miss">'+esc(peerName)+' +1</span>';
+    const right='<span class="ok">You +'+fmtScore(r.pts||0)+'</span>'+
+      (r.rivalPts?'<span class="thought">'+esc(peerName)+' +'+fmtScore(r.rivalPts)+'</span>':'');
+    const rival='<span class="miss">'+esc(peerName)+' +'+fmtScore(r.rivalPts||0)+'</span>';
     const none='<span class="miss">time up</span>';
     return '<div class="resrow"><span>'+esc(r.word)+'</span><span>'+(r.ok?right:(r.rival?rival:none))+'</span></div>';
   }).join("");
   const title='YOU '+g.score+' — '+esc(peerName.toUpperCase())+' '+g.rivalScore;
   const sub = why==="finished"
-    ? (g.score>g.rivalScore ? "You won the showdown!" : g.score<g.rivalScore ? peerName+" won the showdown" : "It’s a tie!")
+    ? (outcome.winnerId===socket?.id || (!outcome.winnerId && g.score>g.rivalScore)
+      ? (outcome.suddenDeath?"You won sudden death!":"You won the showdown!")
+      : outcome.winnerId ? peerName+(outcome.suddenDeath?" won sudden death":" won the showdown")
+      : "It’s a tie!")
     : (why==="peer-left" ? peerName+" left early" : "Match ended early");
   $("rescard").innerHTML='<h2>'+title+'</h2><div class="sub">'+esc(sub)+'</div>'+rows;
   transition("results");
@@ -571,21 +747,16 @@ function endOnline(scores, why){
 export function leaveRoom(){
   if(socket && socket.connected && roomCode) socket.emit("room:leave", {}, ()=>{});
   roomCode=null;
+  state.onlineGuess=null;
   closePeer();
   const stage=$("lobbyStage");
   if(stage) stage.classList.remove("joined");
 }
 
 /* Shared-chrome helpers for the party controller. */
-export { ensureSocket, myName, setLobbyStatus };
+export { ensureSocket, myName, setLobbyStatus, serverNow, perfFromServer };
 export const lobbySettings = () => settings;
 export const renderLobbySettings = editable => renderSettings(editable);
 export const setLobbyCode = code => { roomCode = code; renderCode(code); };
 
 partyBridge.rejoin1v1 = code => { transition("lobby"); $("lobbyStage").dataset.mode="1v1"; joinRoom(code); };
-
-/* Quit button during an online match. */
-export function quitOnline(){
-  if(state.game && state.game.mode==="online") endOnline(null, "quit");
-  leaveRoom();
-}

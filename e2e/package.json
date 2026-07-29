@@ -5,7 +5,8 @@
   "description": "Headless-Chrome end-to-end tests (fake camera; vision input simulated by seeding classifier output).",
   "scripts": {
     "offline": "node offline.test.mjs",
-    "online": "node online.test.mjs"
+    "online": "node online.test.mjs",
+    "party": "node party.test.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^24.0.0"
