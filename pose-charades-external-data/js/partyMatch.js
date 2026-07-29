@@ -20,7 +20,8 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
-import { AWARD_MS, setWordRecognitionMotion, showPointsAward } from "./soloRound.js";
+import { AWARD_MS, setWordRecognitionMotion, showPointsAward,
+         confettiFrom } from "./soloRound.js";
 
 /* Recognition uses the same stability window as the rest of the game: the
    target must stay on top and over threshold before we dare claim. */
@@ -271,6 +272,7 @@ export function onPartyResult(payload){
     setTxt("pmAwardTitle", "GOT IT " + (ORDINALS[mine.place] || "") + "!");
     setTxt("pmAwardLabel", "POINTS!");
     showPointsAward("pmAward", "pmAwardPts", mine.points);
+    confettiFrom($("pmWordCard"));
   }
 }
 

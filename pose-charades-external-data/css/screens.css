@@ -989,20 +989,24 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
 
 /* Win confetti: real torn-paper pieces thrown from the word card, arcing up
    and then falling. Built in soloRound.js; sized/spun per piece. */
-.burstwrap{position:fixed;inset:0;z-index:96;pointer-events:none;overflow:hidden}
+.burstwrap{position:absolute;inset:0;z-index:40;pointer-events:none;overflow:hidden}
+.burstwrap.viewport{position:fixed}
 .burstwrap i{position:absolute;width:var(--sz);aspect-ratio:1;
   background-size:contain;background-repeat:no-repeat;
   background-position:center;transform:translate(-50%,-50%);
   filter:drop-shadow(0 2px 2px rgba(23,53,111,.28));
-  animation:confFly var(--dur) cubic-bezier(.14,.72,.36,1) forwards}
+  animation:confFly var(--dur) cubic-bezier(.16,.62,.3,1) var(--delay) forwards}
+/* Hold full opacity almost the whole way — the old ramp faded the pieces out
+   while they were still the celebration. */
 @keyframes confFly{
-  0%  {opacity:0;transform:translate(-50%,-50%) scale(.35) rotate(0)}
-  14% {opacity:1}
-  55% {transform:translate(calc(-50% + var(--dx) * .82),calc(-50% + var(--dy)))
-       scale(1) rotate(calc(var(--rot) * .6))}
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(0)}
+  7%  {opacity:1}
+  46% {transform:translate(calc(-50% + var(--dx) * .88),calc(-50% + var(--dy)))
+       scale(1) rotate(calc(var(--rot) * .55))}
+  82% {opacity:1}
   100%{opacity:0;
        transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy) + var(--fall)))
-       scale(.92) rotate(var(--rot))}}
+       scale(.94) rotate(var(--rot))}}
 
 /* Score anticipation: the points chip is in flight and the card has not been
    credited yet, so it braces instead of sitting inert on a stale number. */

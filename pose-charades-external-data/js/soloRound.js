@@ -255,36 +255,55 @@ const CONFETTI_ART = [
   "conf-blue-a.png", "conf-blue-b.png", "conf-red-a.png", "conf-red-b.png",
 ];
 
-function confettiFrom(node){
+export function confettiFrom(node){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const r = node ? node.getBoundingClientRect()
-                 : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+
+  /* Live inside the letterboxed stage: sizes and distances scale with it,
+     the bars clip it, and the award (position:fixed) stays on top — so the
+     paper reads as erupting from BEHIND the card rather than under it. */
+  const stage = node?.closest(".solostage,.matchstage,.pmstage");
+  const host = stage || document.body;
+  const box = host === document.body
+    ? { width: innerWidth, height: innerHeight }
+    : host.getBoundingClientRect();
+
   const wrap = document.createElement("div");
   wrap.className = "burstwrap";
-  const N = 38;
+  if(!stage) wrap.classList.add("viewport");
+
+  /* Erupt from where the eye already is — the award lands centre-stage.
+     Bursting from the word card put every piece in the bottom strip, where
+     it fell straight out of frame. */
+  const ox = box.width * .5, oy = box.height * .46;
+  const reach = Math.min(box.width, box.height * 1.9);
+  const N = 54;
+
   for(let i = 0; i < N; i++){
     const p = document.createElement("i");
-    /* fan upward-biased so the pieces arc over the card before falling */
-    const ang = -Math.PI / 2 + (i / N - .5) * Math.PI * 1.55 + (Math.random() - .5) * .35;
-    const dist = 190 + Math.random() * 300;
-    const size = 26 + Math.random() * 38;
-    p.style.left = cx + "px";
-    p.style.top = cy + "px";
+    /* full fan, biased upward so the arc has somewhere to go */
+    const ang = (i / N) * Math.PI * 2 + (Math.random() - .5) * .5;
+    const spread = .42 + Math.random() * .58;
+    const dx = Math.cos(ang) * reach * .58 * spread;
+    const dy = Math.sin(ang) * reach * .40 * spread - box.height * .10;
+    const size = box.height * (.030 + Math.random() * .038);
+
+    p.style.left = ox + "px";
+    p.style.top = oy + "px";
     p.style.setProperty("--sz", size + "px");
-    p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
-    p.style.setProperty("--dy", (Math.sin(ang) * dist) + "px");
-    p.style.setProperty("--fall", (170 + Math.random() * 220) + "px");
+    p.style.setProperty("--dx", dx + "px");
+    p.style.setProperty("--dy", dy + "px");
+    p.style.setProperty("--fall", (box.height * (.55 + Math.random() * .45)) + "px");
     p.style.setProperty("--rot", (Math.random() * 900 - 450) + "deg");
-    p.style.setProperty("--dur", (900 + Math.random() * 500) + "ms");
+    p.style.setProperty("--dur", (1500 + Math.random() * 700) + "ms");
+    p.style.setProperty("--delay", (Math.random() * 90) + "ms");
     /* set on the element, not through a custom property: a url() inside a
        var() resolves against the stylesheet (/css/), not the document. */
     p.style.backgroundImage =
       'url("assets/ui/figma/' + CONFETTI_ART[(Math.random() * CONFETTI_ART.length) | 0] + '")';
     wrap.appendChild(p);
   }
-  document.body.appendChild(wrap);
-  setTimeout(() => wrap.remove(), 1650);
+  host.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 2500);
 }
 
 function flyPointsChip(){

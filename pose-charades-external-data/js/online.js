@@ -24,7 +24,7 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
-import { showPointsAward } from "./soloRound.js";
+import { showPointsAward, confettiFrom } from "./soloRound.js";
 
 const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
@@ -583,6 +583,8 @@ function showMatchAward(side, points){
   if(rival && $("v1RivalAwardTitle"))
     $("v1RivalAwardTitle").textContent=peerName.toUpperCase()+" GOT IT!";
   showPointsAward(awardId, pointsId, points);
+  /* your win earns the paper burst; the rival's award stays informational */
+  if(!rival) confettiFrom($("vsWordCard"));
 }
 
 function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
