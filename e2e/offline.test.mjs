@@ -153,8 +153,12 @@ const soloVisual = await page.evaluate(() => {
       .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) === 0),
   };
 });
-ok(soloVisual.exitSrc.endsWith("/lb-exit.png") && soloVisual.exitText === "",
-  "Solo exit uses the existing exported paper-button asset");
+/* lb-exit.png bakes "EXIT LOBBY" into the art, which is the wrong screen.
+   Solo must use a blank exported paper and carry a live, correct label. */
+ok(/\/lb-[a-z-]+\.png$/.test(soloVisual.exitSrc) && !soloVisual.exitSrc.endsWith("/lb-exit.png"),
+  `Solo exit uses a blank exported paper button (${soloVisual.exitSrc.split("/").pop()})`);
+ok(/END GAME/i.test(soloVisual.exitText) && !/lobby/i.test(soloVisual.exitText),
+  `Solo exit is labelled for the screen it is on ("${soloVisual.exitText}")`);
 ok(/255,\s*255,\s*255/.test(soloVisual.wordShadow),
   `Solo navy type uses the Figma white offset (${soloVisual.wordShadow})`);
 ok(soloVisual.midOpacity <= .7 && soloVisual.botOpacity <= .4,

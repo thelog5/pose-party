@@ -10,25 +10,25 @@
 .camcard .slot{position:absolute;inset:0;border-radius:inherit}
 
 /* live badge */
-.livebadge{position:absolute;top:14px;z-index:6;display:inline-flex;align-items:center;gap:7px;background:var(--live);color:#fff;border-radius:999px;padding:6px 15px;font-weight:900;font-size:13.5px;letter-spacing:1.5px}
+.livebadge{position:absolute;top:14px;z-index:6;display:inline-flex;align-items:center;gap:7px;background:var(--live);color:#fff;border-radius:var(--r-pill);padding:6px 15px;font-weight:900;font-size:13.5px;letter-spacing:1.5px}
 .livebadge i{width:9px;height:9px;border-radius:50%;background:#fff;animation:blink 1.1s infinite}
 @keyframes blink{50%{opacity:.25}}
 .livebadge.left{left:14px}.livebadge.right{right:14px}
 
 /* corner name badge (YOU / RIVAL / HOST) */
-.namebadge{position:absolute;top:14px;left:14px;z-index:6;border-radius:12px;padding:6px 16px;font-weight:900;font-size:14px;letter-spacing:1px;color:#fff;border:2px solid rgba(255,255,255,.7)}
+.namebadge{position:absolute;top:14px;left:14px;z-index:6;border-radius:var(--r-sm);padding:6px 16px;font-weight:900;font-size:14px;letter-spacing:1px;color:#fff;border:2px solid rgba(255,255,255,.7)}
 .namebadge.you{background:var(--blue)}
 .namebadge.rival{background:var(--purple)}
 
 /* viewfinder corner brackets */
-.brackets i{position:absolute;width:44px;height:44px;z-index:5;border:0 solid var(--orange);pointer-events:none}
-.brackets i:nth-child(1){top:12px;left:12px;border-top-width:4px;border-left-width:4px;border-top-left-radius:12px}
-.brackets i:nth-child(2){top:12px;right:12px;border-top-width:4px;border-right-width:4px;border-top-right-radius:12px}
-.brackets i:nth-child(3){bottom:12px;left:12px;border-bottom-width:4px;border-left-width:4px;border-bottom-left-radius:12px}
-.brackets i:nth-child(4){bottom:12px;right:12px;border-bottom-width:4px;border-right-width:4px;border-bottom-right-radius:12px}
+.brackets i{position:absolute;width:clamp(18px,4.4%,44px);aspect-ratio:1;height:auto;z-index:5;border:0 solid var(--orange);pointer-events:none}
+.brackets i:nth-child(1){top:3.2%;left:2.4%;border-top-width:4px;border-left-width:4px;border-top-left-radius:12px}
+.brackets i:nth-child(2){top:3.2%;right:2.4%;border-top-width:4px;border-right-width:4px;border-top-right-radius:12px}
+.brackets i:nth-child(3){bottom:3.2%;left:2.4%;border-bottom-width:4px;border-left-width:4px;border-bottom-left-radius:12px}
+.brackets i:nth-child(4){bottom:3.2%;right:2.4%;border-bottom-width:4px;border-right-width:4px;border-bottom-right-radius:12px}
 
 /* recording dot + train countdown reuse */
-.recdot{position:absolute;top:14px;right:14px;z-index:8;display:none;align-items:center;gap:8px;font-size:13px;font-weight:900;letter-spacing:1px;color:#fff;background:var(--red);border:2px solid #fff;border-radius:10px;padding:5px 12px}
+.recdot{position:absolute;top:14px;right:14px;z-index:8;display:none;align-items:center;gap:8px;font-size:13px;font-weight:900;letter-spacing:1px;color:#fff;background:var(--red);border:2px solid #fff;border-radius:var(--r-sm);padding:5px 12px}
 .recdot i{width:9px;height:9px;border-radius:50%;background:#fff;animation:blink 1s infinite}
 .flash{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:5}
 .flash.good{background:radial-gradient(circle, rgba(63,201,140,.5), transparent 70%);animation:pop .7s ease-out}
@@ -36,28 +36,28 @@
 @keyframes pop{0%{opacity:1}100%{opacity:0}}
 
 /* "AI THINKS YOU ARE..." pill overlaying camera bottom */
-.aipill{position:absolute;left:50%;bottom:38px;transform:translateX(-50%);z-index:6;width:min(720px,88%);display:flex;align-items:center;gap:18px;background:rgba(255,255,255,.96);border:2.5px solid var(--blue);border-radius:24px;padding:14px 24px;box-shadow:var(--sh)}
+.aipill{position:absolute;left:50%;bottom:38px;transform:translateX(-50%);z-index:6;width:min(720px,88%);display:flex;align-items:center;gap:18px;background:rgba(255,255,255,.96);border:2.5px solid var(--blue);border-radius:var(--r-xl);padding:14px 24px;box-shadow:var(--sh)}
 .aipill .boticon{width:54px;height:54px;flex:none}
-.aipill .who{font-family:var(--f-mono);font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--ink);line-height:1.25;white-space:nowrap}
+.aipill .who{font-family:var(--f-label);font-weight:700;font-size:15px;letter-spacing:.5px;color:var(--ink);line-height:1.25;white-space:nowrap}
 .aipill .sep{width:2px;align-self:stretch;background:var(--line-soft);flex:none}
 .aipill .guess{font-family:var(--f-display);font-weight:800;font-size:clamp(18px,2.2vw,30px);letter-spacing:1px;color:var(--yellow-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}
 
 /* ---------- guess panel (AI'S TOP GUESS) ---------- */
 .guesspanel{position:relative;background:rgba(255,255,255,.78);border:2.5px solid var(--blue);border-radius:var(--r-lg);box-shadow:var(--sh);padding:26px 26px 18px}
-.paneltag{position:absolute;top:-14px;left:22px;background:var(--blue);color:#fff;border-radius:999px;padding:5px 16px;font-weight:900;font-size:12.5px;letter-spacing:1.5px;text-transform:uppercase}
+.paneltag{position:absolute;top:-14px;left:22px;background:var(--blue);color:#fff;border-radius:var(--r-pill);padding:5px 16px;font-weight:900;font-size:12.5px;letter-spacing:1.5px;text-transform:uppercase}
 .paneltag.orange{background:var(--orange)}
 .topguess{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .topguess .word{font-family:var(--f-display);font-weight:800;font-size:clamp(26px,3vw,46px);text-transform:uppercase;letter-spacing:1px;line-height:1.05;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .botpct{position:relative;flex:none;width:88px;height:76px}
-.botpct .head{position:absolute;inset:8px 0 0;background:var(--card);border:3px solid var(--ink);border-radius:16px}
+.botpct .head{position:absolute;inset:8px 0 0;background:var(--card);border:3px solid var(--ink);border-radius:var(--r-md)}
 .botpct .ant{position:absolute;top:-2px;left:50%;transform:translateX(-50%);width:4px;height:12px;background:var(--ink);border-radius:2px}
 .botpct .ant:before{content:"";position:absolute;top:-8px;left:-3px;width:10px;height:10px;border-radius:50%;background:var(--red)}
-.botpct .pct{position:absolute;inset:14px 6px 6px;background:var(--ink);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:24px}
+.botpct .pct{position:absolute;inset:14px 6px 6px;background:var(--ink);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:24px}
 
 /* cold → warm → hot meter */
 .meter{margin:12px 0 4px}
-.meter .segs{display:flex;gap:5px;background:var(--card);border:2.5px solid var(--line);border-radius:10px;padding:5px}
-.meter .segs i{flex:1;height:26px;border-radius:6px;background:var(--tint)}
+.meter .segs{display:flex;gap:5px;background:var(--card);border:2.5px solid var(--line);border-radius:var(--r-sm);padding:5px}
+.meter .segs i{flex:1;height:26px;border-radius:var(--r-xs);background:var(--tint)}
 .meter .segs i.on:nth-child(-n+4){background:var(--blue)}
 .meter .segs i.on:nth-child(n+5):nth-child(-n+8){background:var(--yellow)}
 .meter .segs i.on:nth-child(n+9){background:var(--orange)}
@@ -66,15 +66,15 @@
 
 /* ranked guess rows */
 .glist{display:flex;flex-direction:column;gap:8px;margin-top:12px;min-height:40px}
-.grow{display:flex;align-items:center;gap:13px;background:var(--panel);border:2px solid var(--line-soft);border-radius:12px;padding:9px 16px}
+.grow{display:flex;align-items:center;gap:13px;background:var(--panel);border:2px solid var(--line-soft);border-radius:var(--r-sm);padding:9px 16px}
 .grow .rank{flex:none;width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px}
 .grow .gname{font-weight:900;font-size:16px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.grow .gbar{flex:1;height:12px;background:#DEE6FA;border-radius:999px;overflow:hidden;min-width:60px}
-.grow .gbar i{display:block;height:100%;background:#AFC3F5;border-radius:999px}
+.grow .gbar{flex:1;height:12px;background:#DEE6FA;border-radius:var(--r-pill);overflow:hidden;min-width:60px}
+.grow .gbar i{display:block;height:100%;background:#AFC3F5;border-radius:var(--r-pill)}
 .grow .gpct{flex:none;font-weight:900;font-size:16px;color:var(--ink);min-width:48px;text-align:right}
 
 /* ---------- big action buttons ---------- */
-.bigbtn{display:flex;align-items:center;justify-content:center;gap:14px;border:2.5px solid var(--ink);border-radius:18px;padding:18px 30px;font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:2px;text-transform:uppercase;box-shadow:var(--sh-big);line-height:1}
+.bigbtn{display:flex;align-items:center;justify-content:center;gap:14px;border:2.5px solid var(--ink);border-radius:var(--r-lg);padding:18px 30px;font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:2px;text-transform:uppercase;box-shadow:var(--sh-big);line-height:1}
 .bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(21,42,110,.18)}
 .bigbtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .bigbtn.yellow{background:var(--yellow);color:var(--ink)}
@@ -82,7 +82,7 @@
 .bigbtn.outline{background:var(--card);color:var(--blue-deep);border-color:var(--blue)}
 .bigbtn .arrow{font-family:var(--f-body)}
 
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2.5px solid var(--ink);border-radius:12px;padding:10px 18px;font-weight:900;font-size:15px;letter-spacing:.8px;text-transform:uppercase;box-shadow:var(--sh)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2.5px solid var(--ink);border-radius:var(--r-sm);padding:10px 18px;font-weight:900;font-size:15px;letter-spacing:.8px;text-transform:uppercase;box-shadow:var(--sh)}
 .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(21,42,110,.18)}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .btn.blue{background:var(--blue);color:#fff}
@@ -92,7 +92,7 @@
 .btn .dot{width:10px;height:10px;border-radius:50%;background:#fff}
 
 /* small chips */
-.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 14px;font-weight:900;font-size:12px;letter-spacing:1.2px;text-transform:uppercase}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:var(--r-pill);padding:5px 14px;font-weight:900;font-size:12px;letter-spacing:1.2px;text-transform:uppercase}
 .chip.white{background:var(--card);color:var(--ink)}
 .chip.yellow{background:var(--yellow);color:var(--ink)}
 .chip.blue{background:var(--blue);color:#fff}
@@ -112,13 +112,13 @@
 .setrow .meta b{display:block;font-size:14px;letter-spacing:.8px;text-transform:uppercase}
 .setrow .meta small{font-size:11.5px;color:var(--ink-soft);font-weight:800}
 .stepper{display:flex;align-items:center;gap:8px}
-.stepper button{width:32px;height:32px;border:2px solid var(--line-soft);border-radius:10px;background:var(--panel);font-weight:900;font-size:18px;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.stepper button{width:32px;height:32px;border:2px solid var(--line-soft);border-radius:var(--r-sm);background:var(--panel);font-weight:900;font-size:18px;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .stepper button:disabled{opacity:.4;cursor:not-allowed}
-.stepper .stepval{min-width:64px;text-align:center;border:2px solid var(--line-soft);border-radius:10px;padding:5px 10px;font-weight:900;font-size:16px;background:var(--card)}
+.stepper .stepval{min-width:64px;text-align:center;border:2px solid var(--line-soft);border-radius:var(--r-sm);padding:5px 10px;font-weight:900;font-size:16px;background:var(--card)}
 
 /* inputs */
 .field label{font-size:12.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
-.field input,.field select{width:100%;background:var(--card);border:2.5px solid var(--line-soft);color:var(--ink);border-radius:12px;padding:10px 14px;font-weight:800;font-size:15px;margin-top:5px}
+.field input,.field select{width:100%;background:var(--card);border:2.5px solid var(--line-soft);color:var(--ink);border-radius:var(--r-sm);padding:10px 14px;font-weight:800;font-size:15px;margin-top:5px}
 
 /* icon-bullet rows (how it works) */
 .bullets{display:flex;flex-direction:column;gap:12px;margin-top:12px}

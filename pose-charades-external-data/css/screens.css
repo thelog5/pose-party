@@ -324,9 +324,9 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   width:min(62vw,900px);pointer-events:none;opacity:0}
 .sp-award::before{content:"";position:absolute;left:50%;top:50%;width:122%;aspect-ratio:1;
   translate:-50% -50%;z-index:-1;opacity:0;
-  background:repeating-conic-gradient(from 4deg,rgba(255,211,64,.9) 0 3deg,transparent 3deg 13deg);
-  mask:radial-gradient(circle,transparent 0 32%,#000 33% 55%,transparent 56%);
-  filter:drop-shadow(0 0 min(1vw,1.78vh) rgba(255,205,43,.6))}
+  background:radial-gradient(circle,rgba(255,231,150,.85) 0 26%,
+    rgba(255,205,64,.42) 44%,rgba(255,190,40,.14) 62%,transparent 72%);
+  filter:blur(min(.5vw,.9vh))}
 .sp-award .sp-art{aspect-ratio:2.098;
   filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
 .sp-award span{position:absolute;left:0;width:100%;text-align:center;translate:0 -50%;
@@ -348,7 +348,7 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 
 /* points chip flying to the score card (created in JS) */
 .sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby);font-weight:400;
-  background:#ffd964;border:3px solid #17356f;border-radius:999px;padding:.4% 2%;color:#17356f;
+  background:#ffd964;border:3px solid #17356f;border-radius:var(--r-pill);padding:.4% 2%;color:#17356f;
   font-size:clamp(16px,min(2.2vw,3.9vh),88px);box-shadow:0 4px 0 rgba(23,53,111,.25)}
 
 /* theme.css kills every animation under reduced motion, which would leave the
@@ -461,7 +461,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .settings .set-btn[disabled]{opacity:.45;cursor:default}
 
 /* start + status */
-.startbtn[disabled]{opacity:.45;cursor:default;filter:drop-shadow(0 min(.264vw,.469vh) min(.153vw,.272vh) rgba(0,0,0,.35)) saturate(.6)}
+.startbtn[disabled]{opacity:.72;cursor:default;filter:drop-shadow(0 min(.264vw,.469vh) min(.153vw,.272vh) rgba(0,0,0,.35)) saturate(.72) brightness(.94)}
 .startbtn.ready{animation:startpop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes startpop{0%{transform:scale(.94)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
 .waitline{color:#124c9d;font-family:var(--f-sign);font-weight:700;font-size:clamp(14px,min(1.67vw,2.97vh),78px);line-height:.75;letter-spacing:.04em;text-align:center;text-shadow:min(.069vw,.123vh) min(.069vw,.123vh) min(.069vw,.123vh) rgba(0,0,0,.25)}
@@ -543,7 +543,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .v1-video-side .slot,.v1-video-side .camdock,
 .v1-video-side video,.v1-video-side canvas{position:absolute;inset:0;width:100%;height:100%}
 .v1-video-side video,.v1-video-side canvas{object-fit:cover}
-.v1-divider{position:absolute;left:48.333%;top:-19.753%;width:1.806%;height:139.506%;
+.v1-divider{position:absolute;left:48.333%;top:-20%;width:1.806%;height:145%;
   z-index:3;pointer-events:none;object-fit:fill;
   filter:drop-shadow(0 min(.2vw,.36vh) min(.18vw,.32vh) rgba(0,0,0,.25))}
 .v1-tape{position:absolute;z-index:7;pointer-events:none}
@@ -638,7 +638,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 /* The local crown follows the already-local nose landmark; the remote crown
    uses the centred camera framing as a privacy-safe fallback. No landmarks
    are transmitted across the network. */
-.v1-crown{position:absolute;left:50%;top:5.5%;width:14%;height:auto;z-index:4;
+.v1-crown{position:absolute;left:50%;top:19%;width:14%;height:auto;z-index:6;
   opacity:0;pointer-events:none;translate:-50% -50%;rotate:-11deg;scale:.45;
   filter:drop-shadow(0 min(.35vw,.62vh) min(.25vw,.44vh) rgba(0,0,0,.4));
   transition:left .055s linear,top .055s linear,opacity .18s ease,
@@ -665,7 +665,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .partybanner small{font-size:13px;font-weight:800;color:var(--ink-soft)}
 .partyname{margin-left:auto;min-width:132px}
 .partyname label{display:block;font-size:9.5px;font-weight:900;letter-spacing:1px;text-transform:uppercase;color:var(--ink-soft)}
-.partyname input{width:132px;margin-top:3px;border:2px solid var(--line-soft);border-radius:10px;background:#fff;color:var(--ink);font-weight:900;padding:7px 9px}
+.partyname input{width:132px;margin-top:3px;border:2px solid var(--line-soft);border-radius:var(--r-sm);background:#fff;color:var(--ink);font-weight:900;padding:7px 9px}
 .roomcodebig{text-align:center}
 .roomcodebig .lab{font-size:12px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-soft)}
 .roomcodebig .code{font-family:var(--f-display);font-weight:800;font-size:48px;letter-spacing:7px;line-height:1}
@@ -681,14 +681,14 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .teampanel.blue .teamhead{background:var(--blue)}
 .teampanel.orange .teamhead{background:var(--orange)}
 .teamhead h4{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:1px;text-transform:uppercase}
-.teamhead .cnt{background:rgba(255,255,255,.22);border-radius:999px;padding:3px 12px;font-weight:900;font-size:13px}
+.teamhead .cnt{background:rgba(255,255,255,.22);border-radius:var(--r-pill);padding:3px 12px;font-weight:900;font-size:13px}
 .teamhead .btn{margin-left:auto;border-width:2px;padding:7px 16px;font-size:13px}
 .teamgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:20px 16px}
-.ptile{position:relative;aspect-ratio:16/9;border-radius:14px;overflow:hidden;border:2.5px solid var(--line-soft);background:var(--panel)}
+.ptile{position:relative;aspect-ratio:16/9;border-radius:var(--r-md);overflow:hidden;border:2.5px solid var(--line-soft);background:var(--panel)}
 .ptile .pname{position:absolute;left:0;right:0;bottom:0;background:var(--ink);color:#fff;font-weight:900;font-size:12.5px;padding:5px 10px;display:flex;align-items:center;gap:6px}
 .ptile .pname .mini{margin-left:auto}
-.ptile .hostchip{position:absolute;top:8px;left:8px;z-index:3;background:var(--ink);color:#fff;border-radius:8px;padding:3px 9px;font-size:10.5px;font-weight:900;letter-spacing:.8px}
-.ptile .livechip{position:absolute;top:8px;right:8px;z-index:3;background:var(--live);color:#fff;border-radius:8px;padding:3px 9px;font-size:10px;font-weight:900;letter-spacing:.8px}
+.ptile .hostchip{position:absolute;top:8px;left:8px;z-index:3;background:var(--ink);color:#fff;border-radius:var(--r-xs);padding:3px 9px;font-size:10.5px;font-weight:900;letter-spacing:.8px}
+.ptile .livechip{position:absolute;top:8px;right:8px;z-index:3;background:var(--live);color:#fff;border-radius:var(--r-xs);padding:3px 9px;font-size:10px;font-weight:900;letter-spacing:.8px}
 .ptile.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-soft);font-size:12px;font-weight:800;border-style:dashed}
 .ptile.join{border:2.5px dashed;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;font-weight:900;font-size:13px;cursor:pointer}
 .teampanel.blue .ptile.join{border-color:var(--blue);background:var(--blue);color:#fff}
@@ -716,14 +716,14 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .trainpanel{display:flex;flex-direction:column;gap:12px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.wordchip{font-weight:800;font-size:12px;padding:5px 12px;border-radius:999px;border:2px solid var(--line-soft);color:var(--ink-soft);background:var(--card)}
+.wordchip{font-weight:800;font-size:13px;padding:0 14px;min-height:44px;display:inline-flex;align-items:center;border-radius:var(--r-pill);border:2px solid var(--line-soft);color:var(--ink-soft);background:var(--card)}
 .wordchip:hover{border-color:var(--blue);color:var(--blue-deep)}
 .classlist{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
-.classrow{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:2px solid var(--line-soft);border-radius:10px;padding:8px 13px;font-weight:800;font-size:14px}
+.classrow{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:2px solid var(--line-soft);border-radius:var(--r-sm);padding:8px 13px;font-weight:800;font-size:14px}
 .classrow .count{font-weight:900;font-size:13px;color:var(--blue-deep)}
 .classrow .del{color:var(--ink-soft);font-size:14px;padding:2px 7px;font-weight:900}
 .classrow .del:hover{color:var(--red)}
-.trainreport{font-weight:800;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--panel);border-radius:12px;padding:11px 13px;display:none}
+.trainreport{font-weight:800;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--panel);border-radius:var(--r-sm);padding:11px 13px;display:none}
 .trainreport b{color:var(--blue-deep)} .trainreport .warn{color:var(--red)}
 .hint{font-size:12.5px;font-weight:800;color:var(--ink-soft);line-height:1.5}
 .hint b{color:var(--ink)}
@@ -970,3 +970,75 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pmstage.chase-final .pm-word{animation-duration:.11s;
   filter:saturate(1.25) brightness(1.06)}
 #pmWordTimerCard.tick-pop{animation:v1tickpop .32s cubic-bezier(.18,1.65,.32,1)}
+
+/* The rival placeholder is shared by the lobby and the match. Only the lobby
+   has a code to share, so that line must not follow it into gameplay. */
+#rivalPlaceholder .ph-match{display:none}
+body[data-screen="match"] #rivalPlaceholder .ph-lobby{display:none}
+body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
+
+/* Solo's exit used lb-exit.png, whose art reads "EXIT LOBBY" — wrong screen.
+   The blank exported paper button carries a live label instead. Blue also
+   stops the way out from being the loudest thing on the HUD. */
+.sp-exit-label{position:absolute;inset:4% 0 14%;display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
+  font-size:min(1.18vw,2.1vh);letter-spacing:.02em;white-space:nowrap;pointer-events:none;
+  text-shadow:min(.16vw,.284vh) min(.16vw,.284vh) 0 rgba(0,0,0,.5)}
+
+/* =================== GAME FEEL =================== */
+
+/* Win confetti: real torn-paper pieces thrown from the word card, arcing up
+   and then falling. Built in soloRound.js; sized/spun per piece. */
+.burstwrap{position:fixed;inset:0;z-index:96;pointer-events:none;overflow:hidden}
+.burstwrap i{position:absolute;width:var(--sz);aspect-ratio:1;
+  background-size:contain;background-repeat:no-repeat;
+  background-position:center;transform:translate(-50%,-50%);
+  filter:drop-shadow(0 2px 2px rgba(23,53,111,.28));
+  animation:confFly var(--dur) cubic-bezier(.14,.72,.36,1) forwards}
+@keyframes confFly{
+  0%  {opacity:0;transform:translate(-50%,-50%) scale(.35) rotate(0)}
+  14% {opacity:1}
+  55% {transform:translate(calc(-50% + var(--dx) * .82),calc(-50% + var(--dy)))
+       scale(1) rotate(calc(var(--rot) * .6))}
+  100%{opacity:0;
+       transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy) + var(--fall)))
+       scale(.92) rotate(var(--rot))}}
+
+/* Score anticipation: the points chip is in flight and the card has not been
+   credited yet, so it braces instead of sitting inert on a stale number. */
+.sp-card.awaiting,.v1-scorecard.awaiting{animation:scoreBrace .42s ease-in-out infinite alternate}
+@keyframes scoreBrace{from{transform:scale(1)}to{transform:scale(1.035) rotate(-.5deg)}}
+
+/* Streak escalation: a run should visibly build rather than just increment. */
+.sp-streak[data-tier="1"] .sp-art{filter:drop-shadow(0 0 min(.7vw,1.2vh) rgba(255,196,64,.55))}
+.sp-streak[data-tier="2"]{animation:streakSway 1.5s ease-in-out infinite}
+.sp-streak[data-tier="2"] .sp-art{filter:drop-shadow(0 0 min(1.1vw,2vh) rgba(255,170,40,.75))}
+.sp-streak[data-tier="3"]{animation:streakSway .85s ease-in-out infinite}
+.sp-streak[data-tier="3"] .sp-art{filter:drop-shadow(0 0 min(1.6vw,2.8vh) rgba(255,120,30,.9)) saturate(1.15)}
+.sp-streak[data-tier="3"] .sp-val{text-shadow:1.553cqw 1.553cqw 0 rgba(0,0,0,.5),0 0 .8cqw rgba(255,230,150,.9)}
+@keyframes streakSway{0%,100%{rotate:-1.4deg}50%{rotate:1.4deg}}
+
+/* Chase urgency: five seconds of maximum tension needs to read at a glance,
+   not just as a label swap. A breathing red vignette on the whole stage. */
+.matchstage[data-phase="chase"]::after,.pmstage[data-phase="chase"]::after{
+  content:"";position:absolute;inset:0;z-index:11;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 50%,transparent 42%,rgba(214,40,24,.30) 88%);
+  animation:chasePulse .82s ease-in-out infinite}
+@keyframes chasePulse{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* Solo word change: the new word stamps down instead of silently swapping. */
+.sp-word.wordswap{animation:wordStamp .5s cubic-bezier(.18,1.5,.32,1)}
+@keyframes wordStamp{
+  0%  {transform:scale(1.18) rotate(-1.8deg);opacity:.25}
+  40% {opacity:1}
+  62% {transform:scale(.975) rotate(.7deg)}
+  100%{transform:scale(1) rotate(0)}}
+
+@media (prefers-reduced-motion: reduce){
+  .burstwrap{display:none}
+  .sp-streak[data-tier]{animation:none}
+  .matchstage[data-phase="chase"]::after,.pmstage[data-phase="chase"]::after{animation:none;opacity:.7}
+}
+
+/* An empty room code is "being created", not "hidden" — say so quietly. */
+.invite .inv-code.loading{opacity:.55;letter-spacing:.06em}

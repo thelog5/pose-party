@@ -15,7 +15,7 @@
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
-import { fmtTime, fmtScore } from "./ui.js";
+import { fmtTime, fmtScore, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
@@ -85,7 +85,7 @@ function runCountdown(startAt){
     }
     const left = Math.ceil((startAt - ctx.serverNow()) / 1000);
     if(left > 0){
-      if(cd.textContent !== String(left)){ cd.textContent = String(left); blip([440]); }
+      if(setCountdown(left)) blip([440]);
     }else{ clearInterval(ctx.countdownTimer); cd.classList.add("hidden"); }
   }, 100);
 }

@@ -86,9 +86,10 @@ try {
   ok(await A.evaluate(() => !document.getElementById("lobbyStage").classList.contains("joined")), "waiting robot visible before join");
   ok(await A.evaluate(() => document.getElementById("lobbyName").value) === "Alice", "name tag prefilled from storage");
 
-  // the requested scoring format now defaults to 2:00 / 20s
-  ok(await txt(A, "#setMatch") === "2:00" && await txt(A, "#setWord") === "20s",
-    `default settings are 2:00 / 20s (${await txt(A,"#setMatch")}, ${await txt(A,"#setWord")})`);
+  /* Both timers read in the same M:SS unit — adjacent controls in mixed
+     units ("2:00" beside "20s") read as two different kinds of setting. */
+  ok(await txt(A, "#setMatch") === "2:00" && await txt(A, "#setWord") === "0:20",
+    `default settings share one unit (${await txt(A,"#setMatch")}, ${await txt(A,"#setWord")})`);
   // controls still round-trip to the defaults
   await act(A, () => A.click("#matchMinus"));
   await act(A, () => A.click("#matchPlus"));

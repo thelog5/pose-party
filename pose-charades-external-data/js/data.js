@@ -45,7 +45,7 @@ export async function preloadBundledDataset(){
     if(!res.ok) throw new Error("Missing training data file: "+BUNDLED_DATA_URL);
     mergeClips(await res.json());
     if(state.dataset.clips.length) train({silent:true});
-    toast("Loaded training data: "+state.dataset.clips.length+" clips.");
+    /* the preload is expected and uneventful — no toast for it */
   }catch(e){
     console.warn("Training data could not be loaded.", e);
     toast("No training data loaded. Run with localhost and keep data at assets/data/pose-charades-data.json");

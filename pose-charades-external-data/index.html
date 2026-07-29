@@ -6,7 +6,7 @@
 <title>Pose Party</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect x='10' y='25' width='80' height='62' rx='18' fill='%23fff' stroke='%23152A6E' stroke-width='6'/><rect x='22' y='38' width='56' height='38' rx='10' fill='%23152A6E'/><circle cx='38' cy='55' r='6' fill='%23FFC531'/><circle cx='62' cy='55' r='6' fill='%23FFC531'/><line x1='50' y1='25' x2='50' y2='12' stroke='%23152A6E' stroke-width='6'/><circle cx='50' cy='9' r='7' fill='%23F0512D'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Beiruti:wght@700;800&family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Beiruti:wght@700;800&family=Fredoka+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/screens.css">
@@ -269,8 +269,9 @@
         <span class="sk-word">SKIP</span>
         <span class="sk-cost" id="soloSkipCost">−250</span>
       </button>
-      <button class="sp-exit pbtn" id="btnExitSolo" title="End game" aria-label="Exit game">
-        <img src="assets/ui/figma/lb-exit.png" alt="">
+      <button class="sp-exit pbtn" id="btnExitSolo" title="End game" aria-label="End game">
+        <img src="assets/ui/figma/lb-small-blue.png" alt="">
+        <b class="sp-exit-label">END GAME</b>
       </button>
 
       <!-- points award (hidden; shown on a correct catch) -->
@@ -303,7 +304,7 @@
       <div class="lb nametag fig-shadow-xs lobby-alpha lobby-float" style="left:61.8%;top:4%;width:14.5%;z-index:3">
         <img src="assets/ui/figma/lb-nametag.png" alt="">
         <span class="nt-label">Your Name</span>
-        <input id="lobbyName" maxlength="10" autocomplete="off" spellcheck="false" placeholder="TAP TO SET">
+        <input id="lobbyName" maxlength="10" autocomplete="off" spellcheck="false" placeholder="CLICK TO SET">
         <img class="nt-pencil" src="assets/ui/figma/lb-pencil.png" alt="">
       </div>
 
@@ -333,7 +334,7 @@
         <span class="signtext">Invite a Friend</span>
       </div>
       <div class="lb m1 waitbig lobby-rival-layer" id="lobbyWaitBig" style="left:55.3%;top:60.4%;width:49.6%;z-index:5">
-        WAITING FOR FRIEND<i id="dotsBig">...</i></div>
+        WAITING FOR FRIEND<i id="dotsBig">···</i></div>
 
       <!-- vs badge pops when the opponent arrives -->
       <img class="lb m1 vsbadge" id="lobbyVs" style="left:45.6%;top:36%;width:8.8%;z-index:7" src="assets/ui/figma/lb-vs.png" alt="VS">
@@ -378,7 +379,7 @@
         <span class="inv-label" style="top:35%">Your Room</span>
         <span class="inv-label" style="top:68%">Join With Code</span>
         <img class="inv-box" style="top:30%" src="assets/ui/figma/lb-code-box.png" alt="">
-        <span class="inv-code" id="roomCodeText">······</span>
+        <span class="inv-code loading" id="roomCodeText">- - - - - -</span>
         <button class="inv-btn pbtn lobby-alpha" id="btnCopyLink" style="top:33%"><img src="assets/ui/figma/lb-small-blue.png" alt=""><b>Copy</b></button>
         <img class="inv-box" style="top:64%" src="assets/ui/figma/lb-code-box.png" alt="">
         <input id="joinCode" maxlength="6" autocomplete="off" spellcheck="false" placeholder="ABC123">
@@ -396,7 +397,7 @@
         <button class="set-btn pbtn lobby-alpha" id="matchMinus" style="left:37.6%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
         <span class="set-label" style="left:59.05%;width:32%">Word Timer</span>
         <button class="set-btn pbtn lobby-alpha" id="wordPlus"  style="left:56.3%"><img src="assets/ui/figma/lb-plus.png" alt="+"></button>
-        <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">20s</b></span>
+        <span class="set-badge" style="left:65.8%"><img src="assets/ui/figma/lb-value-badge.png" alt=""><b id="setWord">0:20</b></span>
         <button class="set-btn pbtn lobby-alpha" id="wordMinus" style="left:86.3%"><img src="assets/ui/figma/lb-minus.png" alt="−"></button>
       </div>
 
@@ -444,7 +445,7 @@
       <div class="sp-card sp-wtimer v1-wordtimer" id="v1WordTimerCard" style="left:40.97%;top:.86%;width:17.50%">
         <img class="sp-art" src="assets/ui/figma/sp-wtimer.png" alt="">
         <img class="v1-chase-clock" src="assets/ui/figma/sp-clock.png" alt="">
-        <span class="sp-lab" id="v1WordTimerLabel">WORD TIMER</span>
+        <span class="sp-lab" id="v1WordTimerLabel">WORD TIME</span>
         <span class="sp-val" id="v1WordTime">00:20</span>
       </div>
       <div class="v1-scorecard you" style="left:25.90%;top:.25%;width:13.33%">
@@ -459,7 +460,7 @@
       </div>
 
       <!-- rolling local guesses, mirrored rival state -->
-      <div class="sp-guess v1-guess current you" id="myGuessTop" style="left:0;top:57.43%;width:18.69%">
+      <div class="sp-guess v1-guess current you" id="myGuessTop" style="left:1.6%;top:57.43%;width:18.69%">
         <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
         <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
         <span class="glabel" id="myTopWord">GUESSING…</span>
@@ -470,7 +471,7 @@
         <span class="glabel" id="myPastWord"></span>
         <span class="gpct" id="myPastPct"></span>
       </div>
-      <div class="sp-guess v1-guess current rival" id="rivalGuessTop" style="left:80.97%;top:58.77%;width:18.69%">
+      <div class="sp-guess v1-guess current rival" id="rivalGuessTop" style="left:79.6%;top:58.77%;width:18.69%">
         <img class="grobot" src="assets/ui/figma/sp-robot.png" alt="">
         <img class="gcard" src="assets/ui/figma/sp-guess.png" alt="">
         <span class="glabel" id="rivalTopWord">GUESSING…</span>
@@ -644,8 +645,9 @@
     <video id="videoRemote" playsinline autoplay class="hidden"></video>
     <div class="vsplaceholder" id="rivalPlaceholder">
       <svg><use href="#botFull"/></svg>
-      <span>Waiting for rival…</span>
-      <small>share the room code or link below</small>
+      <span class="ph-lobby">Waiting for rival…</span>
+      <span class="ph-match">Rival’s camera is connecting…</span>
+      <small class="ph-lobby">share the room code or link below</small>
     </div>
   </div>
 

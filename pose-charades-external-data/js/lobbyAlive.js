@@ -21,7 +21,8 @@ function start(){
   }, WAVE_MS);
   dotsTimer = setInterval(() => {
     dots = (dots % 3) + 1;
-    const s = ".".repeat(dots);
+    /* one glyph per step so the label width never jumps */
+    const s = "·".repeat(dots);
     for(const id of ["dotsBig", "dotsSmall"]){
       const el = $(id);
       if(el) el.textContent = s;

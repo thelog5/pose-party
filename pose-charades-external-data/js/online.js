@@ -19,7 +19,7 @@
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { toast, flash, pointBurst, fmtTime, fmtScore, fitMatchPaperText,
-         renderRemoteMatchGuess } from "./ui.js";
+         renderRemoteMatchGuess, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
@@ -214,13 +214,15 @@ function wireStepper(key, apply, step){
 
 function renderSettings(editable){
   $("setMatch").textContent=fmtSecs(settings.matchSecs);
-  $("setWord").textContent=settings.wordSecs+"s";
+  $("setWord").textContent=fmtSecs(settings.wordSecs);
   for(const id of ["matchMinus","matchPlus","wordMinus","wordPlus"])
     $(id).disabled=!editable;
 }
 
 function renderCode(code){
-  $("roomCodeText").textContent=code||"······";
+  const el=$("roomCodeText");
+  el.textContent=code||"— — — — — —";
+  el.classList.toggle("loading", !code);
 }
 
 function setLobbyStatus(text){
@@ -403,7 +405,7 @@ function beginError(e){
 
 function offlineExplain(e){
   console.warn("online unavailable:", e);
-  setLobbyStatus("Can’t reach the game server. Online play needs the app served by the Node server: run “npm start” inside server/ and open the address it prints. (You can still play PRACTICE VS ROBOT from the home screen’s Play with AI.)");
+  setLobbyStatus("Can’t reach the game server right now. Check your connection — or head back and play Solo against the AI.");
 }
 
 /* ---------------- webrtc video ---------------- */
@@ -489,7 +491,7 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   countdownTimer=setInterval(()=>{
     if(gameState()!=="countdown" && gameState()!=="playing"){ clearInterval(countdownTimer); cd.classList.add("hidden"); return; }
     const left=Math.ceil((startAt-serverNow())/1000);
-    if(left>0){ if(cd.textContent!==String(left)){ cd.textContent=String(left); blip([440]); } }
+    if(left>0){ if(setCountdown(left)) blip([440]); }
     else { clearInterval(countdownTimer); cd.classList.add("hidden"); }
   },100);
 
@@ -550,7 +552,7 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   if($("v1WordFill")) $("v1WordFill").style.width="0%";
   $("vsWord").textContent=game.word;
   requestAnimationFrame(fitMatchPaperText);
-  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIMER";
+  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIME";
   const stage=$("matchStage");
   if(stage){
     stage.dataset.phase=suddenDeath?"sudden":"word";

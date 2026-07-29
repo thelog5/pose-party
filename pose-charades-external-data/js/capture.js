@@ -3,7 +3,7 @@
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
-import { flash, toast, renderClasses } from "./ui.js";
+import { flash, toast, renderClasses, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
 
 export function startRecording(){
@@ -11,10 +11,10 @@ export function startRecording(){
   if(!label){ $("classInput").focus(); return; }
   const person=$("personInput").value.trim().toLowerCase()||"unknown";
   const secs=+$("clipLen").value;
-  let n=3; const cd=$("countdown"); cd.classList.remove("hidden"); cd.textContent=n;
+  let n=3; const cd=$("countdown"); cd.classList.remove("hidden"); setCountdown(n);
   $("btnRecord").disabled=true;
   const t=setInterval(()=>{
-    n--; if(n>0){ cd.textContent=n; return; }
+    n--; if(n>0){ setCountdown(n); return; }
     clearInterval(t); cd.classList.add("hidden");
     $("recdot").style.display="flex";
     state.recording={ label, person, frames:[], endAt: performance.now()+secs*1000 };

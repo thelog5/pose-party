@@ -211,7 +211,7 @@ function partyError(res){
 
 function partyOffline(e){
   console.warn("party unavailable:", e);
-  setLobbyStatus("Can’t reach the game server. Online play needs the app served by the Node server: run “npm start” inside server/ and open the address it prints.");
+  setLobbyStatus("Can’t reach the game server right now. Check your connection and try again.");
 }
 
 /* ---------------- roster → tiles ---------------- */

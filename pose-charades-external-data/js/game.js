@@ -15,7 +15,7 @@ import { state } from "./state.js";
 import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
 import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore,
-         localMatchGuessIs } from "./ui.js";
+         localMatchGuessIs, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
@@ -53,11 +53,11 @@ function cancelPreCount(){
 function runPreCount(done){
   let n=PRECOUNT_FROM;
   const cd=$("countdown");
-  cd.classList.remove("hidden"); cd.textContent=n;
+  cd.classList.remove("hidden"); setCountdown(n);
   blip([440]);
   preCountTimer=setInterval(()=>{
     n--;
-    if(n>0){ cd.textContent=n; blip([440]); return; }
+    if(n>0){ setCountdown(n); blip([440]); return; }
     clearInterval(preCountTimer); preCountTimer=null;
     cd.classList.add("hidden");
     done();
@@ -85,6 +85,12 @@ function updateHud(){
   setTxt("soloStreakVal",newStreak);
   if(prevScore!==undefined && prevScore!==newScore) bump("soloScoreCard");
   if(prevStreak!==undefined && prevStreak!==newStreak) bump("soloStreakCard");
+  /* 0: no run · 1: warming · 2: hot · 3: on fire — CSS owns the treatment */
+  const streakCard=$("soloStreakCard");
+  if(streakCard){
+    const n=Math.max(1,g.streak);
+    streakCard.dataset.tier = n>=6 ? "3" : n>=4 ? "2" : n>=2 ? "1" : "0";
+  }
   if(state.screen==="match") renderDots(g.round, g.rounds);
 }
 
@@ -117,7 +123,7 @@ export function startGame(mode="ai"){
 }
 
 function animateWordChange(){
-  [$("promptBar"), $("vsWordCard")].forEach(el=>{
+  [$("promptBar"), $("vsWordCard"), $("soloWordCard")].forEach(el=>{
     if(!el) return;
     el.classList.remove("wordswap"); void el.offsetWidth; el.classList.add("wordswap");
   });

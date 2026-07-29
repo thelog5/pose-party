@@ -247,6 +247,14 @@ function showAward(){
     state.game ? state.game.pendingPts : 0);
 }
 
+/* The win burst is real paper: the same torn confetti the home screen uses,
+   thrown outward and then pulled down, rather than CSS shapes. (The previous
+   particles had no styling at all and rendered invisible.) */
+const CONFETTI_ART = [
+  "conf-star-a.png", "conf-star-b.png", "conf-star-c.png",
+  "conf-blue-a.png", "conf-blue-b.png", "conf-red-a.png", "conf-red-b.png",
+];
+
 function confettiFrom(node){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const r = node ? node.getBoundingClientRect()
@@ -254,19 +262,29 @@ function confettiFrom(node){
   const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
   const wrap = document.createElement("div");
   wrap.className = "burstwrap";
-  for(let i = 0; i < 26; i++){
+  const N = 38;
+  for(let i = 0; i < N; i++){
     const p = document.createElement("i");
-    const ang = (i / 26) * Math.PI * 2 + Math.random() * 0.6;
-    const dist = 90 + Math.random() * 160;
-    p.style.left = cx + "px"; p.style.top = cy + "px";
+    /* fan upward-biased so the pieces arc over the card before falling */
+    const ang = -Math.PI / 2 + (i / N - .5) * Math.PI * 1.55 + (Math.random() - .5) * .35;
+    const dist = 190 + Math.random() * 300;
+    const size = 26 + Math.random() * 38;
+    p.style.left = cx + "px";
+    p.style.top = cy + "px";
+    p.style.setProperty("--sz", size + "px");
     p.style.setProperty("--dx", Math.cos(ang) * dist + "px");
-    p.style.setProperty("--dy", Math.sin(ang) * dist - 60 + "px");
-    p.style.setProperty("--rot", (Math.random() * 540 - 270) + "deg");
-    p.className = ["star", "dot", "spark"][i % 3];
+    p.style.setProperty("--dy", (Math.sin(ang) * dist) + "px");
+    p.style.setProperty("--fall", (170 + Math.random() * 220) + "px");
+    p.style.setProperty("--rot", (Math.random() * 900 - 450) + "deg");
+    p.style.setProperty("--dur", (900 + Math.random() * 500) + "ms");
+    /* set on the element, not through a custom property: a url() inside a
+       var() resolves against the stylesheet (/css/), not the document. */
+    p.style.backgroundImage =
+      'url("assets/ui/figma/' + CONFETTI_ART[(Math.random() * CONFETTI_ART.length) | 0] + '")';
     wrap.appendChild(p);
   }
   document.body.appendChild(wrap);
-  setTimeout(() => wrap.remove(), 950);
+  setTimeout(() => wrap.remove(), 1650);
 }
 
 function flyPointsChip(){
@@ -280,6 +298,7 @@ function flyPointsChip(){
   chip.style.left = (fr.left + fr.width / 2) + "px";
   chip.style.top = (fr.top + fr.height / 2) + "px";
   document.body.appendChild(chip);
+  to?.classList.add("awaiting");     // braces until the chip actually lands
   requestAnimationFrame(() => {
     chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.15,.5,1), opacity 140ms " + (CHIP_FLIGHT_MS - 120) + "ms";
     chip.style.transform = "translate(" +
@@ -289,6 +308,7 @@ function flyPointsChip(){
   });
   setTimeout(() => {
     chip.remove();
+    to?.classList.remove("awaiting");
     if(rstate !== "locked") return;
     setState("round_end");
     blip([880]);

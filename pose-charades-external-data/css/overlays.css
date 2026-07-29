@@ -1,10 +1,34 @@
 /* Full-page overlays: countdown, point burst, toast. */
 
-.countdown{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:80;pointer-events:none;font-family:var(--f-display);font-weight:800;font-size:150px;color:var(--orange);text-shadow:0 6px 0 rgba(21,42,110,.25)}
+/* The first three seconds of every session. It needs to own the screen:
+   the world dims, the number lands with weight, and each tick re-punches. */
+.countdown{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+  z-index:80;pointer-events:none;font-family:var(--f-display);font-weight:800;
+  font-size:min(19vw,30vh);line-height:1;color:var(--orange);
+  text-shadow:0 min(.9vw,1.6vh) 0 rgba(21,42,110,.32),
+              0 0 min(2.4vw,4.2vh) rgba(255,255,255,.35);
+  -webkit-text-stroke:min(.42vw,.74vh) #fff8ec;paint-order:stroke fill}
+/* A navy wash flattens cream paper to grey (it equalises the channels), so
+   the HUD read as disabled. Dim multiplicatively instead — the paper keeps
+   its warmth and just gets darker. */
+.countdown::before{content:"";position:absolute;inset:0;z-index:-1;
+  backdrop-filter:brightness(.66) saturate(1.04);
+  -webkit-backdrop-filter:brightness(.66) saturate(1.04);
+  background:radial-gradient(circle at 50% 48%,transparent 38%,rgba(0,0,0,.16) 88%);
+  animation:cdScrim .35s ease-out both}
+@keyframes cdScrim{from{opacity:0}to{opacity:1}}
+/* re-triggered by setCountdown() on every change, so 3-2-1 each get a beat */
+.countdown.tick{animation:cdTick .52s cubic-bezier(.16,1.5,.32,1)}
+@keyframes cdTick{
+  0%{transform:scale(1.75) rotate(-7deg);opacity:0}
+  22%{opacity:1}
+  55%{transform:scale(.94) rotate(1.6deg)}
+  100%{transform:scale(1) rotate(0)}}
+@media (prefers-reduced-motion: reduce){ .countdown::before{animation:none} }
 
 .pointBurst{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%) scale(.72);z-index:90;pointer-events:none;display:none;text-align:center}
 .pointBurst.show{display:block;animation:pointBurstAnim 1.3s cubic-bezier(.16,1.38,.32,1) both}
-.pointBurst .burstCard{min-width:min(680px,86vw);background:var(--card);border:4px solid var(--line);border-radius:26px;padding:26px 38px 22px;box-shadow:0 10px 0 rgba(21,42,110,.22);position:relative;overflow:hidden}
+.pointBurst .burstCard{min-width:min(680px,86vw);background:var(--card);border:4px solid var(--line);border-radius:var(--r-xl);padding:26px 38px 22px;box-shadow:0 10px 0 rgba(21,42,110,.22);position:relative;overflow:hidden}
 .pointBurst .burstCard:before,.pointBurst .burstCard:after{content:"✦";position:absolute;font-size:44px;color:var(--yellow);top:12px}
 .pointBurst .burstCard:before{left:22px}.pointBurst .burstCard:after{right:22px;color:var(--green)}
 .pointBurst .headline{font-family:var(--f-display);font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--ink);font-size:clamp(38px,6vw,72px);line-height:.95}
@@ -14,4 +38,4 @@
 .pointBurst.bad .headline{color:var(--orange)}
 @keyframes pointBurstAnim{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-4deg)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.06) rotate(1.5deg)}72%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-62%) scale(.92)}}
 
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;font-weight:900;font-size:14.5px;border:2px solid #fff;border-radius:14px;padding:12px 22px;box-shadow:var(--sh);z-index:95;display:none;pointer-events:none;max-width:88vw;text-align:center}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:#fff;font-weight:900;font-size:14.5px;border:2px solid #fff;border-radius:var(--r-md);padding:12px 22px;box-shadow:var(--sh);z-index:95;display:none;pointer-events:none;max-width:88vw;text-align:center}

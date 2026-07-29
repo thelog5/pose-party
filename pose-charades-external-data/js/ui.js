@@ -94,25 +94,48 @@ function resetMatchSide(prefix, key){
   return slot;
 }
 
+/* Character count is a poor proxy for glyph width — "JUMPING JACKS" cleared
+   the old heuristic and still ran off its paper. Measure instead. */
 function fitMatchGuess(node, text, base=17.21){
   if(!node) return;
-  const compact=Math.min(1, 11/Math.max(8,text.length));
-  node.style.fontSize=Math.max(9.5,base*compact)+"cqw";
+  fitCqwText(node, base, 9.5);
 }
 
+/* One proportional pass leaves long words a little over, because shrinking
+   re-wraps the glyph advances it was measured from. Verify and re-fit. */
 function fitCqwText(node, base, minimum){
   if(!node) return;
-  node.style.fontSize=base+"cqw";
-  const style=getComputedStyle(node);
-  const available=node.clientWidth-(parseFloat(style.paddingLeft)||0)-
-    (parseFloat(style.paddingRight)||0);
-  if(!available) return;
-  const range=document.createRange();
-  range.selectNodeContents(node);
-  const wanted=Math.max(node.scrollWidth,range.getBoundingClientRect().width);
-  range.detach?.();
-  if(wanted>available)
-    node.style.fontSize=Math.max(minimum,base*(available/wanted)*.96)+"cqw";
+  const measure=()=>{
+    const style=getComputedStyle(node);
+    const available=node.clientWidth-(parseFloat(style.paddingLeft)||0)-
+      (parseFloat(style.paddingRight)||0);
+    /* scrollWidth is layout-only. A range rect would be inflated by the
+       word-stamp transform still running on the card, which made the fitter
+       shrink against a moving target and settle short. */
+    return { available, wanted: node.scrollWidth };
+  };
+  let size=base;
+  node.style.fontSize=size+"cqw";
+  for(let pass=0; pass<4; pass++){
+    const { available, wanted }=measure();
+    if(!available || wanted<=available) return;
+    const next=Math.max(minimum, size*(available/wanted)*.96);
+    if(next>=size) return;          // already at the floor
+    size=next;
+    node.style.fontSize=size+"cqw";
+  }
+}
+
+/* One place owns the countdown so every mode gets the same beat: writing a
+   new value re-triggers the punch animation. */
+export function setCountdown(value){
+  const cd=$("countdown");
+  if(!cd) return;
+  const next=String(value);
+  if(cd.textContent===next) return false;
+  cd.textContent=next;
+  cd.classList.remove("tick"); void cd.offsetWidth; cd.classList.add("tick");
+  return true;
 }
 
 export function fitMatchPaperText(){

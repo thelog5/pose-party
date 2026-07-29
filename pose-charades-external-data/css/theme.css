@@ -21,12 +21,15 @@
   --live:#F65338;
   --sh:0 4px 0 rgba(18,52,119,.13);
   --sh-big:0 6px 0 rgba(18,52,119,.16);
-  --r-sm:12px; --r-md:16px; --r-lg:22px;
+  /* radius scale — every corner in the app snaps to one of these */
+  --r-xs:8px; --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:26px; --r-pill:999px;
   --f-display:'Baloo 2',system-ui,sans-serif;
   --f-lobby:'Fredoka One','Baloo 2',system-ui,sans-serif;
   --f-sign:'Beiruti','Baloo 2',system-ui,sans-serif;
-  --f-body:'Nunito',system-ui,sans-serif;
-  --f-mono:'Courier New',ui-monospace,monospace;
+  --f-body:'Baloo 2',system-ui,sans-serif;
+  /* was Courier New: tracked-out display type reads as a label without
+     dropping a system monospace into the middle of the paper art */
+  --f-label:'Baloo 2',system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -54,13 +57,13 @@ header{display:flex;align-items:center;gap:22px;margin-bottom:16px;min-height:92
 .logo{display:flex;gap:6px;cursor:pointer;user-select:none;flex:none}
 .logo span{
   font-family:var(--f-display);font-weight:800;font-size:41px;line-height:1;
-  padding:9px 18px 11px;border-radius:14px;color:#fff;border:3px solid var(--ink);
+  padding:9px 18px 11px;border-radius:var(--r-md);color:#fff;border:3px solid var(--ink);
   letter-spacing:1px;
 }
 .logo .l1{background:var(--blue);transform:rotate(-2deg);box-shadow:-4px 5px 0 var(--yellow),0 4px 0 rgba(21,42,110,.25)}
 .logo .l2{background:var(--orange);transform:rotate(1.5deg) translateY(3px);box-shadow:0 4px 0 rgba(21,42,110,.25)}
 
-.tagline{display:flex;align-items:center;gap:12px;font-family:var(--f-mono);font-weight:700;letter-spacing:1px;font-size:18px;color:var(--blue-deep);white-space:nowrap}
+.tagline{display:flex;align-items:center;gap:12px;font-family:var(--f-label);font-weight:700;letter-spacing:1px;font-size:18px;color:var(--blue-deep);white-space:nowrap}
 .tagline .dim{color:#8A97C8}
 .tagline .bot{width:52px;height:52px;flex:none}
 
@@ -83,7 +86,7 @@ header{display:flex;align-items:center;gap:22px;margin-bottom:16px;min-height:92
 
 /* header right: icon buttons (home / party / etc.) */
 .hicons{display:flex;gap:12px;margin-left:auto}
-.iconbtn{width:78px;height:78px;background:var(--card);border:2.5px solid var(--blue);border-radius:18px;box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--blue-deep)}
+.iconbtn{width:78px;height:78px;background:var(--card);border:2.5px solid var(--blue);border-radius:var(--r-lg);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--blue-deep)}
 .iconbtn:hover{filter:brightness(1.04);transform:translateY(-1px)}
 .iconbtn svg{width:27px;height:27px}
 .iconbtn small{font-size:10px;font-weight:900;letter-spacing:.5px}
@@ -94,7 +97,7 @@ header{display:flex;align-items:center;gap:22px;margin-bottom:16px;min-height:92
   .logo span{font-size:34px;padding:8px 16px 10px}
   .tagline{font-size:16px}
   .tagline .bot{width:44px;height:44px}
-  .iconbtn{width:66px;height:66px;border-radius:16px}
+  .iconbtn{width:66px;height:66px;border-radius:var(--r-md)}
 }
 
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
