@@ -51,6 +51,19 @@ const MODE_LABELS = {
   results:"GAME OVER!",
 };
 
+let gameEntranceTimer = null;
+function playGameplayEntrance(screen){
+  const id = screen==="solo" ? "soloStage" : screen==="match" ? "matchStage" :
+    screen==="pmatch" ? "pmStage" : "";
+  const stage = id && $(id);
+  if(!stage) return;
+  stage.classList.remove("game-intro");
+  void stage.offsetWidth;
+  stage.classList.add("game-intro");
+  clearTimeout(gameEntranceTimer);
+  gameEntranceTimer = setTimeout(() => stage.classList.remove("game-intro"), 1250);
+}
+
 export function render(fsmState){
   const s = screenFor(fsmState);
   state.screen = s;
@@ -84,6 +97,14 @@ export function render(fsmState){
     $("pillStreak").textContent="x1";
   }
   if(fsmState==="menu") $("pillScore").textContent="0";
+
+  /* Every mode receives the same paper-on-table entrance beat. The stage is
+     already visible here, so one animation system works for Solo, 1v1 and
+     Party without changing any mode's game/network state. */
+  if(fsmState==="countdown" && (s==="solo" || s==="match" || s==="pmatch"))
+    requestAnimationFrame(() => {
+      if(document.body.dataset.state==="countdown") playGameplayEntrance(s);
+    });
 }
 
 /* round-progress dots under the logo on the match screen */

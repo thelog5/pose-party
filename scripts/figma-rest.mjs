@@ -54,13 +54,15 @@ function nodeIdFrom(input = "") {
 /* Every configured token, in order. Consecutive calls alternate between them
    so a burst spreads across accounts instead of hammering one rate limit. */
 function tokens() {
-  return [
+  const configured = [
     process.env.FIGMA_ACCESS_TOKEN,
     process.env.FIGMA_ACCESS_TOKEN_2,
     process.env.FIGMA_ACCESS_TOKEN_3 || process.env.Figma_3,
-  ]
-    .map((t) => t?.trim())
-    .filter(Boolean);
+  ].map((t) => t?.trim());
+  const requested = Number.parseInt(process.env.FIGMA_TOKEN_SLOT || "", 10);
+  if(Number.isInteger(requested) && configured[requested - 1])
+    return [configured[requested - 1]];
+  return configured.filter(Boolean);
 }
 
 /* The CLI normally performs one request and exits, so an in-memory counter
@@ -114,10 +116,13 @@ function usage() {
 Usage:
   node scripts/figma-rest.mjs me
   node scripts/figma-rest.mjs file <figma-url-or-file-key>
+  node scripts/figma-rest.mjs overview <figma-url-or-file-key> [page-name]
   node scripts/figma-rest.mjs nodes <figma-node-url>
   node scripts/figma-rest.mjs tree <figma-node-url>
   node scripts/figma-rest.mjs snapshot <figma-node-url> <output-json>
+  node scripts/figma-rest.mjs snapshot-nodes <figma-url-or-key> <node-ids> <output-json>
   node scripts/figma-rest.mjs renders <figma-url-or-key> <node-ids> [scale]
+  node scripts/figma-rest.mjs download-renders <figma-url-or-key> <node-ids> <directory>
   node scripts/figma-rest.mjs catalog-images <figma-url-or-key> <directory> [max-bytes]
   node scripts/figma-rest.mjs catalog-page <directory> [all|portrait|wide|tall|page:N]
   node scripts/figma-rest.mjs get </v1/endpoint>
@@ -231,6 +236,33 @@ try {
         2,
       ),
     );
+  } else if (command === "overview") {
+    if (!input) throw new Error("Provide a Figma file URL or file key.");
+    const file = await figmaGet(`/v1/files/${encodeURIComponent(fileKeyFrom(input))}`, {
+      depth: "2",
+    });
+    const pages = (file.document?.children || [])
+      .filter(page => !extra || page.name.toLowerCase().includes(extra.toLowerCase()))
+      .map(page => ({
+        id: page.id,
+        name: page.name,
+        children: (page.children || []).map(node => ({
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          box: node.absoluteBoundingBox && {
+            x: Math.round(node.absoluteBoundingBox.x * 100) / 100,
+            y: Math.round(node.absoluteBoundingBox.y * 100) / 100,
+            width: Math.round(node.absoluteBoundingBox.width * 100) / 100,
+            height: Math.round(node.absoluteBoundingBox.height * 100) / 100,
+          },
+        })),
+      }));
+    console.log(JSON.stringify({
+      file: file.name,
+      lastModified: file.lastModified,
+      pages,
+    }, null, 2));
   } else if (command === "nodes") {
     if (!input) throw new Error("Provide a Figma URL containing node-id.");
     const nodeId = nodeIdFrom(input);
@@ -285,6 +317,25 @@ try {
       nodes: snapshot.tree.length,
       lastModified: snapshot.lastModified,
     }, null, 2));
+  } else if (command === "snapshot-nodes") {
+    if (!input || !extra || !option) {
+      throw new Error(
+        "Provide a Figma URL/file key, comma-separated node IDs, and an output JSON path.",
+      );
+    }
+    const ids = extra.replaceAll("-", ":");
+    const nodes = await figmaGet(
+      `/v1/files/${encodeURIComponent(fileKeyFrom(input))}/nodes`,
+      { ids },
+    );
+    await writeFile(option, JSON.stringify(nodes, null, 2), "utf8");
+    console.log(JSON.stringify({
+      output: path.resolve(option),
+      file: nodes.name,
+      requested: ids.split(","),
+      returned: Object.keys(nodes.nodes || {}),
+      lastModified: nodes.lastModified,
+    }, null, 2));
   } else if (command === "renders") {
     if (!input || !extra) {
       throw new Error("Provide a Figma URL/file key and comma-separated node IDs.");
@@ -295,6 +346,41 @@ try {
       { ids: extra.replaceAll("-", ":"), format: "png", scale: String(scale) },
     );
     console.log(JSON.stringify(rendered, null, 2));
+  } else if (command === "download-renders") {
+    if (!input || !extra || !option) {
+      throw new Error(
+        "Provide a Figma URL/file key, comma-separated node IDs, and an output directory.",
+      );
+    }
+    const scale = Math.max(
+      .01,
+      Math.min(4, Number(process.env.FIGMA_RENDER_SCALE) || 1),
+    );
+    const rendered = await figmaGet(
+      `/v1/images/${encodeURIComponent(fileKeyFrom(input))}`,
+      { ids: extra.replaceAll("-", ":"), format: "png", scale: String(scale) },
+    );
+    await mkdir(option, { recursive: true });
+    const downloads = await mapLimit(
+      Object.entries(rendered.images || {}),
+      4,
+      async ([id, url]) => {
+        if (!url) return { id, downloaded: false };
+        const response = await fetch(url);
+        if (!response.ok) {
+          return { id, downloaded: false, status: response.status };
+        }
+        const filename = id.replace(":", "-") + ".png";
+        const data = Buffer.from(await response.arrayBuffer());
+        await writeFile(path.join(option, filename), data);
+        return { id, filename, bytes: data.length, downloaded: true };
+      },
+    );
+    console.log(JSON.stringify({
+      directory: path.resolve(option),
+      scale,
+      downloads,
+    }, null, 2));
   } else if (command === "catalog-images") {
     if (!input || !extra) {
       throw new Error("Provide a Figma URL/file key and an output directory.");

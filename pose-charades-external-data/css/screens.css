@@ -106,6 +106,39 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 #modeVS.card{animation-delay:-2.3s}
 #modeParty.card{animation-delay:-4.6s}
 @keyframes cardfloat{0%,35%,100%{transform:translateY(0)}65%{transform:translateY(-4px)}}
+
+/* The choices arrive like paper cards being placed onto the desk. Their
+   paths follow the composition, then the existing gentle float takes over. */
+.homestage.home-entering #modeParty.card>img{
+  --home-in-x:0%;--home-in-y:-72%;--home-in-r:8deg;
+  transform-origin:50% -10%;
+  animation:homeCardEnter .72s cubic-bezier(.16,1.38,.32,1) .08s both}
+.homestage.home-entering #modeVS.card>img{
+  --home-in-x:-50%;--home-in-y:48%;--home-in-r:-8deg;
+  transform-origin:50% -10%;
+  animation:homeCardEnter .76s cubic-bezier(.16,1.38,.32,1) .22s both}
+.homestage.home-entering #modeAI.card>img{
+  --home-in-x:64%;--home-in-y:18%;--home-in-r:9deg;
+  transform-origin:50% -10%;
+  animation:homeCardEnter .78s cubic-bezier(.16,1.38,.32,1) .36s both}
+.homestage.home-entering :is(#tapeParty,#tapeVS,#tapeSolo){
+  opacity:0;animation:homeTapeSlap .42s cubic-bezier(.16,1.55,.32,1) both}
+.homestage.home-entering #tapeParty{animation-delay:.58s}
+.homestage.home-entering #tapeVS{animation-delay:.76s}
+.homestage.home-entering #tapeSolo{animation-delay:.94s}
+@keyframes homeCardEnter{
+  0%{opacity:0;translate:var(--home-in-x) var(--home-in-y);
+    rotate:var(--home-in-r);scale:.76}
+  68%{opacity:1;translate:0 1.8%;rotate:-1.6deg;scale:1.045}
+  84%{translate:0 -.7%;rotate:.7deg;scale:.985}
+  100%{opacity:1;translate:0 0;rotate:0deg;scale:1}}
+@keyframes homeTapeSlap{
+  0%{opacity:0;transform:scale(1.55) rotate(-8deg)}
+  66%{opacity:1;transform:scale(.94) rotate(2deg)}
+  100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .homestage.home-entering :is(#tapeParty,#tapeVS,#tapeSolo){opacity:1!important}
+}
 .fh.card:hover{rotate:-3.2deg;translate:0 7px}
 .fh.card:active{rotate:-4.5deg;translate:0 11px}
 #modeParty.card:hover{rotate:2.8deg;translate:0 7px}   /* taped at top-left, tips the other way */
@@ -152,6 +185,47 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .pp-circle{width:54px;height:54px;border-radius:50%;background:var(--fig-cream);border:none;display:flex;align-items:center;justify-content:center;color:var(--fig-blue);box-shadow:0 4px 10px rgba(23,53,111,.35);cursor:pointer;transition:transform .15s ease;opacity:.92}
 .pp-circle:hover{transform:scale(1.08) rotate(12deg)}
 .pp-circle svg{width:24px;height:24px}
+
+/* =================== SHARED GAMEPLAY ENTRANCE ===================
+   Solo, 1v1 and Party use one paper-placement language: HUD cards drop from
+   above, side guesses slide inward, the main word rises, then tape sticks.
+   Only presentation is animated; gameplay state and timing remain shared. */
+:is(.solostage,.matchstage,.pmstage).game-intro :is(.sp-card,.v1-scorecard){
+  --game-in-x:0%;--game-in-y:-42%;--game-in-r:-3deg;
+  animation:gamePaperIn .66s cubic-bezier(.16,1.38,.32,1) .06s both}
+:is(.solostage,.matchstage,.pmstage).game-intro .sp-word{
+  --game-in-x:0%;--game-in-y:68%;--game-in-r:2deg;
+  animation:gamePaperIn .72s cubic-bezier(.16,1.38,.32,1) .24s both}
+:is(.solostage,.matchstage,.pmstage).game-intro .sp-guess:not(.empty){
+  --game-in-x:55%;--game-in-y:8%;--game-in-r:5deg;
+  animation:gamePaperIn .68s cubic-bezier(.16,1.38,.32,1) .34s both}
+:is(.matchstage,.pmstage).game-intro
+  :is(.sp-guess.you,.sp-guess.mine,.sp-guess.current.you,.sp-guess.current.mine){
+  --game-in-x:-55%;--game-in-r:-5deg}
+:is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{
+  --game-in-x:-58%;--game-in-y:12%;--game-in-r:-5deg;
+  animation:gamePaperIn .62s cubic-bezier(.16,1.38,.32,1) .42s both}
+:is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{--game-intro-opacity:.55}
+:is(.solostage,.matchstage,.pmstage).game-intro
+  :is(.sp-tape,.v1-tape,.pm-tape,.sp-skip-tape){
+  animation:gameTapeStick .38s cubic-bezier(.16,1.55,.32,1) .72s both}
+:is(.matchstage,.pmstage).game-intro .pm-divider{
+  animation:gameDividerIn .58s cubic-bezier(.16,1.38,.32,1) .18s both}
+@keyframes gamePaperIn{
+  0%{opacity:0;translate:var(--game-in-x) var(--game-in-y);
+    rotate:var(--game-in-r);scale:.78}
+  68%{opacity:var(--game-intro-opacity,1);translate:0 1.5%;
+    rotate:calc(var(--game-in-r) * -.16);scale:1.045}
+  84%{translate:0 -.6%;rotate:.4deg;scale:.99}
+  100%{opacity:var(--game-intro-opacity,1);translate:0 0;rotate:0deg;scale:1}}
+@keyframes gameTapeStick{
+  0%{opacity:0;scale:1.55}
+  68%{opacity:1;scale:.94}
+  100%{opacity:1;scale:1}}
+@keyframes gameDividerIn{
+  0%{opacity:0;scale:.72 1.18}
+  70%{opacity:1;scale:1.04 .98}
+  100%{opacity:1;scale:1}}
 
 /* =================== SOLO PLAY (Figma "Singe player" 150:454) =================== */
 /* HUD overlay on the full-bleed camera. body[data-screen] hides the header;
@@ -206,14 +280,14 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .sp-rtimer .sp-art{aspect-ratio:2.319}
 .sp-rtimer .sp-clock{position:absolute;left:7.8%;top:22.9%;width:23.4%;aspect-ratio:1;
   filter:drop-shadow(1.149cqw 1.149cqw 0 rgba(0,0,0,.5))}
-.sp-rtimer .sp-val{top:19.7%;left:31.3%;width:61.5%;color:#fff;
+.sp-rtimer .sp-val{top:19.7%;left:31.3%;width:61.5%;height:66%;color:#fff;
   font-size:24.63cqw;line-height:26.15cqw;text-shadow:1.609cqw 1.609cqw 0 rgba(0,0,0,.5)}
 
 /* Word Timer — 252px */
 .sp-wtimer .sp-art{aspect-ratio:2.250}
 .sp-wtimer .sp-lab{top:-2.7%;color:#17356f;font-size:11.87cqw;line-height:23.41cqw;
   text-shadow:1.188cqw 1.188cqw 0 rgba(255,255,255,.9)}
-.sp-wtimer .sp-val{top:35.8%;color:#17356f;font-size:22.06cqw;line-height:23.41cqw;
+.sp-wtimer .sp-val{top:35.8%;height:58%;color:#17356f;font-size:22.06cqw;line-height:23.41cqw;
   text-shadow:1.188cqw 1.188cqw 0 rgba(255,255,255,.9)}
 
 /* Score — 227.7px */
@@ -248,6 +322,10 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   text-shadow:.956cqw .956cqw 0 rgba(255,255,255,.9)}
 .sp-guess .glabel{top:10%;font-family:var(--f-sign);font-weight:800;font-size:17.21cqw;line-height:18.84cqw;word-spacing:.1em}
 .sp-guess .gpct{top:49%;font-family:var(--f-lobby);font-weight:400;font-size:22.94cqw;line-height:18.84cqw}
+.sp-guess .glabel.fit-wrap{top:2%;height:43%;padding:0 4%;box-sizing:border-box;
+  display:flex;align-items:center;justify-content:center;
+  white-space:normal;text-wrap:balance;overflow-wrap:anywhere;
+  line-height:.9;word-spacing:normal}
 /* The stack sinks by shrinking, cooling green -> blue -> purple, and clearly
    fading. That separation keeps the current guess dominant at a glance. */
 .sp-guess.top{opacity:1}
@@ -261,6 +339,16 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 @keyframes gpop{0%{transform:translateY(16%) scale(.82)}60%{transform:translateY(0) scale(1.06)}100%{transform:none}}
 .sp-guess.shift{animation:gshift .34s ease-out}
 @keyframes gshift{0%{transform:translateY(-16%)}100%{transform:none}}
+.sp-guess.recognized{filter:brightness(1.09) saturate(1.1);
+  animation:guessRecognized .72s cubic-bezier(.2,1.6,.4,1)}
+@keyframes guessRecognized{
+  0%{scale:1}
+  42%{scale:1.11;rotate:-2deg}
+  100%{scale:1;rotate:0deg}
+}
+/* Kept as a compatibility alias for existing paper controls that use the
+   original lock-pop keyframe name. */
+@keyframes v1locked{0%{scale:1}42%{scale:1.11;rotate:-2deg}100%{scale:1}}
 
 /* --- word card: the yellow paper IS the progress bar (578px) --- */
 .sp-word{position:absolute;z-index:4;transform-origin:50% 60%}
@@ -271,6 +359,9 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   font-family:var(--f-lobby);font-weight:400;font-size:14.69cqw;line-height:12.08cqw;
   color:#17356f;text-transform:uppercase;white-space:nowrap;overflow:hidden;
   text-shadow:.612cqw .612cqw 0 rgba(255,255,255,.9)}
+.sp-word .sp-word-text.fit-wrap{top:8%;height:84%;padding:0 3%;box-sizing:border-box;
+  display:flex;align-items:center;justify-content:center;
+  white-space:normal;text-wrap:balance;overflow-wrap:anywhere;line-height:.88}
 /* Recognition urgency is continuous rather than three abrupt presets. JS
    derives these variables from the displayed target confidence, so 40%
    visibly shakes harder/faster than 30%, and the motion keeps building all
@@ -299,24 +390,38 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 }
 .sp-word.locked .sp-word-fill{filter:hue-rotate(78deg) saturate(.85) brightness(1.02)}
 .matchstage.you-locked #v1WordFill{width:95%!important}
+.sp-word.hit{animation:spwordhit .18s cubic-bezier(.2,.82,.3,1)}
+@keyframes spwordhit{
+  0%{transform:scale(1);filter:none}
+  45%{transform:scale(1.045);filter:brightness(1.12) saturate(1.16)}
+  100%{transform:scale(.985);filter:brightness(1.04)}
+}
 .sp-word.miss{animation:spwordmiss .5s ease-out}
 @keyframes spwordmiss{0%,100%{transform:translateX(0);filter:none}25%{transform:translateX(-1%);filter:saturate(.4)}75%{transform:translateX(1%)}}
 .sp-word.locked{animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes spwordpop{0%{transform:scale(1)}45%{transform:scale(1.08)}100%{transform:scale(1)}}
 
-/* --- skip + exit --- */
-.sp-skip{position:absolute;z-index:5;background:none;border:none;padding:0;cursor:pointer}
-.sp-skip .sp-art{aspect-ratio:1.04}
-.sp-skip span{position:absolute;left:0;width:100%;text-align:center;color:#17356f;
-  font-family:var(--f-lobby);font-weight:400;white-space:nowrap;pointer-events:none;
-  text-shadow:1.4cqw 1.4cqw 0 rgba(0,0,0,.18)}
-.sp-skip .sk-word{top:26%;font-size:24cqw;line-height:26cqw}
-.sp-skip .sk-cost{top:54%;font-size:17cqw;line-height:26cqw;opacity:.8}
+/* --- skip + exit: exact updated Solo component exports --- */
+.sp-skip{position:absolute;left:2.847222%;top:83.827160%;
+  width:17.013889%;height:13.411111%;z-index:5;
+  background:none;border:none;padding:0;cursor:pointer}
+.sp-skip-tape{position:absolute;left:8.055556%;top:81.111111%;
+  width:6.638%;height:5.997556%;z-index:6;object-fit:fill;pointer-events:none}
+.sp-skip .sp-art{position:absolute;left:-.943388%;top:0;
+  width:101.886776%;height:106.087043%;max-width:none;
+  display:block;object-fit:fill;pointer-events:none;filter:none}
 #scrSolo:not([data-rstate="guessing"]) .sp-skip{opacity:.55;pointer-events:none}
-.sp-exit{position:absolute;left:1.55%;top:17.5%;width:14%;z-index:7;background:none;border:0;padding:0;cursor:pointer}
-.sp-exit img{width:100%;display:block}
-.sp-exit:hover:not([disabled]){translate:0 calc(-1 * min(.28vw,.5vh));scale:1.025;
-  filter:brightness(1.04) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+.sp-exit{position:absolute;left:.694444%;top:14.938272%;
+  width:22.564833%;height:13.285260%;z-index:7;
+  background:none;border:0;padding:0;cursor:pointer;opacity:.14;
+  transition:opacity .18s ease,translate .2s cubic-bezier(.2,1.2,.35,1),
+    scale .2s cubic-bezier(.2,1.2,.35,1),filter .18s ease}
+.sp-exit img{position:absolute;left:-.517460%;top:0;
+  width:100.517460%;height:104.297251%;max-width:none;
+  display:block;object-fit:fill;pointer-events:none;filter:none}
+.sp-exit:hover:not([disabled]),.sp-exit:focus-visible{
+  opacity:1;translate:0 calc(-1 * min(.22vw,.39vh));scale:1.018;
+  filter:brightness(1.035)}
 .sp-exit:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.208vw,.37vh)}
 
 /* --- points award (Figma "POINTS AWARD", 898px) --- */
@@ -426,6 +531,19 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 
 /* name tag */
 .nametag img{width:100%}
+#lobbyNameTag{left:64.166667%;top:3.827160%;width:14.513889%;height:10.003418%;z-index:3}
+.lobbystage[data-mode="party"] #lobbyNameTag{left:63.819444%;top:3.950617%}
+.lobby-exit{left:81.736111%;top:2.345679%;width:22.564833%;height:13.285260%;z-index:3}
+.lobbystage[data-mode="party"] .lobby-exit{left:80.763889%;top:2.469136%}
+.lobby-exit img{width:100%;height:100%;display:block;object-fit:fill}
+.lobby-exit::before{content:"";position:absolute;left:50%;top:50%;
+  width:max(100%,44px);height:max(100%,44px);translate:-50% -50%}
+.lobby-exit>*{pointer-events:none}
+@media (prefers-reduced-motion:reduce){
+  .lobby-exit,.lobby-exit:hover,.lobby-exit:active{
+    translate:0 0!important;scale:1!important;rotate:0deg!important;
+    animation:none!important;transition:none!important}
+}
 .nametag .nt-label{position:absolute;left:7.2%;top:15.3%;color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(11px,min(1.12vw,1.99vh),52px);line-height:.91;letter-spacing:.01em}
 .nametag input{position:absolute;left:7.2%;top:48.5%;width:86.5%;background:none;border:none;border-bottom:min(.139vw,.247vh) solid rgba(0,42,141,.35);color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(1.79vw,3.18vh),84px);line-height:.57;letter-spacing:.01em;text-align:center;text-transform:uppercase;padding:0 20% min(.417vw,.741vh) 0}
 .nametag input::placeholder{color:#90867d;font-size:.68em;text-transform:none;letter-spacing:.02em}
@@ -465,7 +583,8 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .startbtn.ready{animation:startpop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes startpop{0%{transform:scale(.94)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
 .waitline{color:#124c9d;font-family:var(--f-sign);font-weight:700;font-size:clamp(14px,min(1.67vw,2.97vh),78px);line-height:.75;letter-spacing:.04em;text-align:center;text-shadow:min(.069vw,.123vh) min(.069vw,.123vh) min(.069vw,.123vh) rgba(0,0,0,.25)}
-.waitline.compact{font-size:clamp(11px,min(1vw,1.78vh),48px);line-height:1.02;letter-spacing:.02em}
+.waitline.compact{font-size:clamp(11px,min(1vw,1.78vh),48px);line-height:1.02;
+  letter-spacing:.02em;overflow-wrap:anywhere;top:auto!important;bottom:1.5%}
 
 /* ---------- lobby mode gating (one stage, two centers) ---------- */
 .lobbystage[data-mode="party"] .m1{display:none!important}
@@ -573,23 +692,21 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .v1-guess.current .grobot{left:3.25%;top:0;width:39.96%;z-index:2}
 .v1-guess.current.rival .grobot{left:50.15%}
 .v1-guess.current .glabel{top:44.62%;font-size:17.21cqw}
+.v1-guess.current .glabel.fit-wrap{top:40.5%;height:27%;padding:0 4%}
 .v1-guess.current .gpct{top:68.61%;font-size:22.94cqw}
 .v1-guess.past{opacity:.56}
 .v1-guess.past .glabel,.v1-guess.past .gpct{color:#0d6ebb}
 .v1-guess.rival.current .glabel,.v1-guess.rival.current .gpct{color:#fd6030}
 .v1-guess.rival.past .glabel,.v1-guess.rival.past .gpct{color:#a90307}
 .v1-guess.empty{opacity:0}
-.v1-guess.current.pop{animation:v1guesspop .42s cubic-bezier(.2,1.6,.4,1)}
-@keyframes v1guesspop{0%{translate:0 12%;scale:.84}62%{translate:0 0;scale:1.055}100%{scale:1}}
+.v1-guess.current.pop{animation:gpop .42s cubic-bezier(.2,1.6,.4,1)}
 .matchstage.you-locked .v1-guess.you.current,
 .matchstage.rival-locked .v1-guess.rival.current{filter:brightness(1.09) saturate(1.1);
-  animation:v1locked .72s cubic-bezier(.2,1.6,.4,1)}
-@keyframes v1locked{0%{scale:1}42%{scale:1.11;rotate:-2deg}100%{scale:1}}
+  animation:guessRecognized .72s cubic-bezier(.2,1.6,.4,1)}
 
 .v1-word{z-index:5}
 .v1-word .sp-word-text{font-family:'Fredoka One',var(--f-display);font-weight:400}
-.v1-word.wordswap{animation:v1wordpop .55s cubic-bezier(.18,1.45,.32,1)}
-@keyframes v1wordpop{0%{scale:.86;translate:0 8%;opacity:.35}58%{scale:1.06;translate:0 -2%;opacity:1}100%{scale:1}}
+.v1-word.wordswap{animation:wordStamp .5s cubic-bezier(.18,1.5,.32,1)}
 .matchstage[data-phase="chase"] .v1-word{animation:v1chaseword .24s ease-in-out infinite}
 .matchstage.chase-urgent .v1-word{animation-duration:.16s}
 .matchstage.chase-final .v1-word{animation-duration:.11s;filter:saturate(1.25) brightness(1.06)}
@@ -929,13 +1046,17 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
     drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
 .pm-score{z-index:8}
 #pmWordTimerCard{z-index:8}
-.pmstage :is(.sp-card,.pm-score,.pm-guess,.pm-word){
+:is(.solostage,.matchstage,.pmstage)
+  :is(.sp-card,.v1-scorecard,.pm-score,.sp-guess,.sp-word){
   transition:translate .18s ease,scale .18s cubic-bezier(.2,1.35,.35,1),
     rotate .18s ease,filter .18s ease}
-.pmstage :is(.sp-card,.pm-score,.pm-guess,.pm-word):hover{
-  translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
-  filter:brightness(1.04)
-    drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+@media (hover:hover){
+  :is(.solostage,.matchstage,.pmstage)
+    :is(.sp-card,.v1-scorecard,.pm-score,.sp-guess,.sp-word):hover{
+    translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
+    filter:brightness(1.04)
+      drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+}
 /* guess papers: your read on the left, the rival team's featured player right */
 .pm-guess{z-index:7;container-type:inline-size}
 .pm-guess.mine.current .glabel,.pm-guess.mine.current .gpct{color:#1b7532}
@@ -976,14 +1097,6 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 #rivalPlaceholder .ph-match{display:none}
 body[data-screen="match"] #rivalPlaceholder .ph-lobby{display:none}
 body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
-
-/* Solo's exit used lb-exit.png, whose art reads "EXIT LOBBY" — wrong screen.
-   The blank exported paper button carries a live label instead. Blue also
-   stops the way out from being the loudest thing on the HUD. */
-.sp-exit-label{position:absolute;inset:4% 0 14%;display:flex;align-items:center;
-  justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
-  font-size:min(1.18vw,2.1vh);letter-spacing:.02em;white-space:nowrap;pointer-events:none;
-  text-shadow:min(.16vw,.284vh) min(.16vw,.284vh) 0 rgba(0,0,0,.5)}
 
 /* =================== GAME FEEL =================== */
 
@@ -1038,6 +1151,14 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
   62% {transform:scale(.975) rotate(.7deg)}
   100%{transform:scale(1) rotate(0)}}
 
+/* A recognition event outranks the looping chase treatment. Without this
+   state precedence, a successful chaser kept wobbling in chase mode and
+   never visibly hit/locked even though the server had accepted the pose. */
+:is(.matchstage,.pmstage) .sp-word.hit{
+  animation:spwordhit .18s cubic-bezier(.2,.82,.3,1)}
+:is(.matchstage,.pmstage) .sp-word.locked{
+  animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
+
 @media (prefers-reduced-motion: reduce){
   .burstwrap{display:none}
   .sp-streak[data-tier]{animation:none}
@@ -1056,169 +1177,403 @@ body[data-screen="results"] .wrap{max-width:none;padding:0}
 body[data-screen="results"] header{display:none}
 .resstage{position:relative;z-index:1;overflow:hidden;font-family:var(--f-lobby);
   width:min(100dvw,calc(100dvh * var(--pp-ar)),var(--pp-maxw));aspect-ratio:var(--pp-ar);
-  background:var(--fig-cream,#f4ece0)}
+  background:var(--fig-cream,#f4ece0);
+  --rs-fast:140ms;--rs-base:180ms;--rs-emphasis:320ms;--rs-page:340ms;
+  --rs-hover:cubic-bezier(.2,1.35,.35,1);--rs-pop:cubic-bezier(.2,1.6,.4,1)}
 @media (max-aspect-ratio:1/1){.resstage{width:100dvw}}
 .rs-bg{position:absolute;left:-.97%;top:-2.35%;width:102.08%;height:102.35%;
   object-fit:cover;z-index:0}
 .rs-divider{position:absolute;left:50.69%;top:-37.41%;width:2.08%;height:147.53%;
   object-fit:fill;z-index:3;pointer-events:none}
-.rs-title{position:absolute;left:-.28%;top:-.37%;width:13.78%;rotate:2.5deg;z-index:6;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.25vw,.44vh) rgba(23,53,111,.3))}
-.rs-tape{position:absolute;z-index:7;pointer-events:none;rotate:var(--rot,0deg);
-  filter:drop-shadow(0 min(.21vw,.37vh) min(.28vw,.49vh) rgba(0,0,0,.26))}
+.rs-title{position:absolute;left:-.08669%;top:.14574%;width:13.39747%;height:15.96958%;
+  rotate:-2.52119deg;z-index:6;
+  background:none;border:0;padding:0;
+  transform-origin:48% 48%;touch-action:manipulation;
+  transition:translate .2s ease,scale .2s cubic-bezier(.2,1.45,.35,1),
+    rotate .2s ease,filter .2s ease;
+  filter:drop-shadow(0 min(.48612vw,.8642vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
+.rs-title-art{width:100%;height:100%;display:block;object-fit:fill}
+.rs-exit{position:absolute;left:84.583333%;top:2.222222%;width:18.333333%;
+  height:10.793925%;z-index:12;background:none;border:0;padding:0;cursor:pointer;
+  transition:translate .18s cubic-bezier(.2,1.3,.35,1),scale .18s cubic-bezier(.2,1.3,.35,1),
+    rotate .18s ease,filter .18s ease}
+.rs-exit img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill}
+.rs-exit:hover{translate:0 calc(-1 * min(.32vw,.57vh));scale:1.035;rotate:-.5deg;
+  filter:brightness(1.055) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(0,0,0,.25))}
+.rs-exit:active{translate:0 min(.1vw,.18vh);scale:.965;rotate:0deg;filter:brightness(.97)}
+.rs-exit:focus-visible{outline:min(.208vw,.37vh) solid #17356f;
+  outline-offset:calc(-1 * min(.278vw,.494vh))}
+.rs-tape{position:absolute;display:block;z-index:7;pointer-events:none;object-fit:fill}
+/* These PNGs are the REST-rendered Figma nodes. Their canvases already bake
+   rotation, alpha bounds, and (for the logo tapes) the authored shadows. */
+.rs-tape-logo-yellow{left:-.972222%;top:-1.140837%;width:5.607639%;height:9.907407%}
+.rs-tape-logo-cream{left:10.232273%;top:8.954911%;width:4.444444%;height:7.407407%}
+.rs-tape-score{left:25.208333%;top:-4.197531%;width:10.550421%;height:13.051290%}
+.resstage[data-size="2"] .rs-tape-score{left:25.138889%;top:-4.938272%}
 
 /* ---- score board ---- */
 .rs-board{position:absolute;left:29.38%;top:1.85%;width:45.56%;z-index:5;
-  container-type:inline-size;pointer-events:none}
+  container-type:inline-size;pointer-events:auto;
+  transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
+    filter var(--rs-base) ease}
 .rs-board-art{width:100%;display:block;aspect-ratio:6.92;object-fit:fill;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.3vw,.53vh) rgba(0,0,0,.28))}
+  filter:drop-shadow(0 .5323cqw .3042cqw rgba(0,0,0,.35))}
 .rs-headline{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
-  font-family:var(--f-lobby);font-size:9.9cqw;line-height:1;color:#17356f;
-  white-space:nowrap;text-shadow:.5cqw .5cqw 0 rgba(0,0,0,.14)}
+  font-family:var(--f-lobby);font-size:9.886cqw;line-height:.75862;color:#17356f;
+  letter-spacing:.01em;white-space:nowrap;translate:.152cqw .152cqw;
+  text-shadow:.3802cqw .3802cqw 0 rgba(255,255,255,.9)}
 .rs-scorechip{position:absolute;left:37.93%;top:10.72%;width:28.44%;z-index:6;
-  container-type:inline-size;pointer-events:none}
+  container-type:inline-size;pointer-events:auto;
+  transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
+    filter var(--rs-base) ease}
 .rs-scorechip img{width:100%;display:block;aspect-ratio:4.28;object-fit:fill;
-  filter:drop-shadow(0 min(.26vw,.46vh) min(.24vw,.42vh) rgba(0,0,0,.3))}
-.rs-scorechip span{position:absolute;inset:4% 0 12%;display:flex;align-items:center;
-  justify-content:center;gap:.22em;font-family:var(--f-sign);font-weight:800;
-  font-size:18.3cqw;line-height:1;color:#17356f;white-space:nowrap}
+  filter:drop-shadow(0 .8526cqw .4872cqw rgba(0,0,0,.35))}
+.rs-scorechip span{position:absolute;left:8.77%;top:33.85%;width:82.58%;height:51.56%;
+  display:flex;align-items:center;justify-content:center;gap:0;
+  font-family:var(--f-sign);font-weight:800;font-size:18.270cqw;line-height:.65747;
+  letter-spacing:.01em;color:#17356f;white-space:pre;
+  text-shadow:.609cqw .609cqw 0 rgba(255,255,255,.9)}
+.rs-scorechip .rs-score-sep{font-style:normal;color:#17356f;white-space:pre}
 .rs-scorechip b.blue{color:#17356f}
 .rs-scorechip b.orange{color:#f4622e}
 
 /* ---- seats: video BEHIND the torn border ---- */
 .rs-seat{position:absolute;z-index:4;rotate:var(--rot,0deg);container-type:inline-size;
-  filter:drop-shadow(0 min(.32vw,.57vh) min(.36vw,.64vh) rgba(23,53,111,.34))}
-.rs-seat .slot{position:absolute;inset:4.2%;z-index:1;overflow:hidden;background:#0e1b4a;
+  transition:translate .18s ease,scale .18s cubic-bezier(.2,1.35,.35,1),filter .18s ease;
+  filter:drop-shadow(0 min(.34722vw,.61728vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
+/* Figma reports an axis-aligned bounding box after rotation. These are the
+   original rectangles recovered from those bounds, with the inverse Figma
+   angle applied in CSS. This avoids rotating an already-expanded box twice. */
+.rs-seat.blue{--rot:-4.39592deg}
+.rs-seat.orange{--rot:3.42776deg}
+.rs-seat[data-seat="blue0"]{left:1.482685%;top:15.189221%;width:22.765257%;aspect-ratio:.908226}
+.rs-seat[data-seat="blue1"]{left:26.0549%;top:17.0229%;width:22.7653%;aspect-ratio:.7109}
+.rs-seat[data-seat="blue2"]{left:2.1901%;top:56.5178%;width:27.0262%;aspect-ratio:1.1537}
+.rs-seat[data-seat="orange0"]{left:76.138527%;top:11.719037%;width:21.541731%;aspect-ratio:.794489}
+.rs-seat[data-seat="orange1"]{left:55.1537%;top:15.4146%;width:21.5845%;aspect-ratio:.6412}
+.rs-seat[data-seat="orange2"]{left:73.113371%;top:55.478052%;width:25.084237%;aspect-ratio:1.045491}
+.rs-seat .slot{position:absolute;inset:1.65%;z-index:1;overflow:hidden;isolation:isolate;background:#0e1b4a;
   border-radius:min(.4vw,.7vh)}
-.rs-seat .slot video,.rs-seat .slot canvas,.rs-seat .slot .camdock,
-.rs-seat .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rs-seat .slot video,.rs-seat .slot canvas,.rs-seat .slot img{
+  position:absolute;inset:0;width:100%;height:100%;min-width:100%;min-height:100%;
+  max-width:none;display:block;object-fit:cover;object-position:50% 50%}
+.rs-seat .slot .camdock{position:absolute;inset:0;width:100%;height:100%;margin:0;
+  border-radius:0;overflow:hidden}
+.rs-seat .slot .camdock video,.rs-seat .slot .camdock canvas{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 50%}
 .rs-seat .rs-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
   pointer-events:none;z-index:2}
-.rs-seat .rs-nametag{position:absolute;z-index:3;top:2.6%;width:30%;
-  container-type:inline-size;pointer-events:none;
-  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.42))}
-.rs-seat.blue .rs-nametag{left:4%}
-.rs-seat.orange .rs-nametag{right:4%}
-.rs-seat .rs-ready{position:absolute;z-index:4;right:4%;bottom:3.5%;width:34%;
-  container-type:inline-size;opacity:0;scale:.6;pointer-events:none;
+.rs-seat .rs-nametag{position:absolute;z-index:3;left:var(--tag-x);top:var(--tag-y);
+  width:var(--tag-w);height:var(--tag-h);rotate:var(--tag-turn);
+  container-type:inline-size;pointer-events:none}
+.rs-seat[data-seat="blue0"]{--tag-x:2.808169%;--tag-y:2.150716%;--tag-w:24.752331%;--tag-h:9.728235%;--tag-turn:4.395915deg}
+.rs-seat[data-seat="blue1"]{--tag-x:4.414934%;--tag-y:2.810678%;--tag-w:24.752331%;--tag-h:7.614483%;--tag-turn:4.395915deg}
+.rs-seat[data-seat="blue2"]{--tag-x:2.576397%;--tag-y:2.296815%;--tag-w:20.849871%;--tag-h:10.409516%;--tag-turn:4.395915deg}
+.rs-seat[data-seat="orange0"]{--tag-x:62.186517%;--tag-y:2.919649%;--tag-w:33.654827%;--tag-h:9.660269%;--tag-turn:-3.427757deg}
+.rs-seat[data-seat="orange1"]{--tag-x:62.218260%;--tag-y:2.759166%;--tag-w:33.588065%;--tag-h:7.781334%;--tag-turn:-3.427757deg}
+.rs-seat[data-seat="orange2"]{--tag-x:65.753657%;--tag-y:1.690222%;--tag-w:28.901945%;--tag-h:10.916945%;--tag-turn:-3.427757deg}
+.rs-seat .rs-ready{position:absolute;z-index:4;left:61.759%;top:88.031%;width:33.556%;
+  aspect-ratio:2.7021;container-type:inline-size;opacity:0;scale:.6;rotate:.0736deg;pointer-events:none;
   transition:opacity .2s ease,scale .3s cubic-bezier(.2,1.6,.4,1)}
-.rs-seat.ready .rs-ready{opacity:1;scale:1}
-.rs-seat .rs-ready img,.rs-nametag img{width:100%;display:block}
-.rs-seat .rs-ready img{aspect-ratio:1.3;object-fit:fill}
-.rs-nametag b,.rs-seat .rs-ready b{position:absolute;inset:6% 0 16%;display:flex;
-  align-items:center;justify-content:center;padding:0 8%;font-family:var(--f-lobby);
-  font-weight:400;color:#fff;white-space:nowrap;overflow:hidden;font-size:22cqw;
-  text-shadow:1.6cqw 1.6cqw 0 rgba(0,0,0,.45)}
-/* orange seats reuse the blue chip paper, warmed to the team colour */
-.rs-seat.orange .rs-nametag img,
-.rs-strip.orange .rs-nametag img{filter:hue-rotate(158deg) saturate(1.5) brightness(1.12)}
+.rs-seat.ready .rs-ready{opacity:1;scale:1.025;
+  filter:none;
+  animation:rsSeatReadyIn 360ms var(--rs-pop)}
+@keyframes rsSeatReadyIn{
+  0%{scale:.96}
+  58%{scale:1.07}
+  100%{scale:1.025}
+}
+.rs-seat .rs-ready img,.rs-nametag img{width:100%;height:100%;display:block;object-fit:fill}
+.rs-nametag-art{position:absolute;inset:0;
+  filter:drop-shadow(0 var(--tag-fx) var(--tag-fx) rgba(0,0,0,.4))}
+.rs-nametag b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding:0 7%;font-family:var(--f-lobby);font-weight:400;color:#fff;letter-spacing:.01em;
+  line-height:1.36;white-space:nowrap;overflow:hidden;rotate:var(--tag-text-rot);
+  font-size:var(--tag-font);text-shadow:var(--tag-shadow) var(--tag-shadow) 0 rgba(0,0,0,.5)}
+.rs-seat.blue .rs-nametag,.rs-strip.blue .rs-nametag,.rs-focus .rs-nametag{
+  --tag-text-rot:-5.258087deg;--tag-font:20.31cqw;--tag-shadow:1.255cqw;
+  --tag-fx:3.697cqw}
+.rs-seat.orange .rs-nametag,.rs-strip.orange .rs-nametag,.rs-focus .rs-nametag.orange{
+  --tag-text-rot:2.94deg;--tag-font:20.58cqw;--tag-shadow:1.271cqw;
+  --tag-fx:3.457cqw}
+.rs-seat .rs-ready b{position:absolute;inset:0 0 6.4%;display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
+  letter-spacing:.01em;line-height:.7586;white-space:nowrap;font-size:20.47cqw;
+  text-shadow:.787cqw .787cqw 0 rgba(0,0,0,.5)}
 .resstage[data-size="2"] [data-seat="blue2"],
 .resstage[data-size="2"] [data-seat="orange2"]{display:none}
 .rs-seat.vacant{display:none}
-/* 2v2 uses the design's own two-up rectangles */
-.resstage[data-size="2"] [data-seat="blue0"]{left:0;top:15.98%;width:26.92%;aspect-ratio:.79}
-.resstage[data-size="2"] [data-seat="orange0"]{left:76.05%;top:12.22%;width:23.95%;aspect-ratio:.57}
+/* 2v2 has its own four portrait rectangles and tag offsets in Figma. */
+.resstage[data-size="2"] [data-seat="blue0"]{left:1.3651%;top:17.5316%;width:24.1857%;aspect-ratio:.6617;
+  --tag-x:4.008651%;--tag-y:2.116149%;--tag-w:23.298632%;--tag-h:6.671767%}
+.resstage[data-size="2"] [data-seat="blue1"]{left:26.1287%;top:17.0179%;width:22.6914%;aspect-ratio:.7086;
+  --tag-x:4.103836%;--tag-y:2.810578%;--tag-w:24.832898%;--tag-h:7.614483%}
+.resstage[data-size="2"] [data-seat="orange0"]{left:77.2530%;top:13.3020%;width:21.5417%;aspect-ratio:.5262;
+  --tag-x:61.980331%;--tag-y:2.959848%;--tag-w:33.654827%;--tag-h:6.398144%}
+.resstage[data-size="2"] [data-seat="orange1"]{left:55.1537%;top:15.4146%;width:21.5845%;aspect-ratio:.6412;
+  --tag-x:62.218260%;--tag-y:2.759166%;--tag-w:33.588065%;--tag-h:7.781334%}
+/* Solo has no opposing team, so the one portrait gets the otherwise empty
+   centre instead of looking stranded on the far-left edge. */
+.resstage[data-mode="solo"][data-page="stage"] .rs-divider{display:none}
+.resstage[data-mode="solo"][data-page="stage"] [data-seat="blue0"]{
+  left:37.9072%;top:17.5316%;width:24.1857%;aspect-ratio:.6617;
+  --rot:1.5deg;--counter-rot:-1.5deg}
+@media (hover:hover){
+  .rs-seat:not(.vacant):hover{translate:0 calc(-1 * min(.28vw,.5vh));scale:1.018;
+    z-index:5;filter:brightness(1.035)
+      drop-shadow(0 min(.48vw,.85vh) min(.46vw,.82vh) rgba(0,0,0,.32))}
+}
 
 /* ---- rematch + breakdown ---- */
 .rs-rematch{position:absolute;left:26.18%;top:77.28%;width:51.50%;z-index:8;
-  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size}
+  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size;
+  transform-origin:50% 56%;touch-action:manipulation;
+  transition:translate .18s ease,scale .18s cubic-bezier(.2,1.45,.35,1),filter .18s ease}
 .rs-rematch img{width:100%;display:block;aspect-ratio:6.78;object-fit:fill;
-  filter:drop-shadow(0 min(.36vw,.64vh) min(.3vw,.53vh) rgba(23,53,111,.34))}
+  filter:drop-shadow(0 .4845cqw .2768cqw rgba(0,0,0,.35))}
 .rs-rematch b{position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:10.4cqw;
-  color:#17356f;white-space:nowrap;letter-spacing:.01em}
-.rs-rematch.mine img{filter:drop-shadow(0 0 min(1vw,1.8vh) rgba(47,160,74,.85))
-  drop-shadow(0 min(.36vw,.64vh) min(.3vw,.53vh) rgba(23,53,111,.34)) saturate(1.1)}
+  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:10.381cqw;
+  line-height:.65747;color:#17356f;white-space:pre;letter-spacing:.01em;
+  translate:.93cqw .14cqw;
+  text-shadow:.346cqw .346cqw 0 rgba(255,255,255,.9)}
+.rs-rematch.mine img{filter:drop-shadow(0 .4845cqw .2768cqw rgba(0,0,0,.35))
+  saturate(1.05) brightness(1.02)}
+.rs-rematch.mine{scale:1.025}
+.rs-rematch.pending{cursor:progress}
+.rs-rematch-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.rs-rematch.count-up{animation:rsReadyGrow 360ms var(--rs-pop)}
+.rs-rematch.count-down{animation:rsReadyShrink 240ms var(--rs-hover)}
+@keyframes rsReadyGrow{
+  0%{scale:.96}
+  58%{scale:1.07}
+  100%{scale:1.025}
+}
+@keyframes rsReadyShrink{
+  0%{scale:1.025}
+  55%{scale:.94}
+  100%{scale:1}
+}
 .rs-tape-rematch{z-index:9}
+.rs-tape-rematch-stage{left:47.98611%;top:74.19753%;width:8.26389%;height:6.04938%}
+.rs-tape-rematch-breakdown{display:none;left:45.833333%;top:82.839506%;
+  width:8.578840%;height:6.878289%}
 
 .rs-breakdown,.rs-back,.rs-save{position:absolute;z-index:8;background:none;border:0;
-  padding:0;cursor:pointer;container-type:inline-size}
+  padding:0;cursor:pointer;container-type:inline-size;touch-action:manipulation;
+  transition:translate .18s ease,scale .18s cubic-bezier(.2,1.45,.35,1),
+    rotate .18s ease,filter .18s ease}
 .rs-breakdown{left:33.95%;top:87.99%;width:34.28%}
 .rs-bd-art{width:100%;display:block;aspect-ratio:5.06;object-fit:fill;
-  filter:drop-shadow(0 min(.24vw,.42vh) min(.22vw,.39vh) rgba(0,0,0,.26))}
+  filter:drop-shadow(0 .7276cqw .4158cqw rgba(0,0,0,.35))}
 .rs-breakdown b,.rs-back b,.rs-save b{position:absolute;inset:0;display:flex;
   align-items:center;justify-content:center;font-family:var(--f-sign);font-weight:800;
-  color:#17356f;white-space:nowrap;letter-spacing:.02em}
-.rs-breakdown b{font-size:9.4cqw;padding-right:12%}
-.rs-bd-arrow{position:absolute;right:5%;top:50%;width:9.5%;translate:0 -50%;rotate:180deg}
-.rs-back{left:3.33%;top:88.95%;width:22.15%}
-.rs-back b{font-size:9.4cqw;padding-left:14%}
-.rs-back-arrow{position:absolute;left:6%;top:50%;width:11%;translate:0 -50%}
-.rs-save{left:74.79%;top:88.89%;width:20.69%}
-.rs-save b{font-size:10.1cqw;padding-right:16%}
-.rs-cam{position:absolute;right:6%;top:50%;width:12%;translate:0 -50%}
+  color:#17356f;white-space:pre;letter-spacing:.01em}
+.rs-breakdown b{font-size:9.355cqw;line-height:1.09578;padding-right:12%;
+  translate:-.5cqw 1.2cqw;
+  text-shadow:.520cqw .520cqw 0 rgba(255,255,255,.9)}
+.rs-bd-arrow{position:absolute;left:85.133%;top:30%;width:10.411%;height:52.71%;
+  object-fit:fill}
+.rs-back{left:3.33%;top:88.95%;width:22.15%;aspect-ratio:319/63}
+.rs-back .rs-bd-art{position:absolute;left:11.91%;top:0;width:88.09%;height:100%;
+  filter:drop-shadow(0 min(.1612vw,.2866vh) min(.0921vw,.1638vh) rgba(0,0,0,.35))}
+.rs-back b{left:27.90%;top:22.22%;width:82.10%;height:57.14%;font-size:9.404cqw;
+  line-height:1.2067;justify-content:flex-start;translate:0 .313cqw;
+  text-shadow:.575cqw .575cqw 0 rgba(255,255,255,.9)}
+.rs-back-arrow{position:absolute;left:15.047%;top:24.596%;width:11.007%;height:55.73%;
+  object-fit:fill}
+.rs-save{left:74.79%;top:88.89%;width:20.69%;aspect-ratio:298/63}
+.rs-save .rs-bd-art{height:100%;aspect-ratio:auto;
+  filter:drop-shadow(0 min(.1612vw,.2866vh) min(.0921vw,.1638vh) rgba(0,0,0,.35))}
+.rs-save b{left:5.705%;top:22.222%;width:87.919%;height:57.143%;font-size:10.067cqw;
+  line-height:1.2067;justify-content:flex-start;
+  text-shadow:.616cqw .616cqw 0 rgba(255,255,255,.9)}
+.rs-cam{position:absolute;left:82.55%;top:28.571%;width:12.416%;height:44.444%;
+  object-fit:fill}
 
 /* ---- breakdown page ---- */
 /* Figma overlaps the thumbnails like a stack of prints rather than spacing
    them out — three square thumbs at full height would overrun the buttons. */
-.rs-strip{position:absolute;z-index:4;display:flex;flex-direction:column}
-.rs-thumb + .rs-thumb{margin-top:-50%}
-.rs-strip.blue{left:0.21%;top:14.94%;width:19.9%}
-.rs-strip.orange{left:77.36%;top:11.98%;width:19.9%}
-.rs-thumb{position:relative;width:100%;aspect-ratio:1;cursor:pointer;
-  container-type:inline-size;rotate:var(--rot,0deg);
-  transition:scale .18s ease,filter .18s ease;
-  filter:drop-shadow(0 min(.24vw,.42vh) min(.28vw,.49vh) rgba(23,53,111,.3))}
-.rs-strip.blue .rs-thumb{--rot:5.3deg}
-.rs-strip.orange .rs-thumb{--rot:-4.5deg}
-.rs-thumb .shotwrap{position:absolute;inset:5%;z-index:1;overflow:hidden;background:#0e1b4a}
+.rs-strip{position:absolute;inset:0;z-index:4;pointer-events:none}
+.rs-thumb{position:absolute;aspect-ratio:1;cursor:pointer;
+  container-type:inline-size;rotate:var(--rot,0deg);translate:0 0;scale:1;
+  border:0;padding:0;background:none;color:inherit;touch-action:manipulation;
+  pointer-events:auto;
+  transform-origin:50% 52%;will-change:translate,scale,rotate,filter;
+  transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
+    rotate var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
+.rs-strip.blue .rs-thumb{width:18.038%;--rot:-5.27954deg}
+.rs-strip.orange .rs-thumb{width:18.4722%;--rot:4.48021deg}
+.rs-strip.blue .rs-thumb:nth-child(1){left:2.3194%;top:16.3456%}
+.rs-strip.blue .rs-thumb:nth-child(2){left:2.1805%;top:34.7406%}
+.rs-strip.blue .rs-thumb:nth-child(3){left:.99995%;top:55.7283%}
+.rs-strip.orange .rs-thumb:nth-child(1){left:78.818257%;top:11.108996%}
+.rs-strip.orange .rs-thumb:nth-child(2){left:79.512702%;top:36.788008%}
+.rs-strip.orange .rs-thumb:nth-child(3){left:79.9294%;top:55.677%}
+.rs-thumb .shotwrap{position:absolute;inset:2.75%;z-index:1;overflow:hidden;background:#0e1b4a}
 .rs-thumb .shotwrap img{width:100%;height:100%;object-fit:cover;display:block}
 .rs-thumb .rs-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:2}
-.rs-thumb .rs-nametag{position:absolute;left:0;top:3%;width:30%;z-index:3;
-  container-type:inline-size;pointer-events:none}
-/* later prints sit on top, so hovering must lift out of the stack */
+.rs-thumb .rs-nametag{position:absolute;left:var(--tag-x);top:var(--tag-y);
+  width:var(--tag-w);height:var(--tag-h);rotate:var(--tag-turn);
+  z-index:3;container-type:inline-size;pointer-events:none}
+.rs-strip.blue .rs-nametag{--tag-w:31.239355%;--tag-h:13.518421%;--tag-turn:5.279545deg}
+.rs-strip.orange .rs-nametag{--tag-w:39.247212%;--tag-h:14.179555%;--tag-turn:-4.480210deg}
+.rs-strip.blue .rs-thumb:nth-child(1) .rs-nametag{--tag-x:-4.831515%;--tag-y:-3.961980%}
+.rs-strip.blue .rs-thumb:nth-child(2) .rs-nametag,
+.rs-strip.blue .rs-thumb:nth-child(3) .rs-nametag{--tag-x:-7.237939%;--tag-y:-3.024456%}
+.rs-strip.orange .rs-thumb:nth-child(1) .rs-nametag{--tag-x:-3.376631%;--tag-y:-3.890933%}
+.rs-strip.orange .rs-thumb:nth-child(2) .rs-nametag{--tag-x:-11.423443%;--tag-y:-5.522984%}
+.rs-strip.orange .rs-thumb:nth-child(3) .rs-nametag{--tag-x:-2.913741%;--tag-y:-2.795926%}
+/* Later prints keep their authored overlap. Only selection may promote a card. */
 .rs-strip .rs-thumb:nth-child(1){z-index:1}
 .rs-strip .rs-thumb:nth-child(2){z-index:2}
 .rs-strip .rs-thumb:nth-child(3){z-index:3}
-.rs-thumb:hover{scale:1.035;z-index:5}
-.rs-thumb.on{scale:1.05;z-index:6;filter:drop-shadow(0 0 min(.9vw,1.6vh) rgba(255,196,64,.9))
-  drop-shadow(0 min(.24vw,.42vh) min(.28vw,.49vh) rgba(23,53,111,.3))}
+.rs-thumb:nth-child(odd){--riffle:-1.15deg}
+.rs-thumb:nth-child(even){--riffle:1.05deg}
+.rs-strip:has(.rs-thumb.on){z-index:5}
+.rs-strip .rs-thumb.on{z-index:8;scale:1.08;
+  filter:brightness(1.045) contrast(1.025);
+  animation:rsThumbSelect var(--rs-emphasis) var(--rs-pop)}
+@keyframes rsThumbSelect{
+  0%{scale:1}
+  58%{scale:1.11}
+  100%{scale:1.08}
+}
+.rs-strip.blue .rs-thumb.on{
+  translate:min(1.25vw,2.22vh) calc(-1 * min(.55vw,.98vh))}
+.rs-strip.orange .rs-thumb.on{
+  translate:calc(-1 * min(1.25vw,2.22vh)) calc(-1 * min(.55vw,.98vh))}
+.rs-strip .rs-thumb:focus-visible{outline:min(.18vw,.32vh) solid #ffc440;
+  outline-offset:min(.12vw,.21vh)}
+.rs-strip .rs-thumb:focus-visible:not(.on){scale:1.02;filter:brightness(1.055)}
+.rs-thumb .shotwrap img{min-width:100%;min-height:100%;max-width:none;object-position:50% 50%}
+
+@media (hover:hover){
+  body[data-screen="results"] .rs-title:hover{
+    translate:0 calc(-1 * min(.28vw,.5vh));scale:1.035;rotate:-3.35deg;
+    filter:brightness(1.05)
+      drop-shadow(0 min(.56vw,.99vh) min(.42vw,.75vh) rgba(0,0,0,.38))}
+  body[data-screen="results"] .rs-rematch:hover:not(:disabled){
+    translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;filter:brightness(1.045) saturate(1.04)}
+  body[data-screen="results"] .rs-breakdown:hover:not(:disabled){
+    translate:0 calc(-1 * min(.28vw,.5vh));scale:1.035;rotate:-.45deg;filter:brightness(1.045)}
+  body[data-screen="results"] .rs-back:hover:not(:disabled){
+    translate:calc(-1 * min(.16vw,.28vh)) calc(-1 * min(.24vw,.43vh));
+    scale:1.035;rotate:-.65deg;filter:brightness(1.045)}
+  body[data-screen="results"] .rs-save:hover:not(:disabled){
+    translate:min(.16vw,.28vh) calc(-1 * min(.24vw,.43vh));
+    scale:1.035;rotate:.65deg;filter:brightness(1.045)}
+  .rs-thumb:hover:not(.on){scale:1.035;
+    rotate:calc(var(--rot) + var(--riffle));
+    filter:brightness(1.035) contrast(1.01)}
+  .rs-thumb.on:hover{scale:1.09}
+  .rs-arrow.prev:hover{translate:calc(-1 * min(.24vw,.43vh)) 0;scale:1.15;
+    filter:brightness(1.08)}
+  .rs-arrow.next:hover{translate:min(.24vw,.43vh) 0;scale:1.15;
+    filter:brightness(1.08)}
+  .rs-board:hover{translate:0 calc(-1 * min(.1vw,.18vh));scale:1.006;
+    filter:brightness(1.015)}
+  .rs-scorechip:hover{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.015;
+    filter:brightness(1.025)}
+  .rs-focus:hover .rs-focus-frame{filter:brightness(1.015)}
+  .rs-award:hover{translate:0 calc(-1 * min(.24vw,.43vh));scale:1.035;
+    rotate:-6.55deg;filter:brightness(1.025)}
+  .rs-stat:hover{translate:0 calc(-1 * min(.18vw,.32vh));scale:1.04;
+    filter:brightness(1.025)}
+}
+
+body[data-screen="results"] .rs-title:active{
+  translate:0 min(.12vw,.21vh);scale:.965;rotate:-1.8deg;filter:brightness(.97)}
+body[data-screen="results"] .rs-rematch:active:not(:disabled),
+body[data-screen="results"] .rs-breakdown:active:not(:disabled),
+body[data-screen="results"] .rs-back:active:not(:disabled),
+body[data-screen="results"] .rs-save:active:not(:disabled){
+  translate:0 min(.14vw,.25vh);scale:.965;filter:brightness(.96)}
+.rs-thumb:active{scale:.975}
+.rs-thumb.on:active{scale:1.035}
+.rs-arrow:active{translate:0 min(.12vw,.21vh);scale:.9;filter:brightness(.94)}
 
 .rs-focus{position:absolute;left:21.53%;top:12.84%;width:57.08%;aspect-ratio:1.427;z-index:6;
   container-type:inline-size}
 .rs-focus-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
-  pointer-events:none;z-index:2;
-  filter:drop-shadow(0 min(.36vw,.64vh) min(.36vw,.64vh) rgba(23,53,111,.32))}
-.rs-focus-shots{position:relative;z-index:1;margin:2.6%;aspect-ratio:1204/730;overflow:hidden;
+  pointer-events:none;z-index:2;transition:filter var(--rs-base) ease}
+.rs-focus-shots{position:absolute;z-index:1;left:1.6%;right:1.6%;top:2%;bottom:2%;overflow:hidden;
   background:#0e1b4a;border-radius:min(.3vw,.55vh)}
 .rs-focus-shots img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  object-position:50% 50%;min-width:100%;min-height:100%;display:block;
   opacity:0;transition:opacity .22s ease}
-.rs-focus-shots img.on{opacity:1}
+.rs-focus-shots img.on{opacity:1;animation:rsPhotoSet 280ms var(--rs-hover)}
+@keyframes rsPhotoSet{
+  from{opacity:.45;scale:1.025}
+  to{opacity:1;scale:1}
+}
 .rs-focus-shots .rs-empty{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;text-align:center;padding:0 8%;color:#cfd9ef;
   font-family:var(--f-sign);font-weight:800;font-size:4.2cqw;line-height:1.4}
-.rs-focus .rs-nametag.big{position:absolute;left:0.2%;top:1.8%;width:28.3%;z-index:4;
-  container-type:inline-size;pointer-events:none;rotate:5.3deg}
-.rs-arrow{position:absolute;top:44.5%;width:7.3%;z-index:5;background:none;border:0;
-  padding:0;cursor:pointer}
+.rs-focus .rs-nametag.big{position:absolute;left:.12165%;top:1.73611%;
+  width:28.2585%;height:17.4511%;z-index:4;container-type:inline-size;
+  pointer-events:none}
+.rs-focus .rs-nametag b{translate:-1.29cqw -1.08cqw}
+.rs-tape-focus{left:3.163017%;top:-28.298611%;width:21.986706%;height:23.745830%;
+  z-index:3}
+.rs-arrow{position:absolute;top:41.8403%;width:7.3%;z-index:5;background:none;border:0;
+  padding:0;cursor:pointer;touch-action:manipulation;
+  transition:translate .16s ease,scale .16s cubic-bezier(.2,1.5,.35,1),filter .16s ease}
 .rs-arrow img{width:100%;display:block;
-  filter:drop-shadow(0 min(.2vw,.35vh) min(.18vw,.32vh) rgba(23,53,111,.4))}
+  object-fit:fill}
+.rs-arrow::before,.rs-back::before,.rs-save::before,.rs-breakdown::before,.rs-title::before,
+.rs-rematch::before,.rs-exit::before{
+  content:"";position:absolute;left:50%;top:50%;
+  width:max(100%,44px);height:max(100%,44px);
+  translate:-50% -50%}
+.rs-arrow>*,.rs-back>*,.rs-save>*,.rs-breakdown>*,.rs-title>*,
+.rs-rematch>*,.rs-exit>*{
+  pointer-events:none}
 .rs-arrow.prev{left:3%}
 .rs-arrow.prev img{rotate:180deg}
 .rs-arrow.next{right:3%}
-.rs-shot-word{position:absolute;left:0;bottom:5.5%;width:100%;text-align:center;z-index:4;
+.rs-shot-word{display:none;position:absolute;left:0;bottom:5.5%;width:100%;text-align:center;z-index:4;
   font-family:var(--f-sign);font-weight:800;font-size:3.6cqw;color:#fff;
   text-shadow:0 .18cqw .5cqw rgba(9,22,62,.85);pointer-events:none}
 
-.rs-award{position:absolute;left:20.00%;top:62.72%;width:17.82%;z-index:7;rotate:5.9deg;
-  container-type:inline-size;pointer-events:none}
-.rs-award img{width:100%;display:block;aspect-ratio:1.486;object-fit:fill;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.28vw,.49vh) rgba(23,53,111,.34))}
+.rs-award{position:absolute;left:20.4840%;top:64.2065%;width:16.8527%;aspect-ratio:1.6376;
+  z-index:7;rotate:-5.89592deg;
+  container-type:inline-size;pointer-events:auto;
+  transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
+    rotate var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
+.rs-award img{width:100%;height:100%;display:block;object-fit:fill;
+  filter:drop-shadow(0 min(.48612vw,.8642vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
 .rs-award span{position:absolute;left:0;width:100%;text-align:center;color:#17356f;
-  white-space:nowrap;overflow:hidden}
-.rs-award .aw-kicker{top:2%;font-family:var(--f-sign);font-weight:800;font-size:16.5cqw}
-.rs-award .aw-title{top:22%;font-family:var(--f-lobby);font-size:19.5cqw}
-.rs-award .aw-sub{top:58%;font-family:var(--f-sign);font-weight:800;font-size:11.7cqw}
+  letter-spacing:.01em;overflow:visible;transform-origin:50% 50%}
+.rs-award .aw-kicker{top:-2.855%;font-family:var(--f-sign);font-weight:800;
+  font-size:17.333cqw;line-height:1.517;
+  translate:-2.91cqw 1.76cqw;
+  text-shadow:1.333cqw 1.333cqw 0 rgba(255,255,255,.9)}
+.rs-award .aw-title{top:23.996%;font-family:var(--f-lobby);font-size:20.603cqw;
+  line-height:1.2764;translate:.96cqw .41cqw;white-space:nowrap;
+  text-shadow:1.333cqw 1.333cqw 0 rgba(255,255,255,.9)}
+.rs-award .aw-sub{top:54.791%;font-family:var(--f-sign);font-weight:800;
+  font-size:12.362cqw;line-height:2.127;translate:1.33cqw .86cqw;white-space:nowrap}
+.rs-award .aw-sub.fit-wrap{left:5%;top:57%;width:90%;height:38%;display:flex;
+  align-items:center;justify-content:center;white-space:normal;text-wrap:balance;
+  line-height:.9}
 
-.rs-stat{position:absolute;z-index:7;container-type:inline-size;pointer-events:none}
-.rs-stat img{width:100%;display:block;aspect-ratio:2.09;object-fit:fill;
-  filter:drop-shadow(0 min(.24vw,.42vh) min(.24vw,.42vh) rgba(23,53,111,.3))}
+.rs-stat{position:absolute;z-index:7;container-type:inline-size;pointer-events:auto;
+  transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
+    filter var(--rs-base) ease}
+.rs-stat img{width:100%;height:100%;display:block;object-fit:fill;
+  filter:drop-shadow(0 min(.54748vw,.97329vh) min(.31284vw,.55617vh) rgba(0,0,0,.35))}
 .rs-stat b{position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:24cqw;
-  color:#17356f;white-space:nowrap}
-#rsStat1{left:37.85%;top:69.38%;width:12.93%;rotate:4.3deg}
-#rsStat2{left:50.74%;top:70.20%;width:12.76%;rotate:-2.2deg}
-#rsStat3{left:63.55%;top:70.51%;width:12.62%;rotate:.6deg}
+  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:26.181cqw;
+  line-height:1.517;letter-spacing:.01em;color:#17356f;white-space:nowrap;
+  rotate:var(--text-rot);translate:var(--text-x) 1.66cqw;
+  text-shadow:2.014cqw 2.014cqw 0 rgba(255,255,255,.9)}
+#rsStat1{left:38.0273%;top:70.2143%;width:12.5655%;aspect-ratio:2.4;
+  rotate:-4.33875deg;--text-rot:1.3583deg;--text-x:.55cqw}
+#rsStat2{left:50.8331%;top:70.6332%;width:12.5655%;aspect-ratio:2.4;
+  rotate:2.21815deg;--text-rot:-.6443deg;--text-x:2.21cqw}
+#rsStat3{left:63.5815%;top:70.6332%;width:12.5655%;aspect-ratio:2.4;
+  rotate:-.62868deg;--text-rot:.9738deg;--text-x:-1.66cqw}
 
 /* ---- which page is showing ---- */
 .resstage[data-page="stage"] .rs-strip,
@@ -1229,24 +1584,48 @@ body[data-screen="results"] header{display:none}
 .resstage[data-page="stage"] .rs-save{display:none}
 .resstage[data-page="breakdown"] .rs-seat,
 .resstage[data-page="breakdown"] .rs-breakdown,
-.resstage[data-page="breakdown"] .rs-scorechip,
-.resstage[data-page="breakdown"] .rs-tape-rematch{display:none}
+.resstage[data-page="breakdown"] .rs-divider{display:none}
+.resstage[data-page="stage"] .rs-tape-rematch-breakdown{display:none}
+.resstage[data-page="breakdown"] .rs-tape-score,
+.resstage[data-page="breakdown"] .rs-tape-rematch-stage,
+.resstage[data-page="breakdown"] .rs-scorechip{display:none}
+.resstage[data-page="breakdown"] .rs-tape-rematch-breakdown{display:block}
 .resstage[data-page="breakdown"] .rs-rematch{left:27.43%;top:85.93%;width:45.28%}
 .resstage[data-page="breakdown"] .rs-board{left:28.68%;top:1.11%}
+.resstage[data-page="breakdown"] .rs-bg{top:-1.23457%}
+.resstage[data-page="breakdown"] .rs-exit{left:84.722222%;top:1.728395%}
 
 /* the page swap is a beat, not a cut */
 .resstage[data-page] .rs-focus,.resstage[data-page] .rs-strip{animation:rsIn .34s cubic-bezier(.2,1.35,.35,1) both}
 @keyframes rsIn{from{opacity:0;transform:translateY(2.2%) scale(.985)}to{opacity:1;transform:none}}
 
-/* results: a quiet way home that never competes with REMATCH */
-.rs-home{position:absolute;left:88.5%;top:79.5%;width:10%;z-index:8;background:none;
-  border:0;padding:0;cursor:pointer;container-type:inline-size}
-.rs-home img{width:100%;display:block;aspect-ratio:2.08;object-fit:fill;
-  filter:drop-shadow(0 min(.24vw,.42vh) min(.22vw,.39vh) rgba(23,53,111,.3))}
-.rs-home b{position:absolute;inset:6% 0 16%;display:flex;align-items:center;
-  justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
-  font-size:19cqw;text-shadow:1.4cqw 1.4cqw 0 rgba(0,0,0,.4)}
-.resstage[data-page="breakdown"] .rs-home{display:none}
+@media (prefers-reduced-motion:reduce){
+  .resstage[data-page] .rs-focus,.resstage[data-page] .rs-strip{
+    animation:none!important}
+  .rs-seat,.rs-seat:hover{
+    translate:0 0!important;scale:1!important;animation:none!important;
+    transition:none!important}
+  .rs-seat .rs-ready{
+    scale:1!important;animation:none!important;transition:none!important}
+  .rs-exit,.rs-exit:hover,.rs-exit:active{
+    translate:0 0!important;scale:1!important;rotate:0deg!important;
+    animation:none!important;transition:none!important}
+  .rs-thumb,.rs-thumb.on,.rs-thumb:hover,.rs-thumb:focus-visible,.rs-thumb:active{
+    translate:0 0!important;scale:1!important;rotate:var(--rot,0deg)!important;
+    animation:none!important;transition:none!important}
+  .rs-rematch,.rs-rematch.mine,.rs-rematch:hover,.rs-rematch:active,
+  .rs-title,.rs-title:hover,.rs-title:active,
+  .rs-breakdown,.rs-breakdown:hover,.rs-breakdown:active,
+  .rs-back,.rs-back:hover,.rs-back:active,
+  .rs-save,.rs-save:hover,.rs-save:active,
+  .rs-arrow,.rs-arrow:hover,.rs-arrow:active,
+  .rs-board,.rs-scorechip,.rs-award,.rs-stat{
+    translate:0 0!important;scale:1!important;animation:none!important;
+    transition:none!important}
+  .rs-title,.rs-title:hover,.rs-title:active{rotate:-2.52119deg!important}
+  .rs-award,.rs-award:hover{rotate:-5.89592deg!important}
+  .rs-focus-shots img.on{animation:none!important}
+}
 
 /* dev shortcut — deliberately plain so it never reads as game UI */
 .devbtn{position:fixed;right:10px;bottom:10px;z-index:200;
@@ -1261,5 +1640,124 @@ body[data-screen="results"] .camdock .livebadge,
 body[data-screen="results"] .camdock .aipill,
 body[data-screen="results"] .camdock .brackets{display:none}
 
-/* blue0 sits under the logo, so its tag drops clear of the title card */
-.rs-seat[data-seat="blue0"] .rs-nametag{top:9%}
+/* =================== RESULTS: 1v1 + SOLO LAYOUTS ===================
+   Figma "1v1 Results" 231:419, "1v1 breakdown" 232:534 and
+   "Single Player breakdown + reuslts" 233:711. Same components as the party
+   results, re-placed per mode — every left/top/width is the Figma rectangle,
+   and every aspect-ratio is that rectangle (W*1440 / H*810), not the asset's
+   natural size. */
+
+/* ---- 1v1 RESULTS: two full-half seats either side of the divider ---- */
+.resstage[data-mode="1v1"] [data-seat="blue1"],
+.resstage[data-mode="1v1"] [data-seat="blue2"],
+.resstage[data-mode="1v1"] [data-seat="orange1"],
+.resstage[data-mode="1v1"] [data-seat="orange2"]{display:none}
+.resstage[data-mode="1v1"] [data-seat="blue0"]{
+  left:0;top:0;width:48.33%;height:100%;aspect-ratio:auto;rotate:0deg}
+.resstage[data-mode="1v1"] [data-seat="orange0"]{
+  left:50.14%;top:0;width:49.86%;height:100%;aspect-ratio:auto;rotate:0deg}
+/* full-bleed halves carry no torn frame — the divider does that job */
+.resstage[data-mode="1v1"] .rs-seat .rs-border{display:none}
+.resstage[data-mode="1v1"] .rs-seat .slot{inset:0;border-radius:0}
+.resstage[data-mode="1v1"] [data-seat="blue0"] .rs-nametag{
+  left:1.43%;top:17.28%;width:24.17%;rotate:10.3deg}
+.resstage[data-mode="1v1"] [data-seat="orange0"] .rs-nametag{
+  left:auto;right:.67%;top:15.80%;width:23.44%;rotate:-11.4deg}
+.resstage[data-mode="1v1"] [data-seat="blue0"] .rs-ready{
+  left:28.45%;right:auto;top:17.53%;bottom:auto;width:23.88%}
+.resstage[data-mode="1v1"] [data-seat="orange0"] .rs-ready{
+  left:4%;right:auto;top:17.53%;bottom:auto;width:23%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-board{left:26.67%;top:2.22%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-scorechip{left:35.22%;top:11.09%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-rematch{left:24.24%;top:74.81%;width:51.50%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-breakdown{left:32.01%;top:85.52%}
+/* the 1v1 divider is the solid centre paper, not the two-tone team strip */
+.resstage[data-mode="1v1"] .rs-divider,
+.resstage[data-mode="solo"] .rs-divider{left:48.33%;top:-19.75%;width:1.81%;height:139.51%}
+
+/* ---- 1v1 BREAKDOWN: both players side by side, no thumbnails ---- */
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-strip,
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-arrow,
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-divider{display:none}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus{
+  left:.90%;top:16.67%;width:49.24%;aspect-ratio:1.312}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.b{
+  display:block;left:50.14%;top:16.91%;width:49.44%;aspect-ratio:1.310}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-award{left:0;top:65.56%;width:15.37%}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-award.b{
+  display:block;left:49.72%;top:65.56%;width:15.37%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat1{left:14.98%;top:70.86%;width:11.15%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat2{left:26.10%;top:71.57%;width:11.01%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat3{left:37.15%;top:71.83%;width:10.89%}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-stat.b{display:block}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB1{left:64.70%;top:70.86%;width:11.15%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB2{left:75.82%;top:71.57%;width:11.01%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB3{left:86.87%;top:71.83%;width:10.89%}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus .rs-nametag.big{
+  left:.27%;top:1.9%;width:28.2%}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.b .rs-nametag.big{
+  left:auto;right:.5%;top:-.8%;width:26.2%;rotate:-11.7deg}
+
+/* the mirrored set only exists for 1v1 */
+.rs-focus.b,.rs-award.b,.rs-stat.b{display:none}
+
+/* ---- SOLO: results and breakdown on one screen ---- */
+.resstage[data-page="solo"] .rs-strip,
+.resstage[data-page="solo"] .rs-arrow,
+.resstage[data-page="solo"] .rs-breakdown,
+.resstage[data-page="solo"] .rs-back,
+.resstage[data-page="solo"] .rs-focus.b,
+.resstage[data-page="solo"] .rs-award.b,
+.resstage[data-page="solo"] .rs-stat.b,
+.resstage[data-page="solo"] [data-seat="blue1"],
+.resstage[data-page="solo"] [data-seat="blue2"],
+.resstage[data-page="solo"] [data-seat="orange0"],
+.resstage[data-page="solo"] [data-seat="orange1"],
+.resstage[data-page="solo"] [data-seat="orange2"]{display:none}
+/* the paper wallpaper covers only the right half; your camera is the left */
+.resstage[data-page="solo"] .rs-bg{left:49.38%;top:0;width:50.62%;height:100%}
+.resstage[data-page="solo"] [data-seat="blue0"]{
+  left:0;top:0;width:48.33%;height:100%;aspect-ratio:auto;rotate:0deg}
+.resstage[data-page="solo"] .rs-seat .rs-border{display:none}
+.resstage[data-page="solo"] .rs-seat .slot{inset:0;border-radius:0}
+.resstage[data-page="solo"] .rs-seat .rs-ready{display:none}
+.resstage[data-page="solo"] [data-seat="blue0"] .rs-nametag{
+  left:.29%;top:18.52%;width:24.21%;rotate:10.9deg}
+.resstage[data-page="solo"] .rs-board{left:32.22%;top:0;width:35.56%}
+.resstage[data-page="solo"] .rs-scorechip{left:35.15%;top:8.87%;width:28.44%}
+.resstage[data-page="solo"] .rs-focus{
+  display:block;left:52.22%;top:13.21%;width:45.83%;aspect-ratio:1.575}
+.resstage[data-page="solo"] .rs-focus .rs-nametag.big{display:none}
+.resstage[data-page="solo"] .rs-save{left:80.00%;top:54.82%;width:16.74%}
+.resstage[data-page="solo"] .rs-award{left:-.35%;top:79.63%;width:15.54%}
+.resstage[data-page="solo"] #rsStat1{left:14.79%;top:84.99%;width:11.27%}
+.resstage[data-page="solo"] #rsStat2{left:26.03%;top:85.71%;width:11.13%}
+.resstage[data-page="solo"] #rsStat3{left:37.21%;top:85.97%;width:11.01%}
+.resstage[data-page="solo"] .rs-rematch{left:51.53%;top:85.56%;width:47.12%;rotate:.3deg}
+.resstage[data-page="solo"] .rs-tape-rematch-breakdown{display:none}
+.resstage[data-page="solo"] .rs-tape-rematch-stage{left:49.75%;top:83.69%;width:7.24%;rotate:15.3deg}
+
+/* every pose of the run and what it paid */
+/* Figma fits exactly five rows a column between the frame and REMATCH, so the
+   block is height-capped and the type shrinks to stay inside it. */
+.rs-poselist{position:absolute;left:54.37%;top:66.05%;width:39.59%;height:17.90%;z-index:7;
+  display:grid;grid-template-columns:1fr 1fr;gap:0 4.2%;pointer-events:none}
+.rs-posecol{list-style:none;margin:0;padding:0;overflow:hidden}
+.rs-posecol li{display:flex;align-items:baseline;gap:.34em;white-space:nowrap;
+  font-family:var(--f-lobby);font-weight:400;color:#17356f;
+  font-size:calc(min(1.9vw,3.38vh) * var(--pl-fs,1));line-height:1.16}
+.rs-posecol .pl-word{overflow:hidden;text-overflow:ellipsis}
+.rs-posecol .pl-dash{opacity:.7}
+.rs-posecol .pl-pts.got{color:#1b7532}
+.rs-posecol .pl-pts.missed{color:#c0271b}
+.rs-posecol .pl-empty{opacity:.6}
+.resstage:not([data-page="solo"]) .rs-poselist{display:none}
+
+/* solo's headline paper is a narrower Figma rectangle than the party board */
+.resstage[data-page="solo"] .rs-board-art{aspect-ratio:5.39}
+/* Fredoka One overshoots a line box smaller than its font-size, so the box is
+   sized to the glyphs and pinned above the score chip rather than centred. */
+.resstage[data-page="solo"] .rs-headline{inset:7% 0 auto 0;height:auto;
+  display:block;line-height:1;font-size:11.6cqw}
+/* the logo sits on top of the breakdown frames, as Figma layers it */
+.rs-title{z-index:12}

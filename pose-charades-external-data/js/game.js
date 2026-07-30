@@ -24,7 +24,12 @@ import { partyCheck } from "./partyMatch.js";
 import { captureShot, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
-         ROUND_END_PAUSE_MS } from "./soloRound.js";
+         ROUND_END_PAUSE_MS, showPointsAward, confettiFrom } from "./soloRound.js";
+import {
+  markGuessRecognized,
+  prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
+  fitGameplayText,
+} from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
 
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
@@ -108,7 +113,7 @@ export function startGame(mode="ai"){
   if(!transition("countdown")){ state.game=null; return; }
   updateHud();
   if(mode==="ai"){
-    setTxt("soloRoundTime", fmtTime(SOLO.roundMs));
+    setTxt("soloRoundTime", fmtTime(SOLO.roundMs,{compact:true}));
     setTxt("soloWordTime", fmtTime(SOLO.wordMs));
     setTxt("soloSkipCost", "−"+SOLO.skipPenalty);
   }else{
@@ -124,7 +129,7 @@ export function startGame(mode="ai"){
 }
 
 function animateWordChange(){
-  [$("promptBar"), $("vsWordCard"), $("soloWordCard")].forEach(el=>{
+  [$("promptBar")].forEach(el=>{
     if(!el) return;
     el.classList.remove("wordswap"); void el.offsetWidth; el.classList.add("wordswap");
   });
@@ -147,6 +152,15 @@ function nextWord(){
   if(ai){
     game.pendingPts=pointsForCurrentWord();
     soloBegin(game.word, onSoloResolve);
+  }else{
+    const stage=$("matchStage");
+    stage?.classList.remove("you-locked","rival-locked");
+    prepareWordFeedback($("vsWordCard"),$("v1WordFill"),THRESH,true);
+    markGuessRecognized($("myGuessTop"),false);
+    markGuessRecognized($("rivalGuessTop"),false);
+    $("v1Award")?.classList.remove("show");
+    $("v1RivalAward")?.classList.remove("show");
+    fitGameplayText($("vsWord"));
   }
   animateWordChange();
 }
@@ -208,14 +222,27 @@ function finishWord(winner, opts={}){
     game.score+=pts;
     game.results.push({word:game.word, ok:true, pts, confidence:opts.confidence||0});
     pointBurst("+"+fmtScore(pts)+" points", game.word+(game.streak>1?" · streak x"+game.streak:""), "good");
-    flash("good");
-    blip([523,659,784]);
+    $("matchStage")?.classList.add("you-locked");
+    markGuessRecognized($("myGuessTop"),true);
+    blip([523]);
+    playWordLockFeedback({
+      card:$("vsWordCard"),fill:$("v1WordFill"),threshold:THRESH,
+      onImpact:()=>{
+        showPointsAward("v1Award","v1AwardPts",pts);
+        confettiFrom($("vsWordCard"));
+        flash("good");
+        blip([523,659,784]);
+      },
+    });
   }else if(winner==="rival"){
     game.streak=0;
     const pts=PTS_CORRECT;
     game.rivalScore+=pts;
     game.results.push({word:game.word, ok:false, rival:true, rivalPts:pts, thought:"Rival guessed it first"});
     pointBurst("Rival wins!", game.word+" · +"+pts, "rival");
+    $("matchStage")?.classList.add("rival-locked");
+    markGuessRecognized($("rivalGuessTop"),true);
+    playWordMissFeedback($("vsWordCard"),THRESH);
     flash("bad");
     blip([330,247]);
   }else{
@@ -223,6 +250,7 @@ function finishWord(winner, opts={}){
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
     const missMsg = opts.skip ? "Skipped" : "Time up";
     pointBurst(missMsg, opts.skip ? "−"+PTS_SKIP+" points" : "Next word coming up", "bad");
+    playWordMissFeedback($("vsWordCard"),THRESH);
     flash("bad");
     blip([220,165]);
   }
@@ -279,7 +307,7 @@ export function gameTick(){
     const now=performance.now();
     const roundLeft=Math.max(0,game.roundEndsAt-now);
     const wordLeft=Math.max(0,game.wordEnd-now);
-    setTxt("soloRoundTime",fmtTime(roundLeft));
+    setTxt("soloRoundTime",fmtTime(roundLeft,{compact:true}));
     setTxt("soloWordTime",fmtTime(wordLeft));
     const wt=$("soloWordTime"); if(wt) wt.classList.toggle("low", wordLeft<=5000 && wordLeft>0);
     if(roundLeft<=0){ if(gameState()==="playing") endGame(); return; }
@@ -321,9 +349,11 @@ export function gameTick(){
     }
   }
   if(game.mode==="online" && game.matchEndsAt){
-    const matchLeft=Math.max(0,game.matchEndsAt-performance.now());
+    const matchLeft=Math.max(0,Math.min(
+      game.matchLimitMs ?? Infinity,
+      game.matchEndsAt-performance.now()));
     setTxt("pillRound",fmtTime(matchLeft));
-    setTxt("v1MatchTime",fmtTime(matchLeft));
+    setTxt("v1MatchTime",fmtTime(matchLeft,{compact:true}));
   }else if(game.mode==="vs"){
     setTxt("v1MatchTime",game.round+" / "+game.rounds);
   }
@@ -362,8 +392,9 @@ export function endGame(){
   const got=g.results.filter(r=>r.ok);
   const times=got.map(r=>r.secs).filter(Number.isFinite);
   const solo=g.mode==="ai";
+  /* Figma's solo frame says GAME OVER over the run total. */
   const headline = solo
-    ? (got.length ? "NICE RUN!" : "GAME OVER")
+    ? "GAME OVER"
     : (g.score>=g.rivalScore ? "YOU WIN!" : "RIVAL WINS");
   showResults({
     mode: solo?"solo":"vs",
@@ -371,6 +402,8 @@ export function endGame(){
     headline,
     teams: solo ? null : { blue:g.score, orange:g.rivalScore },
     soloScore: g.score,
+    /* every pose of the run and what it paid — solo's breakdown list */
+    rounds: g.results.map(r => ({ word:r.word, pts: r.ok ? (r.pts||0) : 0 })),
     players: [{
       id:"me", name:(localStorage.getItem("poseCharadesName")||"YOU"), team:"blue",
       mine:true, score:g.score, firsts:got.length,

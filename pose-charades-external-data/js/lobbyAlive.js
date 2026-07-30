@@ -11,10 +11,22 @@ const WAVE_MS = 1300;
 const DOTS_MS = 450;
 
 let waveTimer = null, dotsTimer = null, dots = 3;
+let active = false;
+const motionPreference = matchMedia("(prefers-reduced-motion: reduce)");
+
+function settle(){
+  $("robotWaveHigh")?.classList.remove("ghosted");
+  $("robotWaveLow")?.classList.add("ghosted");
+  dots = 3;
+  for(const id of ["dotsBig", "dotsSmall"]){
+    const el = $(id);
+    if(el) el.textContent = "···";
+  }
+}
 
 function start(){
-  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   stop();
+  if(motionPreference.matches){ settle(); return; }
   waveTimer = setInterval(() => {
     $("robotWaveHigh").classList.toggle("ghosted");
     $("robotWaveLow").classList.toggle("ghosted");
@@ -45,5 +57,12 @@ export function wireLobbyAlive(){
     });
   });
   wireAlphaHitAreas(stage,".lobby-alpha");
-  onTransition(to => { if(to === "lobby" || to === "party") start(); else stop(); });
+  const refreshMotion = () => { if(active) start(); };
+  if(motionPreference.addEventListener)
+    motionPreference.addEventListener("change", refreshMotion);
+  else motionPreference.addListener?.(refreshMotion);
+  onTransition(to => {
+    active = to === "lobby" || to === "party";
+    if(active) start(); else stop();
+  });
 }

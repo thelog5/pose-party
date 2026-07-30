@@ -206,10 +206,27 @@ try {
   ok(immediateA>=300 && immediateA<=500 &&
     /5 SECONDS LEFT/.test(await txt(A,"#v1WordTimerLabel")),
     `first recognition scored immediately and opened chase (${immediateA})`);
+  const chaseClockFit=await A.evaluate(() => {
+    const value=document.getElementById("v1WordTime");
+    const card=document.getElementById("v1WordTimerCard");
+    const label=document.getElementById("v1WordTimerLabel");
+    return {
+      ratio:parseFloat(getComputedStyle(value).fontSize)/card.clientWidth,
+      labelScroll:label.scrollWidth,
+      labelClient:label.clientWidth,
+    };
+  });
+  ok(chaseClockFit.ratio>.23 &&
+    chaseClockFit.labelScroll<=chaseClockFit.labelClient+1,
+    `the chase clock retains authored enlarged type and fitted label (${chaseClockFit.ratio.toFixed(3)}, ${chaseClockFit.labelScroll}/${chaseClockFit.labelClient}px)`);
+  await A.waitForFunction(() =>
+    document.getElementById("v1Award").classList.contains("show"),
+    {timeout:1500,polling:25});
   ok(await A.evaluate(() =>
     document.getElementById("v1Award").classList.contains("show") &&
+    document.getElementById("vsWordCard").classList.contains("locked") &&
     document.getElementById("v1Award").querySelector("img").src.includes("sp-award.png")),
-    "1v1 reuses Solo's GOT IT paper and animation");
+    "1v1 reuses Solo's impact -> lock -> GOT IT paper sequence");
   ok(await A.evaluate(() =>
     parseFloat(document.getElementById("v1WordFill").style.width)>=94),
     "first recognizer's meter locks full for the chase");
@@ -222,13 +239,19 @@ try {
   await winNow(B);
   await waitState(A, "word-won", 5000);
   await waitState(B, "word-won", 5000);
-  ok(await A.evaluate(() =>
-    parseFloat(getComputedStyle(document.getElementById("v1WordFill")).width) /
-      document.getElementById("vsWordCard").getBoundingClientRect().width > .9) &&
-    await B.evaluate(() =>
-    parseFloat(getComputedStyle(document.getElementById("v1WordFill")).width) /
-      document.getElementById("vsWordCard").getBoundingClientRect().width > .9),
-    "both successful players keep a full meter through the result beat");
+  const resultMeters=await Promise.all([A,B].map(p => p.evaluate(() => {
+    const fill=document.getElementById("v1WordFill");
+    const card=document.getElementById("vsWordCard");
+    return {
+      ratio:parseFloat(getComputedStyle(fill).width) /
+        parseFloat(getComputedStyle(card).width),
+      inline:fill.style.width,
+      phase:document.getElementById("matchStage").dataset.phase,
+      locked:card.classList.contains("locked"),
+    };
+  })));
+  ok(resultMeters.every(value => value.ratio>.9),
+    `both successful players keep a full meter through the result beat (${resultMeters.map(value => value.inline+"/"+value.ratio.toFixed(2)).join(", ")})`);
   const round1A=parseInt((await txt(A,"#v1YouScore")).replace(/[^0-9]/g,""));
   const round1B=parseInt((await txt(A,"#v1RivalScore")).replace(/[^0-9]/g,""));
   ok(round1A>round1B && round1B>0,
@@ -264,8 +287,8 @@ try {
   ok(/LEFT EARLY/i.test(await txt(A, "#rsHeadline")), `peer sees early end ("${await txt(A, "#rsHeadline")}")`);
 
   console.log("replay -> fresh lobby + join by typed code:");
-  await act(A, () => A.click("#rsHome")); // back out, then open a fresh lobby
-  await act(A, () => A.evaluate(() => document.getElementById("modeVS").click()));
+  await act(A, () => A.click("#rsRematch"));
+  await waitState(A, "lobby", 10000);
   await A.waitForFunction(c => {
     const t = document.getElementById("roomCodeText").textContent;
     return /^[A-Z2-9]{6}$/.test(t) && t !== c;
@@ -287,7 +310,14 @@ try {
   await act(A, () => A.click("#btnExitLobby"));
   await A.waitForFunction(() => document.body.dataset.state === "menu", { timeout: 8000, polling: 300 });
   await act(A, () => A.click("#modeParty"));
-  await A.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
+  await A.waitForFunction(() =>
+    document.body.dataset.state === "party" &&
+    document.getElementById("lobbyStage").dataset.mode === "party",
+    { timeout: 8000, polling: 100 });
+  await A.waitForFunction(previous =>
+    /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent) &&
+    document.getElementById("roomCodeText").textContent !== previous,
+    { timeout: 10000, polling: 300 }, code2);
   const pcode = await txt(A, "#roomCodeText");
   ok(/^[A-Z2-9]{6}$/.test(pcode), `party room created (${pcode})`);
   ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name b')?.textContent) === "Alice", "host camera tile uses the saved player name");
@@ -325,7 +355,14 @@ try {
   await act(B, () => B.click("#btnExitLobby"));
   await B.waitForFunction(() => document.body.dataset.state === "menu", { timeout: 8000, polling: 300 });
   await act(B, () => B.click("#modeParty"));
-  await B.waitForFunction(() => /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent), { timeout: 10000, polling: 300 });
+  await B.waitForFunction(() =>
+    document.body.dataset.state === "party" &&
+    document.getElementById("lobbyStage").dataset.mode === "party",
+    { timeout: 8000, polling: 100 });
+  await B.waitForFunction(previous =>
+    /^[A-Z2-9]{6}$/.test(document.getElementById("roomCodeText").textContent) &&
+    document.getElementById("roomCodeText").textContent !== previous,
+    { timeout: 10000, polling: 300 }, code2);
   await act(B, () => B.evaluate(() => { document.getElementById("joinCode").value = ""; }));
   await act(B, () => B.type("#joinCode", pcode));
   await act(B, () => B.click("#btnJoinRoom"));
@@ -333,7 +370,10 @@ try {
   ok(true, "B joined the party by code");
   await B.waitForFunction(() => document.querySelector('#ptO0 .pt-name b')?.textContent === "Bob", { timeout: 8000, polling: 300 });
   ok(true, "B auto-balanced onto orange");
-  ok(await B.evaluate(() => document.querySelector('#ptB0 .pt-name b')?.textContent) === "PartyAlice", "party name change reached the other player");
+  await B.waitForFunction(() =>
+    document.querySelector('#ptB0 .pt-name b')?.textContent === "PartyAlice",
+    { timeout:3000,polling:50 });
+  ok(true, "party name change reached the other player");
   await A.waitForFunction(() => !!document.querySelector('#ptO0 video'), { timeout: 8000, polling: 300 });
   ok(true, "A sees B's tile appear");
   // mesh video: B's feed lands in A's orange tile

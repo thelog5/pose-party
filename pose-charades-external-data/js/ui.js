@@ -4,7 +4,13 @@ import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { fakeRivalGuesses } from "./rival.js";
 import { THRESH } from "./constants.js";
-import { setWordRecognitionMotion } from "./soloRound.js";
+import {
+  advanceRecognitionFill,
+  createGuessHistory, resetGuessHistory, updateGuessHistory,
+  restartFeedbackAnimation, markGuessRecognized,
+  setWordRecognitionMotion,
+  fitGameplayText,
+} from "./gameplayFeedback.js";
 
 /* ---------------- transient feedback ---------------- */
 export function showStatus(msg){
@@ -38,9 +44,11 @@ export function pointBurst(headline, detail, kind="good"){
   pointBurst._t=setTimeout(()=>b.classList.remove("show"),1300);
 }
 
-export const fmtTime = ms => {
+export const fmtTime = (ms, { compact=false }={}) => {
   const s=Math.max(0,Math.ceil(ms/1000));
-  return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+  const minutes=String(Math.floor(s/60));
+  return (compact ? minutes : minutes.padStart(2,"0"))+
+    ":"+String(s%60).padStart(2,"0");
 };
 
 export const fmtScore = n => (n|0).toLocaleString("en-US");
@@ -76,54 +84,29 @@ export function fillGuessPanel(prefix, top, rows=4){
    Keep the existing classifier output funnel, but render it through that
    smaller rolling stack rather than the old dashboard panels. */
 const matchGuess = {
-  my:{ key:null,current:null,past:null,candidate:null,since:0 },
-  rival:{ key:null,current:null,past:null,candidate:null,since:0 },
+  my:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
+  rival:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
 };
 
 function resetMatchSide(prefix, key){
   const slot=matchGuess[prefix];
   if(slot.key===key) return slot;
-  Object.assign(slot,{key,current:null,past:null,candidate:null,since:0});
+  slot.key=key;
+  slot.shownFill=0;
+  slot.fillAt=0;
+  resetGuessHistory(slot.history);
   const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct");
-  const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"), pastBox=$(prefix+"GuessPast");
+  const topBox=$(prefix+"GuessTop");
+  const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"),
+    pastBox=$(prefix+"GuessPast");
   if(topWord) topWord.textContent="GUESSING…";
   if(topPct) topPct.textContent="0%";
   if(pastWord) pastWord.textContent="";
   if(pastPct) pastPct.textContent="";
   if(pastBox) pastBox.classList.add("empty");
+  markGuessRecognized(topBox,false);
+  fitGameplayText(topWord);
   return slot;
-}
-
-/* Character count is a poor proxy for glyph width — "JUMPING JACKS" cleared
-   the old heuristic and still ran off its paper. Measure instead. */
-function fitMatchGuess(node, text, base=17.21){
-  if(!node) return;
-  fitCqwText(node, base, 9.5);
-}
-
-/* One proportional pass leaves long words a little over, because shrinking
-   re-wraps the glyph advances it was measured from. Verify and re-fit. */
-function fitCqwText(node, base, minimum){
-  if(!node) return;
-  const measure=()=>{
-    const style=getComputedStyle(node);
-    const available=node.clientWidth-(parseFloat(style.paddingLeft)||0)-
-      (parseFloat(style.paddingRight)||0);
-    /* scrollWidth is layout-only. A range rect would be inflated by the
-       word-stamp transform still running on the card, which made the fitter
-       shrink against a moving target and settle short. */
-    return { available, wanted: node.scrollWidth };
-  };
-  let size=base;
-  node.style.fontSize=size+"cqw";
-  for(let pass=0; pass<4; pass++){
-    const { available, wanted }=measure();
-    if(!available || wanted<=available) return;
-    const next=Math.max(minimum, size*(available/wanted)*.96);
-    if(next>=size) return;          // already at the floor
-    size=next;
-    node.style.fontSize=size+"cqw";
-  }
 }
 
 /* One place owns the countdown so every mode gets the same beat: writing a
@@ -139,29 +122,35 @@ export function setCountdown(value){
 }
 
 export function fitMatchPaperText(){
-  fitCqwText($("vsWord"),14.69,7.5);
-  fitCqwText($("v1YouName"),17.15,9);
-  fitCqwText($("v1RivalName"),17.15,9);
+  for(const id of [
+    "vsWord", "v1YouName", "v1RivalName",
+    "v1MatchTime", "v1WordTime",
+    "myTopWord", "myPastWord", "rivalTopWord", "rivalPastWord",
+  ]) fitGameplayText($(id));
 }
 
 function paintMatchSide(prefix, slot, popped=false){
   const word=$(prefix+"TopWord"), pct=$(prefix+"TopPct"), topBox=$(prefix+"GuessTop");
   const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"), pastBox=$(prefix+"GuessPast");
-  if(slot.current){
-    const label=displayName(slot.current.label).toUpperCase()+(slot.current.locked?"":"?");
-    if(word){ word.textContent=label; fitMatchGuess(word,label); }
-    if(pct) pct.textContent=Math.round(slot.current.pct*100)+"%";
+  const current=slot.history.items[0];
+  const past=slot.history.items[1];
+  if(current){
+    const label=displayName(current.label).toUpperCase()+(current.locked?"":"?");
+    if(word){ word.textContent=label; fitGameplayText(word); }
+    if(pct) pct.textContent=Math.round(current.pct*100)+"%";
   }
-  if(slot.past){
-    const label=displayName(slot.past.label).toUpperCase()+"?";
-    if(pastWord){ pastWord.textContent=label; fitMatchGuess(pastWord,label); }
-    if(pastPct) pastPct.textContent=Math.round(slot.past.pct*100)+"%";
+  if(past){
+    const label=displayName(past.label).toUpperCase()+"?";
+    if(pastWord){ pastWord.textContent=label; fitGameplayText(pastWord); }
+    if(pastPct) pastPct.textContent=Math.round(past.pct*100)+"%";
     pastBox?.classList.remove("empty");
   }else{
     pastBox?.classList.add("empty");
   }
+  markGuessRecognized(topBox,!!current?.locked);
   if(popped && topBox){
-    topBox.classList.remove("pop"); void topBox.offsetWidth; topBox.classList.add("pop");
+    restartFeedbackAnimation(topBox,"pop");
+    if(past) restartFeedbackAnimation(pastBox,"shift");
   }
 }
 
@@ -169,35 +158,23 @@ function renderMatchSide(prefix, top, key, locked=false){
   const slot=resetMatchSide(prefix,key);
   if(locked && state.game?.word){
     const target=state.game.word;
-    const changed=slot.current?.label!==target || !slot.current?.locked;
-    if(changed && slot.current?.label!==target) slot.past=slot.current;
-    slot.current={label:target,pct:1,locked:true};
-    paintMatchSide(prefix,slot,changed);
+    const update=updateGuessHistory(slot.history,target,1,
+      { force:true,locked:true });
+    paintMatchSide(prefix,slot,update.changed);
     return slot;
   }
   const best=top?.[0];
   if(!best) return slot;
   const [label,confidence]=best;
-  const now=performance.now();
-  if(label!==slot.candidate){
-    slot.candidate=label;
-    slot.since=now;
-  }
-  if(!slot.current || (label!==slot.current.label && now-slot.since>=420)){
-    if(slot.current && slot.current.label!==label) slot.past=slot.current;
-    slot.current={label,pct:confidence||0,locked:false};
-    paintMatchSide(prefix,slot,true);
-  }else if(label===slot.current.label){
-    slot.current.pct=confidence||0;
-    paintMatchSide(prefix,slot,false);
-  }
+  const update=updateGuessHistory(slot.history,label,confidence);
+  if(update.committed) paintMatchSide(prefix,slot,update.changed);
   return slot;
 }
 
 /* gameCheck uses this same displayed state, so neither a fill nor a win can
    race ahead while the robot paper is still showing the previous label. */
 export function localMatchGuessIs(label){
-  return !!label && matchGuess.my.current?.label===label;
+  return !!label && matchGuess.my.history.items[0]?.label===label;
 }
 
 /* Online 1v1 relays only the opponent's already-computed label + confidence.
@@ -258,18 +235,29 @@ export function renderGuesses(){
     }
     const fill=$("v1WordFill");
     if(fill && g?.word){
-      const targetIsDisplayed=mySlot?.current?.label===g.word;
+      const current=mySlot?.history.items[0];
+      const targetIsDisplayed=current?.label===g.word;
       const displayedConfidence=targetIsDisplayed
-        ? Math.max(0,Math.min(1,mySlot.current?.pct||0))
+        ? Math.max(0,Math.min(1,current?.pct||0))
         : 0;
-      const progress=localLocked
+      const targetProgress=localLocked
         ? 1
         : Math.max(0,Math.min(1,displayedConfidence/THRESH));
-      fill.style.width=(progress*95)+"%";
+      if(localLocked){
+        mySlot.shownFill=1;
+        mySlot.fillAt=performance.now();
+      }else{
+        const next=advanceRecognitionFill(
+          mySlot.shownFill,targetProgress,mySlot.fillAt);
+        mySlot.shownFill=next.value;
+        mySlot.fillAt=next.at;
+      }
+      fill.style.width=(mySlot.shownFill*95)+"%";
       const card=$("vsWordCard");
-      const canShake=stage?.dataset.phase!=="chase" &&
-        !localLocked;
-      setWordRecognitionMotion(card,displayedConfidence,THRESH,canShake);
+      const activePhase=g.mode==="vs" ||
+        ["word","chase","sudden"].includes(g.roundPhase);
+      const canShake=activePhase && !localLocked;
+      setWordRecognitionMotion(card,mySlot.shownFill*THRESH,THRESH,canShake);
     }
     fitMatchPaperText();
   } else if(s==="train"){

@@ -67,9 +67,16 @@ try {
   const code = await txt(A, "#roomCodeText");
   ok(!!code, `party room opened (${code})`);
 
-  /* Settings, team switches and claims all share one per-socket bucket, so
-     the test must not spam the timer controls before it needs to claim. */
-  for (let i = 0; i < 4; i++) await A.click("#matchMinus").catch(() => {});
+  /* The public UI deliberately floors matches at one minute. This suite uses
+     the server's validated 10-second test floor so it can cover real results
+     readiness, same-room restart and results-phase leaving. */
+  await A.evaluate(async () => {
+    const {lobbySettings, partyBridge}=await import("/js/online.js");
+    const settings=lobbySettings();
+    settings.matchSecs=10;
+    settings.wordSecs=5;
+    partyBridge.settings(settings);
+  });
 
   for (const p of [B, C, D]) {
     await p.click("#modeParty");
@@ -157,6 +164,58 @@ try {
   ok(!!word, `word dealt to everyone ("${word}")`);
   const sameWord = await Promise.all([B, C, D].map(p => ev(p, `${mod("state.js")}.state.game.word`)));
   ok(sameWord.every(w => w === word), "all four clients share the word");
+  const partyFeedbackProbe = await A.evaluate(async currentWord => {
+    const {state}=await import("/js/state.js");
+    const {partyCheck}=await import("/js/partyMatch.js");
+    const {fitGameplayText,fitSingleLinePaperText}=
+      await import("/js/gameplayFeedback.js");
+    state.smooth[currentWord]=.45;
+    partyCheck(currentWord,.45);
+    await new Promise(resolve=>setTimeout(resolve,260));
+    const card=document.getElementById("pmWordCard");
+    const fill=document.getElementById("pmWordFill");
+    const clock=document.getElementById("pmMatchTime");
+    const wordNode=document.getElementById("pmWord");
+    const guessNode=document.getElementById("pmMyTopWord");
+    const nameNode=document.querySelector('#pmStage [data-seat]:not(.vacant) .pm-nametag b');
+    const oldWord=wordNode.textContent;
+    const oldGuess=guessNode.textContent;
+    const oldName=nameNode?.textContent || "";
+    wordNode.textContent="THE EXTRAORDINARILY LONG CURRENT ACTION";
+    guessNode.textContent="EXTRAORDINARILY LONG ROBOT GUESS?";
+    if(nameNode) nameNode.textContent="MAXIMILIAN";
+    fitGameplayText(wordNode);
+    fitGameplayText(guessNode);
+    fitSingleLinePaperText(nameNode,{safety:.86,minScale:.44});
+    const inside=node => node.scrollWidth<=node.clientWidth+1 &&
+      node.scrollHeight<=node.clientHeight+1;
+    const result={
+      tracking:card.classList.contains("tracking"),
+      fill:parseFloat(fill.style.width)||0,
+      current:document.getElementById("pmMyTop").classList.contains("pop"),
+      wordFit:inside(wordNode),
+      guessFit:inside(guessNode),
+      nameFit:!!nameNode && inside(nameNode),
+      wraps:wordNode.classList.contains("fit-wrap") &&
+        guessNode.classList.contains("fit-wrap"),
+      clockFit:inside(clock) && /^\d+:\d\d$/.test(clock.textContent) &&
+        !/^0\d:/.test(clock.textContent),
+    };
+    wordNode.textContent=oldWord;
+    guessNode.textContent=oldGuess;
+    if(nameNode) nameNode.textContent=oldName;
+    fitGameplayText(wordNode);
+    fitGameplayText(guessNode);
+    fitSingleLinePaperText(nameNode,{safety:.86,minScale:.44});
+    return result;
+  },word);
+  ok(partyFeedbackProbe.tracking && partyFeedbackProbe.fill>0 &&
+     partyFeedbackProbe.fill<72 && partyFeedbackProbe.current,
+    `Party uses the shared immediate robot paper + eased meter/shake (${partyFeedbackProbe.fill.toFixed(1)}%)`);
+  ok(partyFeedbackProbe.wordFit && partyFeedbackProbe.guessFit &&
+     partyFeedbackProbe.nameFit && partyFeedbackProbe.wraps &&
+     partyFeedbackProbe.clockFit,
+    "Party long word/guess/name copy and compact blue clock stay inside their papers");
   if(process.env.PARTY_SCREENSHOT){
     await sleep(700);
     await A.screenshot({path:process.env.PARTY_SCREENSHOT,fullPage:true});
@@ -204,7 +263,10 @@ try {
     const { state } = await import('${APP}/js/state.js');
     const w = state.game.word;
     clearInterval(window.__rec);
-    window.__rec = setInterval(() => partyCheck(w, .95), 70);
+    window.__rec = setInterval(() => {
+      state.smooth[w] = .95;
+      partyCheck(w, .95);
+    }, 70);
   })()`);
 
   // A is recognized first
@@ -212,6 +274,10 @@ try {
   await A.waitForFunction(() => document.querySelector('#pmStage [data-seat].mine.got'),
     { timeout: 8000, polling: 100 });
   ok(true, "the local player's seat turns green on recognition");
+  await A.waitForFunction(() =>
+    document.getElementById("pmAward").classList.contains("show") &&
+    document.getElementById("pmWordCard").classList.contains("locked"),
+    { timeout:1500,polling:25 });
   ok(/1ST/.test(await txt(A, '#pmStage [data-seat].mine .pm-gotit b')),
     `the sticker names the placement ("${await txt(A, '#pmStage [data-seat].mine .pm-gotit b')}")`);
   const hitFeedback = await ev(A, `(() => {
@@ -224,15 +290,22 @@ try {
       locked: document.getElementById('pmWordCard').classList.contains('locked'),
       fill: document.getElementById('pmWordFill').style.width,
       stickerOnHead: sticker.top + sticker.height / 2 < box.top + box.height * .45,
+      stickerFits: (() => {
+        const label=seat.querySelector(".pm-gotit b");
+        return label.scrollWidth<=label.clientWidth+1;
+      })(),
       teamBorder: getComputedStyle(seat.querySelector('.pm-border-team') || seat).opacity,
       greenBorder: getComputedStyle(seat.querySelector('.pm-border-got') || seat).opacity,
+      confetti: !!document.querySelector(".burstwrap"),
     };
   })()`);
   ok(hitFeedback.award && hitFeedback.awardLabel === "PLACE!",
-    "recognition immediately replays the shared Solo/1v1 award-paper animation");
+    "recognition replays the shared impact -> lock -> award-paper sequence");
   ok(hitFeedback.locked && hitFeedback.fill === "95%",
     `the successful word state locks at a full meter (${hitFeedback.fill})`);
-  ok(hitFeedback.stickerOnHead, "the local GOT IT paper lands in the head band");
+  ok(hitFeedback.confetti, "Party recognition erupts from the shared word card");
+  ok(hitFeedback.stickerOnHead && hitFeedback.stickerFits,
+    "the local GOT IT paper lands in the head band without clipping its placement");
   if(process.env.PARTY_GOT_SCREENSHOT){
     await A.screenshot({path:process.env.PARTY_GOT_SCREENSHOT,fullPage:true});
     console.log(`  info party recognition screenshot: ${process.env.PARTY_GOT_SCREENSHOT}`);
@@ -247,8 +320,14 @@ try {
     p.waitForFunction(() => document.getElementById("pmStage").dataset.phase === "chase",
       { timeout: 10000, polling: 100 })));
   ok(true, "blue completing the team opened the final chase on every client");
-  ok(/FINAL CHASE/i.test(await txt(A, "#pmWordTimerLabel")),
-    "the word clock becomes the chase clock");
+  ok(/FINAL CHASE/i.test(await txt(A, "#pmWordTimerLabel")) &&
+    await A.evaluate(() => {
+      const label=document.getElementById("pmWordTimerLabel");
+      const value=document.getElementById("pmWordTime");
+      const card=document.getElementById("pmWordTimerCard");
+      return label.scrollWidth<=label.clientWidth+1 &&
+        parseFloat(getComputedStyle(value).fontSize)/card.clientWidth>.23;
+    }), "the word clock becomes a fitted, authored-size chase clock");
 
   // B lands inside the window, D never does
   await recognize(B);
@@ -273,6 +352,76 @@ try {
     `completing team leads on the bonus (${scores.blue} vs ${scores.orange})`);
 
   for (const p of [A, B, C, D]) await p.evaluate(() => clearInterval(window.__rec));
+
+  console.log("party results + same-room rematch:");
+  await Promise.all([A, B, C, D].map(p =>
+    p.waitForFunction(() => document.body.dataset.screen === "results",
+      { timeout: 18000, polling: 150 })));
+  ok(true, "all four players reached results without leaving the party room");
+  ok((await txt(A, "#rsRematchLabel")).includes("0/4"),
+    `results starts with the authoritative ready tally (${await txt(A, "#rsRematchLabel")})`);
+
+  await A.click("#rsRematch");
+  await Promise.all([A, B, C, D].map(p =>
+    p.waitForFunction(() => /1\/4/.test(document.getElementById("rsRematchLabel").textContent),
+      { timeout: 6000, polling: 100 })));
+  ok(await A.evaluate(() => {
+    const button=document.getElementById("rsRematch");
+    const mine=document.querySelector(".rs-seat[data-pid].ready");
+    return button.getAttribute("aria-pressed") === "true" && !!mine;
+  }), "a party READY vote reaches every client and marks the local result seat");
+
+  await A.click("#rsRematch");
+  await Promise.all([A, B, C, D].map(p =>
+    p.waitForFunction(() => /0\/4/.test(document.getElementById("rsRematchLabel").textContent),
+      { timeout: 6000, polling: 100 })));
+  ok(true, "the party READY vote is undoable on every client");
+
+  await Promise.all([A, B, C, D].map(p => p.click("#rsRematch")));
+  await Promise.all([A, B, C, D].map(p =>
+    p.waitForFunction(() => document.body.dataset.screen === "pmatch",
+      { timeout: 10000, polling: 100 })));
+  ok((await txt(A, "#roomCodeText")) === code,
+    "all-ready restarts the match in the SAME room with the same code");
+
+  /* Let the short restarted match end naturally, then prove a results-phase
+     leaver disappears from the survivor papers and reduces the tally. */
+  await Promise.all([A, B, C, D].map(p =>
+    p.waitForFunction(() => document.body.dataset.screen === "results",
+      { timeout: 18000, polling: 150 })));
+  await D.click("#rsExit");
+  await D.waitForFunction(() => document.body.dataset.screen === "home",
+    { timeout: 6000, polling: 100 });
+  await A.waitForFunction(() =>
+    /0\/3/.test(document.getElementById("rsRematchLabel").textContent) &&
+    document.querySelectorAll(".rs-seat:not(.vacant)").length === 3,
+    { timeout: 6000, polling: 100 });
+  ok(await A.evaluate(() =>
+    ![...document.querySelectorAll(".rs-seat:not(.vacant) .rs-nametag b")]
+      .some(node => /DAN/.test(node.textContent))),
+    "a results-phase leaver is removed and the authoritative tally drops to three");
+  ok(await D.evaluate(() => !/^[A-Z2-9]{6}$/.test(
+    document.getElementById("roomCodeText").textContent.trim())),
+    "leaving party results clears the shared room code after one lifecycle cleanup");
+
+  await Promise.all([A, B, C].map(p => p.click("#rsRematch")));
+  await Promise.all([A, B, C].map(p =>
+    p.waitForFunction(() =>
+      document.getElementById("rsRematch").dataset.waiting === "need-teams",
+      { timeout: 6000, polling: 100 })));
+  ok(await Promise.all([A, B, C].map(p => p.evaluate(() =>
+    document.body.dataset.screen === "results" &&
+    /NEED\s+2\s+PER\s+TEAM/.test(document.getElementById("rsRematchLabel").textContent) &&
+    /Need at least 2 players on each team to rematch/.test(
+      document.getElementById("rsRematchStatus").textContent))))
+    .then(values => values.every(Boolean)),
+    "all-ready 2–1 roster stays on results and announces the team minimum");
+  await A.click("#rsRematch");
+  await Promise.all([A, B, C].map(p =>
+    p.waitForFunction(() => /2\/3/.test(
+      document.getElementById("rsRematchLabel").textContent),
+      { timeout: 6000, polling: 100 })));
+  ok(true, "a NEED TEAMS ready vote remains undoable");
 
   console.log("hygiene:");
   for (const tag of TAGS) {

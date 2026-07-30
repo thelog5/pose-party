@@ -52,14 +52,22 @@ function wireControls(){
 
   /* results — the screen owns its own buttons now (see results.js) */
   wireResults();
-  $("rsHome").onclick=()=>{ leaveRoom(); transition("menu"); };
+  const leaveResults=()=>{
+    /* Party results still own a live shared room; its lifecycle listener
+       performs the single room:leave. Solo/1v1 keep their existing cleanup. */
+    if($("resStage").dataset.mode !== "party") leaveRoom();
+    transition("menu");
+  };
+  $("rsHome").onclick=leaveResults;
+  $("rsExit").onclick=leaveResults;
 
   /* dev: jump straight to either results layout without playing a match */
-  $("btnDevResults").onclick=()=>{
-    const order=["3v3","2v2","breakdown"];
-    const next=order[(order.indexOf($("btnDevResults").dataset.kind||"breakdown")+1)%order.length];
-    $("btnDevResults").dataset.kind=next;
-    $("btnDevResults").textContent="DEV: RESULTS "+next.toUpperCase();
+  const resultsDev=$("btnDevResults");
+  resultsDev.onclick=()=>{
+    const order=["3v3","2v2","breakdown","1v1","1v1-breakdown","solo"];
+    const next=order[(order.indexOf(resultsDev.dataset.kind||"breakdown")+1)%order.length];
+    resultsDev.dataset.kind=next;
+    resultsDev.textContent="DEV: RESULTS "+next.toUpperCase();
     devResults(next);
   };
 

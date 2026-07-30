@@ -76,17 +76,33 @@ function spinConfetti(){
   });
 }
 
+let entranceTimer = null;
+function playHomeEntrance(){
+  const stage = $("homeStage");
+  if(!stage) return;
+  stage.classList.remove("home-entering");
+  void stage.offsetWidth;
+  stage.classList.add("home-entering");
+  clearTimeout(entranceTimer);
+  entranceTimer = setTimeout(() => stage.classList.remove("home-entering"), 1500);
+}
+
+function revealHome(){
+  playHomeEntrance();
+  spinConfetti();
+}
+
 function spinConfettiWhenHomeIsReady(){
   const status = $("status");
   if(!status || status.style.display === "none"){
-    spinConfetti();
+    revealHome();
     return;
   }
 
   const observer = new MutationObserver(()=>{
     if(status.style.display !== "none") return;
     observer.disconnect();
-    if(document.body.dataset.screen === "home") spinConfetti();
+    if(document.body.dataset.screen === "home") revealHome();
   });
   observer.observe(status, { attributes:true, attributeFilter:["style"] });
 }
@@ -98,10 +114,22 @@ export function wireHomeAlive(){
   document.querySelectorAll("#homeStage .iv:not(.wave)").forEach(el => {
     el.addEventListener("click", () => react(el));
   });
+  /* Tape is visual hardware, not a separate control. During the entrance it
+     travels on a different path from its card and can temporarily sit over
+     the card's centre; letting it take pointer events makes a deliberate
+     card click disappear into decoration. */
+  document.querySelectorAll("#homeStage .tape").forEach(el => {
+    el.style.pointerEvents = "none";
+  });
   wireAlphaHitAreas(
     $("homeStage"),
-    ".iv, #robotBody, #robotHead, .fh.card, .fh.bubble",
+    /* Mode choices are primary controls: keep their entire native button
+       hitboxes stable while the card and its separate tape animate. Alpha
+       routing could otherwise leave an inline pointer-events:none behind
+       after returning from another screen, making PARTY/1V1 look clickable
+       while swallowing the click. */
+    ".iv:not(.tape), #robotBody, #robotHead, .fh.bubble",
   );
-  onTransition(to=>{ if(to==="menu") requestAnimationFrame(spinConfetti); });
+  onTransition(to=>{ if(to==="menu") requestAnimationFrame(revealHome); });
   spinConfettiWhenHomeIsReady();
 }

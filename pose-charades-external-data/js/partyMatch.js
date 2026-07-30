@@ -20,16 +20,22 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
-import { AWARD_MS, setWordRecognitionMotion, showPointsAward,
-         confettiFrom } from "./soloRound.js";
+import { AWARD_MS, showPointsAward, confettiFrom } from "./soloRound.js";
+import {
+  RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
+  advanceRecognitionFill,
+  createGuessHistory, resetGuessHistory, updateGuessHistory,
+  restartFeedbackAnimation, markGuessRecognized,
+  setWordRecognitionMotion, prepareWordFeedback, playWordLockFeedback,
+  playWordMissFeedback,
+  fitGameplayText,
+} from "./gameplayFeedback.js";
 import { captureShot, showResults, setRematchState } from "./results.js";
 
 /* Recognition uses the same stability window as the rest of the game: the
    target must stay on top and over threshold before we dare claim. */
 const CLAIM_THRESH = 0.60, CLAIM_HOLD_MS = 250;
 const LOCK_FILL = CLAIM_THRESH;      // the bar completes at the real claim threshold
-const FILL_MIN = 0, FILL_MAX = 95;
-const FILL_LERP = 0.16;
 const GUESS_SEND_MS = 240;
 const ORDINALS = ["1ST", "2ND", "3RD", "4TH", "5TH", "6TH"];
 
@@ -37,8 +43,13 @@ let ctx = null;          // {socket, roster, myId, peers, myName}
 let seats = new Map();   // seatKey -> playerId
 let rafId = null;
 let shownFill = 0;
+let fillAt = 0;
 let lastGuessAt = 0, lastGuessLabel = "", lastGuessConf = -1;
 let foeFeaturedId = null;
+const partyGuess = {
+  pmMyTop: createGuessHistory(2),
+  pmFoeTop: createGuessHistory(2),
+};
 
 const stage = () => $("pmStage");
 const seatEl = key => document.querySelector('#pmStage [data-seat="' + key + '"]');
@@ -54,6 +65,8 @@ export function startPartyMatch(bridge, payload){
     mode: "party", word: null, roundId: null, claimed: false,
     holdSince: 0, phase: "countdown",
     matchEndsAt: bridge.perfFromServer(payload.matchEndsAt),
+    matchLimitMs: Math.max(0,
+      Number(payload.matchEndsAt) - Number(payload.startAt)),
     wordEnd: 0, wordLimitMs: payload.wordMs || 20000,
     scores: payload.scores, myPlace: null,
     lastChaseSecond: null,
@@ -68,7 +81,9 @@ export function startPartyMatch(bridge, payload){
   applyScores(payload.scores);
   stage().dataset.phase = "waiting";
   setTxt("pmWord", "—");
-  setTxt("pmMatchTime", fmtTime(Math.max(0, g.matchEndsAt - performance.now())));
+  setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
+    g.matchLimitMs || Infinity,
+    g.matchEndsAt - performance.now())), { compact:true }));
   setTxt("pmWordTime", fmtTime(g.wordLimitMs));
   resetGuessPapers();
 
@@ -175,6 +190,7 @@ export function onPartyRound(payload){
   g.phase = "word";
   g.wordEnd = ctx.perfFromServer(payload.endsAt);
   shownFill = 0;
+  fillAt = 0;
   lastGuessAt = 0; lastGuessLabel = ""; lastGuessConf = -1;
   /* confidence must be re-earned for this word — see soloRound.js */
   if(state.smooth) state.smooth[g.word] = 0;
@@ -183,7 +199,7 @@ export function onPartyRound(payload){
   stage().classList.remove("chase-urgent", "chase-final");
   setTxt("pmWordTimerLabel", "WORD TIME");
   setTxt("pmWord", g.word);
-  fitWord();
+  fitGameplayText($("pmWord"));
   resetGuessPapers();
   $("pmAward")?.classList.remove("show");
   setTxt("pmAwardLabel", "POINTS!");
@@ -200,11 +216,7 @@ export function onPartyRound(payload){
   }
   applyScores(payload.scores);
   const card = $("pmWordCard");
-  if(card){
-    setWordRecognitionMotion(card, 0, CLAIM_THRESH, false);
-    card.classList.remove("locked");
-  }
-  if($("pmWordFill")) $("pmWordFill").style.width = FILL_MIN + "%";
+  prepareWordFeedback(card, $("pmWordFill"), CLAIM_THRESH, true);
 }
 
 /* Someone — anyone — was recognized. Green border + placement sticker. */
@@ -224,13 +236,33 @@ export function onPartyGot({ id, place } = {}){
   if(g) recordFinish(g, id, place);
   if(id === ctx.myId){
     if(g) g.myPlace = place;
-    blip([523, 659, 784], .08);
-    if($("pmWordFill")) $("pmWordFill").style.width = FILL_MAX + "%";
     const card = $("pmWordCard");
-    setWordRecognitionMotion(card, 0, CLAIM_THRESH, false);
-    card?.classList.add("locked");
-    showPartyPlacement(place);
+    const roundId = g?.roundId;
+    const update = updateGuessHistory(partyGuess.pmMyTop, g?.word || "", 1,
+      { force:true,locked:true });
+    renderPartyGuess("pmMyTop", "pmMyPast", partyGuess.pmMyTop, update.changed);
+    markGuessRecognized($("pmMyTop"), true);
+    blip([523]);
+    playWordLockFeedback({
+      card,
+      fill: $("pmWordFill"),
+      threshold: CLAIM_THRESH,
+      onImpact: () => {
+        const live = state.game;
+        if(!live || live.mode !== "party" || live.roundId !== roundId) return;
+        showPartyPlacement(place);
+        confettiFrom(card);
+        blip([523, 659, 784], .08);
+      },
+    });
   }else{
+    if(id === foeFeaturedId && g?.word){
+      const update = updateGuessHistory(partyGuess.pmFoeTop, g.word, 1,
+        { force:true,locked:true });
+      renderPartyGuess("pmFoeTop", "pmFoePast", partyGuess.pmFoeTop,
+        update.changed);
+      markGuessRecognized($("pmFoeTop"), true);
+    }
     blip([494, 622], .05);
   }
 }
@@ -244,6 +276,8 @@ export function onPartyChase({ team, chaseEndsAt, bonus } = {}){
   stage().dataset.phase = "chase";
   stage().classList.remove("chase-urgent", "chase-final");
   setTxt("pmWordTimerLabel", "FINAL CHASE");
+  fitGameplayText($("pmWordTimerLabel"));
+  fitGameplayText($("pmWordTime"));
   const mine = team === myTeam();
   ctx.toast(mine
     ? "Your team finished! +" + bonus + " bonus"
@@ -280,7 +314,8 @@ export function onPartyResult(payload){
     setTxt("pmAwardTitle", "GOT IT " + (ORDINALS[mine.place] || "") + "!");
     setTxt("pmAwardLabel", "POINTS!");
     showPointsAward("pmAward", "pmAwardPts", mine.points);
-    confettiFrom($("pmWordCard"));
+  }else{
+    playWordMissFeedback($("pmWordCard"), CLAIM_THRESH);
   }
 }
 
@@ -303,22 +338,23 @@ function frame(){
   const g = state.game;
   if(!g || g.mode !== "party" || g.phase !== "word" && g.phase !== "chase") return;
   const card = $("pmWordCard");
-  if(g.claimed){
+  if(g.myPlace !== null){
     setWordRecognitionMotion(card, 0, CLAIM_THRESH, false);
     return;
   }
 
   /* Like Solo/1v1, the progress paper cannot move before the robot's visible
      top-guess paper has actually changed to the target word. */
-  const targetText = g.word
-    ? (g.word === "idle" ? "JUST STANDING" : g.word).toUpperCase() + "?"
-    : "";
-  const targetIsDisplayed = !!targetText && shownLabel.pmMyTop === targetText;
+  const targetIsDisplayed = !!g.word &&
+    partyGuess.pmMyTop.items[0]?.label === g.word;
   const raw = targetIsDisplayed ? (state.smooth?.[g.word] || 0) : 0;
   const want = Math.max(0, Math.min(1, raw / LOCK_FILL));
-  shownFill += (want - shownFill) * FILL_LERP;
+  const next = advanceRecognitionFill(shownFill, want, fillAt);
+  shownFill = next.value;
+  fillAt = next.at;
   const fill = $("pmWordFill");
-  if(fill) fill.style.width = (FILL_MIN + shownFill * (FILL_MAX - FILL_MIN)) + "%";
+  if(fill) fill.style.width = (RECOGNITION_FILL_MIN +
+    shownFill * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";
   setWordRecognitionMotion(card, shownFill * LOCK_FILL, CLAIM_THRESH, true);
 }
 
@@ -326,7 +362,9 @@ function tick(){
   const g = state.game;
   if(!g || g.mode !== "party") return;
   const now = performance.now();
-  setTxt("pmMatchTime", fmtTime(Math.max(0, g.matchEndsAt - now)));
+  setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
+    g.matchLimitMs || Infinity,
+    g.matchEndsAt - now)), { compact:true }));
   if(g.phase === "chase"){
     const remaining = Math.max(0, (g.chaseEndsAt || 0) - now);
     const chaseSecond = Math.max(0, Math.ceil(remaining / 1000));
@@ -357,10 +395,7 @@ export function partyCheck(topLabel, topP){
   pushGuess("pmMyTop", "pmMyPast", topLabel, topP);
   sendGuess(topLabel, topP);
 
-  const targetText = g.word === "idle"
-    ? "JUST STANDING?"
-    : String(g.word || "").toUpperCase() + "?";
-  const targetIsDisplayed = shownLabel.pmMyTop === targetText;
+  const targetIsDisplayed = partyGuess.pmMyTop.items[0]?.label === g.word;
   if(targetIsDisplayed && topLabel === g.word && topP >= CLAIM_THRESH){
     if(!g.holdSince) g.holdSince = performance.now();
     if(performance.now() - g.holdSince >= CLAIM_HOLD_MS) claim();
@@ -395,40 +430,63 @@ function sendGuess(label, confidence){
 
 /* ---------------- guess papers ---------------- */
 
-const shownLabel = { pmMyTop: "", pmFoeTop: "" };
-
 function pushGuess(topId, pastId, label, confidence){
   if(typeof label !== "string" || !label) return;
-  const text = (label === "idle" ? "just standing" : label).toUpperCase() + "?";
-  const pct = Math.round((confidence || 0) * 100) + "%";
+  const history = partyGuess[topId];
+  if(!history) return;
+  const update = updateGuessHistory(history, label, confidence);
+  if(update.committed)
+    renderPartyGuess(topId, pastId, history, update.changed);
+}
+
+function renderPartyGuess(topId, pastId, history, popped=false){
   const wordEl = topId === "pmMyTop" ? "pmMyTopWord" : "pmFoeTopWord";
   const pctEl = topId === "pmMyTop" ? "pmMyTopPct" : "pmFoeTopPct";
   const pastWordEl = pastId === "pmMyPast" ? "pmMyPastWord" : "pmFoePastWord";
   const pastPctEl = pastId === "pmMyPast" ? "pmMyPastPct" : "pmFoePastPct";
+  const current = history.items[0];
+  const past = history.items[1];
+  if(!current) return;
+  const currentText = (current.label === "idle" ? "just standing" :
+    current.label).toUpperCase() + (current.locked ? "" : "?");
+  setTxt(wordEl, currentText);
+  setTxt(pctEl, Math.round(current.pct * 100) + "%");
+  fitGameplayText($(wordEl));
 
-  if(shownLabel[topId] && shownLabel[topId] !== text){
-    setTxt(pastWordEl, $(wordEl).textContent);
-    setTxt(pastPctEl, $(pctEl).textContent);
+  if(past){
+    const pastText = (past.label === "idle" ? "just standing" :
+      past.label).toUpperCase() + "?";
+    setTxt(pastWordEl, pastText);
+    setTxt(pastPctEl, Math.round(past.pct * 100) + "%");
+    fitGameplayText($(pastWordEl));
     $(pastId).classList.remove("empty");
-    const p = $(pastId);
-    p.classList.remove("shift"); void p.offsetWidth; p.classList.add("shift");
-    const t = $(topId);
-    t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop");
+  }else{
+    $(pastId).classList.add("empty");
+    setTxt(pastWordEl, "");
+    setTxt(pastPctEl, "");
   }
-  shownLabel[topId] = text;
-  setTxt(wordEl, text);
-  setTxt(pctEl, pct);
+  markGuessRecognized($(topId), !!current.locked);
+  if(popped){
+    restartFeedbackAnimation($(topId), "pop");
+    if(past) restartFeedbackAnimation($(pastId), "shift");
+  }
 }
 
 function resetGuessPapers(){
-  shownLabel.pmMyTop = ""; shownLabel.pmFoeTop = "";
+  resetGuessHistory(partyGuess.pmMyTop);
+  resetGuessHistory(partyGuess.pmFoeTop);
   setTxt("pmMyTopWord", "GUESSING…"); setTxt("pmMyTopPct", "0%");
   setTxt("pmFoeTopWord", "GUESSING…"); setTxt("pmFoeTopPct", "0%");
+  for(const id of ["pmMyTop", "pmFoeTop"]){
+    markGuessRecognized($(id), false);
+  }
   for(const id of ["pmMyPast", "pmFoePast"]){
     $(id)?.classList.add("empty");
   }
   setTxt("pmMyPastWord", ""); setTxt("pmMyPastPct", "");
   setTxt("pmFoePastWord", ""); setTxt("pmFoePastPct", "");
+  for(const id of ["pmMyTopWord", "pmFoeTopWord"])
+    fitGameplayText($(id));
 }
 
 /* The recognition moment reuses Solo/1v1's exact points-award paper and its
@@ -464,17 +522,6 @@ function bump(id){
   const el = $(id);
   if(!el) return;
   el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
-}
-
-/* Figma sizes the word against "JUMPING"; real decks run longer. */
-function fitWord(){
-  const t = $("pmWord");
-  if(!t) return;
-  t.style.fontSize = "14.69cqw";
-  const avail = t.clientWidth;
-  if(!avail) return;
-  const want = t.scrollWidth;
-  if(want > avail) t.style.fontSize = (14.69 * (avail / want) * .97) + "cqw";
 }
 
 /* ---------------- teardown ---------------- */
@@ -528,7 +575,18 @@ function endPartyMatch(payload){
     players,
     rematch: { ready: payload?.rematch?.ready || 0,
                total: payload?.rematch?.total || players.length, mine: false },
-    onRematch: () => ctx.socket?.emit("party:rematch", {}, () => {}),
+    onRematch: () => new Promise(resolve => {
+      if(!ctx.socket){ resolve({ error:"offline" }); return; }
+      let settled = false;
+      const finish = response => {
+        if(settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        resolve(response || { ok:true });
+      };
+      const timeout = setTimeout(() => finish({ error:"timeout" }), 4500);
+      ctx.socket.emit("party:rematch", {}, finish);
+    }),
   });
 }
 

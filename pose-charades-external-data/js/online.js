@@ -25,6 +25,12 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
 import { showPointsAward, confettiFrom } from "./soloRound.js";
+import { THRESH } from "./constants.js";
+import {
+  markGuessRecognized,
+  prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
+  fitGameplayText,
+} from "./gameplayFeedback.js";
 import { captureShot, showResults } from "./results.js";
 
 const NAME_KEY = "poseCharadesName";
@@ -49,6 +55,8 @@ let nameFitFrame = 0;
 let lastGuessSentAt = 0;
 let lastGuessLabel = "";
 let lastGuessConfidence = -1;
+let roomAttemptVersion = 0;
+let statusFitFrame = 0;
 
 const serverNow = () => Date.now() + clockOffset;
 const perfFromServer = tServer => performance.now() + (tServer - serverNow());
@@ -88,6 +96,23 @@ function fitLobbyNames(){
   });
 }
 
+function fitLobbyStatus(){
+  cancelAnimationFrame(statusFitFrame);
+  statusFitFrame=requestAnimationFrame(()=>{
+    const line=$("lobbyStatus"), stage=$("lobbyStage");
+    if(!line || !stage) return;
+    line.style.removeProperty("font-size");
+    if(!line.classList.contains("compact") || !line.clientWidth) return;
+    const stageBox=stage.getBoundingClientRect();
+    const bottom=stageBox.bottom-Math.max(2,stageBox.height*.004);
+    let size=parseFloat(getComputedStyle(line).fontSize);
+    for(let pass=0; pass<12 && line.getBoundingClientRect().bottom>bottom; pass++){
+      size=Math.max(5.5,size*.9);
+      line.style.fontSize=size+"px";
+    }
+  });
+}
+
 /* Leaving the lobby or an online match through navigation or connection
    teardown tells the server and drops the peer link. Registered at import
    time, before game.js's lifecycle listener. */
@@ -100,7 +125,7 @@ onTransition((to, from) => {
     clearInterval(countdownTimer);
   }
   if(from==="lobby" && to!=="countdown" && to!=="lobby") leaveRoom();
-  if(from==="party" && to==="lobby") leaveRoom(); // mode hop cleans 1v1 side too
+  /* party.js owns party -> lobby cleanup so room:leave is emitted once. */
 });
 
 /* ---------------- lobby ---------------- */
@@ -112,8 +137,16 @@ export function enterLobby(mode="1v1"){
     toast("Train the AI first — record idle plus at least one action word. Tap SETTINGS.");
     transition("training"); return;
   }
-  if(!transition(mode==="party" ? "party" : "lobby")) return;
-  $("lobbyStage").dataset.mode = mode;
+  /* render() runs inside transition listeners. Publish the lobby variant
+     first so the first party frame mounts the camera/controls into the party
+     composition rather than briefly rendering the stale 1v1 arrangement. */
+  const lobbyStage = $("lobbyStage");
+  const previousMode = lobbyStage.dataset.mode;
+  lobbyStage.dataset.mode = mode;
+  if(!transition(mode==="party" ? "party" : "lobby")){
+    lobbyStage.dataset.mode = previousMode;
+    return;
+  }
   wireLobby();
   $("lobbyName").value = localStorage.getItem(NAME_KEY) || "";
   resetLobbyUi();
@@ -183,11 +216,21 @@ function wireLobby(){
     fitLobbyNames();
   });
   $("lobbyName").onchange=()=>{
-    localStorage.setItem(NAME_KEY, $("lobbyName").value.trim().slice(0,NAME_MAX));
+    const name=$("lobbyName").value.trim().slice(0,NAME_MAX);
+    localStorage.setItem(NAME_KEY, name);
+    /* Input stays debounced while typing; change/commit flushes the final
+       Party name before another player can join against a stale roster. */
+    if(lobbyMode()==="party") partyBridge.rename?.(name, true);
     toast("Name saved — it applies to the next room you create or join.");
   };
-  addEventListener("resize", fitLobbyNames);
-  document.fonts?.ready.then(fitLobbyNames);
+  addEventListener("resize", ()=>{
+    fitLobbyNames();
+    fitLobbyStatus();
+  });
+  document.fonts?.ready.then(()=>{
+    fitLobbyNames();
+    fitLobbyStatus();
+  });
   wireStepper("match", v=>({...settings, matchSecs:clamp(v,60,600)}), 30);
   wireStepper("word",  v=>({...settings, wordSecs:clamp(v,10,60)}), 5);
 }
@@ -231,9 +274,11 @@ function setLobbyStatus(text){
   el.classList.toggle("compact", Boolean(text && text.length > 34));
   if(!text){
     el.innerHTML='Waiting for friend to join<i id="dotsSmall">...</i>';
+    fitLobbyStatus();
     return;
   }
   el.textContent=text;
+  fitLobbyStatus();
 }
 
 function myName(){
@@ -339,11 +384,14 @@ function wireSocket(s){
 }
 
 async function createRoom(){
+  const attempt = ++roomAttemptVersion;
   const name=myName();
   try{
     const s=await ensureSocket();
+    if(!roomAttemptActive(attempt)) return;
     setLobbyStatus("Creating room…");
     s.emit("room:create", { name, labels:state.model.labels, settings }, res=>{
+      if(!roomAttemptActive(attempt)) return;
       if(!res || res.error) return setLobbyStatus(lobbyError(res));
       isHost=true; roomCode=res.code;
       renderCode(res.code);
@@ -351,15 +399,18 @@ async function createRoom(){
       setLobbyStatus(null); // back to waiting-with-dots
       s.emit("player:ready", {}, ()=>{});
     });
-  }catch(e){ offlineExplain(e); }
+  }catch(e){ if(roomAttemptActive(attempt)) offlineExplain(e); }
 }
 
 async function joinRoom(code){
+  const attempt = ++roomAttemptVersion;
   const name=myName();
   try{
     const s=await ensureSocket();
+    if(!roomAttemptActive(attempt)) return;
     setLobbyStatus("Joining "+code+"…");
     s.emit("room:join", { code, name, labels:state.model.labels }, res=>{
+      if(!roomAttemptActive(attempt)) return;
       if(res && res.error==="party-room"){
         // that code is a party — hop over with the same code
         $("lobbyStage").dataset.mode="party";
@@ -379,7 +430,12 @@ async function joinRoom(code){
       openPeer(false);
       s.emit("player:ready", {}, ()=>{});
     });
-  }catch(e){ offlineExplain(e); }
+  }catch(e){ if(roomAttemptActive(attempt)) offlineExplain(e); }
+}
+
+function roomAttemptActive(attempt){
+  return attempt === roomAttemptVersion && gameState() === "lobby" &&
+    $("lobbyStage")?.dataset.mode !== "party";
 }
 
 function lobbyError(res){
@@ -468,6 +524,8 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
 
   state.game={ mode:"online", word:null, round:0, rounds:0,
                matchEndsAt:perfFromServer(matchEndsAt),
+               matchLimitMs:Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
+                 settings.matchSecs*1000,
                wordEnd:0, wordStart:0, wordLimitMs:settings.wordSecs*1000,
                holdSince:0, score:0, rivalScore:0, streak:0,
                results:[], roundId:null, claimed:false, bestWrong:{},
@@ -480,7 +538,11 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   $("pillStreak").textContent="x1";
   /* time-based mode: the round pill becomes the match clock */
   document.querySelector(".statpill.round .lab").textContent="Match";
-  $("pillRound").textContent=fmtTime(state.game.matchEndsAt-performance.now());
+  const initialMatchLeft=Math.min(state.game.matchLimitMs,
+    state.game.matchEndsAt-performance.now());
+  $("pillRound").textContent=fmtTime(initialMatchLeft);
+  if($("v1MatchTime")) $("v1MatchTime").textContent=fmtTime(
+    initialMatchLeft, {compact:true});
   if($("v1YouName")) $("v1YouName").textContent=myName();
   if($("v1RivalName")) $("v1RivalName").textContent=peerName;
   requestAnimationFrame(fitMatchPaperText);
@@ -550,9 +612,8 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   game.wordStart=performance.now();
   game.wordEnd=perfFromServer(endsAt);
   if(state.smooth) state.smooth[game.word]=0;
-  if($("v1WordFill")) $("v1WordFill").style.width="0%";
   $("vsWord").textContent=game.word;
-  requestAnimationFrame(fitMatchPaperText);
+  fitGameplayText($("vsWord"));
   if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIME";
   const stage=$("matchStage");
   if(stage){
@@ -561,10 +622,12 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
     delete stage.dataset.chaseSecond;
   }
   const vw=$("vsWordCard");
-  if(vw){
-    vw.classList.remove("tracking","warm","hot","critical","wordswap");
-    void vw.offsetWidth; vw.classList.add("wordswap");
-  }
+  prepareWordFeedback(vw,$("v1WordFill"),THRESH,true);
+  for(const id of ["myGuessTop","rivalGuessTop"])
+    markGuessRecognized($(id),false);
+  $("v1Award")?.classList.remove("show");
+  $("v1RivalAward")?.classList.remove("show");
+  requestAnimationFrame(fitMatchPaperText);
   resetRivalPanel();
   if(!game.timer) game.timer=setInterval(gameTick,100);
 }
@@ -592,6 +655,22 @@ function showMatchAward(side, points){
   else captureShot("me", word, $("video"), true);
 }
 
+function playLocalMatchLock(points){
+  const card=$("vsWordCard");
+  markGuessRecognized($("myGuessTop"),true);
+  blip([523]);
+  playWordLockFeedback({
+    card,
+    fill:$("v1WordFill"),
+    threshold:THRESH,
+    onImpact:()=>{
+      showMatchAward("you",points);
+      flash("good");
+      blip([523,659,784]);
+    },
+  });
+}
+
 function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
@@ -612,15 +691,19 @@ function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
     stage.classList.toggle("you-locked",mine);
     stage.classList.toggle("rival-locked",!mine);
   }
+  /* Phase-specific authored sizes are inline-fit guardrails, so apply them
+     after publishing the chase phase instead of waiting a frame for the
+     mutation observer. */
+  fitGameplayText($("v1WordTimerLabel"));
+  fitGameplayText($("v1WordTime"));
   const prefix=mine?"my":"rival";
   const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct"), topBox=$(prefix+"GuessTop");
   if(topWord) topWord.textContent=String(game.word||"").toUpperCase();
   if(topPct) topPct.textContent="100%";
-  if(topBox){ topBox.classList.remove("pop"); void topBox.offsetWidth; topBox.classList.add("pop"); }
-  if(mine && $("v1WordFill")) $("v1WordFill").style.width="95%";
+  fitGameplayText(topWord);
+  markGuessRecognized(topBox,true);
   if(mine){
-    showMatchAward("you", firstPoints);
-    flash("good"); blip([523,659,784]);
+    playLocalMatchLock(firstPoints);
   }else{
     showMatchAward("rival", firstPoints);
     blip([392,523,659]);
@@ -647,6 +730,8 @@ function onRoundResult({
       const prefix=id===myId?"my":"rival";
       if($(prefix+"TopWord")) $(prefix+"TopWord").textContent=String(word||"").toUpperCase();
       if($(prefix+"TopPct")) $(prefix+"TopPct").textContent="100%";
+      fitGameplayText($(prefix+"TopWord"));
+      markGuessRecognized($(prefix+"GuessTop"),true);
     }
   }
   if(iWasFirst){
@@ -657,8 +742,7 @@ function onRoundResult({
   }else if(iWasChaser && caught){
     game.streak++;
     game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true});
-    showMatchAward("you", chaserPoints);
-    flash("good"); blip([523,659,784]);
+    playLocalMatchLock(chaserPoints);
   }else if(winnerId){
     game.streak=0;
     game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
@@ -670,6 +754,8 @@ function onRoundResult({
     pointBurst("Time up", "Next word coming up", "bad");
     flash("bad"); blip([220,165]);
   }
+  const localSucceeded=iWasFirst || (caught&&iWasChaser);
+  if(!localSucceeded) playWordMissFeedback($("vsWordCard"),THRESH);
   $("pillStreak").textContent="x"+Math.max(1,game.streak);
   const stage=$("matchStage");
   if(stage){
@@ -678,7 +764,7 @@ function onRoundResult({
     delete stage.dataset.chaseSecond;
     /* Both successful players keep their word paper and local meter full
        through the between-word beat, including a successful chaser. */
-    const youSucceeded=iWasFirst || (caught&&iWasChaser);
+    const youSucceeded=localSucceeded;
     const rivalSucceeded=(!!firstId&&firstId!==myId) ||
       (caught&&!!chaserId&&chaserId!==myId);
     stage.classList.toggle("you-locked",youSucceeded);
@@ -736,9 +822,9 @@ function endOnline(scores, why, outcome={}){
   const title = why==="finished"
     ? (outcome.winnerId===socket?.id || (!outcome.winnerId && g.score>g.rivalScore)
         ? (outcome.suddenDeath?"YOU WON SUDDEN DEATH!":"YOU WIN!")
-        : outcome.winnerId ? esc(peerName.toUpperCase())+" WINS"
+        : outcome.winnerId ? peerName.toUpperCase()+" WINS"
         : "IT’S A TIE!")
-    : (why==="peer-left" ? esc(peerName.toUpperCase())+" LEFT EARLY" : "MATCH ENDED EARLY");
+    : (why==="peer-left" ? peerName.toUpperCase()+" LEFT EARLY" : "MATCH ENDED EARLY");
 
   showResults({
     mode:"1v1", size:2, headline:title,
@@ -754,7 +840,7 @@ function endOnline(scores, why, outcome={}){
         fastest:null, avg:null, clutch:0, ready:false },
     ],
     rematch:{ ready:0, total:2, mine:false },
-    onRematch: () => { toast("Head back to the lobby to run it again."); },
+    onRematch: () => enterLobby(),
   });
   state.lastMode="online";
 }
@@ -762,8 +848,15 @@ function endOnline(scores, why, outcome={}){
 /* ---------------- leaving ---------------- */
 
 export function leaveRoom(){
-  if(socket && socket.connected && roomCode) socket.emit("room:leave", {}, ()=>{});
+  roomAttemptVersion++;
+  /* Also send during a pending create/join. Socket.IO preserves ordering, so
+     create → leave reaches the server even before the create ack sets code. */
+  if(socket && socket.connected) socket.emit("room:leave", {}, ()=>{});
   roomCode=null;
+  /* Clear the shared invite paper synchronously. Otherwise a fast
+     lobby→home→Party handoff can momentarily expose the departed 1v1 code,
+     and consumers cannot distinguish it from the new party create ack. */
+  renderCode(null);
   state.onlineGuess=null;
   closePeer();
   const stage=$("lobbyStage");

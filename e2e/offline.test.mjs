@@ -41,6 +41,10 @@ await page.waitForFunction(() => document.getElementById("status").style.display
 console.log("boot:");
 ok(true, "engine + camera booted (status overlay hidden)");
 ok(await bodyScreen() === "home", "home screen visible");
+ok(await page.evaluate(() =>
+  document.getElementById("homeStage").classList.contains("home-entering") &&
+  getComputedStyle(document.querySelector("#modeParty>img")).animationName.includes("homeCardEnter")),
+  "the three mode papers animate into the intro composition");
 const loaded = await evalApp(`${mod("state.js")}.state.dataset.clips.length`);
 ok(loaded > 0, `bundled dataset loaded (${loaded} clips)`);
 ok(await evalApp(`!!${mod("state.js")}.state.model`), "model trained on preload");
@@ -114,6 +118,10 @@ await sleep(180);
 console.log("solo play:");
 await page.click("#modeAI");
 ok(await fsmState() === "countdown", "SOLO card -> countdown");
+ok(await page.evaluate(() =>
+  document.getElementById("soloStage").classList.contains("game-intro") &&
+  getComputedStyle(document.getElementById("soloWordCard")).animationName === "gamePaperIn"),
+  "Solo HUD papers use the shared gameplay entrance motion");
 await sleep(2900);
 ok(await fsmState() === "playing", "countdown -> playing");
 ok(await bodyScreen() === "solo", "solo screen shown");
@@ -122,12 +130,21 @@ const rstate = () => page.evaluate(() => document.getElementById("scrSolo").data
 ok(await rstate() === "guessing", "round state GUESSING");
 const word = await txt("#soloWord");
 ok(word && word !== "—", `word card shows the target: "${word}"`);
-ok(/^\d\d:\d\d$/.test(await txt("#soloRoundTime")), `round timer mm:ss (${await txt("#soloRoundTime")})`);
+ok(/^\d+:\d\d$/.test(await txt("#soloRoundTime")) &&
+  !/^0\d:/.test(await txt("#soloRoundTime")),
+  `blue round clock uses compact m:ss (${await txt("#soloRoundTime")})`);
 ok(/^\d\d:\d\d$/.test(await txt("#soloWordTime")), `word timer mm:ss (${await txt("#soloWordTime")})`);
-ok(await txt("#soloSkipCost") === "\u2212250", `skip cost from SOLO settings (${await txt("#soloSkipCost")})`);
+ok(await page.evaluate(() =>
+  /sp-skip-action\.png$/.test(document.querySelector("#btnSkipSolo img")?.getAttribute("src") || "") &&
+  document.getElementById("btnSkipSolo").getAttribute("aria-label")?.includes("250")),
+  "updated Figma SKIP art is used and its point cost remains accessible");
 ok(await page.evaluate(() => !document.querySelector("#soloAward.show")), "no award paper while GUESSING (single-state render)");
 const soloVisual = await page.evaluate(() => {
   const exit = document.getElementById("btnExitSolo");
+  const rect = node => {
+    const r = node.getBoundingClientRect();
+    return [r.x,r.y,r.width,r.height];
+  };
   const historyOpacity = id => {
     const node = document.getElementById(id);
     const wasEmpty = node.classList.contains("empty");
@@ -142,7 +159,13 @@ const soloVisual = await page.evaluate(() => {
   };
   return {
     exitSrc: exit.querySelector("img")?.getAttribute("src") || "",
-    exitText: exit.textContent.trim(),
+    exitOpacity: Number.parseFloat(getComputedStyle(exit).opacity),
+    exitRect: rect(exit),
+    exitArtRect: rect(exit.querySelector("img")),
+    skipRect: rect(document.getElementById("btnSkipSolo")),
+    skipArtRect: rect(document.querySelector("#btnSkipSolo img")),
+    skipTapeRect: rect(document.getElementById("spTapeSkip")),
+    skipTapeSrc: document.getElementById("spTapeSkip").getAttribute("src") || "",
     wordShadow: getComputedStyle(document.getElementById("soloWord")).textShadow,
     midOpacity: historyOpacity("spGuessMid"),
     botOpacity: historyOpacity("spGuessBot"),
@@ -153,18 +176,85 @@ const soloVisual = await page.evaluate(() => {
       .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) === 0),
   };
 });
-/* lb-exit.png bakes "EXIT LOBBY" into the art, which is the wrong screen.
-   Solo must use a blank exported paper and carry a live, correct label. */
-ok(/\/lb-[a-z-]+\.png$/.test(soloVisual.exitSrc) && !soloVisual.exitSrc.endsWith("/lb-exit.png"),
-  `Solo exit uses a blank exported paper button (${soloVisual.exitSrc.split("/").pop()})`);
-ok(/END GAME/i.test(soloVisual.exitText) && !/lobby/i.test(soloVisual.exitText),
-  `Solo exit is labelled for the screen it is on ("${soloVisual.exitText}")`);
+ok(/sp-leave\.png$/.test(soloVisual.exitSrc), "Solo uses the updated Figma LEAVE component");
+const soloRectNear = (actual,want,tolerance=1.1) =>
+  actual.every((value,index) => Math.abs(value-want[index]) <= tolerance);
+ok(soloRectNear(soloVisual.exitRect,[10,121,324.9336,107.6106]) &&
+   soloRectNear(soloVisual.skipRect,[41,679,245,108.6321]) &&
+   soloRectNear(soloVisual.skipTapeRect,[116,657,95.5858,48.5802]) &&
+   /sp-skip-tape\.png$/.test(soloVisual.skipTapeSrc),
+  "Solo LEAVE, SKIP, and its separate blue tape use the updated Figma rectangles");
+ok(soloVisual.exitArtRect[0] < soloVisual.exitRect[0] &&
+   soloVisual.exitArtRect[2] > soloVisual.exitRect[2] &&
+   soloVisual.skipArtRect[0] < soloVisual.skipRect[0] &&
+   soloVisual.skipArtRect[3] > soloVisual.skipRect[3],
+  "export shadow padding renders outside the exact Solo button hit rectangles");
+ok(soloVisual.exitOpacity < .2, "Solo LEAVE stays visually quiet until hover or keyboard focus");
+await page.hover("#btnExitSolo");
+await sleep(220);
+ok(await page.evaluate(() =>
+  Number.parseFloat(getComputedStyle(document.getElementById("btnExitSolo")).opacity) > .95),
+  "Solo LEAVE becomes fully visible on hover");
+await page.mouse.move(720,405);
 ok(/255,\s*255,\s*255/.test(soloVisual.wordShadow),
   `Solo navy type uses the Figma white offset (${soloVisual.wordShadow})`);
 ok(soloVisual.midOpacity <= .7 && soloVisual.botOpacity <= .4,
   `past guesses visibly recede (${soloVisual.midOpacity.toFixed(2)} / ${soloVisual.botOpacity.toFixed(2)})`);
 ok(soloVisual.exactTapes, "Solo uses the eight exact tape exports without a second CSS rotation");
 ok(soloVisual.emptyHistoryTapesHidden, "empty guess slots do not leave floating tape on the camera");
+const soloTextGuardrails = await page.evaluate(async target => {
+  const {fitGameplayText}=await import("/js/gameplayFeedback.js");
+  await document.fonts.ready;
+  const wordNode=document.getElementById("soloWord");
+  const guessNode=document.getElementById("spGuessTopLabel");
+  const clock=document.getElementById("soloRoundTime");
+  const score=document.getElementById("soloScoreVal");
+  const streak=document.getElementById("soloStreakVal");
+  const award=document.getElementById("soloAwardPts");
+  const oldWord=wordNode.textContent, oldGuess=guessNode.textContent;
+  const oldScore=score.textContent, oldStreak=streak.textContent;
+  const oldAward=award.textContent;
+  /* Lowercase is intentional: these nodes render with text-transform, so
+     fitting must measure the painted uppercase glyphs rather than source. */
+  wordNode.textContent="the extraordinarily long current action";
+  guessNode.textContent="extraordinarily long robot guess?";
+  score.textContent="999,999,999";
+  streak.textContent="x999";
+  award.textContent="+999,999,999";
+  fitGameplayText(wordNode);
+  fitGameplayText(guessNode);
+  fitGameplayText(score);
+  fitGameplayText(streak);
+  fitGameplayText(award);
+  await new Promise(requestAnimationFrame);
+  const inside=node => node.scrollWidth<=node.clientWidth+1 &&
+    node.scrollHeight<=node.clientHeight+1;
+  const insideLine=node => node.scrollWidth<=node.clientWidth+1 &&
+    getComputedStyle(node).textOverflow !== "ellipsis";
+  const result={
+    word:inside(wordNode),
+    guess:inside(guessNode),
+    wraps:wordNode.classList.contains("fit-wrap") &&
+      guessNode.classList.contains("fit-wrap"),
+    clock:inside(clock),
+    totals:[score,streak,award].every(insideLine),
+  };
+  wordNode.textContent=oldWord || target;
+  guessNode.textContent=oldGuess;
+  score.textContent=oldScore;
+  streak.textContent=oldStreak;
+  award.textContent=oldAward;
+  fitGameplayText(wordNode);
+  fitGameplayText(guessNode);
+  fitGameplayText(score);
+  fitGameplayText(streak);
+  fitGameplayText(award);
+  return result;
+},word);
+ok(soloTextGuardrails.word && soloTextGuardrails.guess &&
+   soloTextGuardrails.wraps && soloTextGuardrails.clock &&
+   soloTextGuardrails.totals,
+  "lowercase long gameplay copy, clocks, scores, streaks, and award points fit their papers");
 
 // feed the model funnel; state.smooth[target] drives the word progress bar
 const feed = (labelExpr, conf) => page.evaluate(`(async () => {
@@ -299,24 +389,65 @@ ok(await fsmState() === "results", "exit -> results");
 /* results is the designed two-beat screen now: headline paper, live seats,
    REMATCH, and a pulled breakdown page. */
 ok(/RUN|OVER/.test(await txt("#rsHeadline")), `results headline (${await txt("#rsHeadline")})`);
-ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "stage",
-  "results opens on the shared-moment page, not the data page");
+/* Solo has no shared moment to hold, so Figma folds its results and
+   breakdown into one screen — there is no stage/breakdown toggle. */
+ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "solo",
+  "solo results and breakdown are one screen");
 ok(await page.evaluate(() => document.getElementById("cameraDock").closest(".rs-seat") !== null),
-  "your live camera sits in your results seat");
+  "your live camera fills the left half");
+ok(await page.evaluate(() =>
+  document.getElementById("rsHome").classList.contains("rs-title") &&
+  getComputedStyle(document.getElementById("btnDevResults")).display !== "none"),
+  "the logo is the quiet home control and the results dev shortcut stays available");
 ok(await page.evaluate(() => {
-  const s = document.querySelector('.rs-seat[data-pid] .slot'), b = document.querySelector(".rs-seat .rs-border");
-  if(!s || !b) return false;
-  return Number(getComputedStyle(b).zIndex) > Number(getComputedStyle(s).zIndex || 0);
-}), "video sits BEHIND the torn border");
-await page.click("#rsSeeBreakdown");
-ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "breakdown",
-  "see-the-breakdown opens the record page");
-ok(await page.evaluate(() => document.querySelectorAll("#rsStripBlue .rs-thumb").length) >= 1,
-  "breakdown lists the players as photo thumbnails");
-ok(!!(await txt("#rsAwardTitle")), `everyone gets an award (${await txt("#rsAwardTitle")})`);
-await page.click("#rsBack");
-ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "stage",
-  "back to results returns to the shared page");
+  const button = document.getElementById("rsRematch");
+  return !button.hasAttribute("aria-pressed") &&
+    button.getAttribute("aria-label") === "Play again";
+}), "solo PLAY AGAIN remains an action, not an aria toggle");
+ok(await page.evaluate(() =>
+  getComputedStyle(document.getElementById("rsSeeBreakdown")).display === "none" &&
+  getComputedStyle(document.getElementById("rsPoseList")).display !== "none"),
+  "no breakdown button; the pose list is on the same screen");
+
+/* the run, pose by pose, with what each one paid */
+const poses = await page.evaluate(() =>
+  [...document.querySelectorAll("#rsPoseList li")].map(li => ({
+    word: li.querySelector(".pl-word")?.textContent || "",
+    pts: li.querySelector(".pl-pts")?.textContent || "",
+    got: !!li.querySelector(".pl-pts.got"),
+  })));
+ok(poses.length >= 1, `every pose of the run is listed (${poses.length})`);
+ok(poses.every(p => p.word && /Pts$/.test(p.pts)),
+  `each row carries its word and points (${poses[0]?.word} - ${poses[0]?.pts})`);
+ok(poses.some(p => p.got), "scored poses are marked as scored");
+ok(await page.evaluate(() => {
+  const list = document.getElementById("rsPoseList");
+  return [...list.querySelectorAll(".rs-posecol")]
+    .every(c => c.scrollHeight <= c.clientHeight + 2);
+}), "the pose list fits its block instead of sliding under REMATCH");
+
+/* stills cycle themselves — no arrows to click */
+ok(await page.evaluate(() =>
+  getComputedStyle(document.getElementById("rsPrev")).display === "none" ||
+  document.getElementById("rsPrev").style.visibility === "hidden"),
+  "solo has no photo arrows");
+/* Poll rather than sleep a fixed span: with two stills a whole number of
+   beats lands back on the frame you started from. */
+const cycled = await page.evaluate(() => new Promise(resolve => {
+  const at = () => {
+    const on = document.querySelector("#rsFocusShots img.on");
+    return on ? [...on.parentElement.children].indexOf(on) : -1;
+  };
+  const start = at();
+  if(document.querySelectorAll("#rsFocusShots img").length < 2) return resolve("single");
+  const t0 = Date.now();
+  const poll = setInterval(() => {
+    if(at() !== start){ clearInterval(poll); resolve("cycled"); }
+    else if(Date.now() - t0 > 4000){ clearInterval(poll); resolve("stuck"); }
+  }, 80);
+}));
+ok(cycled !== "stuck", `stills cycle on their own (${cycled})`);
+ok(!!(await txt("#rsAwardTitle")), `solo still earns an award (${await txt("#rsAwardTitle")})`);
 
 console.log("replay + training:");
 await page.click("#rsRematch");
@@ -400,6 +531,23 @@ const lobbyType = await page.evaluate(async () => {
 });
 ok(lobbyType.labels.join("|") === "Match Timer|Word Timer", "lobby timer descriptions match their controls");
 ok(lobbyType.editorFits && lobbyType.chipFits, "maximum 10-character name fits the editor and video chip");
+await page.setViewport({ width:600,height:900 });
+await page.evaluate(async () => {
+  const {setLobbyStatus}=await import("/js/online.js");
+  setLobbyStatus("Can’t reach the game server right now. Check your connection and try joining the room again.");
+});
+await sleep(100);
+ok(await page.evaluate(() => {
+  const stage=document.getElementById("lobbyStage").getBoundingClientRect();
+  const status=document.getElementById("lobbyStatus").getBoundingClientRect();
+  return status.bottom <= stage.bottom+1;
+}), "compact server status refits above the paper edge in a portrait viewport");
+await page.setViewport({ width:1440,height:810 });
+await page.evaluate(async () => {
+  const {setLobbyStatus}=await import("/js/online.js");
+  setLobbyStatus(null);
+});
+await sleep(100);
 
 // ---- party lobby (shared stage, party mode; no server on a static host) ----
 console.log("party lobby:");
@@ -441,12 +589,341 @@ ok(true, "graceful no-server message in party mode");
 await page.click("#btnExitLobby");
 ok(await fsmState() === "menu", "back to home");
 
+// ---- results visual contract (2v2 has different Figma rectangles) ----
+console.log("results geometry:");
+await page.evaluate(async () => {
+  const {devResults}=await import("/js/results.js");
+  await devResults("2v2");
+});
+await sleep(350);
+const resultRects=await page.evaluate(() => Object.fromEntries(
+  [...document.querySelectorAll(".rs-seat:not(.vacant)")].map(el => {
+    const r=el.getBoundingClientRect();
+    return [el.dataset.seat,[r.x,r.y,r.width,r.height]];
+  })
+));
+const closeRect=(actual,want) => actual &&
+  actual.every((n,i) => Math.abs(n-want[i])<1.5);
+ok(closeRect(resultRects.blue0,[0,129.4,387.6,551.4]) &&
+   closeRect(resultRects.blue1,[359.1,126,361.1,484.8]) &&
+   closeRect(resultRects.orange0,[1095.1,99,344.9,607]) &&
+   closeRect(resultRects.orange1,[780,116,339.2,502.4]),
+  "2v2 seats use the four distinct Figma rectangles");
+
+const resultsMedia = await page.evaluate(() => {
+  const seat = document.querySelector(".rs-seat:not(.vacant)");
+  const slot = seat?.querySelector(".slot");
+  if(!seat || !slot) return null;
+  const outer = seat.getBoundingClientRect(), inner = slot.getBoundingClientRect();
+  return { width:inner.width / outer.width, height:inner.height / outer.height };
+});
+ok(resultsMedia && resultsMedia.width > .94 && resultsMedia.height > .94,
+  "live media underlaps the torn results border without a paper seam");
+
+const resultsStageTextFit = await page.evaluate(async () => {
+  const {fitSingleLinePaperText}=await import("/js/gameplayFeedback.js");
+  const names=[...document.querySelectorAll(".rs-seat:not(.vacant) .rs-nametag b")];
+  const oldNames=names.map(node=>node.textContent);
+  names.forEach((node,index)=>{
+    node.textContent=["MAXIMILIAN","ALEXANDRA","CHRISTOPHR","BERNADETTE"][index];
+    fitSingleLinePaperText(node,{safety:.86,minScale:.44});
+  });
+  const score=document.getElementById("rsScoreLine");
+  const oldScore=score.innerHTML;
+  score.textContent="60,000 - 55,000";
+  fitSingleLinePaperText(score,{safety:.91,minScale:.38});
+  const headline=document.getElementById("rsHeadline");
+  const oldHeadline=headline.textContent;
+  headline.textContent="MAXIMILIAN LEFT EARLY";
+  fitSingleLinePaperText(headline,{safety:.91,minScale:.38});
+  const inside=node=>node.scrollWidth<=node.clientWidth+1 &&
+    node.scrollHeight<=node.clientHeight+1;
+  const result={
+    names:names.every(inside),
+    score:inside(score),
+    headline:inside(headline),
+  };
+  score.innerHTML=oldScore;
+  fitSingleLinePaperText(score,{safety:.91,minScale:.38});
+  headline.textContent=oldHeadline;
+  fitSingleLinePaperText(headline,{safety:.91,minScale:.38});
+  names.forEach((node,index)=>{
+    node.textContent=oldNames[index];
+    fitSingleLinePaperText(node,{safety:.86,minScale:.44});
+  });
+  return result;
+});
+ok(resultsStageTextFit.names && resultsStageTextFit.score &&
+   resultsStageTextFit.headline,
+  "maximum player names, peer-left headline, and five-digit totals fit the stage papers");
+
+await page.click("#rsRematch");
+await sleep(90);
+const readyOn = await page.evaluate(() => {
+  const button = document.getElementById("rsRematch");
+  const mine = document.querySelector('.rs-seat[data-pid="blue0"]');
+  return {
+    pressed:button.getAttribute("aria-pressed"),
+    label:document.getElementById("rsRematchLabel").textContent,
+    status:document.getElementById("rsRematchStatus").textContent,
+    mineReady:mine?.classList.contains("ready"),
+    scale:Number.parseFloat(getComputedStyle(button).scale),
+    readyFilter:getComputedStyle(mine?.querySelector(".rs-ready")).filter,
+    rematchFilter:getComputedStyle(button.querySelector("img")).filter,
+  };
+});
+ok(readyOn.pressed === "true" && /3\/4/.test(readyOn.label) &&
+   /3 of 4 players ready/.test(readyOn.status) && readyOn.mineReady &&
+   readyOn.scale >= 1.02 && readyOn.readyFilter === "none" &&
+   !/47,\s*160,\s*74/.test(readyOn.rematchFilter),
+  "party REMATCH votes ready, grows and announces the count without a green glow");
+await page.click("#rsRematch");
+await sleep(90);
+ok(await page.evaluate(() => {
+  const button = document.getElementById("rsRematch");
+  return button.getAttribute("aria-pressed") === "false" &&
+    /2\/4/.test(document.getElementById("rsRematchLabel").textContent) &&
+    !document.querySelector('.rs-seat[data-pid="blue0"]').classList.contains("ready");
+}), "party REMATCH toggles back to unready and shrinks the shared count");
+
+await page.click("#rsSeeBreakdown");
+await sleep(380);
+ok(await page.evaluate(() =>
+  [...document.querySelectorAll(".rs-thumb")].every(el =>
+    el.tagName === "BUTTON" && el.getAttribute("aria-pressed") !== null)),
+  "every blue/orange breakdown card is a native selectable button");
+const resultsBreakdownTextFit = await page.evaluate(async () => {
+  const {fitSingleLinePaperText}=await import("/js/gameplayFeedback.js");
+  const names=[...document.querySelectorAll(".rs-thumb .rs-nametag b"),
+    document.querySelector("#rsFocusName b")].filter(Boolean);
+  const stats=[...document.querySelectorAll(".rs-stat b")];
+  names.forEach((node,index)=>{
+    node.textContent=["MAXIMILIAN","ALEXANDRA","CHRISTOPHR","BERNADETTE","MAXIMILIAN"][index];
+    fitSingleLinePaperText(node,{safety:.86,minScale:.44});
+  });
+  ["60,000 PTS","123 Firsts","999.9 AVG"].forEach((text,index)=>{
+    stats[index].textContent=text;
+    fitSingleLinePaperText(stats[index],{safety:.88,minScale:.4});
+  });
+  const inside=node=>node.scrollWidth<=node.clientWidth+1 &&
+    node.scrollHeight<=node.clientHeight+1;
+  return {names:names.every(inside),stats:stats.every(inside)};
+});
+ok(resultsBreakdownTextFit.names && resultsBreakdownTextFit.stats,
+  "maximum breakdown names, five-digit points, and three-digit stats fit their papers");
+const orangeHoverBefore = await page.evaluate(() => {
+  const card = document.querySelector("#rsStripOrange .rs-thumb");
+  const style = getComputedStyle(card);
+  return {
+    zIndex:style.zIndex,
+    translate:style.translate,
+    left:style.left,
+    top:style.top,
+  };
+});
+await page.hover("#rsStripOrange .rs-thumb");
+await sleep(190);
+const orangeHoverAfter = await page.evaluate(() => {
+  const card = document.querySelector("#rsStripOrange .rs-thumb");
+  const style = getComputedStyle(card);
+  return {
+    zIndex:style.zIndex,
+    translate:style.translate,
+    left:style.left,
+    top:style.top,
+    scale:Number.parseFloat(style.scale),
+  };
+});
+ok(orangeHoverAfter.zIndex === orangeHoverBefore.zIndex &&
+   orangeHoverAfter.translate === orangeHoverBefore.translate &&
+   orangeHoverAfter.left === orangeHoverBefore.left &&
+   orangeHoverAfter.top === orangeHoverBefore.top &&
+   orangeHoverAfter.scale >= 1.02 && orangeHoverAfter.scale < 1.05,
+  "hover gives a subtle riffle without changing card stack order or laid-out position");
+await page.click("#rsStripOrange .rs-thumb");
+await sleep(360);
+ok(await page.evaluate(() => {
+  const orange = document.querySelector("#rsStripOrange .rs-thumb");
+  const blue = document.querySelector("#rsStripBlue .rs-thumb.on");
+  const style = getComputedStyle(orange);
+  const translated = style.translate !== "none" &&
+    !/^0px(?:\s+0px)?$/.test(style.translate);
+  return orange.classList.contains("on") &&
+    orange.getAttribute("aria-pressed") === "true" &&
+    !blue &&
+    document.getElementById("rsFocusName").classList.contains("orange") &&
+    Number(style.zIndex) >= 8 &&
+    Number.parseFloat(style.scale) >= 1.07 &&
+    translated &&
+    !style.filter.includes("drop-shadow");
+}), "clicking orange selects, lifts and focuses it without a team-colored glow");
+await page.focus("#rsStripBlue .rs-thumb");
+ok(await page.evaluate(() => {
+  const blue = document.querySelector("#rsStripBlue .rs-thumb");
+  const style = getComputedStyle(blue);
+  return Number(style.zIndex) === 1 &&
+    (style.translate === "none" || /^0px(?:\s+0px)?$/.test(style.translate));
+}), "keyboard focus outlines an unselected card without promoting or translating it");
+await page.keyboard.press("Enter");
+await sleep(360);
+ok(await page.evaluate(() => {
+  const blue = document.querySelector("#rsStripBlue .rs-thumb");
+  return blue.classList.contains("on") &&
+    blue.getAttribute("aria-pressed") === "true" &&
+    !document.querySelector("#rsStripOrange .rs-thumb.on") &&
+    !document.getElementById("rsFocusName").classList.contains("orange");
+}), "keyboard selection promotes blue and reverses the single focused card");
+ok(await page.evaluate(() => {
+  const thumb = document.querySelector(".rs-thumb"), shot = thumb.querySelector(".shotwrap");
+  const focus = document.getElementById("rsFocus"), media = document.getElementById("rsFocusShots");
+  const tr = thumb.getBoundingClientRect(), sr = shot.getBoundingClientRect();
+  const fr = focus.getBoundingClientRect(), mr = media.getBoundingClientRect();
+  return sr.width / tr.width > .93 && sr.height / tr.height > .93 &&
+    mr.width / fr.width > .95 && mr.height / fr.height > .94;
+}), "thumbnail and focus media fully underlap their torn photo borders");
+
+await page.setViewport({ width:1080, height:608 });
+await page.evaluate(() => {
+  const title = document.getElementById("rsAwardTitle");
+  const sub = document.getElementById("rsAwardSub");
+  title.dataset.fullText = "PHILOSOPHER";
+  title.textContent = title.dataset.fullText;
+  sub.dataset.fullText = "Fastest recognition across every single pose";
+  sub.textContent = sub.dataset.fullText;
+  dispatchEvent(new Event("resize"));
+});
+await sleep(180);
+ok(await page.evaluate(() => {
+  const title = document.getElementById("rsAwardTitle");
+  const sub = document.getElementById("rsAwardSub");
+  const xScale = node => node.style.scale ? Number.parseFloat(node.style.scale) : 1;
+  return title.textContent === "PHILOSOPHER" &&
+    Number.parseFloat(title.style.fontSize) < 20.603 &&
+    title.scrollWidth * xScale(title) <= title.clientWidth * 1.02 &&
+    sub.classList.contains("fit-wrap") &&
+    sub.querySelectorAll("br").length === 1 &&
+    sub.scrollWidth * xScale(sub) <= sub.clientWidth * 1.02 &&
+    getComputedStyle(sub).overflow === "visible";
+}), "long award title/description auto-fit without clipping at 75% viewport");
+await page.setViewport({ width:600, height:900 });
+await sleep(100);
+ok(await page.evaluate(() => {
+  const stage=document.getElementById("resStage");
+  const expanded=id => {
+    const hit=getComputedStyle(document.getElementById(id), "::before");
+    return Number.parseFloat(hit.width) >= 44 && Number.parseFloat(hit.height) >= 44;
+  };
+  const breakdown=["rsExit","rsHome","rsPrev","rsNext","rsBack","rsSaveStrip","rsRematch"]
+    .every(expanded);
+  const page=stage.dataset.page;
+  stage.dataset.page="stage";
+  const stageControls=expanded("rsSeeBreakdown");
+  stage.dataset.page=page;
+  return breakdown && stageControls;
+}), "small-stage result controls retain transparent 44×44 hit targets");
+await page.setViewport({ width:1440, height:810 });
+await sleep(120);
+
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"reduce" }]);
+await sleep(80);
+ok(await page.evaluate(() => {
+  const selected = document.querySelector(".rs-thumb.on");
+  const ready = document.querySelector(".rs-seat .rs-ready");
+  const strip = document.querySelector(".rs-strip");
+  return Number.parseFloat(getComputedStyle(selected).scale) === 1 &&
+    getComputedStyle(strip).animationName === "none" &&
+    getComputedStyle(ready).transitionDuration === "0s";
+}), "reduced-motion removes page/card/ready movement while preserving selection state");
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
+
+await page.click("#rsStripOrange .rs-thumb");
+await sleep(80);
+await page.evaluate(async () => {
+  const {syncResultsRoster}=await import("/js/results.js");
+  syncResultsRoster([
+    {id:"blue0",name:"LOGAN",team:"blue"},
+    {id:"blue1",name:"MIA",team:"blue"},
+    {id:"orange1",name:"ZOE",team:"orange"},
+  ]);
+});
+ok(await page.evaluate(() =>
+  document.querySelectorAll(".rs-thumb").length === 3 &&
+  !document.querySelector('[data-pid="orange0"]') &&
+  /1\/3/.test(document.getElementById("rsRematchLabel").textContent) &&
+  !document.getElementById("rsFocusName").classList.contains("orange") &&
+  /LOGAN/.test(document.getElementById("rsFocusName").textContent)),
+  "a results-phase leaver disappears and focus falls back to a surviving local player");
+
+await page.evaluate(async () => {
+  const {showResults}=await import("/js/results.js");
+  window.__finishReadyVote = null;
+  showResults({
+    mode:"party", size:2, headline:"BLUE TEAM WINS!",
+    teams:{blue:10,orange:5},
+    players:[
+      {id:"mine",name:"ME",team:"blue",mine:true,score:10,ready:false},
+      {id:"peer",name:"PEER",team:"orange",score:5,ready:false},
+    ],
+    rematch:{ready:0,total:2,mine:false},
+    onRematch:()=>new Promise(resolve => { window.__finishReadyVote=resolve; }),
+  });
+});
+await page.click("#rsRematch");
+await sleep(60);
+ok(await page.evaluate(() => {
+  const button=document.getElementById("rsRematch");
+  button.click();
+  return button.disabled && button.getAttribute("aria-busy") === "true" &&
+    /1\/2/.test(document.getElementById("rsRematchLabel").textContent);
+}), "an in-flight party vote is guarded against duplicate clicks");
+await page.evaluate(() => window.__finishReadyVote({error:"offline"}));
+await page.waitForFunction(() => !document.getElementById("rsRematch").disabled);
+ok(await page.evaluate(() => {
+  const button=document.getElementById("rsRematch");
+  return button.getAttribute("aria-busy") === null &&
+    button.getAttribute("aria-pressed") === "false" &&
+    /0\/2/.test(document.getElementById("rsRematchLabel").textContent) &&
+    !document.querySelector('.rs-seat[data-pid="mine"]').classList.contains("ready");
+}), "failed party vote rolls back the count, toggle and READY paper");
+await page.click("#rsHome");
+ok(await fsmState() === "menu", "clicking the results logo returns home");
+ok(await page.evaluate(() =>
+  !document.querySelector("#resStage .rs-seat video") &&
+  !document.querySelector("#resStage .rs-seat[data-pid]") &&
+  !document.getElementById("rsFocusShots").children.length &&
+  !document.getElementById("rsStripBlue").children.length &&
+  !document.getElementById("rsStripOrange").children.length),
+  "leaving results releases seat streams and result-only photo DOM");
+
+console.log("reduced-motion gameplay:");
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"reduce" }]);
+await page.click("#modeAI");
+await page.waitForFunction(() => document.body.dataset.state === "playing",
+  { timeout:6000,polling:50 });
+const reducedScoreBefore=await txt("#soloScoreVal");
+await feed("state.game.word", .99);
+await page.waitForFunction(() =>
+  document.getElementById("soloAward").classList.contains("show"),
+  { timeout:3000,polling:10 });
+const reducedAwardAt=Date.now();
+await page.waitForFunction(before =>
+  document.getElementById("soloScoreVal").textContent !== before,
+  { timeout:1000,polling:10 }, reducedScoreBefore);
+const reducedScoreDelay=Date.now()-reducedAwardAt;
+ok(await page.evaluate(() => {
+  const award=document.getElementById("soloAward");
+  return Number.parseFloat(getComputedStyle(award).opacity) === 1 &&
+    !document.querySelector(".sp-chip");
+}), "reduced-motion keeps the settled points award visible and removes the invisible flight");
+ok(reducedScoreDelay < 200,
+  `reduced-motion commits the Solo score without the 650ms chip delay (${reducedScoreDelay}ms)`);
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
+
 // ---- console errors ----
 console.log("hygiene:");
 const realErrors = consoleErrors.filter(e =>
   !e.includes("favicon") && !e.includes("net::ERR_") &&
-  !e.includes("socket.io") &&                  // static host has no socket endpoint — expected
-  !/assets\/ui\/figma\/sp-/.test(e)          // solo art pending Figma export (rate-limited)
+  !e.includes("socket.io")                    // static host has no socket endpoint — expected
 );
 ok(realErrors.length === 0, `no console/page errors (${realErrors.length})`);
 realErrors.forEach(e => console.log("    " + e.slice(0, 200)));

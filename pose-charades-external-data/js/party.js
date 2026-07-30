@@ -20,7 +20,7 @@ import { createPeer } from "./webrtc.js";
 import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
          lobbySettings, renderLobbySettings, setLobbyCode,
          serverNow, perfFromServer } from "./online.js";
-import { setRematchState } from "./results.js";
+import { setRematchState, syncResultsRoster } from "./results.js";
 import { startPartyMatch, wirePartyMatch, attachPartyStream, onPartyRound,
          onPartyGot, onPartyChase, onPartyResult, onPartyEnd,
          onPartyGuess } from "./partyMatch.js";
@@ -35,6 +35,9 @@ const peers = new Map();      // peerId -> {peer, stream}
 let wired = false;
 let nameFitCanvas = null;
 let renameTimer = null;
+let partyRequestVersion = 0;
+let pendingPartyRequest = 0;
+const cleanedPartyRequests = new Set();
 
 const myTeam = () => roster?.players.find(p => p.id === myId)?.team;
 const teamOf = t => roster ? roster.players.filter(p => p.team === t) : [];
@@ -62,10 +65,13 @@ export function wireParty(){
   addEventListener("resize", fitAllPartyNames);
   document.fonts?.ready.then(fitAllPartyNames);
   onTransition((to, from) => {
-    /* Starting the match leaves "party" for "countdown" but keeps the room
-       AND the mesh — partyMatch.js takes over the same peer links. */
-    if(from === "party" && to !== "party" && to !== "countdown") leaveParty();
-    if(to === "menu" || to === "results") leaveParty();
+    /* Lobby, match and results are one party lifecycle. In particular,
+       results keeps the socket + mesh alive so READY can restart this room. */
+    const inPartyFlow = value =>
+      value === "party" || value === "countdown" || value === "playing" ||
+      value === "word-won" || value === "results";
+    if(inPartyFlow(from) && !inPartyFlow(to) && (roster || from === "party"))
+      leaveParty();
   });
 }
 
@@ -80,29 +86,59 @@ function resetPartyUi(){
 /* ---------------- socket flows ---------------- */
 
 async function createParty(){
+  const request = ++partyRequestVersion;
+  pendingPartyRequest = request;
   resetPartyUi();
   try{
-    socket = await ensureSocket();
-    wirePartySocket(socket);
-    myId = socket.id;
+    const nextSocket = await ensureSocket();
+    if(!partyRequestActive(request)){
+      finishPartyRequest(request);
+      cleanedPartyRequests.delete(request);
+      return;
+    }
+    socket = nextSocket;
+    wirePartySocket(nextSocket);
+    myId = nextSocket.id;
     setLobbyStatus("Opening a party room…");
-    socket.emit("party:create", { name: myName(), settings: lobbySettings(), labels: state.model.labels }, res => {
+    nextSocket.emit("party:create", { name: myName(), settings: lobbySettings(), labels: state.model.labels }, res => {
+      finishPartyRequest(request);
+      if(!partyRequestActive(request)){
+        cleanLatePartyRoom(request, nextSocket, res);
+        return;
+      }
       if(!res || res.error) return setLobbyStatus(partyError(res));
       setLobbyCode(res.code);
       applyRoster(res.roster);
       setLobbyStatus(null);
     });
-  }catch(e){ partyOffline(e); }
+  }catch(e){
+    finishPartyRequest(request);
+    cleanedPartyRequests.delete(request);
+    if(partyRequestActive(request)) partyOffline(e);
+  }
 }
 
 async function joinParty(code){
+  const request = ++partyRequestVersion;
+  pendingPartyRequest = request;
   resetPartyUi();
   try{
-    socket = await ensureSocket();
-    wirePartySocket(socket);
-    myId = socket.id;
+    const nextSocket = await ensureSocket();
+    if(!partyRequestActive(request)){
+      finishPartyRequest(request);
+      cleanedPartyRequests.delete(request);
+      return;
+    }
+    socket = nextSocket;
+    wirePartySocket(nextSocket);
+    myId = nextSocket.id;
     setLobbyStatus("Joining party " + code + "…");
-    socket.emit("party:join", { code, name: myName(), labels: state.model.labels }, res => {
+    nextSocket.emit("party:join", { code, name: myName(), labels: state.model.labels }, res => {
+      finishPartyRequest(request);
+      if(!partyRequestActive(request)){
+        cleanLatePartyRoom(request, nextSocket, res);
+        return;
+      }
       if(!res || res.error){
         if(res && res.error === "1v1-room"){
           partyBridge.rejoin1v1?.(code);   // typed a 1v1 code — hop over
@@ -115,7 +151,26 @@ async function joinParty(code){
       setLobbyStatus(null);
       blip([523, 659], 0.07);
     });
-  }catch(e){ partyOffline(e); }
+  }catch(e){
+    finishPartyRequest(request);
+    cleanedPartyRequests.delete(request);
+    if(partyRequestActive(request)) partyOffline(e);
+  }
+}
+
+function partyRequestActive(request){
+  return request === partyRequestVersion && gameState() === "party" &&
+    $("lobbyStage")?.dataset.mode === "party";
+}
+
+function finishPartyRequest(request){
+  if(pendingPartyRequest === request) pendingPartyRequest = 0;
+}
+
+function cleanLatePartyRoom(request, requestSocket, response){
+  const alreadyCleaned = cleanedPartyRequests.delete(request);
+  if(!alreadyCleaned && response && !response.error && requestSocket?.connected)
+    requestSocket.emit("room:leave", {}, () => {});
 }
 
 function requestTeam(team){
@@ -146,7 +201,7 @@ function sendSettings(settings){
   if(socket && roster) socket.emit("party:settings", { settings }, () => {});
 }
 
-function renameParty(name){
+function renameParty(name, immediate=false){
   const clean = String(name || "").trim().slice(0, 10) || "Player";
   const me = roster?.players.find(p => p.id === myId);
   if(me && me.name !== clean){
@@ -154,23 +209,44 @@ function renameParty(name){
     renderTiles();
   }
   clearTimeout(renameTimer);
-  renameTimer = setTimeout(()=>{
+  const send=()=>{
+    renameTimer=null;
     if(socket?.connected && roster) socket.emit("party:name", { name:clean }, () => {});
-  }, 180);
+  };
+  if(immediate) send();
+  else renameTimer = setTimeout(send, 180);
 }
 
 export function leaveParty(){
-  if(socket && socket.connected && roster) socket.emit("room:leave", {}, () => {});
+  const request = pendingPartyRequest;
+  if(socket && socket.connected){
+    socket.emit("room:leave", {}, () => {});
+    if(request) cleanedPartyRequests.add(request);
+  }
+  pendingPartyRequest = 0;
+  partyRequestVersion++;
+  setLobbyCode(null);
   clearTimeout(renameTimer);
   for(const [, entry] of peers) entry.peer.close();
   peers.clear();
-  roster = null;
+  resetPartyUi();
+  setLobbyStatus(null);
 }
 
 function wirePartySocket(s){
   if(s._partyWired) return;
   s._partyWired = true;
-  s.on("party:roster", payload => { if(gameState() === "party") applyRoster(payload); });
+  s.on("party:roster", payload => {
+    const screen = gameState();
+    if(screen === "party"){
+      applyRoster(payload);
+    }else if(screen === "results"){
+      roster = payload;
+      syncResultsRoster(payload?.players || []);
+    }else if(screen === "countdown" || screen === "playing" || screen === "word-won"){
+      roster = payload;
+    }
+  });
   s.on("party:signal", ({from, data} = {}) => { peers.get(from)?.peer.handleSignal(data); });
   s.on("party:left", ({id} = {}) => {
     const entry = peers.get(id);
@@ -185,6 +261,7 @@ function wirePartySocket(s){
 
   /* in-game: partyMatch.js owns the screen, this module owns the mesh */
   s.on("party:match", payload => {
+    if(!roster) return;
     startPartyMatch({
       socket: s, myId, peers, roster,
       serverNow, perfFromServer, toast,
@@ -195,8 +272,10 @@ function wirePartySocket(s){
   s.on("party:chase",  p => onPartyChase(p));
   s.on("party:result", p => onPartyResult(p));
   s.on("party:end",    p => onPartyEnd(p));
-  s.on("party:rematch", ({ready, total, voters} = {}) =>
-    setRematchState(ready, total, (voters || []).includes(myId)));
+  s.on("party:rematch", ({ready, total, voters} = {}) => {
+    if(gameState() === "results" && roster)
+      setRematchState(ready, total, (voters || []).includes(myId), voters || []);
+  });
   s.on("party:guess",  p => onPartyGuess(p));
 }
 
