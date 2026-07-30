@@ -25,6 +25,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
 import { showPointsAward, confettiFrom } from "./soloRound.js";
+import { captureShot, showResults } from "./results.js";
 
 const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
@@ -585,6 +586,10 @@ function showMatchAward(side, points){
   showPointsAward(awardId, pointsId, points);
   /* your win earns the paper burst; the rival's award stays informational */
   if(!rival) confettiFrom($("vsWordCard"));
+  /* grab whoever was recognised, from the feed already showing them */
+  const word = state.game?.word;
+  if(rival) captureShot("rival", word, $("videoRemote"), false);
+  else captureShot("me", word, $("video"), true);
 }
 
 function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
@@ -727,22 +732,30 @@ function endOnline(scores, why, outcome={}){
   state.onlineGuess=null;
   closePeer();
 
-  const rows=g.results.map(r=>{
-    const right='<span class="ok">You +'+fmtScore(r.pts||0)+'</span>'+
-      (r.rivalPts?'<span class="thought">'+esc(peerName)+' +'+fmtScore(r.rivalPts)+'</span>':'');
-    const rival='<span class="miss">'+esc(peerName)+' +'+fmtScore(r.rivalPts||0)+'</span>';
-    const none='<span class="miss">time up</span>';
-    return '<div class="resrow"><span>'+esc(r.word)+'</span><span>'+(r.ok?right:(r.rival?rival:none))+'</span></div>';
-  }).join("");
-  const title='YOU '+g.score+' — '+esc(peerName.toUpperCase())+' '+g.rivalScore;
-  const sub = why==="finished"
+  const mineTimes=g.results.filter(r=>r.ok && Number.isFinite(r.secs)).map(r=>r.secs);
+  const title = why==="finished"
     ? (outcome.winnerId===socket?.id || (!outcome.winnerId && g.score>g.rivalScore)
-      ? (outcome.suddenDeath?"You won sudden death!":"You won the showdown!")
-      : outcome.winnerId ? peerName+(outcome.suddenDeath?" won sudden death":" won the showdown")
-      : "It’s a tie!")
-    : (why==="peer-left" ? peerName+" left early" : "Match ended early");
-  $("rescard").innerHTML='<h2>'+title+'</h2><div class="sub">'+esc(sub)+'</div>'+rows;
-  transition("results");
+        ? (outcome.suddenDeath?"YOU WON SUDDEN DEATH!":"YOU WIN!")
+        : outcome.winnerId ? esc(peerName.toUpperCase())+" WINS"
+        : "IT’S A TIE!")
+    : (why==="peer-left" ? esc(peerName.toUpperCase())+" LEFT EARLY" : "MATCH ENDED EARLY");
+
+  showResults({
+    mode:"1v1", size:2, headline:title,
+    teams:{ blue:g.score, orange:g.rivalScore },
+    players:[
+      { id:"me", name:myName(), team:"blue", mine:true, score:g.score,
+        firsts:g.results.filter(r=>r.ok).length,
+        fastest:mineTimes.length?Math.min(...mineTimes):null,
+        avg:mineTimes.length?mineTimes.reduce((a,b)=>a+b,0)/mineTimes.length:null,
+        clutch:g.results.filter(r=>r.ok && r.chase).length, ready:false },
+      { id:"rival", name:peerName, team:"orange", mine:false, score:g.rivalScore,
+        firsts:g.results.filter(r=>r.rival).length,
+        fastest:null, avg:null, clutch:0, ready:false },
+    ],
+    rematch:{ ready:0, total:2, mine:false },
+    onRematch: () => { toast("Head back to the lobby to run it again."); },
+  });
   state.lastMode="online";
 }
 

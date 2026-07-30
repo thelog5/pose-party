@@ -408,6 +408,24 @@ try {
 
   const ended = await once(M[0], "party:end", 15000);
   ok(ended.winner === "blue", `match decided on total score, not rounds (${ended.winner})`);
+
+  /* Rematch used to be impossible: the room was destroyed at match end, so a
+     rerun meant a new code re-shared with everyone in the room. */
+  ok(ended.rematch && ended.rematch.total === 4,
+    `results screen is told the rematch tally (${JSON.stringify(ended.rematch)})`);
+  const voteSeen = once(M[1], "party:rematch");
+  r = await emit(M[0], "party:rematch", {});
+  ok(r.ok === true && r.ready === 1, `a rematch vote registers (${r.ready}/4)`);
+  const vote = await voteSeen;
+  ok(vote.ready === 1 && vote.voters.includes(M[0].id),
+    "the vote and who cast it reach every client");
+  r = await emit(M[0], "party:rematch", {});
+  ok(r.ok === true && r.ready === 0, "voting again takes it back (a misclick is undoable)");
+
+  const restarted = M.map(s => once(s, "party:match", 9000));
+  for (const s of M) await emit(s, "party:rematch", {});
+  await Promise.all(restarted);
+  ok(true, "everyone ready restarts the match in the SAME room — no new code");
   for (const s of M) s.disconnect();
 
 

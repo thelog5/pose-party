@@ -261,10 +261,11 @@ try {
   }));
   await waitState(B, "menu", 10000);
   await waitState(A, "results", 6000);
-  ok(/left early/i.test(await txt(A, "#rescard .sub")), `peer sees early end ("${await txt(A, "#rescard .sub")}")`);
+  ok(/LEFT EARLY/i.test(await txt(A, "#rsHeadline")), `peer sees early end ("${await txt(A, "#rsHeadline")}")`);
 
   console.log("replay -> fresh lobby + join by typed code:");
-  await act(A, () => A.click("#btnAgain")); // online replay -> fresh lobby
+  await act(A, () => A.click("#rsHome")); // back out, then open a fresh lobby
+  await act(A, () => A.evaluate(() => document.getElementById("modeVS").click()));
   await A.waitForFunction(c => {
     const t = document.getElementById("roomCodeText").textContent;
     return /^[A-Z2-9]{6}$/.test(t) && t !== c;

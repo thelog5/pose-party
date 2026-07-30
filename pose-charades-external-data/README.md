@@ -72,6 +72,7 @@ deliberately override the section files above them, so **do not reorder the
 | `party.js` | Party lobby: roster, teams, WebRTC mesh. Hands the mesh to `partyMatch.js` at start. |
 | `partyMatch.js` | Party match screen: seating, recognition claims, green borders, GOT IT stickers. |
 | `scoring.js` | Point formulas, shared verbatim with the Node server (no browser deps). |
+| `results.js` | Results screen: live-face stage, photo-carousel breakdown, awards, capture, rematch. |
 | `screens.js` | Maps FSM states to screens; moves the camera dock between them. |
 | `ui.js` | Guess list, toasts, flashes, class list. |
 | `state.js` | Shared mutable state, in one object. |

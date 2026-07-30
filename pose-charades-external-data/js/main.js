@@ -10,6 +10,7 @@ import { exportData, importData, preloadBundledDataset } from "./data.js";
 import { render } from "./screens.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
+import { wireResults, devResults } from "./results.js";
 import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty } from "./party.js";
 import { wireHomeAlive } from "./homeAlive.js";
@@ -49,12 +50,18 @@ function wireControls(){
   $("btnExitSolo").onclick=()=>state.game&&endGame();
   $("btnSkipSolo").onclick=()=>missWord(true);
 
-  /* results */
-  $("btnAgain").onclick=()=>{
-    if(state.lastMode==="online") enterLobby();
-    else startGame(state.lastMode);
+  /* results — the screen owns its own buttons now (see results.js) */
+  wireResults();
+  $("rsHome").onclick=()=>{ leaveRoom(); transition("menu"); };
+
+  /* dev: jump straight to either results layout without playing a match */
+  $("btnDevResults").onclick=()=>{
+    const order=["3v3","2v2","breakdown"];
+    const next=order[(order.indexOf($("btnDevResults").dataset.kind||"breakdown")+1)%order.length];
+    $("btnDevResults").dataset.kind=next;
+    $("btnDevResults").textContent="DEV: RESULTS "+next.toUpperCase();
+    devResults(next);
   };
-  $("btnHome").onclick=()=>{ leaveRoom(); transition("menu"); };
 
   /* training */
   $("btnRecord").onclick=startRecording;

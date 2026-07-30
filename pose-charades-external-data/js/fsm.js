@@ -17,7 +17,8 @@
 */
 
 const TRANSITIONS = {
-  "menu":      ["menu","training","lobby","countdown","party"],
+  /* results is reachable from menu for the dev results shortcut */
+  "menu":      ["menu","training","lobby","countdown","party","results"],
   "party":     ["menu","training","party","lobby","countdown"],
   "training":  ["menu","training","countdown"],
   "lobby":     ["menu","training","countdown","lobby","party"],

@@ -21,6 +21,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
 import { partyCheck } from "./partyMatch.js";
+import { captureShot, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
          ROUND_END_PAUSE_MS } from "./soloRound.js";
@@ -162,7 +163,10 @@ function onSoloResolve({won, skip}){
     game.streak++;
     const pts=game.pendingPts||PTS_CORRECT;
     game.score+=pts;
-    game.results.push({word:game.word, ok:true, pts});
+    /* the held pose at recognition — see results.js */
+    captureShot("me", game.word, $("video"), true);
+    game.results.push({word:game.word, ok:true, pts,
+      secs:Math.max(.1,(SOLO.wordMs-Math.max(0,game.wordEnd-performance.now()))/1000)});
   }else{
     game.streak=0;
     if(skip) game.score=Math.max(0,game.score-SOLO.skipPenalty);
@@ -355,16 +359,30 @@ export function endGame(){
   clearInterval(state.game.timer);
   if(state.game.mode==="ai") soloEnd();
   const g=state.game; state.game=null;
-  const rows=g.results.map(r=>{
-    const right='<span class="ok">You +'+fmtScore(r.pts||0)+'</span>';
-    const rival='<span class="miss">Rival +'+(r.rivalPts||0)+'</span><span class="thought">Rival guessed it first.</span>';
-    const wrong='<span class="miss">'+(r.skipped?'skipped':'missed')+'</span>'+(r.thought?'<span class="thought">AI thought: '+esc(r.thought)+'</span>':'');
-    return '<div class="resrow"><span>'+esc(r.word)+'</span><span>'+(r.ok?right:(r.rival?rival:wrong))+'</span></div>';
-  }).join("");
-  const got=g.results.filter(r=>r.ok).length;
-  const title = g.mode==="vs" ? 'YOU '+fmtScore(g.score)+' — RIVAL '+fmtScore(g.rivalScore) : 'SCORE '+fmtScore(g.score);
-  const sub = g.mode==="vs" ? (g.score>=g.rivalScore?'You won the showdown!':'Rival won the showdown') : (got+' of '+g.results.length+' words guessed');
-  $("rescard").innerHTML='<h2>'+title+'</h2><div class="sub">'+sub+'</div>'+rows;
-  transition("results");
-  $("pillScore").textContent=fmtScore(g.score);
+  const got=g.results.filter(r=>r.ok);
+  const times=got.map(r=>r.secs).filter(Number.isFinite);
+  const solo=g.mode==="ai";
+  const headline = solo
+    ? (got.length ? "NICE RUN!" : "GAME OVER")
+    : (g.score>=g.rivalScore ? "YOU WIN!" : "RIVAL WINS");
+  showResults({
+    mode: solo?"solo":"vs",
+    size: 2,
+    headline,
+    teams: solo ? null : { blue:g.score, orange:g.rivalScore },
+    soloScore: g.score,
+    players: [{
+      id:"me", name:(localStorage.getItem("poseCharadesName")||"YOU"), team:"blue",
+      mine:true, score:g.score, firsts:got.length,
+      fastest:times.length?Math.min(...times):null,
+      avg:times.length?times.reduce((a,b)=>a+b,0)/times.length:null,
+      clutch:0, ready:false,
+    }].concat(solo?[]:[{
+      id:"rival", name:"RIVAL", team:"orange", mine:false,
+      score:g.rivalScore, firsts:g.results.filter(r=>r.rival).length,
+      fastest:null, avg:null, clutch:0, ready:false,
+    }]),
+    rematch:{ ready:0, total:1, mine:false },
+    onRematch: () => startGame(state.lastMode||"ai"),
+  });
 }

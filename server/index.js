@@ -222,6 +222,13 @@ io.on("connection", socket => {
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     cb(store.relayPartyGuess(socket.id, payload.roundId, payload.label, payload.confidence));
   });
+  socket.on("party:rematch", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    const res = store.partyRematch(socket.id);
+    if(res.started) log(`party rematch started by ${socket.id.slice(0,6)}`);
+    cb(res);
+  });
   socket.on("party:claim", (payload, cb) => {
     cb = ack(cb);
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });

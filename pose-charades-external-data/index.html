@@ -531,7 +531,7 @@
 
       <!-- centre tiles: two per team, hugging the divider -->
       <div class="pm-tile blue" data-seat="blue1"
-           style="left:31.92%;top:14.65%;width:16.21%;aspect-ratio:.807;--rot:-1.2deg">
+           style="left:31.92%;top:14.65%;width:16.21%;aspect-ratio:.747;--rot:-1.2deg">
         <div class="slot"></div>
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
@@ -539,7 +539,7 @@
         <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
       </div>
       <div class="pm-tile blue" data-seat="blue2"
-           style="left:32.57%;top:50.86%;width:15.86%;aspect-ratio:.817;--rot:2.8deg">
+           style="left:32.57%;top:50.86%;width:15.86%;aspect-ratio:1.130;--rot:2.8deg">
         <div class="slot"></div>
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
@@ -547,7 +547,7 @@
         <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
       </div>
       <div class="pm-tile orange" data-seat="orange1"
-           style="left:51.39%;top:14.07%;width:16.32%;aspect-ratio:.813;--rot:2.2deg">
+           style="left:51.39%;top:14.07%;width:16.32%;aspect-ratio:.675;--rot:2.2deg">
         <div class="slot"></div>
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
@@ -555,7 +555,7 @@
         <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
       </div>
       <div class="pm-tile orange" data-seat="orange2"
-           style="left:51.39%;top:50.00%;width:15.14%;aspect-ratio:.801;--rot:-0.2deg">
+           style="left:51.39%;top:50.00%;width:15.14%;aspect-ratio:.864;--rot:-0.2deg">
         <div class="slot"></div>
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
@@ -688,17 +688,108 @@
   </section>
 
   <!-- ============ RESULTS ============ -->
+  <!-- ============ RESULTS — Figma "Results S1" (203:367 / 203:581) and
+       "results breakdown" (211:635). Two beats on one screen:
+         data-page="stage"     — the shared moment: live faces, who won, rematch
+         data-page="breakdown" — the personal record: photo carousel + stats
+       Seat count comes from data-size (2 = 2v2, 3 = 3v3). Video mounts BEHIND
+       each torn border, same sandwich as the lobby and party tiles. ============ -->
   <section class="screen hidden" id="scrResults">
-    <div class="rescard" id="rescard"></div>
-    <div class="actions" style="width:min(720px,94%)">
-      <button class="bigbtn yellow" id="btnAgain">Play Again</button>
-      <button class="bigbtn outline" id="btnHome">Home</button>
+    <div class="resstage" id="resStage" data-page="stage" data-size="3">
+      <img class="rs-bg" src="assets/ui/figma/rs-bg.jpg" alt="">
+      <img class="rs-divider" src="assets/ui/figma/pm-divider.png" alt="">
+
+      <!-- brand -->
+      <img class="rs-title" src="assets/ui/figma/title-card.png" alt="Pose Party">
+      <img class="rs-tape" style="left:-.97%;top:-1.14%;width:5.04%;--rot:38.7deg" src="assets/ui/figma/tape-yl-a.png" alt="">
+      <img class="rs-tape" style="left:10.23%;top:8.95%;width:4.43%;--rot:32.3deg" src="assets/ui/figma/tape-cream-a.png" alt="">
+      <img class="rs-tape" style="left:25.21%;top:-4.20%;width:10.55%;--rot:20.5deg" src="assets/ui/figma/tape-cream-b.png" alt="">
+
+      <!-- score board: headline paper + yellow score chip -->
+      <div class="rs-board">
+        <img class="rs-board-art" src="assets/ui/figma/sp-word.png" alt="">
+        <span class="rs-headline" id="rsHeadline">BLUE TEAM WINS!</span>
+      </div>
+      <div class="rs-scorechip">
+        <img src="assets/ui/figma/sp-score.png" alt="">
+        <span id="rsScoreLine"><b class="blue">1460</b> - <b class="orange">1280</b></span>
+      </div>
+
+      <!-- ===== six seats. Positions are the Figma rectangles; 2v2 hides
+           seat 3 on each side (data-size). ===== -->
+      <div class="rs-seat blue" data-seat="blue0"
+           style="left:0.59%;top:12.66%;width:24.62%;aspect-ratio:.921;--rot:4.4deg"></div>
+      <div class="rs-seat blue" data-seat="blue1"
+           style="left:24.86%;top:15.56%;width:25.15%;aspect-ratio:.747;--rot:4.4deg"></div>
+      <div class="rs-seat blue" data-seat="blue2"
+           style="left:1.33%;top:54.74%;width:28.74%;aspect-ratio:1.130;--rot:4.4deg"></div>
+      <div class="rs-seat orange" data-seat="orange0"
+           style="left:76.59%;top:0.77%;width:23.12%;aspect-ratio:.816;--rot:-3.4deg"></div>
+      <div class="rs-seat orange" data-seat="orange1"
+           style="left:54.17%;top:14.32%;width:23.56%;aspect-ratio:.675;--rot:-3.4deg"></div>
+      <div class="rs-seat orange" data-seat="orange2"
+           style="left:74.71%;top:49.29%;width:24.36%;aspect-ratio:.864;--rot:-3.4deg"></div>
+
+      <!-- ===== rematch + breakdown ===== -->
+      <img class="rs-tape rs-tape-rematch" style="left:47.99%;top:74.20%;width:8.26%" src="assets/ui/figma/tape-blue.png" alt="">
+      <button class="rs-rematch pbtn" id="rsRematch">
+        <img src="assets/ui/figma/sp-pill.png" alt="">
+        <b id="rsRematchLabel">REMATCH? 0/6 READY</b>
+      </button>
+      <button class="rs-breakdown pbtn" id="rsSeeBreakdown">
+        <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+        <b>SEE THE BREAKDOWN</b>
+        <img class="rs-bd-arrow" src="assets/ui/figma/rs-arrow.png" alt="">
+      </button>
+
+      <!-- ===== BREAKDOWN PAGE ===== -->
+      <div class="rs-strip blue" id="rsStripBlue"></div>
+      <div class="rs-strip orange" id="rsStripOrange"></div>
+
+      <div class="rs-focus" id="rsFocus">
+        <div class="rs-focus-shots" id="rsFocusShots"></div>
+        <img class="rs-focus-frame" src="assets/ui/figma/rs-carousel-frame.png" alt="">
+        <div class="rs-nametag big" id="rsFocusName"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
+        <img class="rs-tape" style="left:3.15%;top:-30.0%;width:22%;--rot:25.7deg" src="assets/ui/figma/tape-cream-b.png" alt="">
+        <button class="rs-arrow prev pbtn" id="rsPrev" aria-label="Previous photo">
+          <img src="assets/ui/figma/rs-carousel-arrow.png" alt=""></button>
+        <button class="rs-arrow next pbtn" id="rsNext" aria-label="Next photo">
+          <img src="assets/ui/figma/rs-carousel-arrow.png" alt=""></button>
+        <span class="rs-shot-word" id="rsShotWord"></span>
+      </div>
+
+      <div class="rs-award" id="rsAward">
+        <img src="assets/ui/figma/sp-score.png" alt="">
+        <span class="aw-kicker">POSE</span>
+        <span class="aw-title" id="rsAwardTitle">MENACE</span>
+        <span class="aw-sub" id="rsAwardSub">Most Points scored</span>
+      </div>
+
+      <div class="rs-stat" id="rsStat1"><img src="assets/ui/figma/rs-stat.png" alt=""><b></b></div>
+      <div class="rs-stat" id="rsStat2"><img src="assets/ui/figma/rs-stat.png" alt=""><b></b></div>
+      <div class="rs-stat" id="rsStat3"><img src="assets/ui/figma/rs-stat.png" alt=""><b></b></div>
+
+      <button class="rs-back pbtn" id="rsBack">
+        <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+        <img class="rs-back-arrow" src="assets/ui/figma/rs-arrow.png" alt="">
+        <b>BACK TO RESULTS</b>
+      </button>
+      <button class="rs-home pbtn" id="rsHome" title="Back to home">
+        <img src="assets/ui/figma/lb-small-blue.png" alt=""><b>HOME</b></button>
+      <button class="rs-save pbtn" id="rsSaveStrip">
+        <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+        <b>SAVE PHOTO STRIP</b>
+        <img class="rs-cam" src="assets/ui/figma/rs-camera.png" alt="">
+      </button>
     </div>
   </section>
 
 </div>
 
 <!-- overlays -->
+<!-- dev shortcut: opens either results layout without playing a match -->
+<button class="devbtn" id="btnDevResults" data-kind="breakdown">DEV: RESULTS 3V3</button>
+
 <div class="countdown hidden" id="countdown"></div>
 <div class="pointBurst" id="pointBurst"><div class="burstCard"><div class="headline" id="pointHeadline"></div><div class="detail" id="pointDetail"></div></div></div>
 <div class="toast" id="toast" role="status"></div>

@@ -730,7 +730,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 
 /* =================== RESULTS =================== */
 #scrResults{align-items:center;justify-content:center}
-#scrResults .rescard{width:min(720px,94%);background:var(--card);border:3px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-big);padding:30px 34px}
+/* the old generic results card is gone — see the RESULTS block below */
 #scrResults h2{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,4vw,48px);text-align:center;letter-spacing:1px;text-transform:uppercase}
 #scrResults .sub{text-align:center;font-size:15px;font-weight:800;color:var(--ink-soft);margin:4px 0 16px}
 .resrow{display:flex;justify-content:space-between;gap:10px;border-top:2px dashed var(--line-soft);padding:10px 2px;font-weight:800;font-size:15px;flex-wrap:wrap}
@@ -1046,3 +1046,220 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
 
 /* An empty room code is "being created", not "hidden" — say so quietly. */
 .invite .inv-code.loading{opacity:.55;letter-spacing:.06em}
+
+/* =================== RESULTS (Figma 203:367 / 203:581 / 211:635) ===================
+   One screen, two beats. data-page="stage" is the shared moment (live faces,
+   who won, rematch); data-page="breakdown" is the personal record (captured
+   stills, award, stats). Seats hold LIVE video on the stage page and are
+   replaced by still carousels on the breakdown page. */
+body[data-screen="results"] .wrap{max-width:none;padding:0}
+body[data-screen="results"] header{display:none}
+.resstage{position:relative;z-index:1;overflow:hidden;font-family:var(--f-lobby);
+  width:min(100dvw,calc(100dvh * var(--pp-ar)),var(--pp-maxw));aspect-ratio:var(--pp-ar);
+  background:var(--fig-cream,#f4ece0)}
+@media (max-aspect-ratio:1/1){.resstage{width:100dvw}}
+.rs-bg{position:absolute;left:-.97%;top:-2.35%;width:102.08%;height:102.35%;
+  object-fit:cover;z-index:0}
+.rs-divider{position:absolute;left:50.69%;top:-37.41%;width:2.08%;height:147.53%;
+  object-fit:fill;z-index:3;pointer-events:none}
+.rs-title{position:absolute;left:-.28%;top:-.37%;width:13.78%;rotate:2.5deg;z-index:6;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.25vw,.44vh) rgba(23,53,111,.3))}
+.rs-tape{position:absolute;z-index:7;pointer-events:none;rotate:var(--rot,0deg);
+  filter:drop-shadow(0 min(.21vw,.37vh) min(.28vw,.49vh) rgba(0,0,0,.26))}
+
+/* ---- score board ---- */
+.rs-board{position:absolute;left:29.38%;top:1.85%;width:45.56%;z-index:5;
+  container-type:inline-size;pointer-events:none}
+.rs-board-art{width:100%;display:block;aspect-ratio:6.92;object-fit:fill;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.3vw,.53vh) rgba(0,0,0,.28))}
+.rs-headline{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-family:var(--f-lobby);font-size:9.9cqw;line-height:1;color:#17356f;
+  white-space:nowrap;text-shadow:.5cqw .5cqw 0 rgba(0,0,0,.14)}
+.rs-scorechip{position:absolute;left:37.93%;top:10.72%;width:28.44%;z-index:6;
+  container-type:inline-size;pointer-events:none}
+.rs-scorechip img{width:100%;display:block;aspect-ratio:4.28;object-fit:fill;
+  filter:drop-shadow(0 min(.26vw,.46vh) min(.24vw,.42vh) rgba(0,0,0,.3))}
+.rs-scorechip span{position:absolute;inset:4% 0 12%;display:flex;align-items:center;
+  justify-content:center;gap:.22em;font-family:var(--f-sign);font-weight:800;
+  font-size:18.3cqw;line-height:1;color:#17356f;white-space:nowrap}
+.rs-scorechip b.blue{color:#17356f}
+.rs-scorechip b.orange{color:#f4622e}
+
+/* ---- seats: video BEHIND the torn border ---- */
+.rs-seat{position:absolute;z-index:4;rotate:var(--rot,0deg);container-type:inline-size;
+  filter:drop-shadow(0 min(.32vw,.57vh) min(.36vw,.64vh) rgba(23,53,111,.34))}
+.rs-seat .slot{position:absolute;inset:4.2%;z-index:1;overflow:hidden;background:#0e1b4a;
+  border-radius:min(.4vw,.7vh)}
+.rs-seat .slot video,.rs-seat .slot canvas,.rs-seat .slot .camdock,
+.rs-seat .slot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.rs-seat .rs-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  pointer-events:none;z-index:2}
+.rs-seat .rs-nametag{position:absolute;z-index:3;top:2.6%;width:30%;
+  container-type:inline-size;pointer-events:none;
+  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.42))}
+.rs-seat.blue .rs-nametag{left:4%}
+.rs-seat.orange .rs-nametag{right:4%}
+.rs-seat .rs-ready{position:absolute;z-index:4;right:4%;bottom:3.5%;width:34%;
+  container-type:inline-size;opacity:0;scale:.6;pointer-events:none;
+  transition:opacity .2s ease,scale .3s cubic-bezier(.2,1.6,.4,1)}
+.rs-seat.ready .rs-ready{opacity:1;scale:1}
+.rs-seat .rs-ready img,.rs-nametag img{width:100%;display:block}
+.rs-seat .rs-ready img{aspect-ratio:1.3;object-fit:fill}
+.rs-nametag b,.rs-seat .rs-ready b{position:absolute;inset:6% 0 16%;display:flex;
+  align-items:center;justify-content:center;padding:0 8%;font-family:var(--f-lobby);
+  font-weight:400;color:#fff;white-space:nowrap;overflow:hidden;font-size:22cqw;
+  text-shadow:1.6cqw 1.6cqw 0 rgba(0,0,0,.45)}
+/* orange seats reuse the blue chip paper, warmed to the team colour */
+.rs-seat.orange .rs-nametag img,
+.rs-strip.orange .rs-nametag img{filter:hue-rotate(158deg) saturate(1.5) brightness(1.12)}
+.resstage[data-size="2"] [data-seat="blue2"],
+.resstage[data-size="2"] [data-seat="orange2"]{display:none}
+.rs-seat.vacant{display:none}
+/* 2v2 uses the design's own two-up rectangles */
+.resstage[data-size="2"] [data-seat="blue0"]{left:0;top:15.98%;width:26.92%;aspect-ratio:.79}
+.resstage[data-size="2"] [data-seat="orange0"]{left:76.05%;top:12.22%;width:23.95%;aspect-ratio:.57}
+
+/* ---- rematch + breakdown ---- */
+.rs-rematch{position:absolute;left:26.18%;top:77.28%;width:51.50%;z-index:8;
+  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size}
+.rs-rematch img{width:100%;display:block;aspect-ratio:6.78;object-fit:fill;
+  filter:drop-shadow(0 min(.36vw,.64vh) min(.3vw,.53vh) rgba(23,53,111,.34))}
+.rs-rematch b{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:10.4cqw;
+  color:#17356f;white-space:nowrap;letter-spacing:.01em}
+.rs-rematch.mine img{filter:drop-shadow(0 0 min(1vw,1.8vh) rgba(47,160,74,.85))
+  drop-shadow(0 min(.36vw,.64vh) min(.3vw,.53vh) rgba(23,53,111,.34)) saturate(1.1)}
+.rs-tape-rematch{z-index:9}
+
+.rs-breakdown,.rs-back,.rs-save{position:absolute;z-index:8;background:none;border:0;
+  padding:0;cursor:pointer;container-type:inline-size}
+.rs-breakdown{left:33.95%;top:87.99%;width:34.28%}
+.rs-bd-art{width:100%;display:block;aspect-ratio:5.06;object-fit:fill;
+  filter:drop-shadow(0 min(.24vw,.42vh) min(.22vw,.39vh) rgba(0,0,0,.26))}
+.rs-breakdown b,.rs-back b,.rs-save b{position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;font-family:var(--f-sign);font-weight:800;
+  color:#17356f;white-space:nowrap;letter-spacing:.02em}
+.rs-breakdown b{font-size:9.4cqw;padding-right:12%}
+.rs-bd-arrow{position:absolute;right:5%;top:50%;width:9.5%;translate:0 -50%;rotate:180deg}
+.rs-back{left:3.33%;top:88.95%;width:22.15%}
+.rs-back b{font-size:9.4cqw;padding-left:14%}
+.rs-back-arrow{position:absolute;left:6%;top:50%;width:11%;translate:0 -50%}
+.rs-save{left:74.79%;top:88.89%;width:20.69%}
+.rs-save b{font-size:10.1cqw;padding-right:16%}
+.rs-cam{position:absolute;right:6%;top:50%;width:12%;translate:0 -50%}
+
+/* ---- breakdown page ---- */
+/* Figma overlaps the thumbnails like a stack of prints rather than spacing
+   them out — three square thumbs at full height would overrun the buttons. */
+.rs-strip{position:absolute;z-index:4;display:flex;flex-direction:column}
+.rs-thumb + .rs-thumb{margin-top:-50%}
+.rs-strip.blue{left:0.21%;top:14.94%;width:19.9%}
+.rs-strip.orange{left:77.36%;top:11.98%;width:19.9%}
+.rs-thumb{position:relative;width:100%;aspect-ratio:1;cursor:pointer;
+  container-type:inline-size;rotate:var(--rot,0deg);
+  transition:scale .18s ease,filter .18s ease;
+  filter:drop-shadow(0 min(.24vw,.42vh) min(.28vw,.49vh) rgba(23,53,111,.3))}
+.rs-strip.blue .rs-thumb{--rot:5.3deg}
+.rs-strip.orange .rs-thumb{--rot:-4.5deg}
+.rs-thumb .shotwrap{position:absolute;inset:5%;z-index:1;overflow:hidden;background:#0e1b4a}
+.rs-thumb .shotwrap img{width:100%;height:100%;object-fit:cover;display:block}
+.rs-thumb .rs-border{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:2}
+.rs-thumb .rs-nametag{position:absolute;left:0;top:3%;width:30%;z-index:3;
+  container-type:inline-size;pointer-events:none}
+/* later prints sit on top, so hovering must lift out of the stack */
+.rs-strip .rs-thumb:nth-child(1){z-index:1}
+.rs-strip .rs-thumb:nth-child(2){z-index:2}
+.rs-strip .rs-thumb:nth-child(3){z-index:3}
+.rs-thumb:hover{scale:1.035;z-index:5}
+.rs-thumb.on{scale:1.05;z-index:6;filter:drop-shadow(0 0 min(.9vw,1.6vh) rgba(255,196,64,.9))
+  drop-shadow(0 min(.24vw,.42vh) min(.28vw,.49vh) rgba(23,53,111,.3))}
+
+.rs-focus{position:absolute;left:21.53%;top:12.84%;width:57.08%;aspect-ratio:1.427;z-index:6;
+  container-type:inline-size}
+.rs-focus-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  pointer-events:none;z-index:2;
+  filter:drop-shadow(0 min(.36vw,.64vh) min(.36vw,.64vh) rgba(23,53,111,.32))}
+.rs-focus-shots{position:relative;z-index:1;margin:2.6%;aspect-ratio:1204/730;overflow:hidden;
+  background:#0e1b4a;border-radius:min(.3vw,.55vh)}
+.rs-focus-shots img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .22s ease}
+.rs-focus-shots img.on{opacity:1}
+.rs-focus-shots .rs-empty{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;text-align:center;padding:0 8%;color:#cfd9ef;
+  font-family:var(--f-sign);font-weight:800;font-size:4.2cqw;line-height:1.4}
+.rs-focus .rs-nametag.big{position:absolute;left:0.2%;top:1.8%;width:28.3%;z-index:4;
+  container-type:inline-size;pointer-events:none;rotate:5.3deg}
+.rs-arrow{position:absolute;top:44.5%;width:7.3%;z-index:5;background:none;border:0;
+  padding:0;cursor:pointer}
+.rs-arrow img{width:100%;display:block;
+  filter:drop-shadow(0 min(.2vw,.35vh) min(.18vw,.32vh) rgba(23,53,111,.4))}
+.rs-arrow.prev{left:3%}
+.rs-arrow.prev img{rotate:180deg}
+.rs-arrow.next{right:3%}
+.rs-shot-word{position:absolute;left:0;bottom:5.5%;width:100%;text-align:center;z-index:4;
+  font-family:var(--f-sign);font-weight:800;font-size:3.6cqw;color:#fff;
+  text-shadow:0 .18cqw .5cqw rgba(9,22,62,.85);pointer-events:none}
+
+.rs-award{position:absolute;left:20.00%;top:62.72%;width:17.82%;z-index:7;rotate:5.9deg;
+  container-type:inline-size;pointer-events:none}
+.rs-award img{width:100%;display:block;aspect-ratio:1.486;object-fit:fill;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.28vw,.49vh) rgba(23,53,111,.34))}
+.rs-award span{position:absolute;left:0;width:100%;text-align:center;color:#17356f;
+  white-space:nowrap;overflow:hidden}
+.rs-award .aw-kicker{top:2%;font-family:var(--f-sign);font-weight:800;font-size:16.5cqw}
+.rs-award .aw-title{top:22%;font-family:var(--f-lobby);font-size:19.5cqw}
+.rs-award .aw-sub{top:58%;font-family:var(--f-sign);font-weight:800;font-size:11.7cqw}
+
+.rs-stat{position:absolute;z-index:7;container-type:inline-size;pointer-events:none}
+.rs-stat img{width:100%;display:block;aspect-ratio:2.09;object-fit:fill;
+  filter:drop-shadow(0 min(.24vw,.42vh) min(.24vw,.42vh) rgba(23,53,111,.3))}
+.rs-stat b{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:24cqw;
+  color:#17356f;white-space:nowrap}
+#rsStat1{left:37.85%;top:69.38%;width:12.93%;rotate:4.3deg}
+#rsStat2{left:50.74%;top:70.20%;width:12.76%;rotate:-2.2deg}
+#rsStat3{left:63.55%;top:70.51%;width:12.62%;rotate:.6deg}
+
+/* ---- which page is showing ---- */
+.resstage[data-page="stage"] .rs-strip,
+.resstage[data-page="stage"] .rs-focus,
+.resstage[data-page="stage"] .rs-award,
+.resstage[data-page="stage"] .rs-stat,
+.resstage[data-page="stage"] .rs-back,
+.resstage[data-page="stage"] .rs-save{display:none}
+.resstage[data-page="breakdown"] .rs-seat,
+.resstage[data-page="breakdown"] .rs-breakdown,
+.resstage[data-page="breakdown"] .rs-scorechip,
+.resstage[data-page="breakdown"] .rs-tape-rematch{display:none}
+.resstage[data-page="breakdown"] .rs-rematch{left:27.43%;top:85.93%;width:45.28%}
+.resstage[data-page="breakdown"] .rs-board{left:28.68%;top:1.11%}
+
+/* the page swap is a beat, not a cut */
+.resstage[data-page] .rs-focus,.resstage[data-page] .rs-strip{animation:rsIn .34s cubic-bezier(.2,1.35,.35,1) both}
+@keyframes rsIn{from{opacity:0;transform:translateY(2.2%) scale(.985)}to{opacity:1;transform:none}}
+
+/* results: a quiet way home that never competes with REMATCH */
+.rs-home{position:absolute;left:88.5%;top:79.5%;width:10%;z-index:8;background:none;
+  border:0;padding:0;cursor:pointer;container-type:inline-size}
+.rs-home img{width:100%;display:block;aspect-ratio:2.08;object-fit:fill;
+  filter:drop-shadow(0 min(.24vw,.42vh) min(.22vw,.39vh) rgba(23,53,111,.3))}
+.rs-home b{position:absolute;inset:6% 0 16%;display:flex;align-items:center;
+  justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
+  font-size:19cqw;text-shadow:1.4cqw 1.4cqw 0 rgba(0,0,0,.4)}
+.resstage[data-page="breakdown"] .rs-home{display:none}
+
+/* dev shortcut — deliberately plain so it never reads as game UI */
+.devbtn{position:fixed;right:10px;bottom:10px;z-index:200;
+  font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72vw,13px);
+  letter-spacing:.06em;color:#fff;background:rgba(9,22,62,.72);
+  border:1px solid rgba(255,255,255,.35);border-radius:var(--r-xs);
+  padding:.5em .8em;cursor:pointer}
+.devbtn:hover{background:rgba(9,22,62,.92)}
+
+/* the dock's own chrome is noise on a results wall of faces */
+body[data-screen="results"] .camdock .livebadge,
+body[data-screen="results"] .camdock .aipill,
+body[data-screen="results"] .camdock .brackets{display:none}
+
+/* blue0 sits under the logo, so its tag drops clear of the title card */
+.rs-seat[data-seat="blue0"] .rs-nametag{top:9%}

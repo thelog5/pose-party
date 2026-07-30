@@ -22,6 +22,7 @@ import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
 import { AWARD_MS, setWordRecognitionMotion, showPointsAward,
          confettiFrom } from "./soloRound.js";
+import { captureShot, showResults, setRematchState } from "./results.js";
 
 /* Recognition uses the same stability window as the rest of the game: the
    target must stay on top and over threshold before we dare claim. */
@@ -56,6 +57,8 @@ export function startPartyMatch(bridge, payload){
     wordEnd: 0, wordLimitMs: payload.wordMs || 20000,
     scores: payload.scores, myPlace: null,
     lastChaseSecond: null,
+    /* per-player match record, for the results breakdown */
+    tally: new Map(),
   };
   state.game = g;
   ctx.roster = payload.roster;
@@ -214,6 +217,11 @@ export function onPartyGot({ id, place } = {}){
   const sticker = el.querySelector(".pm-gotit");
   if(sticker) sticker.querySelector("b").textContent = "I GOT IT " + (ORDINALS[place] || "");
   const g = state.game;
+  /* the pose they were holding when the AI got it is the funny frame */
+  const slot = el.querySelector(".slot");
+  const vid = slot?.querySelector("video") || (id === ctx.myId ? $("video") : null);
+  captureShot(id, g?.word, vid, id === ctx.myId);
+  if(g) recordFinish(g, id, place);
   if(id === ctx.myId){
     if(g) g.myPlace = place;
     blip([523, 659, 784], .08);
@@ -471,6 +479,17 @@ function fitWord(){
 
 /* ---------------- teardown ---------------- */
 
+function recordFinish(g, id, place){
+  if(!g.tally) g.tally = new Map();
+  const t = g.tally.get(id) || { firsts: 0, times: [], clutch: 0 };
+  if(place === 0) t.firsts++;
+  const left = Math.max(0, g.wordEnd - performance.now());
+  const spent = Math.max(.1, (g.wordLimitMs - left) / 1000);
+  t.times.push(spent);
+  if(g.phase === "chase") t.clutch++;
+  g.tally.set(id, t);
+}
+
 function endPartyMatch(payload){
   const g = state.game;
   if(g) clearInterval(g.timer);
@@ -484,16 +503,33 @@ function endPartyMatch(payload){
   const title = payload?.winner
     ? (won ? "YOUR TEAM WINS!" : "TEAM " + payload.winner.toUpperCase() + " WINS")
     : "IT'S A DRAW";
-  const rows = (payload?.scores?.players || [])
-    .slice().sort((a, b) => b.score - a.score)
-    .map(p => '<div class="resrow"><span>' + disp(p.name) +
-      '</span><span class="' + (p.team === mine ? "ok" : "miss") + '">' +
-      fmtScore(p.score) + '</span></div>').join("");
-  $("rescard").innerHTML = "<h2>" + title + "</h2>" +
-    '<div class="sub">BLUE ' + fmtScore(teams.blue) +
-    " — ORANGE " + fmtScore(teams.orange) + "</div>" + rows;
+  const tally = g?.tally || new Map();
+  const perTeam = { blue: 0, orange: 0 };
+  const players = (payload?.scores?.players || []).map(p => {
+    const t = tally.get(p.id) || { firsts: 0, times: [], clutch: 0 };
+    perTeam[p.team] = (perTeam[p.team] || 0) + 1;
+    return {
+      id: p.id, name: p.name, team: p.team, score: p.score,
+      mine: p.id === ctx.myId,
+      stream: p.id === ctx.myId ? null : ctx.peers.get(p.id)?.stream || null,
+      firsts: t.firsts,
+      fastest: t.times.length ? Math.min(...t.times) : null,
+      avg: t.times.length ? t.times.reduce((a, b) => a + b, 0) / t.times.length : null,
+      clutch: t.clutch,
+      ready: false,
+    };
+  });
   state.game = null;
-  transition("results");
+  showResults({
+    mode: "party",
+    size: Math.max(perTeam.blue, perTeam.orange, 2) >= 3 ? 3 : 2,
+    headline: title,
+    teams,
+    players,
+    rematch: { ready: payload?.rematch?.ready || 0,
+               total: payload?.rematch?.total || players.length, mine: false },
+    onRematch: () => ctx.socket?.emit("party:rematch", {}, () => {}),
+  });
 }
 
 /* Leaving the screen for any reason tears the loop down. */

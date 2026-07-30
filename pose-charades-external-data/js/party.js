@@ -20,6 +20,7 @@ import { createPeer } from "./webrtc.js";
 import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
          lobbySettings, renderLobbySettings, setLobbyCode,
          serverNow, perfFromServer } from "./online.js";
+import { setRematchState } from "./results.js";
 import { startPartyMatch, wirePartyMatch, attachPartyStream, onPartyRound,
          onPartyGot, onPartyChase, onPartyResult, onPartyEnd,
          onPartyGuess } from "./partyMatch.js";
@@ -194,6 +195,8 @@ function wirePartySocket(s){
   s.on("party:chase",  p => onPartyChase(p));
   s.on("party:result", p => onPartyResult(p));
   s.on("party:end",    p => onPartyEnd(p));
+  s.on("party:rematch", ({ready, total, voters} = {}) =>
+    setRematchState(ready, total, (voters || []).includes(myId)));
   s.on("party:guess",  p => onPartyGuess(p));
 }
 

@@ -698,8 +698,47 @@ export function createRoomStore({ config, emit }){
     const scores = partyScores(room);
     const winner = scores.teams.blue === scores.teams.orange
       ? null : (scores.teams.blue > scores.teams.orange ? "blue" : "orange");
-    for(const p of room.players) emit(p.id, "party:end", { scores, winner });
-    destroyRoom(room.code);
+    /* The room used to be destroyed here, which meant a rematch needed a new
+       code re-shared with everyone standing in the room. It now survives on
+       the normal TTL so the results screen can collect ready votes. */
+    room.rematch = new Set();
+    for(const p of room.players)
+      emit(p.id, "party:end", { scores, winner, rematch: rematchState(room) });
+  }
+
+  const rematchState = room => ({
+    ready: room.rematch ? room.rematch.size : 0,
+    total: room.players.length,
+  });
+
+  function broadcastRematch(room){
+    for(const p of room.players)
+      emit(p.id, "party:rematch", {
+        ...rematchState(room),
+        voters: [...(room.rematch || [])],
+      });
+  }
+
+  /* Toggling is deliberate: a misclick must be undoable, and seeing the count
+     drop is honest feedback. */
+  function partyRematch(socketId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(room.phase !== "done") return { error: "match-in-progress" };
+    if(!room.rematch) room.rematch = new Set();
+    if(room.rematch.has(socketId)) room.rematch.delete(socketId);
+    else room.rematch.add(socketId);
+    broadcastRematch(room);
+
+    if(room.rematch.size >= room.players.length && room.players.length >= 2){
+      if(teamCount(room, "blue") < MIN_PER_TEAM || teamCount(room, "orange") < MIN_PER_TEAM)
+        return { ok: true, waiting: "need-teams" };
+      room.rematch.clear();
+      room.phase = "lobby";
+      startPartyMatch(room);
+      return { ok: true, started: true };
+    }
+    return { ok: true, ...rematchState(room) };
   }
 
   /* Targeted mesh signaling: every pair of party members holds its own
@@ -721,6 +760,12 @@ export function createRoomStore({ config, emit }){
     if(!room.players.length){ destroyRoom(room.code); return; }
     for(const p of room.players) emit(p.id, "party:left", { id: socketId });
 
+    if(room.phase === "done"){
+      room.rematch?.delete(socketId);
+      broadcastRoster(room);
+      broadcastRematch(room);
+      return;
+    }
     if(room.phase === "lobby"){ broadcastRoster(room); return; }
 
     /* Mid-match: a side that empties ends the match. Otherwise the leaver may
@@ -820,6 +865,6 @@ export function createRoomStore({ config, emit }){
   return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
            relaySignal, relayGuess, sweep,
            partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart,
-           partySignal, partyClaim, relayPartyGuess,
+           partySignal, partyClaim, relayPartyGuess, partyRematch,
            _rooms: rooms };
 }

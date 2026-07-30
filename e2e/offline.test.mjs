@@ -296,16 +296,36 @@ ok(await txt("#soloStreakVal") === "x1", "skip reset the streak");
 // exit -> results
 await page.click("#btnExitSolo");
 ok(await fsmState() === "results", "exit -> results");
-ok(/SCORE/.test(await txt("#rescard h2")), `results title (${await txt("#rescard h2")})`);
+/* results is the designed two-beat screen now: headline paper, live seats,
+   REMATCH, and a pulled breakdown page. */
+ok(/RUN|OVER/.test(await txt("#rsHeadline")), `results headline (${await txt("#rsHeadline")})`);
+ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "stage",
+  "results opens on the shared-moment page, not the data page");
+ok(await page.evaluate(() => document.getElementById("cameraDock").closest(".rs-seat") !== null),
+  "your live camera sits in your results seat");
+ok(await page.evaluate(() => {
+  const s = document.querySelector('.rs-seat[data-pid] .slot'), b = document.querySelector(".rs-seat .rs-border");
+  if(!s || !b) return false;
+  return Number(getComputedStyle(b).zIndex) > Number(getComputedStyle(s).zIndex || 0);
+}), "video sits BEHIND the torn border");
+await page.click("#rsSeeBreakdown");
+ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "breakdown",
+  "see-the-breakdown opens the record page");
+ok(await page.evaluate(() => document.querySelectorAll("#rsStripBlue .rs-thumb").length) >= 1,
+  "breakdown lists the players as photo thumbnails");
+ok(!!(await txt("#rsAwardTitle")), `everyone gets an award (${await txt("#rsAwardTitle")})`);
+await page.click("#rsBack");
+ok(await page.evaluate(() => document.getElementById("resStage").dataset.page) === "stage",
+  "back to results returns to the shared page");
 
 console.log("replay + training:");
-await page.click("#btnAgain");
-ok(await fsmState() === "countdown", "play again -> countdown");
+await page.click("#rsRematch");
+ok(await fsmState() === "countdown", "rematch -> countdown");
 await sleep(2900);
 ok(await fsmState() === "playing", "replay reached playing");
 await page.click("#btnExitSolo");
 ok(await fsmState() === "results", "exit -> results again");
-await page.click("#btnHome");
+await page.click("#rsHome");
 ok(await fsmState() === "menu", "home from results");
 await page.click("#btnHomeGear");
 ok(await fsmState() === "training", "home gear opens training");
