@@ -31,7 +31,6 @@ let payload = null;       // the match summary being displayed
 let cycleTimer = 0;       // drives the GIF-style still cycle
 const CYCLE_MS = 2600;    // relaxed enough to read each physical-photo beat
 let focusId = null;       // which player's carousel is open
-let shotIx = 0;
 let wired = false;
 let awardFitFrame = 0;
 let poseFitFrame = 0;
@@ -39,10 +38,6 @@ let awardMeasureCanvas = null;
 let rematchPulseTimer = 0;
 let rematchPendingTimer = 0;
 let rematchVersion = 0;
-let soloPointerStart = null;
-let soloSwipeHandled = false;
-let v1PointerStart = null;
-let v1SwipeHandled = false;
 let enterTimer = 0;
 /* which pages have already played their assembly beat this results session */
 const entered = new Set();
@@ -155,7 +150,6 @@ export function showResults(next){
   payload = next;
   assignAwards(payload.players);
   focusId = (payload.players.find(p => p.mine) || payload.players[0])?.id || null;
-  shotIx = 0;
 
   const st = stage();
   const mode = payload.mode || "party";
@@ -542,7 +536,6 @@ export function syncResultsRoster(nextPlayers = []){
   };
   if(!payload.players.some(p => p.id === focusId)){
     focusId = (payload.players.find(p => p.mine) || payload.players[0])?.id || null;
-    shotIx = 0;
   }
 
   renderSeats();
@@ -660,7 +653,6 @@ function selectBreakdownPlayer(id, control){
   if(!payload?.players.some(p => p.id === id)) return;
   const changed = focusId !== id;
   focusId = id;
-  shotIx = 0;
   syncThumbSelection();
   if(control){
     /* Re-selecting the open print should still feel like picking it up. */
@@ -688,24 +680,15 @@ function paintPanel(suffix, p){
         '" data-active="' + (i === 0 ? "true" : "false") + '">').join("")
     : '<div class="rs-empty">No photos this round —<br>they’re taken the moment the AI recognises you.</div>';
 
+  /* The reel plays itself. It carries no tap, swipe or key handling, so it
+     is described as a plain gallery rather than an interactive control. */
   const focus = $("rsFocus" + suffix);
-  const soloCarousel = payload.mode === "solo" && suffix === "";
-  const v1Carousel = is1v1();
   if(focus){
-    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
-    focus.toggleAttribute("data-solo-carousel", soloCarousel);
-    focus.toggleAttribute("data-1v1-carousel", v1Carousel);
-    if(soloCarousel || v1Carousel){
-      focus.tabIndex = 0;
-      focus.setAttribute("role", "button");
-      focus.setAttribute("aria-roledescription", "photo carousel");
-    }else{
-      focus.removeAttribute("tabindex");
-      focus.removeAttribute("role");
-      focus.removeAttribute("aria-roledescription");
-      focus.removeAttribute("aria-label");
-      delete focus.dataset.shotIndex;
-    }
+    /* `group` so aria-roledescription is valid, and live="off" so the label
+       changing every few seconds does not make a screen reader chatter. */
+    focus.setAttribute("role", "group");
+    focus.setAttribute("aria-roledescription", "photo gallery");
+    focus.setAttribute("aria-live", "off");
   }
 
   const tag = $("rsFocusName" + suffix);
@@ -920,28 +903,22 @@ function breakdownOrder(){
           ...payload.players.filter(p => p.team === "orange")];
 }
 
-/* Stills read as a little GIF of the round, but Solo also lets a player pick
-   up the stack with tap, swipe, or arrow keys. Reduced-motion users keep the
-   same manual controls without an unsolicited auto-cycle. */
+/* The stills play themselves — a little GIF of the round. There is no tap,
+   swipe or key handling on the reel in any mode, and hovering it does not
+   pause: it just runs. The only thing that stops it is the tab going away.
+
+   Reduced motion still advances, because the point of the screen is seeing
+   your photos; the CSS drops the cross-fade to a plain cut instead. */
 function startShotCycle(){
   stopShotCycle();
-  if(document.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const soloFocus = payload?.mode === "solo" ? $("rsFocus") : null;
-  if(soloFocus &&
-     (document.activeElement === soloFocus || soloFocus.matches(":hover"))) return;
-  if(is1v1() &&
-     visiblePanels().some(panel => {
-       const focus = $("rsFocus" + panel.suffix);
-       return focus &&
-         (document.activeElement === focus || focus.matches(":hover"));
-     })) return;
+  if(document.hidden) return;
   cycleTimer = setInterval(() => {
     let moved = false;
     for(const panel of visiblePanels()){
       const list = shots.get(panel.pid) || [];
       if(list.length < 2) continue;
       panel.ix = (panel.ix + 1) % list.length;
-      paintPanelFrame(panel, "auto");
+      paintPanelFrame(panel);
       moved = true;
     }
     if(!moved) stopShotCycle();
@@ -959,18 +936,18 @@ function visiblePanels(){
 }
 function syncPanelA11y(panel){
   const focus = $("rsFocus" + panel.suffix);
-  if(!focus || (!focus.hasAttribute("data-solo-carousel") &&
-      !focus.hasAttribute("data-1v1-carousel"))) return;
+  if(!focus) return;
   const list = shots.get(panel.pid) || [];
   const p = payload?.players.find(player => player.id === panel.pid);
   focus.dataset.shotIndex = String(panel.ix);
   focus.setAttribute("aria-label", list.length
-    ? disp(p?.name) + " result photo " + (panel.ix + 1) + " of " + list.length +
-      ". Tap, swipe, press Enter or Space, or use left and right arrow keys."
+    ? disp(p?.name) + " result photo " + (panel.ix + 1) + " of " + list.length
     : disp(p?.name) + " has no captured result photos.");
 }
 
-function paintPanelFrame(panel, direction = "auto"){
+/* Swap which still is showing. No direction, because nothing steps it by
+   hand any more — the reel only ever moves forward, on its own clock. */
+function paintPanelFrame(panel){
   const wrap = $("rsFocusShots" + panel.suffix);
   if(!wrap) return;
   const imgs = wrap.querySelectorAll("img");
@@ -984,43 +961,6 @@ function paintPanelFrame(panel, direction = "auto"){
   setTxt("rsShotWord" + panel.suffix,
     list.length ? (list[panel.ix]?.word || "").toUpperCase() : "");
   syncPanelA11y(panel);
-
-  const focus = $("rsFocus" + panel.suffix);
-  if(!focus || !imgs.length) return;
-  focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
-  void focus.offsetWidth;
-  focus.classList.add("is-cycling", "cycle-" + direction);
-  clearTimeout(focus._cycleClassTimer);
-  focus._cycleClassTimer = setTimeout(() => {
-    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
-  }, 420);
-}
-
-function stepSoloShot(dir){
-  if(!payload || stage()?.dataset.page !== "solo") return false;
-  const panel = panelState.get("");
-  const list = panel ? (shots.get(panel.pid) || []) : [];
-  if(!panel || list.length < 2) return false;
-  panel.ix = (panel.ix + dir + list.length) % list.length;
-  paintPanelFrame(panel, dir < 0 ? "prev" : "next");
-  blip(dir < 0 ? [392, 494] : [523, 659], .035);
-  startShotCycle();
-  return true;
-}
-
-function step1v1Shot(suffix, dir){
-  if(!payload || !is1v1() ||
-      stage()?.dataset.page !== "breakdown") return false;
-  const panel = panelState.get(suffix);
-  const list = panel ? (shots.get(panel.pid) || []) : [];
-  if(!panel) return false;
-  if(list.length > 1)
-    panel.ix = (panel.ix + dir + list.length) % list.length;
-  if(list.length)
-    paintPanelFrame(panel, dir < 0 ? "prev" : "next");
-  if(list.length > 1) blip(dir < 0 ? [392, 494] : [523, 659], .035);
-  startShotCycle();
-  return true;
 }
 
 /* ---------------- photo strip ---------------- */
@@ -1091,10 +1031,6 @@ function teardownResultsMedia(){
   clearTimeout(enterTimer);
   enterTimer = 0;
   delete stage()?.dataset.enter;
-  soloPointerStart = null;
-  soloSwipeHandled = false;
-  v1PointerStart = null;
-  v1SwipeHandled = false;
   const dock = $("cameraDock");
   if(dock?.closest("#resStage")) mountCamera($("slotHomePark"));
   for(const el of document.querySelectorAll("#resStage .rs-seat")){
@@ -1116,11 +1052,6 @@ function teardownResultsMedia(){
     $("rsFocusShots" + suffix)?.replaceChildren();
     const focus = $("rsFocus" + suffix);
     if(!focus) continue;
-    clearTimeout(focus._cycleClassTimer);
-    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
-    focus.removeAttribute("data-solo-carousel");
-    focus.removeAttribute("data-1v1-carousel");
-    focus.removeAttribute("tabindex");
     focus.removeAttribute("role");
     focus.removeAttribute("aria-roledescription");
     focus.removeAttribute("aria-label");
@@ -1163,118 +1094,17 @@ export function wireResults(){
       if(stage()?.dataset.page === "solo") fitPoseList();
     }).observe($("rsPoseList"));
 
-  const focus = $("rsFocus");
-  focus?.addEventListener("click", () => {
-    if(soloSwipeHandled) return;
-    if(stage()?.dataset.page === "solo") stepSoloShot(1);
-  });
-  focus?.addEventListener("pointerdown", event => {
-    if(stage()?.dataset.page !== "solo" || event.button > 0) return;
-    soloPointerStart = { id:event.pointerId, x:event.clientX, y:event.clientY };
-  });
-  focus?.addEventListener("pointerup", event => {
-    if(!soloPointerStart || event.pointerId !== soloPointerStart.id) return;
-    const dx = event.clientX - soloPointerStart.x;
-    const dy = event.clientY - soloPointerStart.y;
-    soloPointerStart = null;
-    if(Math.abs(dx) < 34 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
-    soloSwipeHandled = stepSoloShot(dx < 0 ? 1 : -1);
-    if(soloSwipeHandled)
-      setTimeout(() => { soloSwipeHandled = false; }, 0);
-  });
-  focus?.addEventListener("pointercancel", () => { soloPointerStart = null; });
-  focus?.addEventListener("pointerenter", () => {
-    if(stage()?.dataset.page === "solo") stopShotCycle();
-  });
-  focus?.addEventListener("pointerleave", () => {
-    soloPointerStart = null;
-    if(stage()?.dataset.page === "solo" && document.activeElement !== focus)
-      startShotCycle();
-  });
-  focus?.addEventListener("focus", stopShotCycle);
-  focus?.addEventListener("blur", () => {
-    if(stage()?.dataset.page === "solo") startShotCycle();
-  });
-
-  for(const suffix of ["", "B"]){
-    const reel = $("rsFocus" + suffix);
-    reel?.addEventListener("click", () => {
-      if(v1SwipeHandled || stage()?.dataset.page !== "breakdown" ||
-          !is1v1()) return;
-      reel.focus({ preventScroll:true });
-      step1v1Shot(suffix, 1);
-    });
-    reel?.addEventListener("pointerdown", event => {
-      if(stage()?.dataset.page !== "breakdown" || event.button > 0 ||
-          !is1v1()) return;
-      v1PointerStart = {
-        suffix, id:event.pointerId, x:event.clientX, y:event.clientY,
-      };
-    });
-    reel?.addEventListener("pointerup", event => {
-      if(!v1PointerStart || v1PointerStart.suffix !== suffix ||
-          event.pointerId !== v1PointerStart.id) return;
-      const dx = event.clientX - v1PointerStart.x;
-      const dy = event.clientY - v1PointerStart.y;
-      v1PointerStart = null;
-      if(Math.abs(dx) < 34 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
-      v1SwipeHandled = step1v1Shot(suffix, dx < 0 ? 1 : -1);
-      if(v1SwipeHandled)
-        setTimeout(() => { v1SwipeHandled = false; }, 0);
-    });
-    reel?.addEventListener("pointercancel", () => { v1PointerStart = null; });
-    reel?.addEventListener("pointerenter", () => {
-      if(stage()?.dataset.page === "breakdown" &&
-          is1v1())
-        stopShotCycle();
-    });
-    reel?.addEventListener("pointerleave", () => {
-      v1PointerStart = null;
-      if(stage()?.dataset.page === "breakdown" &&
-          is1v1() &&
-          document.activeElement !== reel)
-        startShotCycle();
-    });
-    reel?.addEventListener("focus", () => {
-      if(is1v1()) stopShotCycle();
-    });
-    reel?.addEventListener("blur", () => {
-      if(stage()?.dataset.page === "breakdown" &&
-          is1v1())
-        startShotCycle();
-    });
-  }
-
+  /* The photo reels carry no handlers at all — no tap, no swipe, no keys.
+     They auto-advance and that is the whole interaction. The arrow keys
+     still step between PLAYERS on the party breakdown, which is what the
+     on-screen arrows do too. */
   addEventListener("keydown", e => {
     if(gameState() !== "results") return;
-    const soloFocus = $("rsFocus");
-    if(stage().dataset.page === "solo" && document.activeElement === soloFocus &&
-       ["ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)){
-      const dir = e.key === "ArrowLeft" ? -1 : 1;
-      if(stepSoloShot(dir)) e.preventDefault();
-      return;
-    }
-    if(stage().dataset.page !== "breakdown") return;
-    if(is1v1()){
-      const active = document.activeElement;
-      const suffix = active === $("rsFocus") ? "" :
-        active === $("rsFocusB") ? "B" : null;
-      if(suffix !== null &&
-         ["ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)){
-        if(step1v1Shot(suffix, e.key === "ArrowLeft" ? -1 : 1))
-          e.preventDefault();
-      }
-      return;
-    }
+    if(stage().dataset.page !== "breakdown" || is1v1()) return;
     if(e.key === "ArrowLeft") step(-1);
     if(e.key === "ArrowRight") step(1);
   });
 
-  matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", event => {
-    if(gameState() !== "results") return;
-    if(event.matches) stopShotCycle();
-    else startShotCycle();
-  });
   document.addEventListener("visibilitychange", () => {
     if(gameState() !== "results") return;
     if(document.hidden) stopShotCycle();

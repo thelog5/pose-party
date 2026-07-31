@@ -84,7 +84,8 @@ function playHomeEntrance(){
   void stage.offsetWidth;
   stage.classList.add("home-entering");
   clearTimeout(entranceTimer);
-  entranceTimer = setTimeout(() => stage.classList.remove("home-entering"), 1500);
+  /* must outlast the last tape (1.26s delay + .66s slap) or it snaps */
+  entranceTimer = setTimeout(() => stage.classList.remove("home-entering"), 2100);
 }
 
 function revealHome(){

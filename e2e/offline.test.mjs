@@ -519,50 +519,55 @@ const cycled = await page.evaluate(() => new Promise(resolve => {
   }, 80);
 }));
 ok(cycled !== "stuck", `stills cycle on their own (${cycled})`);
-const soloCarouselControls = await page.evaluate(async () => {
-  const focus=document.getElementById("rsFocus");
-  const count=document.querySelectorAll("#rsFocusShots img").length;
-  if(count < 2) return { count, keyboard:true, enter:true, guarded:true, swipe:true, a11y:true };
-  const at=()=>Number(focus.dataset.shotIndex);
-  focus.focus();
-  const start=at();
-  focus.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true}));
-  await new Promise(r=>setTimeout(r,30));
-  const afterArrow=at();
-  focus.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
-  await new Promise(r=>setTimeout(r,30));
-  const afterEnter=at();
-  document.getElementById("rsSaveStrip").focus();
-  dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true}));
-  await new Promise(r=>setTimeout(r,30));
-  const afterGuard=at();
-  focus.dispatchEvent(new PointerEvent("pointerdown",{
-    pointerId:71,button:0,clientX:1100,clientY:300,bubbles:true}));
-  focus.dispatchEvent(new PointerEvent("pointerup",{
-    pointerId:71,button:0,clientX:990,clientY:302,bubbles:true}));
-  await new Promise(r=>setTimeout(r,30));
-  const afterSwipe=at();
+/* The reel is a GIF, not a control: it plays itself and answers to nothing.
+   No tap, no swipe, no keys, no pointer cursor, no focus ring. */
+const soloReelInert = await page.evaluate(async () => {
+  const focus = document.getElementById("rsFocus");
+  const count = document.querySelectorAll("#rsFocusShots img").length;
+  const at = () => Number(focus.dataset.shotIndex);
+  /* read back in the same task so the auto-advance cannot race the probe */
+  const before = at();
+  focus.dispatchEvent(new PointerEvent("pointerdown", {
+    pointerId:71, button:0, clientX:1100, clientY:300, bubbles:true }));
+  focus.dispatchEvent(new PointerEvent("pointerup", {
+    pointerId:71, button:0, clientX:990, clientY:302, bubbles:true }));
+  focus.dispatchEvent(new MouseEvent("click", { bubbles:true }));
+  focus.dispatchEvent(new KeyboardEvent("keydown", {
+    key:"ArrowRight", bubbles:true, cancelable:true }));
+  focus.dispatchEvent(new KeyboardEvent("keydown", {
+    key:"Enter", bubbles:true, cancelable:true }));
+  const cs = getComputedStyle(focus);
   return {
     count,
-    keyboard:afterArrow !== start,
-    enter:afterEnter !== afterArrow,
-    guarded:afterGuard === afterEnter,
-    swipe:afterSwipe !== afterGuard,
-    a11y:focus.getAttribute("role") === "button" &&
-      /photo \d+ of \d+/.test(focus.getAttribute("aria-label") || ""),
+    inert: at() === before,
+    noCursor: cs.cursor !== "pointer",
+    noTabStop: !focus.hasAttribute("tabindex") && focus.getAttribute("role") !== "button",
+    a11y: /photo \d+ of \d+/.test(focus.getAttribute("aria-label") || ""),
   };
 });
-ok(Object.values(soloCarouselControls).slice(1).every(Boolean),
-  `Solo reel supports focus-owned arrows, Enter and swipe (${soloCarouselControls.count} stills)`);
+ok(Object.values(soloReelInert).slice(1).every(Boolean),
+  `Solo reel is auto-scroll only — tap, swipe and keys do nothing (${JSON.stringify(soloReelInert)})`);
 
+/* Reduced motion keeps the photos moving, because with no manual control a
+   frozen reel would hide most of the run. The CSS drops the cross-fade to a
+   plain cut instead — that is the accommodation. */
 await page.evaluate(() => document.activeElement?.blur());
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"reduce" }]);
-const reducedReelStart=await page.evaluate(() =>
-  document.getElementById("rsFocus").dataset.shotIndex);
-await sleep(2800);
-ok(await page.evaluate(start =>
-  document.getElementById("rsFocus").dataset.shotIndex === start, reducedReelStart),
-  "reduced motion stops the unsolicited Solo photo cycle");
+const reducedCycled = await page.evaluate(() => new Promise(resolve => {
+  const at = () => Number(document.getElementById("rsFocus").dataset.shotIndex);
+  const start = at();
+  if(document.querySelectorAll("#rsFocusShots img").length < 2) return resolve("single");
+  const t0 = Date.now();
+  const poll = setInterval(() => {
+    if(at() !== start){ clearInterval(poll); resolve("cycled"); }
+    else if(Date.now() - t0 > 4000){ clearInterval(poll); resolve("stuck"); }
+  }, 80);
+}));
+ok(reducedCycled !== "stuck",
+  `reduced motion still advances the reel, without the cross-fade (${reducedCycled})`);
+ok(await page.evaluate(() =>
+  getComputedStyle(document.querySelector("#rsFocusShots img.on")).transitionDuration === "0s"),
+  "reduced motion swaps the still as a cut, not a fade");
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 ok(!!(await txt("#rsAwardTitle")), `solo still earns an award (${await txt("#rsAwardTitle")})`);
 

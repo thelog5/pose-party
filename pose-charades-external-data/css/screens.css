@@ -112,20 +112,23 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .homestage.home-entering #modeParty.card>img{
   --home-in-x:0%;--home-in-y:-72%;--home-in-r:8deg;
   transform-origin:50% -10%;
-  animation:homeCardEnter .72s cubic-bezier(.16,1.38,.32,1) .08s both}
+  animation:homeCardEnter .92s cubic-bezier(.16,1.38,.32,1) .10s both}
 .homestage.home-entering #modeVS.card>img{
   --home-in-x:-50%;--home-in-y:48%;--home-in-r:-8deg;
   transform-origin:50% -10%;
-  animation:homeCardEnter .76s cubic-bezier(.16,1.38,.32,1) .22s both}
+  animation:homeCardEnter .96s cubic-bezier(.16,1.38,.32,1) .30s both}
 .homestage.home-entering #modeAI.card>img{
   --home-in-x:64%;--home-in-y:18%;--home-in-r:9deg;
   transform-origin:50% -10%;
-  animation:homeCardEnter .78s cubic-bezier(.16,1.38,.32,1) .36s both}
+  animation:homeCardEnter 1s cubic-bezier(.16,1.38,.32,1) .50s both}
+/* Each tape lands after the card it holds down. It arrives from much further
+   out than the card did — a big slap that settles — so the eye is pulled to
+   the tape rather than it just appearing. */
 .homestage.home-entering :is(#tapeParty,#tapeVS,#tapeSolo){
-  opacity:0;animation:homeTapeSlap .42s cubic-bezier(.16,1.55,.32,1) both}
-.homestage.home-entering #tapeParty{animation-delay:.58s}
-.homestage.home-entering #tapeVS{animation-delay:.76s}
-.homestage.home-entering #tapeSolo{animation-delay:.94s}
+  opacity:0;animation:homeTapeSlap .66s cubic-bezier(.16,1.5,.32,1) both}
+.homestage.home-entering #tapeParty{animation-delay:.78s}
+.homestage.home-entering #tapeVS{animation-delay:1.02s}
+.homestage.home-entering #tapeSolo{animation-delay:1.26s}
 @keyframes homeCardEnter{
   0%{opacity:0;translate:var(--home-in-x) var(--home-in-y);
     rotate:var(--home-in-r);scale:.76}
@@ -133,8 +136,10 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
   84%{translate:0 -.7%;rotate:.7deg;scale:.985}
   100%{opacity:1;translate:0 0;rotate:0deg;scale:1}}
 @keyframes homeTapeSlap{
-  0%{opacity:0;transform:scale(1.55) rotate(-8deg)}
-  66%{opacity:1;transform:scale(.94) rotate(2deg)}
+  0%{opacity:0;transform:scale(2.6) rotate(-14deg)}
+  46%{opacity:1;transform:scale(1.22) rotate(5deg)}
+  74%{transform:scale(.93) rotate(-2.5deg)}
+  89%{transform:scale(1.035) rotate(1deg)}
   100%{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){
   .homestage.home-entering :is(#tapeParty,#tapeVS,#tapeSolo){opacity:1!important}
@@ -1517,7 +1522,6 @@ body[data-screen="results"] header{display:none}
     filter:brightness(1.015)}
   .rs-scorechip:hover{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.015;
     filter:brightness(1.025)}
-  .rs-focus:hover .rs-focus-frame{filter:brightness(1.015)}
   .rs-award:hover{translate:0 calc(-1 * min(.24vw,.43vh));scale:1.035;
     rotate:-6.55deg;filter:brightness(1.025)}
   .rs-stat:hover{translate:0 calc(-1 * min(.18vw,.32vh));scale:1.04;
@@ -1817,45 +1821,9 @@ body[data-screen="results"] .camdock .brackets{display:none}
   left:75.403215%;right:auto;top:2.496894%;width:25.135995%;height:10.408158%;
   rotate:11.699311deg}
 
-/* Each side is its own physical stack of prints. Interaction never promotes
-   one side over the other; the equal two-panel composition remains authored. */
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus[data-1v1-carousel]{
-  cursor:pointer;touch-action:pan-y;outline:none;transform-origin:50% 52%;
-  transition:translate var(--rs-base) var(--rs-hover),
-    scale var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-prev{
-  --v1-print-x:calc(-1 * min(.7vw,1.25vh));--v1-print-turn:-.7deg}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-next{
-  --v1-print-x:min(.7vw,1.25vh);--v1-print-turn:.7deg}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-auto{
-  --v1-print-x:0px;--v1-print-turn:.32deg}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-shots img.on{
-  animation:rs1v1PrintIn 380ms var(--rs-pop)}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-frame{
-  animation:rs1v1FrameSlap 360ms var(--rs-pop)}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus:focus-visible{
-  outline:min(.208vw,.37vh) solid #ffc440;
-  outline-offset:calc(-1 * min(.34vw,.6vh))}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus:active{
-  scale:.994;filter:brightness(.985)}
-@keyframes rs1v1PrintIn{
-  0%{opacity:0;translate:var(--v1-print-x,0) calc(-1 * min(.42vw,.75vh));
-    scale:1.045;rotate:var(--v1-print-turn,0deg);filter:saturate(.9)}
-  58%{opacity:1;translate:0 min(.08vw,.14vh);scale:.995;rotate:0deg}
-  100%{opacity:1;translate:0 0;scale:1;rotate:0deg;filter:none}
-}
-@keyframes rs1v1FrameSlap{
-  0%{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.008}
-  62%{translate:0 min(.09vw,.16vh);scale:.997}
-  100%{translate:0 0;scale:1}
-}
-
-/* Party uses the same tactile photo beat without moving or promoting the
-   selected player card. The paper frame stays put while the new print lands. */
-.resstage[data-mode="party"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-shots img.on{
-  animation:rs1v1PrintIn 380ms var(--rs-pop)}
-.resstage[data-mode="party"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-frame{
-  animation:rs1v1FrameSlap 360ms var(--rs-pop)}
+/* The photo reels auto-advance and are not interactive: no tap, no swipe,
+   no keys, so no pointer cursor, press state or focus ring either. Each new
+   still simply cross-fades in (.rs-focus-shots img.on -> rsPhotoSet). */
 
 /* A restrained, one-time assembly beat, gated on [data-enter] rather than
    [data-page]: results.js sets it once per page per match, so flipping
@@ -1890,26 +1858,14 @@ body[data-screen="results"] .camdock .brackets{display:none}
   to{opacity:1;transform:none}
 }
 
-@media (hover:hover){
-  .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus[data-1v1-carousel]:hover{
-    translate:0 calc(-1 * min(.14vw,.25vh));scale:1.006;
-    filter:brightness(1.018)
-      drop-shadow(0 min(.28vw,.5vh) min(.22vw,.39vh) rgba(0,0,0,.18))}
-}
-
 @media (prefers-reduced-motion:reduce){
   .resstage[data-mode="1v1"] :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,
     .rs-exit,.rs-board,.rs-scorechip,.rs-divider,.rs-seat,.rs-tape-rematch-stage,
     .rs-tape-rematch-breakdown,.rs-breakdown,.rs-focus,.rs-award,.rs-stat,.rs-back,.rs-save),
   .resstage[data-mode="1v1"] .rs-rematch>*,
-  .resstage[data-mode="1v1"] .rs-focus.is-cycling
-    :is(.rs-focus-frame,.rs-focus-shots img.on){
+  .resstage[data-mode="1v1"] .rs-focus-shots img.on{
     animation:none!important}
-  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel],
-  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel]:hover,
-  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel]:active{
-    translate:0 0!important;scale:1!important;filter:none!important;
-    transition:none!important}
+  /* the auto-advance still runs; it just becomes a cut, not a cross-fade */
   .resstage[data-mode="1v1"] .rs-focus-shots img{transition:none!important}
 }
 
@@ -1959,12 +1915,10 @@ body[data-screen="results"] .camdock .brackets{display:none}
   left:32.222222%;top:0;width:35.555556%;z-index:10}
 .resstage[data-page="solo"] .rs-scorechip{
   left:35.154028%;top:8.868642%;width:28.441944%;z-index:9}
+/* the reel plays itself — nothing to point at, nothing to swipe */
 .resstage[data-page="solo"] .rs-focus{
   display:block;left:52.222222%;top:13.209877%;width:45.833333%;
-  aspect-ratio:660/408;cursor:pointer;touch-action:pan-y;
-  transform-origin:50% 52%;
-  transition:translate var(--rs-base) var(--rs-hover),
-    scale var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
+  aspect-ratio:660/408}
 .resstage[data-page="solo"] .rs-focus .rs-nametag.big{display:none}
 .resstage[data-page="solo"] .rs-save{
   left:80%;top:54.821111%;width:16.736111%}
@@ -2027,28 +1981,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
   justify-content:flex-start;
   font-size:min(4.861111vw,8.641975vh)!important;line-height:.702823}
 
-/* A new still lands like a fresh print instead of silently replacing pixels. */
-.resstage[data-page="solo"] .rs-focus.cycle-prev{
-  --solo-print-x:calc(-1 * min(.7vw,1.25vh));--solo-print-turn:-.7deg}
-.resstage[data-page="solo"] .rs-focus.cycle-next{
-  --solo-print-x:min(.7vw,1.25vh);--solo-print-turn:.7deg}
-.resstage[data-page="solo"] .rs-focus.cycle-auto{
-  --solo-print-x:0px;--solo-print-turn:.32deg}
-.resstage[data-page="solo"] .rs-focus.is-cycling .rs-focus-shots img.on{
-  animation:rsSoloPrintIn 380ms var(--rs-pop)}
-.resstage[data-page="solo"] .rs-focus.is-cycling .rs-focus-frame{
-  animation:rsSoloFrameSlap 360ms var(--rs-pop)}
-@keyframes rsSoloPrintIn{
-  0%{opacity:0;translate:var(--solo-print-x,0) calc(-1 * min(.42vw,.75vh));
-    scale:1.045;rotate:var(--solo-print-turn,0deg);filter:saturate(.9)}
-  58%{opacity:1;translate:0 min(.08vw,.14vh);scale:.995;rotate:0deg}
-  100%{opacity:1;translate:0 0;scale:1;rotate:0deg;filter:none}
-}
-@keyframes rsSoloFrameSlap{
-  0%{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.008}
-  62%{translate:0 min(.09vw,.16vh);scale:.997}
-  100%{translate:0 0;scale:1}
-}
+/* Solo's reel auto-advances like the others — the still cross-fades. */
 
 /* The combined screen assembles in readable beats while the camera remains
    live underneath. All rectangles finish at their authored resting values. */
@@ -2068,16 +2001,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
   to{opacity:1;transform:none}
 }
 
-.resstage[data-page="solo"] .rs-focus:focus-visible{
-  outline:min(.208vw,.37vh) solid #ffc440;
-  outline-offset:calc(-1 * min(.34vw,.6vh))}
-.resstage[data-page="solo"] .rs-focus:active{scale:.994;filter:brightness(.985)}
-
 @media (hover:hover){
-  .resstage[data-page="solo"] .rs-focus:hover{
-    translate:0 calc(-1 * min(.14vw,.25vh));scale:1.006;
-    filter:brightness(1.018)
-      drop-shadow(0 min(.28vw,.5vh) min(.22vw,.39vh) rgba(0,0,0,.18))}
   .resstage[data-page="solo"] .rs-seat:hover{
     translate:0 0;scale:1;filter:brightness(1.018)}
   .resstage[data-page="solo"] .rs-poselist:hover li{
@@ -2089,8 +2013,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
 @media (prefers-reduced-motion:reduce){
   .resstage[data-page="solo"] :is(.rs-board,.rs-scorechip,.rs-focus,.rs-poselist,
     .rs-save,.rs-award,.rs-stat,.rs-rematch),
-  .resstage[data-page="solo"] .rs-focus.is-cycling :is(.rs-focus-frame,.rs-focus-shots img.on){
-    animation:none!important}
+  .resstage[data-page="solo"] .rs-focus-shots img.on{animation:none!important}
   .resstage[data-page="solo"] .rs-focus-shots img{
     transition:none!important}
 }
