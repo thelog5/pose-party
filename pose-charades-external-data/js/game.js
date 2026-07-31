@@ -29,7 +29,7 @@ import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
 import {
   markGuessRecognized,
   prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
-  fitGameplayText,
+  fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
 
@@ -322,6 +322,9 @@ export function gameTick(){
     return;
   }
 
+  /* the shared 180ms recognition impact stops the clock here too, so the
+     hit lands with the same weight it does in Solo */
+  if(impactFrozen($("vsWordCard"))) return;
   const wLeft=Math.max(0,game.wordEnd-performance.now());
   setTxt("pillTime",fmtTime(wLeft));
   setTxt("v1WordTime",fmtTime(wLeft));

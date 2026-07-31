@@ -64,7 +64,6 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 @keyframes swellB{0%,100%{transform:translateX(0) scaleY(1)}50%{transform:translateX(-1.2%) scaleY(1.02)}}
 @keyframes swellC{0%,100%{transform:translateX(0) scaleY(1.01)}50%{transform:translateX(.8%) scaleY(1.025)}}
 .iv.conf:hover{transform:translateY(-7px) rotate(9deg) scale(1.1)}
-.iv.tape:hover{transform:rotate(-7deg) scale(1.06)}
 .iv.boat{animation:boatrock 3.2s ease-in-out infinite;transform-origin:50% 92%}
 @keyframes boatrock{0%,100%{transform:rotate(-4deg) translateY(0)}33%{transform:rotate(2deg) translateY(-9px)}66%{transform:rotate(4deg) translateY(-3px)}}
 
@@ -432,6 +431,32 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   opacity:1;translate:0 calc(-1 * min(.22vw,.39vh));scale:1.018;
   filter:brightness(1.035)}
 .sp-exit:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.208vw,.37vh)}
+
+/* In-match volume. The header is hidden on every play screen, so each stage
+   carries its own — sitting just under the LEAVE paper and wearing the same
+   ghosted treatment, so it is findable without ever competing with the round.
+   Deliberately NOT .pbtn: that helper sets background:none and its own
+   hover/active, both of which fight the solid circle this control needs. */
+.sp-sound{position:absolute;left:2.4%;top:29.8%;width:4.3%;aspect-ratio:1;z-index:7;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--fig-cream);color:var(--fig-blue);
+  border:none;border-radius:50%;padding:0;cursor:pointer;opacity:.14;
+  box-shadow:0 min(.28vw,.5vh) min(.55vw,.98vh) rgba(23,53,111,.35);
+  transition:opacity .18s ease,translate .2s cubic-bezier(.2,1.2,.35,1),
+    scale .2s cubic-bezier(.2,1.2,.35,1),filter .18s ease}
+.sp-sound svg{width:56%;height:56%;display:block;pointer-events:none}
+.sp-sound:hover,.sp-sound:focus-visible{
+  opacity:1;translate:0 calc(-1 * min(.22vw,.39vh));scale:1.06}
+.sp-sound:active{scale:.93;filter:brightness(.96)}
+.sp-sound:focus-visible{outline:min(.208vw,.37vh) solid #fff;
+  outline-offset:min(.208vw,.37vh)}
+/* muted is a state, not a hover — it stays legible so you can see why it is quiet */
+.sp-sound.muted{opacity:.62;background:#f4622e;color:#fff}
+.sp-sound.muted:hover,.sp-sound.muted:focus-visible{opacity:1}
+@media (prefers-reduced-motion:reduce){
+  .sp-sound,.sp-sound:hover,.sp-sound:active{
+    translate:0 0!important;scale:1!important;transition:opacity .18s ease}
+}
 
 /* --- points award (Figma "POINTS AWARD", 898px) --- */
 .sp-award{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%) scale(.6);z-index:95;

@@ -86,7 +86,7 @@
     <div class="hicons" id="hdrIcons">
       <button class="iconbtn" id="btnFriends" title="Friends"><svg><use href="#icoUsers"/></svg><small>FRIENDS</small></button>
       <button class="iconbtn" id="btnSound" title="Volume">
-        <svg id="sndOn"><use href="#icoSpeaker"/></svg><svg id="sndOff" class="hidden"><use href="#icoSpeakerOff"/></svg><small>VOLUME</small>
+        <svg id="sndOn" class="snd-on"><use href="#icoSpeaker"/></svg><svg id="sndOff" class="snd-off hidden"><use href="#icoSpeakerOff"/></svg><small>VOLUME</small>
       </button>
       <button class="iconbtn" id="btnGear" title="Settings & AI training"><svg><use href="#icoGear"/></svg><small>SETTINGS</small></button>
     </div>
@@ -175,8 +175,8 @@
       <div class="pp-corner left">
         <button class="pp-circle" id="btnHomeGear" title="Settings & AI training"><svg><use href="#icoGear"/></svg></button>
         <button class="pp-circle" id="btnHomeSound" title="Volume">
-          <svg id="homeSndOn"><use href="#icoSpeaker"/></svg>
-          <svg id="homeSndOff" class="hidden"><use href="#icoSpeakerOff"/></svg>
+          <svg id="homeSndOn" class="snd-on"><use href="#icoSpeaker"/></svg>
+          <svg id="homeSndOff" class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
         </button>
       </div>
     </div>
@@ -271,6 +271,12 @@
               title="Skip word (costs 250 points)"
               aria-label="Skip word; costs 250 points">
         <img class="sp-art" src="assets/ui/figma/sp-skip-action.png" alt="">
+      </button>
+      <!-- the header (and its volume control) is hidden during a round,
+           so each stage carries its own, ghosted like the LEAVE paper -->
+      <button class="sp-sound" id="btnSoloSound" title="Mute" aria-label="Mute sound">
+        <svg class="snd-on"><use href="#icoSpeaker"/></svg>
+        <svg class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
       </button>
       <button class="sp-exit pbtn" id="btnExitSolo"
               title="Leave game" aria-label="Leave game">
@@ -507,8 +513,17 @@
         <span class="aw-lbl">POINTS!</span>
       </div>
 
+      <!-- the win wash covers the whole split, not just your camera -->
+      <div class="sp-flash" id="matchFlash"></div>
+
       <!-- same ghosted LEAVE paper Solo uses: near-invisible until you go
            looking for it, so it never competes with the round -->
+      <!-- the header (and its volume control) is hidden during a round,
+           so each stage carries its own, ghosted like the LEAVE paper -->
+      <button class="sp-sound" id="btnMatchSound" title="Mute" aria-label="Mute sound">
+        <svg class="snd-on"><use href="#icoSpeaker"/></svg>
+        <svg class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
+      </button>
       <button class="sp-exit pbtn" id="btnExitMatch"
               title="Leave the match" aria-label="Leave the match">
         <img src="assets/ui/figma/sp-leave.png" alt="">
@@ -648,6 +663,14 @@
         <span class="aw-lbl" id="pmAwardLabel">POINTS!</span>
       </div>
 
+      <div class="sp-flash" id="pmFlash"></div>
+
+      <!-- the header (and its volume control) is hidden during a round,
+           so each stage carries its own, ghosted like the LEAVE paper -->
+      <button class="sp-sound" id="btnPartySound" title="Mute" aria-label="Mute sound">
+        <svg class="snd-on"><use href="#icoSpeaker"/></svg>
+        <svg class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
+      </button>
       <button class="sp-exit pbtn" id="btnExitParty"
               title="Leave the party" aria-label="Leave the party">
         <img src="assets/ui/figma/sp-leave.png" alt="">

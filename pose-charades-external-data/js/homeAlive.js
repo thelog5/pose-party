@@ -102,9 +102,13 @@ function spinConfettiWhenHomeIsReady(){
 
   const observer = new MutationObserver(()=>{
     if(status.style.display !== "none") return;
-    observer.disconnect();
+    stop();
     if(document.body.dataset.screen === "home") revealHome();
   });
+  /* If boot never finishes — no camera, no model — the status never hides and
+     this used to observe for the life of the session. Give it a deadline. */
+  const give_up = setTimeout(stop, 60000);
+  function stop(){ clearTimeout(give_up); observer.disconnect(); }
   observer.observe(status, { attributes:true, attributeFilter:["style"] });
 }
 
@@ -112,13 +116,15 @@ export function wireHomeAlive(){
   $("speechBubble").onclick = cyclePhrase;
   $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
   $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
-  document.querySelectorAll("#homeStage .iv:not(.wave)").forEach(el => {
-    el.addEventListener("click", () => react(el));
-  });
   /* Tape is visual hardware, not a separate control. During the entrance it
      travels on a different path from its card and can temporarily sit over
      the card's centre; letting it take pointer events makes a deliberate
-     card click disappear into decoration. */
+     card click disappear into decoration. It is therefore excluded from the
+     click wiring too — it used to be listed here and then given
+     pointer-events:none two lines later, so the listener could never fire. */
+  document.querySelectorAll("#homeStage .iv:not(.wave):not(.tape)").forEach(el => {
+    el.addEventListener("click", () => react(el));
+  });
   document.querySelectorAll("#homeStage .tape").forEach(el => {
     el.style.pointerEvents = "none";
   });

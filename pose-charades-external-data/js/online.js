@@ -18,14 +18,14 @@
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
-import { toast, flash, fmtTime, fmtScore, fitMatchPaperText,
+import { toast, fmtTime, fmtScore, fitMatchPaperText,
          renderRemoteMatchGuess, setCountdown, showTimesUp,
          stopMatchFill } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
-import { showPointsAward, confettiFrom, flyPoints } from "./soloRound.js";
+import { showPointsAward, confettiFrom, flyPoints, greenFlash } from "./soloRound.js";
 import { THRESH } from "./constants.js";
 import {
   markGuessRecognized,
@@ -598,7 +598,7 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
                matchLimitMs:Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
                  settings.matchSecs*1000,
                wordEnd:0, wordStart:0, wordLimitMs:settings.wordSecs*1000,
-               holdSince:0, score:0, rivalScore:0, streak:0,
+               holdSince:0, score:0, rivalScore:0,
                results:[], roundId:null, claimed:false, bestWrong:{},
                roundPhase:"waiting", firstId:null, firstPoints:0,
                suddenDeath:false };
@@ -610,7 +610,6 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
      already won, apparently already solved. */
   clearMatchBoard();
   $("pillScore").textContent="0";
-  $("pillStreak").textContent="x1";
   /* time-based mode: the round pill becomes the match clock */
   document.querySelector(".statpill.round .lab").textContent="Match";
   const initialMatchLeft=Math.min(state.game.matchLimitMs,
@@ -731,7 +730,8 @@ function playLocalMatchLock(points){
     threshold:THRESH,
     onImpact:()=>{
       showMatchAward("you",points);
-      flash("good");
+      /* the wash covers the whole split — flash() is bounded by #cameraDock */
+      greenFlash(card);
       blip([523,659,784]);
       /* Solo's signature beat, now shared: the points physically travel to
          your card, and the number only moves when they land. The server is
@@ -822,31 +822,25 @@ function onRoundResult({
     }
   }
   if(iWasFirst){
-    game.streak++;
     game.results.push({word, ok:true, pts:firstPoints, rivalPts:chaserPoints, first:true});
     if(caught) showMatchAward("rival", chaserPoints);
     blip(caught?[523,659]:[523,659,784]);
   }else if(iWasChaser && caught){
-    game.streak++;
     game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true});
     playLocalMatchLock(chaserPoints);
   }else if(winnerId){
-    game.streak=0;
     game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
     /* The rival's award paper already says exactly this, in the paper-craft
        language the rest of the game speaks — the old square burst card was
        the last piece of the pre-Figma HUD still showing during a match. */
     showMatchAward("rival", firstPoints);
-    flash("bad"); blip([330,247]);
+    blip([330,247]);
   }else{
-    game.streak=0;
     game.results.push({word, ok:false, timeout:true});
     showTimesUp();
-    flash("bad");
   }
   const localSucceeded=iWasFirst || (caught&&iWasChaser);
   if(!localSucceeded) playWordMissFeedback($("vsWordCard"),THRESH);
-  $("pillStreak").textContent="x"+Math.max(1,game.streak);
   const stage=$("matchStage");
   if(stage){
     stage.dataset.phase="between";

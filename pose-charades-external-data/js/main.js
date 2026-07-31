@@ -4,6 +4,7 @@ import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { STARTERS } from "./constants.js";
 import { toast, renderClasses, setDatasetEditedHandler } from "./ui.js";
+import { blip } from "./audio.js";
 import { startRecording } from "./capture.js";
 import { train } from "./training.js";
 import { exportData, importData, preloadBundledDataset } from "./data.js";
@@ -31,15 +32,26 @@ function wireControls(){
   $("btnGear").onclick=()=>transition(gameState()==="training"?"menu":"training");
   $("btnDoneTrain").onclick=()=>transition("menu");
   $("btnFriends").onclick=()=>toast("Friends lists are coming soon — share a room link to play together!");
+  /* Class-driven so every screen's volume control stays in sync — the header,
+     Home, and one per play stage (the header is hidden during a round). */
   const toggleMute=()=>{
     state.muted=!state.muted;
-    for(const [on,off] of [["sndOn","sndOff"],["homeSndOn","homeSndOff"]]){
-      $(on).classList.toggle("hidden",state.muted);
-      $(off).classList.toggle("hidden",!state.muted);
+    for(const el of document.querySelectorAll(".snd-on"))
+      el.classList.toggle("hidden",state.muted);
+    for(const el of document.querySelectorAll(".snd-off"))
+      el.classList.toggle("hidden",!state.muted);
+    for(const el of document.querySelectorAll(".sp-sound")){
+      el.classList.toggle("muted",state.muted);
+      el.setAttribute("aria-label",state.muted?"Unmute sound":"Mute sound");
+      el.title=state.muted?"Unmute":"Mute";
     }
+    /* blip() is silent while muted, so this only ever sounds on UNmute —
+       which is exactly the confirmation you want: proof audio works. */
+    blip([523,784],.05);
   };
-  $("btnSound").onclick=toggleMute;
-  $("btnHomeSound").onclick=toggleMute;
+  for(const id of ["btnSound","btnHomeSound",
+                   "btnSoloSound","btnMatchSound","btnPartySound"])
+    $(id).onclick=toggleMute;
 
   /* home (Figma v2): SOLO card -> solo, 1V1 -> lobby, PARTY -> party room */
   $("modeAI").onclick=()=>startGame("ai");

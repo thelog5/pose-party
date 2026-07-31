@@ -183,6 +183,14 @@ export function playWordLockFeedback({
   else commit();
 }
 
+/* True while a word card is inside its recognition-impact beat. Solo froze
+   its clocks here through its own state machine; 1v1 and Party kept counting
+   through the same 180ms, so the identical impact read as weightless in two
+   of the three modes. This is the shared hook. */
+export function impactFrozen(card){
+  return !!card?._recognitionImpactTimer;
+}
+
 export function playWordMissFeedback(card, threshold){
   if(!card) return;
   clearTimeout(card._recognitionImpactTimer);

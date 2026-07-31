@@ -20,7 +20,8 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
-import { AWARD_MS, showPointsAward, confettiFrom, flyPoints } from "./soloRound.js";
+import { AWARD_MS, showPointsAward, confettiFrom, flyPoints,
+         greenFlash } from "./soloRound.js";
 import {
   RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
   advanceRecognitionFill,
@@ -28,7 +29,7 @@ import {
   restartFeedbackAnimation, markGuessRecognized,
   setWordRecognitionMotion, prepareWordFeedback, playWordLockFeedback,
   playWordMissFeedback,
-  fitGameplayText,
+  fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
 import { captureShot, showResults, setRematchState } from "./results.js";
 
@@ -272,6 +273,7 @@ export function onPartyGot({ id, place } = {}){
         const live = state.game;
         if(!live || live.mode !== "party" || live.roundId !== roundId) return;
         showPartyPlacement(place);
+        greenFlash(card);
         confettiFrom(card);
         blip([523, 659, 784], .08);
         /* the same physical hand-off Solo and 1v1 use: points travel from
@@ -396,6 +398,8 @@ function frame(){
 function tick(){
   const g = state.game;
   if(!g || g.mode !== "party") return;
+  /* the shared 180ms recognition impact stops the clocks, as it does in Solo */
+  if(impactFrozen($("pmWordCard"))) return;
   const now = performance.now();
   setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
     g.matchLimitMs || Infinity,

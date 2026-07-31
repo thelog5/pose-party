@@ -170,7 +170,7 @@ function beginLock(){
     onImpact: () => {
       if(rstate !== "hitstop") return;
       setState("locked");
-      greenFlash();
+      greenFlash(card);
       confettiFrom(card);
       showAward();
       blip([523, 659, 784, 1047], 0.08);
@@ -179,8 +179,13 @@ function beginLock(){
   });
 }
 
-function greenFlash(){
-  const f = el("soloFlash");
+/* The green win wash, on whichever stage the word card belongs to. It used
+   to be Solo-only: 1v1 fired ui.js's flash(), which lives INSIDE #cameraDock
+   and so tinted just the local half of the split, and Party fired nothing at
+   all. Same lookup confettiFrom uses, so the two always land together. */
+export function greenFlash(node){
+  const stage = node?.closest(".solostage,.matchstage,.pmstage");
+  const f = stage?.querySelector(".sp-flash");
   if(!f) return;
   f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
 }
