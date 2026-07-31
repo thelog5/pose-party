@@ -196,9 +196,34 @@ try {
   ok(fin["Alice"] === fin["Bobscript"], `sudden death preserves tied point totals (${JSON.stringify(fin)})`);
   ok(endPayload.winnerId === A.id && endPayload.suddenDeath === true, "match winner is the sudden-death first recognizer");
 
+  console.log("1v1 same-room rematch:");
+  ok(endPayload.rematch?.ready === 0 && endPayload.rematch?.total === 2,
+    `match:end opens the shared ready tally (${JSON.stringify(endPayload.rematch)})`);
+  const firstVoteSeen = once(B, "match:rematch");
+  r = await emit(A, "match:rematch", {});
+  const firstVote = await firstVoteSeen;
+  ok(r.ok === true && r.ready === 1 && r.mine === true &&
+    firstVote.ready === 1 && firstVote.voters.includes(A.id),
+    "one player can ready up and both clients receive the voter state");
+  r = await emit(A, "match:rematch", {});
+  ok(r.ok === true && r.ready === 0 && r.mine === false,
+    "the 1v1 rematch vote is an undoable toggle");
+
+  const rematchStartA = once(A, "match:start");
+  const rematchStartB = once(B, "match:start");
+  await emit(A, "match:rematch", {});
+  r = await emit(B, "match:rematch", {});
+  const [rematchPayloadA, rematchPayloadB] =
+    await Promise.all([rematchStartA, rematchStartB]);
+  ok(r.started === true &&
+    rematchPayloadA.players.every(p => p.score === 0) &&
+    rematchPayloadB.players.every(p => p.score === 0),
+    "2/2 ready restarts the SAME 1v1 room with clean scores");
+
   console.log("signaling:");
-  // room is destroyed after match end — signaling should fail now
-  r = await emit(A, "rtc:signal", { data: { type: "offer" } });
+  // End the restarted room membership before the independent signaling case.
+  await emit(A, "room:leave", {});
+  r = await emit(B, "rtc:signal", { data: { type: "offer" } });
   ok(!!r.error, `signal outside room rejected (${r.error})`);
 
   // fresh room for signaling + disconnect tests

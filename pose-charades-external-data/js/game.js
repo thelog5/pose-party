@@ -15,7 +15,7 @@ import { state } from "./state.js";
 import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
 import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore,
-         localMatchGuessIs, setCountdown } from "./ui.js";
+         localMatchGuessIs, setCountdown, showTimesUp } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
@@ -249,6 +249,7 @@ function finishWord(winner, opts={}){
     game.streak=0;
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
     const missMsg = opts.skip ? "Skipped" : "Time up";
+    if(!opts.skip) showTimesUp();
     pointBurst(missMsg, opts.skip ? "−"+PTS_SKIP+" points" : "Next word coming up", "bad");
     playWordMissFeedback($("vsWordCard"),THRESH);
     flash("bad");

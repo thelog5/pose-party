@@ -23,6 +23,7 @@
 import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { blip } from "./audio.js";
+import { showTimesUp } from "./ui.js";
 import { SOLO } from "./constants.js";
 import { calculateFirstPoints } from "./scoring.js";
 import {
@@ -309,7 +310,9 @@ export function failRound(skipped){
   if(rstate !== "guessing") return false;
   setState("round_end");
   playWordMissFeedback(el("soloWordCard"), LOCK_THRESHOLD);
-  blip(skipped ? [294, 220] : [220, 165]);
+  /* a skip is a choice; running out of time is the beat that needs the paper */
+  if(skipped) blip([294, 220]);
+  else showTimesUp();
   if(resolveCb) resolveCb({ won: false, skip: !!skipped });
   return true;
 }

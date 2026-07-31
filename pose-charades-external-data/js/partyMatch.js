@@ -15,7 +15,7 @@
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
-import { fmtTime, fmtScore, setCountdown } from "./ui.js";
+import { fmtTime, fmtScore, setCountdown, showTimesUp } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
@@ -310,6 +310,8 @@ export function onPartyResult(payload){
   }
 
   const mine = (payload.results || []).find(r => r.id === ctx.myId);
+  /* everyone else landed it and the window shut on you */
+  if(!mine) showTimesUp();
   if(mine){
     setTxt("pmAwardTitle", "GOT IT " + (ORDINALS[mine.place] || "") + "!");
     setTxt("pmAwardLabel", "POINTS!");

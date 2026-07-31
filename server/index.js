@@ -141,6 +141,14 @@ io.on("connection", socket => {
     cb(res);
   });
 
+  socket.on("match:rematch", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    const res = store.matchRematch(socket.id);
+    if(res.started) log(`1v1 rematch started by ${socket.id.slice(0,6)}`);
+    cb(res);
+  });
+
   socket.on("round:claim", (payload, cb) => {
     cb = ack(cb);
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });

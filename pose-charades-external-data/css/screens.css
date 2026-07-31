@@ -1653,50 +1653,219 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-mode="1v1"] [data-seat="orange1"],
 .resstage[data-mode="1v1"] [data-seat="orange2"]{display:none}
 .resstage[data-mode="1v1"] [data-seat="blue0"]{
-  left:0;top:0;width:48.33%;height:100%;aspect-ratio:auto;rotate:0deg}
+  left:0;top:0;width:48.333333%;height:100%;aspect-ratio:auto;rotate:0deg}
 .resstage[data-mode="1v1"] [data-seat="orange0"]{
-  left:50.14%;top:0;width:49.86%;height:100%;aspect-ratio:auto;rotate:0deg}
+  left:50.138889%;top:0;width:49.861111%;height:100%;aspect-ratio:auto;rotate:0deg}
 /* full-bleed halves carry no torn frame — the divider does that job */
 .resstage[data-mode="1v1"] .rs-seat .rs-border{display:none}
 .resstage[data-mode="1v1"] .rs-seat .slot{inset:0;border-radius:0}
 .resstage[data-mode="1v1"] [data-seat="blue0"] .rs-nametag{
-  left:1.43%;top:17.28%;width:24.17%;rotate:10.3deg}
+  left:1.982136%;top:18.996299%;width:23.079936%;height:7.037037%;
+  rotate:-10.275430deg}
 .resstage[data-mode="1v1"] [data-seat="orange0"] .rs-nametag{
-  left:auto;right:.67%;top:15.80%;width:23.44%;rotate:-11.4deg}
+  left:75.689604%;right:auto;top:17.715029%;width:22.493036%;height:6.296296%;
+  rotate:11.426281deg}
+.resstage[data-mode="1v1"] .rs-nametag{
+  --tag-text-rot:0deg;--tag-font:20.886cqw;--tag-shadow:1.290cqw}
 .resstage[data-mode="1v1"] [data-seat="blue0"] .rs-ready{
-  left:28.45%;right:auto;top:17.53%;bottom:auto;width:23.88%}
+  left:28.479900%;right:auto;top:17.604917%;bottom:auto;
+  width:23.811715%;height:7.571972%;aspect-ratio:auto;rotate:.415306deg}
 .resstage[data-mode="1v1"] [data-seat="orange0"] .rs-ready{
-  left:4%;right:auto;top:17.53%;bottom:auto;width:23%}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-board{left:26.67%;top:2.22%}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-scorechip{left:35.22%;top:11.09%}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-rematch{left:24.24%;top:74.81%;width:51.50%}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-breakdown{left:32.01%;top:85.52%}
+  left:49.334%;right:auto;top:17.604917%;bottom:auto;
+  width:23.811715%;height:7.571972%;aspect-ratio:auto;rotate:-.415306deg}
+.resstage[data-mode="1v1"] .rs-seat.ready .rs-ready{scale:1}
+.resstage[data-mode="1v1"][data-page="stage"]{
+  background:#0e1b4a}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-bg,
+.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-score{display:none}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-title{
+  left:.886856%;top:.545889%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-logo-yellow{
+  left:.001323%;top:-.740741%;width:5.038125%;height:8.532716%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-logo-cream{
+  left:11.205817%;top:9.355061%;width:4.428403%;height:6.602840%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-exit{
+  left:85.556878%;top:2.622372%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-board{
+  left:26.666667%;top:2.222222%;width:45.555560%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-scorechip{
+  left:35.223490%;top:11.090856%;width:28.441912%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-rematch{
+  left:24.236111%;top:74.814815%;width:51.498371%}
+.resstage[data-mode="1v1"] .rs-rematch.mine{scale:1}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-rematch-stage{
+  left:46.041667%;top:71.728395%;width:8.263889%;height:6.049383%}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-breakdown{
+  left:32.005412%;top:85.522401%;width:34.284729%}
 /* the 1v1 divider is the solid centre paper, not the two-tone team strip */
 .resstage[data-mode="1v1"] .rs-divider,
-.resstage[data-mode="solo"] .rs-divider{left:48.33%;top:-19.75%;width:1.81%;height:139.51%}
+.resstage[data-mode="solo"] .rs-divider{
+  left:48.333333%;top:-19.753086%;width:1.805556%;height:139.506173%}
+
+@media (hover:hover){
+  .resstage[data-mode="1v1"][data-page="stage"] .rs-seat:hover{
+    translate:0 0;scale:1;filter:none}
+}
 
 /* ---- 1v1 BREAKDOWN: both players side by side, no thumbnails ---- */
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-strip,
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-arrow,
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-divider{display:none}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-bg{
+  left:-.972222%;top:-1.234568%;width:102.083333%;height:102.345679%}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-tape-score{
+  display:block;left:22.77552%;top:-9.60748%;width:14.65636%;height:21.66449%}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus{
-  left:.90%;top:16.67%;width:49.24%;aspect-ratio:1.312}
+  left:.902778%;top:16.666667%;width:49.236111%;height:66.790123%;
+  aspect-ratio:auto}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.b{
-  display:block;left:50.14%;top:16.91%;width:49.44%;aspect-ratio:1.310}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-award{left:0;top:65.56%;width:15.37%}
+  display:block;left:50.138889%;top:16.913580%;width:49.444444%;height:67.037037%;
+  aspect-ratio:auto}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus-shots{
+  background:transparent}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-empty{opacity:0}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-award{
+  left:.417478%;top:66.841084%;width:14.536426%;aspect-ratio:1.637555}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-award.b{
-  display:block;left:49.72%;top:65.56%;width:15.37%}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat1{left:14.98%;top:70.86%;width:11.15%}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat2{left:26.10%;top:71.57%;width:11.01%}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat3{left:37.15%;top:71.83%;width:10.89%}
+  display:block;left:50.139700%;top:66.841084%;width:14.536426%;
+  aspect-ratio:1.637555}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat1{
+  left:14.977620%;top:70.858410%;width:11.945771%;height:9.463232%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:1.300006%;--paper-y:7.580578%;--paper-w:90.730899%;--paper-h:84.839117%;
+  --paper-rot:-4.338747deg;--text-rot:-2.980198deg;--text-x:.55cqw}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat2{
+  left:26.095412%;top:71.566961%;width:12.133421%;height:8.791611%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:.686880%;--paper-y:4.207177%;--paper-w:89.327694%;--paper-h:91.320258%;
+  --paper-rot:2.218150deg;--text-rot:1.573755deg;--text-x:2.21cqw}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStat3{
+  left:37.150489%;top:71.831597%;width:11.895248%;height:8.328029%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:.205541%;--paper-y:1.266997%;--paper-w:91.116266%;--paper-h:96.403644%;
+  --paper-rot:-.628684deg;--text-rot:.345125deg;--text-x:-1.66cqw}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-stat.b{display:block}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB1{left:64.70%;top:70.86%;width:11.15%}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB2{left:75.82%;top:71.57%;width:11.01%}
-.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB3{left:86.87%;top:71.83%;width:10.89%}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB1{
+  left:64.699843%;top:70.858410%;width:11.945771%;height:9.463232%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:1.300006%;--paper-y:7.580578%;--paper-w:90.730899%;--paper-h:84.839117%;
+  --paper-rot:-4.338747deg;--text-rot:-2.980198deg;--text-x:.55cqw}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB2{
+  left:75.817634%;top:71.566961%;width:12.133421%;height:8.791611%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:.686880%;--paper-y:4.207177%;--paper-w:89.327694%;--paper-h:91.320258%;
+  --paper-rot:2.218150deg;--text-rot:1.573755deg;--text-x:2.21cqw}
+.resstage[data-mode="1v1"][data-page="breakdown"] #rsStatB3{
+  left:86.872711%;top:71.831597%;width:11.895248%;height:8.328029%;
+  aspect-ratio:auto;rotate:0deg;
+  --paper-x:.205541%;--paper-y:1.266997%;--paper-w:91.116266%;--paper-h:96.403644%;
+  --paper-rot:-.628684deg;--text-rot:.345125deg;--text-x:-1.66cqw}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-stat img{
+  position:absolute;left:var(--paper-x);top:var(--paper-y);
+  width:var(--paper-w);height:var(--paper-h);rotate:var(--paper-rot)}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-stat b{
+  rotate:var(--text-rot);
+  font-size:min(2.837715vw,5.044828vh);
+  text-shadow:min(.218286vw,.388064vh) min(.218286vw,.388064vh) 0 rgba(255,255,255,.9)}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus .rs-nametag.big{
-  left:.27%;top:1.9%;width:28.2%}
+  left:-.903083%;top:3.286887%;width:27.481468%;height:12.779678%;
+  rotate:-5.258087deg}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.b .rs-nametag.big{
-  left:auto;right:.5%;top:-.8%;width:26.2%;rotate:-11.7deg}
+  left:75.403215%;right:auto;top:2.496894%;width:25.135995%;height:10.408158%;
+  rotate:11.699311deg}
+
+/* Each side is its own physical stack of prints. Interaction never promotes
+   one side over the other; the equal two-panel composition remains authored. */
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus[data-1v1-carousel]{
+  cursor:pointer;touch-action:pan-y;outline:none;transform-origin:50% 52%;
+  transition:translate var(--rs-base) var(--rs-hover),
+    scale var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-prev{
+  --v1-print-x:calc(-1 * min(.7vw,1.25vh));--v1-print-turn:-.7deg}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-next{
+  --v1-print-x:min(.7vw,1.25vh);--v1-print-turn:.7deg}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.cycle-auto{
+  --v1-print-x:0px;--v1-print-turn:.32deg}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-shots img.on{
+  animation:rs1v1PrintIn 380ms var(--rs-pop)}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-frame{
+  animation:rs1v1FrameSlap 360ms var(--rs-pop)}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus:focus-visible{
+  outline:min(.208vw,.37vh) solid #ffc440;
+  outline-offset:calc(-1 * min(.34vw,.6vh))}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus:active{
+  scale:.994;filter:brightness(.985)}
+@keyframes rs1v1PrintIn{
+  0%{opacity:0;translate:var(--v1-print-x,0) calc(-1 * min(.42vw,.75vh));
+    scale:1.045;rotate:var(--v1-print-turn,0deg);filter:saturate(.9)}
+  58%{opacity:1;translate:0 min(.08vw,.14vh);scale:.995;rotate:0deg}
+  100%{opacity:1;translate:0 0;scale:1;rotate:0deg;filter:none}
+}
+@keyframes rs1v1FrameSlap{
+  0%{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.008}
+  62%{translate:0 min(.09vw,.16vh);scale:.997}
+  100%{translate:0 0;scale:1}
+}
+
+/* Party uses the same tactile photo beat without moving or promoting the
+   selected player card. The paper frame stays put while the new print lands. */
+.resstage[data-mode="party"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-shots img.on{
+  animation:rs1v1PrintIn 380ms var(--rs-pop)}
+.resstage[data-mode="party"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-frame{
+  animation:rs1v1FrameSlap 360ms var(--rs-pop)}
+
+/* A restrained, one-time assembly beat. Stable parent nodes carry these
+   animations, so READY votes and photo changes do not replay the entrance. */
+.resstage[data-mode="1v1"][data-page="stage"]
+  :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,.rs-exit,.rs-board,.rs-scorechip){
+  animation:rs1v1PaperIn 320ms 30ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="stage"] :is(.rs-divider,.rs-seat){
+  animation:rs1v1PaperIn 360ms 90ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-rematch>*,
+.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-rematch-stage{
+  animation:rs1v1PaperIn 340ms 170ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="stage"] .rs-breakdown{
+  animation:rs1v1PaperIn 320ms 230ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="breakdown"]
+  :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,.rs-exit,.rs-board,.rs-tape-score){
+  animation:rs1v1PaperIn 320ms 30ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus{
+  animation:rs1v1PaperIn 360ms 90ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="breakdown"] :is(.rs-award,.rs-stat){
+  animation:rs1v1PaperIn 350ms 150ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-rematch>*,
+.resstage[data-mode="1v1"][data-page="breakdown"] .rs-tape-rematch-breakdown{
+  animation:rs1v1PaperIn 340ms 210ms var(--rs-pop) both}
+.resstage[data-mode="1v1"][data-page="breakdown"] :is(.rs-back,.rs-save){
+  animation:rs1v1PaperIn 320ms 260ms var(--rs-pop) both}
+@keyframes rs1v1PaperIn{
+  from{opacity:0;transform:translateY(min(.7vw,1.24vh)) scale(.978)}
+  70%{opacity:1;transform:translateY(calc(-1 * min(.07vw,.12vh))) scale(1.003)}
+  to{opacity:1;transform:none}
+}
+
+@media (hover:hover){
+  .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus[data-1v1-carousel]:hover{
+    translate:0 calc(-1 * min(.14vw,.25vh));scale:1.006;
+    filter:brightness(1.018)
+      drop-shadow(0 min(.28vw,.5vh) min(.22vw,.39vh) rgba(0,0,0,.18))}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .resstage[data-mode="1v1"] :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,
+    .rs-exit,.rs-board,.rs-scorechip,.rs-divider,.rs-seat,.rs-tape-rematch-stage,
+    .rs-tape-rematch-breakdown,.rs-breakdown,.rs-focus,.rs-award,.rs-stat,.rs-back,.rs-save),
+  .resstage[data-mode="1v1"] .rs-rematch>*,
+  .resstage[data-mode="1v1"] .rs-focus.is-cycling
+    :is(.rs-focus-frame,.rs-focus-shots img.on){
+    animation:none!important}
+  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel],
+  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel]:hover,
+  .resstage[data-mode="1v1"] .rs-focus[data-1v1-carousel]:active{
+    translate:0 0!important;scale:1!important;filter:none!important;
+    transition:none!important}
+  .resstage[data-mode="1v1"] .rs-focus-shots img{transition:none!important}
+}
 
 /* the mirrored set only exists for 1v1 */
 .rs-focus.b,.rs-award.b,.rs-stat.b{display:none}
@@ -1714,50 +1883,222 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-page="solo"] [data-seat="orange0"],
 .resstage[data-page="solo"] [data-seat="orange1"],
 .resstage[data-page="solo"] [data-seat="orange2"]{display:none}
-/* the paper wallpaper covers only the right half; your camera is the left */
-.resstage[data-page="solo"] .rs-bg{left:49.38%;top:0;width:50.62%;height:100%}
+/* Figma places a full-width Home paper at x=711 and clips it at the stage
+   edge. Keeping that source width preserves the texture scale on the right. */
+.resstage[data-page="solo"] .rs-bg{
+  left:49.375%;top:0;width:99.930556%;height:100%}
+.resstage[data-page="solo"] .rs-title{
+  left:.879203%;top:.567149%}
+.resstage[data-page="solo"] .rs-tape-logo-yellow{
+  left:0;top:-.740741%;width:5.038125%;height:8.532716%}
+.resstage[data-page="solo"] .rs-tape-logo-cream{
+  left:11.205833%;top:9.355062%;width:4.428403%;height:6.602840%}
+.resstage[data-page="solo"] .rs-exit{
+  left:85.556875%;top:2.622346%;width:18.333333%;height:10.793925%}
+.resstage[data-page="solo"] .rs-tape-score{display:none}
+.resstage[data-page="solo"] .rs-tape-focus{display:none}
 .resstage[data-page="solo"] [data-seat="blue0"]{
   left:0;top:0;width:48.33%;height:100%;aspect-ratio:auto;rotate:0deg}
 .resstage[data-page="solo"] .rs-seat .rs-border{display:none}
 .resstage[data-page="solo"] .rs-seat .slot{inset:0;border-radius:0}
 .resstage[data-page="solo"] .rs-seat .rs-ready{display:none}
 .resstage[data-page="solo"] [data-seat="blue0"] .rs-nametag{
-  left:.29%;top:18.52%;width:24.21%;rotate:10.9deg}
-.resstage[data-page="solo"] .rs-board{left:32.22%;top:0;width:35.56%}
-.resstage[data-page="solo"] .rs-scorechip{left:35.15%;top:8.87%;width:28.44%}
+  left:.852961%;top:20.327595%;width:23.080%;height:7.037037%;
+  rotate:-10.884041deg;
+  --tag-text-rot:0deg;--tag-font:20.886cqw;--tag-shadow:1.290cqw;
+  --tag-fx:2.632cqw}
+.resstage[data-page="solo"] .rs-board{
+  left:32.222222%;top:0;width:35.555556%;z-index:9}
+.resstage[data-page="solo"] .rs-scorechip{
+  left:35.154028%;top:8.868642%;width:28.441944%;z-index:10}
 .resstage[data-page="solo"] .rs-focus{
-  display:block;left:52.22%;top:13.21%;width:45.83%;aspect-ratio:1.575}
+  display:block;left:52.222222%;top:13.209877%;width:45.833333%;
+  aspect-ratio:660/408;cursor:pointer;touch-action:pan-y;
+  transform-origin:50% 52%;
+  transition:translate var(--rs-base) var(--rs-hover),
+    scale var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
 .resstage[data-page="solo"] .rs-focus .rs-nametag.big{display:none}
-.resstage[data-page="solo"] .rs-save{left:80.00%;top:54.82%;width:16.74%}
-.resstage[data-page="solo"] .rs-award{left:-.35%;top:79.63%;width:15.54%}
-.resstage[data-page="solo"] #rsStat1{left:14.79%;top:84.99%;width:11.27%}
-.resstage[data-page="solo"] #rsStat2{left:26.03%;top:85.71%;width:11.13%}
-.resstage[data-page="solo"] #rsStat3{left:37.21%;top:85.97%;width:11.01%}
-.resstage[data-page="solo"] .rs-rematch{left:51.53%;top:85.56%;width:47.12%;rotate:.3deg}
+.resstage[data-page="solo"] .rs-save{
+  left:80%;top:54.821111%;width:16.736111%}
+.resstage[data-page="solo"] .rs-award{
+  left:.074831%;top:80.929274%;width:14.695762%;aspect-ratio:1.637555}
+.resstage[data-page="solo"] #rsStat1{
+  left:14.951580%;top:85.715836%;width:10.957326%}
+.resstage[data-page="solo"] #rsStat2{
+  left:26.118485%;top:86.080971%;width:10.957336%}
+.resstage[data-page="solo"] #rsStat3{
+  left:37.235204%;top:86.081193%;width:10.957301%}
+.resstage[data-page="solo"] .rs-stat b{
+  font-size:min(2.86882vw,5.10012vh);
+  text-shadow:min(.22068vw,.39232vh) min(.22068vw,.39232vh) 0 rgba(255,255,255,.9)}
+.resstage[data-page="solo"] .rs-rematch{
+  left:51.548379%;top:85.809114%;width:47.083312%;rotate:-.347283deg}
+.resstage[data-page="solo"] .rs-rematch img{aspect-ratio:6.784044}
 .resstage[data-page="solo"] .rs-tape-rematch-breakdown{display:none}
-.resstage[data-page="solo"] .rs-tape-rematch-stage{left:49.75%;top:83.69%;width:7.24%;rotate:15.3deg}
+.resstage[data-page="solo"] .rs-tape-rematch-stage{
+  left:50%;top:85.185134%;width:6.750820%;height:4.941777%;
+  rotate:-15.253273deg}
 
 /* every pose of the run and what it paid */
 /* Figma fits exactly five rows a column between the frame and REMATCH, so the
    block is height-capped and the type shrinks to stay inside it. */
-.rs-poselist{position:absolute;left:54.37%;top:66.05%;width:39.59%;height:17.90%;z-index:7;
-  display:grid;grid-template-columns:1fr 1fr;gap:0 4.2%;pointer-events:none}
-.rs-posecol{list-style:none;margin:0;padding:0;overflow:hidden}
-.rs-posecol li{display:flex;align-items:baseline;gap:.34em;white-space:nowrap;
+.resstage[data-page="solo"] .rs-poselist{
+  position:absolute;left:54.375%;top:66.049383%;width:39.583333%;height:17.901235%;z-index:7;
+  display:grid;grid-template-columns:44.912281% 44.912281%;column-gap:10.175438%;
+  pointer-events:auto}
+.resstage[data-page="solo"] .rs-posecol{
+  list-style:none;margin:0;padding:0;overflow:visible}
+.resstage[data-page="solo"] .rs-posecol li{
+  display:flex;align-items:baseline;gap:.34em;white-space:nowrap;
   font-family:var(--f-lobby);font-weight:400;color:#17356f;
-  font-size:calc(min(1.9vw,3.38vh) * var(--pl-fs,1));line-height:1.16}
-.rs-posecol .pl-word{overflow:hidden;text-overflow:ellipsis}
-.rs-posecol .pl-dash{opacity:.7}
-.rs-posecol .pl-pts.got{color:#1b7532}
-.rs-posecol .pl-pts.missed{color:#c0271b}
-.rs-posecol .pl-empty{opacity:.6}
+  font-size:calc(min(1.905285vw,3.387174vh) * var(--pl-row-fs,1));
+  line-height:1.093449;letter-spacing:.01em;
+  text-shadow:min(.073280vw,.130276vh) min(.073280vw,.130276vh) 0 rgba(255,255,255,.9);
+  transition:translate var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
+.resstage[data-page="solo"] .rs-posecol .pl-word,
+.resstage[data-page="solo"] .rs-posecol .pl-dash,
+.resstage[data-page="solo"] .rs-posecol .pl-pts{flex:0 0 auto}
+.resstage[data-page="solo"] .rs-posecol .pl-word{
+  overflow:visible;text-overflow:clip}
+.resstage[data-page="solo"] .rs-posecol .pl-dash{opacity:1}
+.resstage[data-page="solo"] .rs-posecol .pl-pts.got{color:#176f2d}
+.resstage[data-page="solo"] .rs-posecol .pl-pts.missed{color:#b01313}
+.resstage[data-page="solo"] .rs-posecol .pl-empty{opacity:.6}
 .resstage:not([data-page="solo"]) .rs-poselist{display:none}
 
 /* solo's headline paper is a narrower Figma rectangle than the party board */
 .resstage[data-page="solo"] .rs-board-art{aspect-ratio:5.39}
-/* Fredoka One overshoots a line box smaller than its font-size, so the box is
-   sized to the glyphs and pinned above the score chip rather than centred. */
-.resstage[data-page="solo"] .rs-headline{inset:7% 0 auto 0;height:auto;
-  display:block;line-height:1;font-size:11.6cqw}
+/* Text frames are wider than their paper components in the authored file. */
+.resstage[data-page="solo"] .rs-headline{
+  inset:auto;left:-9.097409%;top:23.629474%;width:118.186796%;height:51.986393%;
+  display:flex;align-items:flex-start;justify-content:center;
+  font-size:12.666351cqw;line-height:.758619;translate:0 0;
+  text-shadow:.487167cqw .487167cqw 0 rgba(255,255,255,.9)}
+.resstage[data-page="solo"] .rs-scorechip span{
+  left:6.294986%;top:33.584126%;width:91.805224%;height:52.202042%;
+  justify-content:flex-start;
+  font-size:min(4.861111vw,8.641975vh)!important;line-height:.702823}
+
+/* A new still lands like a fresh print instead of silently replacing pixels. */
+.resstage[data-page="solo"] .rs-focus.cycle-prev{
+  --solo-print-x:calc(-1 * min(.7vw,1.25vh));--solo-print-turn:-.7deg}
+.resstage[data-page="solo"] .rs-focus.cycle-next{
+  --solo-print-x:min(.7vw,1.25vh);--solo-print-turn:.7deg}
+.resstage[data-page="solo"] .rs-focus.cycle-auto{
+  --solo-print-x:0px;--solo-print-turn:.32deg}
+.resstage[data-page="solo"] .rs-focus.is-cycling .rs-focus-shots img.on{
+  animation:rsSoloPrintIn 380ms var(--rs-pop)}
+.resstage[data-page="solo"] .rs-focus.is-cycling .rs-focus-frame{
+  animation:rsSoloFrameSlap 360ms var(--rs-pop)}
+@keyframes rsSoloPrintIn{
+  0%{opacity:0;translate:var(--solo-print-x,0) calc(-1 * min(.42vw,.75vh));
+    scale:1.045;rotate:var(--solo-print-turn,0deg);filter:saturate(.9)}
+  58%{opacity:1;translate:0 min(.08vw,.14vh);scale:.995;rotate:0deg}
+  100%{opacity:1;translate:0 0;scale:1;rotate:0deg;filter:none}
+}
+@keyframes rsSoloFrameSlap{
+  0%{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.008}
+  62%{translate:0 min(.09vw,.16vh);scale:.997}
+  100%{translate:0 0;scale:1}
+}
+
+/* The combined screen assembles in readable beats while the camera remains
+   live underneath. All rectangles finish at their authored resting values. */
+.resstage[data-page="solo"] :is(.rs-board,.rs-scorechip){
+  animation:rsSoloPaperIn 320ms 40ms var(--rs-pop) both}
+.resstage[data-page="solo"] .rs-focus{
+  animation:rsSoloPaperIn 360ms 100ms var(--rs-pop) both}
+.resstage[data-page="solo"] :is(.rs-poselist,.rs-save){
+  animation:rsSoloPaperIn 330ms 170ms var(--rs-pop) both}
+.resstage[data-page="solo"] :is(.rs-award,.rs-stat){
+  animation:rsSoloPaperIn 350ms 230ms var(--rs-pop) both}
+.resstage[data-page="solo"] .rs-rematch{
+  animation:rsSoloPaperIn 360ms 290ms var(--rs-pop) both}
+@keyframes rsSoloPaperIn{
+  from{opacity:0;transform:translateY(min(.75vw,1.33vh)) scale(.975)}
+  70%{opacity:1;transform:translateY(calc(-1 * min(.08vw,.14vh))) scale(1.004)}
+  to{opacity:1;transform:none}
+}
+
+.resstage[data-page="solo"] .rs-focus:focus-visible{
+  outline:min(.208vw,.37vh) solid #ffc440;
+  outline-offset:calc(-1 * min(.34vw,.6vh))}
+.resstage[data-page="solo"] .rs-focus:active{scale:.994;filter:brightness(.985)}
+
+@media (hover:hover){
+  .resstage[data-page="solo"] .rs-focus:hover{
+    translate:0 calc(-1 * min(.14vw,.25vh));scale:1.006;
+    filter:brightness(1.018)
+      drop-shadow(0 min(.28vw,.5vh) min(.22vw,.39vh) rgba(0,0,0,.18))}
+  .resstage[data-page="solo"] .rs-seat:hover{
+    translate:0 0;scale:1;filter:brightness(1.018)}
+  .resstage[data-page="solo"] .rs-poselist:hover li{
+    translate:min(.08vw,.14vh) 0;filter:brightness(1.04)}
+  .resstage[data-page="solo"] .rs-poselist:hover li:nth-child(even){
+    translate:min(.13vw,.23vh) 0}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .resstage[data-page="solo"] :is(.rs-board,.rs-scorechip,.rs-focus,.rs-poselist,
+    .rs-save,.rs-award,.rs-stat,.rs-rematch),
+  .resstage[data-page="solo"] .rs-focus.is-cycling :is(.rs-focus-frame,.rs-focus-shots img.on){
+    animation:none!important}
+  .resstage[data-page="solo"] .rs-focus-shots img{
+    transition:none!important}
+}
 /* the logo sits on top of the breakdown frames, as Figma layers it */
 .rs-title{z-index:12}
+
+/* =================== TIME'S UP (Figma "TIMES UP" 245:907) ===================
+   Running out of time is the one moment the game has to be unmistakable, so
+   the paper slams in, shakes, and burns red before it leaves. */
+.timesup{position:fixed;left:50%;top:42%;z-index:97;pointer-events:none;
+  width:min(46vw,660px);translate:-50% -50%;opacity:0;scale:.4}
+.timesup img{width:100%;display:block;
+  filter:drop-shadow(0 min(.6vw,1.06vh) min(.42vw,.74vh) rgba(0,0,0,.36))}
+/* the red is a glow behind the paper, so the torn edge stays paper */
+.timesup::before{content:"";position:absolute;inset:-52% -26%;z-index:-1;
+  border-radius:50%;
+  background:radial-gradient(ellipse at 50% 50%,rgba(255,86,54,.95),
+    rgba(232,64,42,.72) 42%,rgba(214,40,24,.3) 66%,transparent 78%);
+  filter:blur(min(1.6vw,2.9vh));opacity:0}
+.timesup.fire{animation:tuIn 1.5s cubic-bezier(.16,1.4,.32,1) both}
+.timesup.fire img{animation:tuShake .09s linear 6 .16s}
+.timesup.fire::before{animation:tuGlow 1.5s ease-out both}
+@keyframes tuIn{
+  0%  {opacity:0;scale:.4;rotate:-9deg}
+  12% {opacity:1;scale:1.14;rotate:2.5deg}
+  26% {scale:.97;rotate:-1.2deg}
+  38% {scale:1.03;rotate:.6deg}
+  50% {scale:1;rotate:0deg}
+  80% {opacity:1;scale:1}
+  100%{opacity:0;scale:.92;translate:-50% -62%}}
+/* a short hard rattle right after the slam, not a permanent wobble */
+@keyframes tuShake{
+  0%{translate:-2.2% 0}25%{translate:1.8% -1%}50%{translate:-1.6% .8%}
+  75%{translate:2% .4%}100%{translate:0 0}}
+@keyframes tuGlow{
+  0%{opacity:0;scale:.7}
+  14%{opacity:1;scale:1.06}
+  55%{opacity:.72;scale:1}
+  100%{opacity:0;scale:1.12}}
+/* The red has to read out of the corner of your eye — the paper alone is easy
+   to miss mid-pose. This is its own layer, not an inset shadow on the stage:
+   an inset shadow paints UNDER the stage's video child and never shows. */
+.timesup-flash{position:fixed;inset:0;z-index:96;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse at 50% 45%,transparent 34%,
+    rgba(226,48,28,.24) 66%,rgba(196,28,16,.6) 100%)}
+.timesup-flash.fire{animation:tuFlash 1.15s ease-out}
+@keyframes tuFlash{
+  0%{opacity:0}
+  12%{opacity:.92}
+  46%{opacity:.5}
+  70%{opacity:.8}
+  100%{opacity:0}}
+
+@media (prefers-reduced-motion: reduce){
+  .timesup.fire{animation:none;opacity:1;scale:1}
+  .timesup.fire img{animation:none}
+  .timesup.fire::before{animation:none;opacity:.8}
+  .timesup-flash.fire{animation:none;opacity:.5}
+}

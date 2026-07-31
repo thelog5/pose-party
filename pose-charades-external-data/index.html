@@ -820,6 +820,13 @@
 <!-- dev shortcut: opens either results layout without playing a match -->
 <button class="devbtn" id="btnDevResults" data-kind="breakdown">DEV: RESULTS 3V3</button>
 
+<!-- Figma "TIMES UP" (245:907). One shared overlay: solo, 1v1 and party all
+     run out of time the same way, so they all get the same paper. -->
+<div class="timesup-flash" id="timesUpFlash" aria-hidden="true"></div>
+<div class="timesup" id="timesUp" aria-hidden="true">
+  <img src="assets/ui/figma/rs-timesup.png" alt="Time&rsquo;s up">
+</div>
+
 <div class="countdown hidden" id="countdown"></div>
 <div class="pointBurst" id="pointBurst"><div class="burstCard"><div class="headline" id="pointHeadline"></div><div class="detail" id="pointDetail"></div></div></div>
 <div class="toast" id="toast" role="status"></div>

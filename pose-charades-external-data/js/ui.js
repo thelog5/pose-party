@@ -2,6 +2,7 @@
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
+import { blip } from "./audio.js";
 import { fakeRivalGuesses } from "./rival.js";
 import { THRESH } from "./constants.js";
 import {
@@ -119,6 +120,29 @@ export function setCountdown(value){
   cd.textContent=next;
   cd.classList.remove("tick"); void cd.offsetWidth; cd.classList.add("tick");
   return true;
+}
+
+/* Running out of time is the one beat that has to be unmistakable, so every
+   mode shows the same Figma paper (245:907) rather than a text burst. The
+   stage takes a red pulse too — the card alone is easy to miss mid-pose. */
+let timesUpTimer = 0;
+export function showTimesUp(){
+  const card = $("timesUp");
+  if(!card) return;
+  clearTimeout(timesUpTimer);
+  card.classList.remove("fire");
+  void card.offsetWidth;
+  card.classList.add("fire");
+
+  const flash = $("timesUpFlash");
+  if(flash){
+    flash.classList.remove("fire");
+    void flash.offsetWidth;
+    flash.classList.add("fire");
+    setTimeout(() => flash.classList.remove("fire"), 1200);
+  }
+  blip([392, 294, 196], .12);
+  timesUpTimer = setTimeout(() => card.classList.remove("fire"), 1600);
 }
 
 export function fitMatchPaperText(){

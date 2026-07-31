@@ -298,6 +298,7 @@ export function fitSingleLinePaperText(nodeOrSelector, options={}){
   if(!Number.isFinite(base) || base <= 0 || box.width <= 0) return false;
 
   const safety = Number(options.safety) || .88;
+  const widthOnly = !!options.widthOnly;
   const available = box.width * safety;
   const wanted = measuredTextWidth(node);
   if(!wanted || wanted <= available){
@@ -318,7 +319,7 @@ export function fitSingleLinePaperText(nodeOrSelector, options={}){
   for(let pass=0; pass<8; pass++){
     const current = measuredTextWidth(node);
     if(current <= available + .5 &&
-        node.scrollHeight <= node.clientHeight + .75) break;
+        (widthOnly || node.scrollHeight <= node.clientHeight + .75)) break;
     size = Math.max(3.8, size * .93);
     node.style.fontSize = size + "px";
   }
@@ -329,7 +330,9 @@ export function fitSingleLinePaperText(nodeOrSelector, options={}){
 function fitRepeatedPaperText(node){
   if(!node?.matches?.(REPEATED_TEXT_SELECTOR)) return false;
   if(node.matches(".rs-scorechip span"))
-    return fitSingleLinePaperText(node, { safety:.91, minScale:.38 });
+    return fitSingleLinePaperText(node, {
+      safety:.995, minScale:.38, widthOnly:true,
+    });
   if(node.matches(".rs-stat b"))
     return fitSingleLinePaperText(node, { safety:.88, minScale:.40 });
   if(node.matches("#rsHeadline"))

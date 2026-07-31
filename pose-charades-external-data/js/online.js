@@ -19,7 +19,7 @@
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { toast, flash, pointBurst, fmtTime, fmtScore, fitMatchPaperText,
-         renderRemoteMatchGuess, setCountdown } from "./ui.js";
+         renderRemoteMatchGuess, setCountdown, showTimesUp } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
@@ -31,7 +31,12 @@ import {
   prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
   fitGameplayText,
 } from "./gameplayFeedback.js";
-import { captureShot, showResults } from "./results.js";
+import {
+  captureShot,
+  setRematchState,
+  setRematchUnavailable,
+  showResults,
+} from "./results.js";
 
 const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
@@ -125,6 +130,12 @@ onTransition((to, from) => {
     clearInterval(countdownTimer);
   }
   if(from==="lobby" && to!=="countdown" && to!=="lobby") leaveRoom();
+  /* A completed 1v1 now stays in its room while the results-ready vote is
+     open. Leaving results ends that membership; a same-room rematch is the
+     one transition that deliberately keeps it. */
+  if(from==="results" && to!=="countdown" &&
+     $("resStage")?.dataset.mode==="1v1" && roomCode)
+    leaveRoom();
   /* party.js owns party -> lobby cleanup so room:leave is emitted once. */
 });
 
@@ -362,6 +373,10 @@ function wireSocket(s){
   s.on("round:result", payload => onRoundResult(payload));
   s.on("match:sudden", payload => onMatchSudden(payload));
   s.on("match:end", payload => onMatchEnd(payload));
+  s.on("match:rematch", ({ready, total, mine, voters=[]}={}) => {
+    const mappedVoters = voters.map(id => id===s.id ? "me" : "rival");
+    setRematchState(ready, total, mine, mappedVoters);
+  });
 
   s.on("room:error", ({error}={}) => {
     toast(error==="no-shared-words"
@@ -372,6 +387,11 @@ function wireSocket(s){
   s.on("peer:left", () => {
     toast(peerName+" left the game.");
     if(state.game && state.game.mode==="online") endOnline(null, "peer-left");
+    else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
+      roomCode=null;
+      closePeer();
+      setRematchUnavailable(peerName+" left — start a new room to play again.");
+    }
     else if(gameState()==="lobby"){ resetLobbyUi(); createRoom(); }
   });
 
@@ -379,6 +399,10 @@ function wireSocket(s){
     if(state.game && state.game.mode==="online"){
       toast("Connection to the server was lost.");
       endOnline(null, "disconnected");
+    }else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
+      roomCode=null;
+      closePeer();
+      setRematchUnavailable("Connection lost — reconnect to play again.");
     }
   });
 }
@@ -521,6 +545,7 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   const myId=socket.id;
   const rec=(players||[]).find(p=>p.id!==myId);
   if(rec && rec.name) peerName=rec.name;
+  if(!peer) openPeer(isHost);
 
   state.game={ mode:"online", word:null, round:0, rounds:0,
                matchEndsAt:perfFromServer(matchEndsAt),
@@ -751,8 +776,8 @@ function onRoundResult({
   }else{
     game.streak=0;
     game.results.push({word, ok:false, timeout:true});
-    pointBurst("Time up", "Next word coming up", "bad");
-    flash("bad"); blip([220,165]);
+    showTimesUp();
+    flash("bad");
   }
   const localSucceeded=iWasFirst || (caught&&iWasChaser);
   if(!localSucceeded) playWordMissFeedback($("vsWordCard"),THRESH);
@@ -801,9 +826,9 @@ function onMatchSudden({scores}={}){
   blip([392,523,659,784]);
 }
 
-function onMatchEnd({scores, winnerId, suddenDeath=false}={}){
+function onMatchEnd({scores, winnerId, suddenDeath=false, rematch}={}){
   applyScores(scores);
-  endOnline(scores, "finished", {winnerId, suddenDeath});
+  endOnline(scores, "finished", {winnerId, suddenDeath, rematch});
 }
 
 /* Build the results card from what the server told us and clean up. */
@@ -816,13 +841,15 @@ function endOnline(scores, why, outcome={}){
   state.game=null;
   state.onlineClaim=null;
   state.onlineGuess=null;
-  closePeer();
+  const rivalStream=$("videoRemote")?.srcObject || null;
+  const sameRoom=why==="finished" && !!roomCode && !!socket?.connected;
+  if(!sameRoom) closePeer();
 
   const mineTimes=g.results.filter(r=>r.ok && Number.isFinite(r.secs)).map(r=>r.secs);
   const title = why==="finished"
     ? (outcome.winnerId===socket?.id || (!outcome.winnerId && g.score>g.rivalScore)
-        ? (outcome.suddenDeath?"YOU WON SUDDEN DEATH!":"YOU WIN!")
-        : outcome.winnerId ? peerName.toUpperCase()+" WINS"
+        ? myName().toUpperCase()+" WINS!"
+        : outcome.winnerId ? peerName.toUpperCase()+" WINS!"
         : "IT’S A TIE!")
     : (why==="peer-left" ? peerName.toUpperCase()+" LEFT EARLY" : "MATCH ENDED EARLY");
 
@@ -837,10 +864,16 @@ function endOnline(scores, why, outcome={}){
         clutch:g.results.filter(r=>r.ok && r.chase).length, ready:false },
       { id:"rival", name:peerName, team:"orange", mine:false, score:g.rivalScore,
         firsts:g.results.filter(r=>r.rival).length,
-        fastest:null, avg:null, clutch:0, ready:false },
+        fastest:null, avg:null, clutch:0, ready:false, stream:rivalStream },
     ],
-    rematch:{ ready:0, total:2, mine:false },
-    onRematch: () => enterLobby(),
+    rematch: sameRoom
+      ? { ready:outcome.rematch?.ready || 0,
+          total:outcome.rematch?.total || 2, mine:false }
+      : { ready:0, total:1, mine:false, direct:true },
+    onRematch: sameRoom
+      ? () => new Promise(resolve =>
+          socket.emit("match:rematch", {}, response => resolve(response || {error:"offline"})))
+      : () => enterLobby(),
   });
   state.lastMode="online";
 }

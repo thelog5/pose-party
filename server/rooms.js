@@ -152,6 +152,19 @@ export function createRoomStore({ config, emit }){
   }
 
   function startMatch(room){
+    clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
+    room.createdAt = Date.now();
+    room.roundNum = 0;
+    room.roundId = null;
+    room.word = null;
+    room.roundStart = 0;
+    room.roundEnd = 0;
+    room.chaseEndsAt = 0;
+    for(const p of room.players){
+      p.score = 0;
+      p.ready = false;
+    }
     room.phase = "starting";
     room.deck = shuffledDeck(room);
     room.matchExpired = false;
@@ -389,13 +402,57 @@ export function createRoomStore({ config, emit }){
     room.phase = "done";
     clearTimeout(room.timer);
     clearTimeout(room.matchTimer);
+    room.timer = null;
+    room.matchTimer = null;
+    room.rematch = new Set();
     for(const p of room.players)
       emit(p.id, "match:end", {
         scores: scoresPayload(room),
         winnerId,
         suddenDeath,
+        rematch: matchRematchState(room),
       });
-    destroyRoom(room.code); // players re-lobby with a fresh code for a rematch
+    /* Keep the two-player room alive through results. Both players can undo
+       or confirm a rematch vote without exchanging a fresh invite code. */
+  }
+
+  const matchRematchState = room => ({
+    ready: room.rematch ? room.rematch.size : 0,
+    total: room.players.length,
+  });
+
+  function broadcastMatchRematch(room){
+    for(const p of room.players)
+      emit(p.id, "match:rematch", {
+        ...matchRematchState(room),
+        mine: room.rematch?.has(p.id) || false,
+        voters: [...(room.rematch || [])],
+      });
+  }
+
+  /* The 1v1 results paper is a real ready toggle, not a disguised "new
+     lobby" button. The second vote resets scores and starts the same room. */
+  function matchRematch(socketId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "1v1") return { error: "not-in-room" };
+    if(room.phase !== "done") return { error: "match-in-progress" };
+    if(room.players.length !== 2) return { error: "need-two" };
+    if(!room.rematch) room.rematch = new Set();
+    if(room.rematch.has(socketId)) room.rematch.delete(socketId);
+    else room.rematch.add(socketId);
+    const state = matchRematchState(room);
+    broadcastMatchRematch(room);
+
+    if(state.ready === state.total){
+      room.rematch.clear();
+      startMatch(room);
+      return { ok: true, started: true, ...state, mine: true };
+    }
+    return {
+      ok: true,
+      ...state,
+      mine: room.rematch.has(socketId),
+    };
   }
 
   /* ---------------- party rooms (3v3 lobby) ----------------
@@ -862,7 +919,7 @@ export function createRoomStore({ config, emit }){
     return { ok:true };
   }
 
-  return { createRoom, joinRoom, ready, begin, setSettings, claim, leave,
+  return { createRoom, joinRoom, ready, begin, setSettings, claim, matchRematch, leave,
            relaySignal, relayGuess, sweep,
            partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart,
            partySignal, partyClaim, relayPartyGuess, partyRematch,

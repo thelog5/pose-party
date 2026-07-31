@@ -29,15 +29,20 @@ let shotCanvas = null;
 
 let payload = null;       // the match summary being displayed
 let cycleTimer = 0;       // drives the GIF-style still cycle
-const CYCLE_MS = 900;     // one beat per still
+const CYCLE_MS = 2600;    // relaxed enough to read each physical-photo beat
 let focusId = null;       // which player's carousel is open
 let shotIx = 0;
 let wired = false;
 let awardFitFrame = 0;
+let poseFitFrame = 0;
 let awardMeasureCanvas = null;
 let rematchPulseTimer = 0;
 let rematchPendingTimer = 0;
 let rematchVersion = 0;
+let soloPointerStart = null;
+let soloSwipeHandled = false;
+let v1PointerStart = null;
+let v1SwipeHandled = false;
 
 const stage = () => $("resStage");
 const seatEl = k => document.querySelector('#resStage [data-seat="' + k + '"]');
@@ -129,11 +134,18 @@ export function showResults(next){
 
   const st = stage();
   const mode = payload.mode || "party";
+  const layoutMode = mode === "vs" ? "1v1" : mode;
   /* Solo has no shared moment to hold, so its results and breakdown are one
      screen — the Figma frame carries both. Everyone else gets the two beats. */
   st.dataset.page = mode === "solo" ? "solo" : "stage";
   st.dataset.size = String(payload.size || 3);
-  st.dataset.mode = mode;
+  st.dataset.mode = layoutMode;
+  syncPhotoStripTarget();
+  const divider = st.querySelector(".rs-divider");
+  if(divider)
+    divider.src = layoutMode === "1v1" || layoutMode === "solo"
+      ? "assets/ui/figma/v1-divider.png"
+      : "assets/ui/figma/pm-divider.png";
   orderResultsControls(st.dataset.page);
 
   setTxt("rsHeadline", payload.headline || "GAME OVER");
@@ -168,28 +180,60 @@ function renderPoseList(){
 }
 
 /* Figma sized these columns around "JUMPING - 560 Pts"; real decks carry
-   "spiking a volleyball". Shrink the list until the longest row fits rather
-   than truncating someone's word. */
+   "spiking a volleyball". Fit only the row that needs help so the remaining
+   copy keeps the authored 27.44px type instead of shrinking both columns. */
 function fitPoseList(){
   const list = $("rsPoseList");
   if(!list) return;
-  list.style.removeProperty("--pl-fs");
-  requestAnimationFrame(() => {
-    const rows = [...list.querySelectorAll("li")];
+  cancelAnimationFrame(poseFitFrame);
+  const rows = [...list.querySelectorAll("li")];
+  rows.forEach(li => li.style.removeProperty("--pl-row-fs"));
+  poseFitFrame = requestAnimationFrame(() => {
+    poseFitFrame = 0;
     if(!rows.length) return;
-    let worst = 1;
+    const factors = new Map();
     for(const li of rows){
       const avail = li.clientWidth;
       if(!avail) continue;
-      const want = [...li.children].reduce((sum, c) => sum + c.scrollWidth, 0) + 6;
-      if(want > avail) worst = Math.max(worst, want / avail);
+      const style = getComputedStyle(li);
+      const gap = parseFloat(style.columnGap || style.gap) || 0;
+      const want = [...li.children].reduce((sum, c) => sum + c.scrollWidth, 0) +
+        gap * Math.max(0, li.children.length - 1);
+      const factor = want > avail ? Math.max(.46, avail / want * .92) : 1;
+      factors.set(li, factor);
+      if(factor < 1) li.style.setProperty("--pl-row-fs", factor.toFixed(3));
     }
-    /* also keep the tallest column inside the block, so late rows never slide
-       under the rematch button */
-    for(const col of list.querySelectorAll(".rs-posecol"))
-      if(col.scrollHeight > col.clientHeight && col.clientHeight)
-        worst = Math.max(worst, col.scrollHeight / col.clientHeight);
-    if(worst > 1) list.style.setProperty("--pl-fs", (1 / worst * .96).toFixed(3));
+    /* Flex intrinsic widths and fractional font metrics can leave a few
+       pixels beyond the paper even after the first canvas-style estimate.
+       Reconcile against the browser's painted row until it is genuinely in. */
+    for(const li of rows){
+      if(!li.clientWidth) continue;
+      let factor = factors.get(li) || 1;
+      for(let pass=0; pass<4 && li.scrollWidth > li.clientWidth + .5; pass++){
+        factor *= li.clientWidth / li.scrollWidth * .96;
+        li.style.setProperty("--pl-row-fs", factor.toFixed(3));
+      }
+      factors.set(li, factor);
+    }
+    /* The authored text boxes run five 30px lines through a 145px frame and
+       use the small clear strip above REMATCH. Real decks can be longer, so
+       use all of that safe space without ever clipping under the button. */
+    const rematchTop = $("rsRematch")?.getBoundingClientRect().top;
+    let verticalFactor = 1;
+    for(const col of list.querySelectorAll(".rs-posecol")){
+      const top = col.getBoundingClientRect().top;
+      const safeHeight = Number.isFinite(rematchTop)
+        ? Math.max(col.clientHeight, rematchTop - top - 7)
+        : col.clientHeight;
+      if(col.scrollHeight > safeHeight && safeHeight)
+        verticalFactor = Math.min(verticalFactor, safeHeight / col.scrollHeight * .985);
+    }
+    if(verticalFactor < 1){
+      for(const li of rows){
+        const factor = (factors.get(li) || 1) * verticalFactor;
+        li.style.setProperty("--pl-row-fs", factor.toFixed(3));
+      }
+    }
   });
 }
 
@@ -197,7 +241,11 @@ function renderScoreLine(){
   const el = $("rsScoreLine");
   if(!el) return;
   const t = payload.teams;
-  if(!t){ el.innerHTML = '<b class="blue">' + plain(payload.soloScore || 0) + "</b>"; return; }
+  if(!t){
+    el.innerHTML = '<b class="blue">' + plain(payload.soloScore || 0) +
+      '</b><i class="rs-score-sep"> POINTS</i>';
+    return;
+  }
   el.innerHTML = '<b class="blue">' + plain(t.blue) +
     '</b><i class="rs-score-sep"> - </i><b class="orange">' +
     plain(t.orange) + "</b>";
@@ -209,7 +257,8 @@ function orderResultsControls(page){
   const rematch = $("rsRematch");
   const status = $("rsRematchStatus");
   if(!rematch) return;
-  if(page === "breakdown") $("rsBack")?.after(rematch, status);
+  if(page === "solo") $("rsSaveStrip")?.after(rematch, status);
+  else if(page === "breakdown") $("rsBack")?.after(rematch, status);
   else $("rsSeeBreakdown")?.before(rematch, status);
 }
 
@@ -345,14 +394,20 @@ function renderRematch(animate = true){
     (teams.blue < 2 || teams.orange < 2);
   const previous = btn.dataset.ready === undefined ? null : Number(btn.dataset.ready);
   setTxt("rsRematchLabel",
-    payload.mode === "solo" || payload.mode === "vs"
-      ? "PLAY AGAIN"
+    r?.unavailable
+      ? "RIVAL LEFT"
+      : r?.direct
+        ? "PLAY AGAIN"
+      : payload.mode === "solo"
+      ? "REMATCH? READY UP!"
+      : payload.mode === "vs"
+        ? "PLAY AGAIN"
       : needsTeams
         ? "NEED  2  PER  TEAM"
         : "REMATCH?  " + ready + "/" + total + "  READY");
   btn.classList.toggle("mine", mine);
   btn.dataset.waiting = needsTeams ? "need-teams" : "";
-  if(payload.mode === "party" || payload.mode === "1v1"){
+  if((payload.mode === "party" || payload.mode === "1v1") && !r?.direct){
     btn.setAttribute("aria-pressed", String(mine));
     btn.setAttribute("aria-label",
       mine ? "Cancel rematch readiness" : "Ready for a rematch");
@@ -363,14 +418,16 @@ function renderRematch(animate = true){
         (mine ? "You are ready." : "You are not ready."));
   }else{
     btn.removeAttribute("aria-pressed");
-    btn.setAttribute("aria-label", "Play again");
-    setTxt("rsRematchStatus", "");
+    btn.setAttribute("aria-label", r?.unavailable ? "Rival left" : "Play again");
+    setTxt("rsRematchStatus", r?.unavailable
+      ? r.message || "Your rival left the room."
+      : "");
   }
   btn.dataset.ready = String(ready);
   btn.dataset.mine = String(mine);
   if(animate && previous !== null && ready !== previous)
     pulseRematch(btn, ready - previous);
-  btn.disabled = btn.classList.contains("pending");
+  btn.disabled = btn.classList.contains("pending") || !!r?.unavailable;
 }
 
 function syncPlayerReady(mine, voters){
@@ -390,10 +447,26 @@ export function setRematchState(ready, total, mine, voters){
   if(!payload) return;
   rematchVersion++;
   setRematchPending(false);
-  payload.rematch = { ...(payload.rematch || {}), ready, total, mine };
+  payload.rematch = {
+    ...(payload.rematch || {}),
+    ready, total, mine, direct:false, unavailable:false,
+  };
   syncPlayerReady(mine, voters);
   renderSeats();
   renderRematch(true);
+}
+
+export function setRematchUnavailable(message){
+  if(!payload || payload.mode !== "1v1") return;
+  rematchVersion++;
+  setRematchPending(false);
+  payload.rematch = {
+    ...(payload.rematch || {}),
+    ready:0, total:1, mine:false, direct:true, unavailable:true, message,
+  };
+  syncPlayerReady(false, []);
+  renderSeats();
+  renderRematch(false);
 }
 
 /* A party room survives on the results screen. If somebody leaves there,
@@ -440,7 +513,9 @@ function rollbackReadyVote(version, before, error){
 function toggleRematchReady(){
   if(!payload) return;
   if($("rsRematch")?.classList.contains("pending")) return;
-  if(payload.mode !== "party"){
+  const votes = (payload.mode === "party" || payload.mode === "1v1") &&
+    !payload.rematch?.direct;
+  if(!votes){
     payload.onRematch?.();
     return;
   }
@@ -555,8 +630,30 @@ function paintPanel(suffix, p){
   const wrap = $("rsFocusShots" + suffix);
   if(wrap) wrap.innerHTML = list.length
     ? list.map((s, i) =>
-        '<img class="' + (i === 0 ? "on" : "") + '" src="' + s.url + '" alt="">').join("")
+        '<img class="' + (i === 0 ? "on" : "") + '" src="' + s.url +
+        '" alt="" aria-hidden="' + (i === 0 ? "false" : "true") +
+        '" data-active="' + (i === 0 ? "true" : "false") + '">').join("")
     : '<div class="rs-empty">No photos this round —<br>they’re taken the moment the AI recognises you.</div>';
+
+  const focus = $("rsFocus" + suffix);
+  const soloCarousel = payload.mode === "solo" && suffix === "";
+  const v1Carousel = payload.mode === "1v1" || payload.mode === "vs";
+  if(focus){
+    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
+    focus.toggleAttribute("data-solo-carousel", soloCarousel);
+    focus.toggleAttribute("data-1v1-carousel", v1Carousel);
+    if(soloCarousel || v1Carousel){
+      focus.tabIndex = 0;
+      focus.setAttribute("role", "button");
+      focus.setAttribute("aria-roledescription", "photo carousel");
+    }else{
+      focus.removeAttribute("tabindex");
+      focus.removeAttribute("role");
+      focus.removeAttribute("aria-roledescription");
+      focus.removeAttribute("aria-label");
+      delete focus.dataset.shotIndex;
+    }
+  }
 
   const tag = $("rsFocusName" + suffix);
   if(tag){
@@ -565,6 +662,7 @@ function paintPanel(suffix, p){
     tag.classList.toggle("orange", p.team === "orange");
   }
   setTxt("rsShotWord" + suffix, list.length ? (list[0].word || "").toUpperCase() : "");
+  syncPanelA11y({ suffix, pid:p.id, ix:0 });
 
   const A = suffix === "B" ? "B" : "";
   setAwardText("rsAward" + (A ? "TitleB" : "Title"), p.award.title);
@@ -650,8 +748,8 @@ function fitAwardLine(id, baseCqw, minimumCqw){
     node.style.scale = Math.min(1, available / remaining * .99) + " 1";
 }
 
-function fitAwardDescription(){
-  const node = $("rsAwardSub");
+function fitAwardDescription(id = "rsAwardSub"){
+  const node = $(id);
   if(!node || !node.clientWidth) return;
   const fullText = (node.dataset.fullText ?? node.textContent ?? "").trim();
   const baseCqw = 12.362;
@@ -674,7 +772,7 @@ function fitAwardDescription(){
 
   const words = fullText.split(/\s+/).filter(Boolean);
   if(words.length < 2){
-    fitAwardLine("rsAwardSub", baseCqw, 6.2);
+    fitAwardLine(id, baseCqw, 6.2);
     return;
   }
 
@@ -706,6 +804,10 @@ function scheduleAwardFit(){
   awardFitFrame = requestAnimationFrame(() => {
     fitAwardLine("rsAwardTitle", 20.603, 8.8);
     fitAwardDescription();
+    if(payload?.mode === "1v1" || payload?.mode === "vs"){
+      fitAwardLine("rsAwardTitleB", 20.603, 8.8);
+      fitAwardDescription("rsAwardSubB");
+    }
   });
 }
 
@@ -727,17 +829,28 @@ function breakdownOrder(){
           ...payload.players.filter(p => p.team === "orange")];
 }
 
-/* Stills read as a little GIF of the round rather than something to click
-   through, so every visible panel advances on the same beat. */
+/* Stills read as a little GIF of the round, but Solo also lets a player pick
+   up the stack with tap, swipe, or arrow keys. Reduced-motion users keep the
+   same manual controls without an unsolicited auto-cycle. */
 function startShotCycle(){
   stopShotCycle();
+  if(document.hidden || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const soloFocus = payload?.mode === "solo" ? $("rsFocus") : null;
+  if(soloFocus &&
+     (document.activeElement === soloFocus || soloFocus.matches(":hover"))) return;
+  if((payload?.mode === "1v1" || payload?.mode === "vs") &&
+     visiblePanels().some(panel => {
+       const focus = $("rsFocus" + panel.suffix);
+       return focus &&
+         (document.activeElement === focus || focus.matches(":hover"));
+     })) return;
   cycleTimer = setInterval(() => {
     let moved = false;
     for(const panel of visiblePanels()){
       const list = shots.get(panel.pid) || [];
       if(list.length < 2) continue;
       panel.ix = (panel.ix + 1) % list.length;
-      paintPanelFrame(panel);
+      paintPanelFrame(panel, "auto");
       moved = true;
     }
     if(!moved) stopShotCycle();
@@ -753,23 +866,99 @@ function visiblePanels(){
     return el && getComputedStyle(el).display !== "none";
   });
 }
-function paintPanelFrame(panel){
+function syncPanelA11y(panel){
+  const focus = $("rsFocus" + panel.suffix);
+  if(!focus || (!focus.hasAttribute("data-solo-carousel") &&
+      !focus.hasAttribute("data-1v1-carousel"))) return;
+  const list = shots.get(panel.pid) || [];
+  const p = payload?.players.find(player => player.id === panel.pid);
+  focus.dataset.shotIndex = String(panel.ix);
+  focus.setAttribute("aria-label", list.length
+    ? disp(p?.name) + " result photo " + (panel.ix + 1) + " of " + list.length +
+      ". Tap, swipe, press Enter or Space, or use left and right arrow keys."
+    : disp(p?.name) + " has no captured result photos.");
+}
+
+function paintPanelFrame(panel, direction = "auto"){
   const wrap = $("rsFocusShots" + panel.suffix);
   if(!wrap) return;
   const imgs = wrap.querySelectorAll("img");
-  imgs.forEach((im, i) => im.classList.toggle("on", i === panel.ix));
+  imgs.forEach((im, i) => {
+    const active = i === panel.ix;
+    im.classList.toggle("on", active);
+    im.setAttribute("aria-hidden", String(!active));
+    im.dataset.active = String(active);
+  });
   const list = shots.get(panel.pid) || [];
   setTxt("rsShotWord" + panel.suffix,
     list.length ? (list[panel.ix]?.word || "").toUpperCase() : "");
+  syncPanelA11y(panel);
+
+  const focus = $("rsFocus" + panel.suffix);
+  if(!focus || !imgs.length) return;
+  focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
+  void focus.offsetWidth;
+  focus.classList.add("is-cycling", "cycle-" + direction);
+  clearTimeout(focus._cycleClassTimer);
+  focus._cycleClassTimer = setTimeout(() => {
+    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
+  }, 420);
+}
+
+function stepSoloShot(dir){
+  if(!payload || stage()?.dataset.page !== "solo") return false;
+  const panel = panelState.get("");
+  const list = panel ? (shots.get(panel.pid) || []) : [];
+  if(!panel || list.length < 2) return false;
+  panel.ix = (panel.ix + dir + list.length) % list.length;
+  paintPanelFrame(panel, dir < 0 ? "prev" : "next");
+  blip(dir < 0 ? [392, 494] : [523, 659], .035);
+  startShotCycle();
+  return true;
+}
+
+function step1v1Shot(suffix, dir){
+  if(!payload || (payload.mode !== "1v1" && payload.mode !== "vs") ||
+      stage()?.dataset.page !== "breakdown") return false;
+  const panel = panelState.get(suffix);
+  const list = panel ? (shots.get(panel.pid) || []) : [];
+  if(!panel) return false;
+  if(list.length > 1)
+    panel.ix = (panel.ix + dir + list.length) % list.length;
+  if(list.length)
+    paintPanelFrame(panel, dir < 0 ? "prev" : "next");
+  if(list.length > 1) blip(dir < 0 ? [392, 494] : [523, 659], .035);
+  startShotCycle();
+  return true;
 }
 
 /* ---------------- photo strip ---------------- */
 
 /* Stitches the focused player's stills into one image and hands it to the
    browser as a download. Nothing leaves the machine. */
+function syncPhotoStripTarget(){
+  const save = $("rsSaveStrip");
+  if(!save) return;
+  if(payload?.mode === "1v1" || payload?.mode === "vs"){
+    const local = payload.players.find(p => p.mine) || payload.players[0];
+    save.setAttribute("aria-label", "Save your photo strip");
+    save.title = "Save your photo strip";
+    if(local) save.dataset.playerId = local.id;
+    else delete save.dataset.playerId;
+  }else{
+    save.removeAttribute("aria-label");
+    save.removeAttribute("title");
+    delete save.dataset.playerId;
+  }
+}
+
 function savePhotoStrip(){
-  const p = payload.players.find(x => x.id === focusId);
-  const list = shots.get(focusId) || [];
+  const local = payload.players.find(player => player.mine) || payload.players[0];
+  const targetId = payload.mode === "1v1" || payload.mode === "vs"
+    ? local?.id
+    : focusId;
+  const p = payload.players.find(x => x.id === targetId);
+  const list = shots.get(targetId) || [];
   if(!list.length){ toast("No photos to save from this round yet."); return; }
   const pad = 18, w = SHOT_W, h = SHOT_H;
   const c = document.createElement("canvas");
@@ -778,18 +967,28 @@ function savePhotoStrip(){
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#f4ece0";
   ctx.fillRect(0, 0, c.width, c.height);
-  let loaded = 0;
+  let settled = 0, drawn = 0;
+  const finish = () => {
+    if(++settled !== list.length) return;
+    if(!drawn){
+      toast("Couldn’t decode the photos for this strip.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.download = "pose-party-" +
+      (p ? p.name.toLowerCase().replace(/\W+/g, "-") : "strip") + ".png";
+    a.href = c.toDataURL("image/png");
+    a.click();
+    toast(drawn === list.length ? "Photo strip saved." : "Photo strip saved with the available shots.");
+  };
   list.forEach((s, i) => {
     const img = new Image();
     img.onload = () => {
       ctx.drawImage(img, pad, pad + i * (h + pad), w, h);
-      if(++loaded !== list.length) return;
-      const a = document.createElement("a");
-      a.download = "pose-party-" + (p ? p.name.toLowerCase().replace(/\W+/g, "-") : "strip") + ".png";
-      a.href = c.toDataURL("image/png");
-      a.click();
-      toast("Photo strip saved.");
+      drawn++;
+      finish();
     };
+    img.onerror = finish;
     img.src = s.url;
   });
 }
@@ -797,6 +996,10 @@ function savePhotoStrip(){
 function teardownResultsMedia(){
   stopShotCycle();
   panelState.clear();
+  soloPointerStart = null;
+  soloSwipeHandled = false;
+  v1PointerStart = null;
+  v1SwipeHandled = false;
   const dock = $("cameraDock");
   if(dock?.closest("#resStage")) mountCamera($("slotHomePark"));
   for(const el of document.querySelectorAll("#resStage .rs-seat")){
@@ -812,7 +1015,22 @@ function teardownResultsMedia(){
   }
   $("rsStripBlue")?.replaceChildren();
   $("rsStripOrange")?.replaceChildren();
-  $("rsFocusShots")?.replaceChildren();
+  $("rsPoseColA")?.replaceChildren();
+  $("rsPoseColB")?.replaceChildren();
+  for(const suffix of ["", "B"]){
+    $("rsFocusShots" + suffix)?.replaceChildren();
+    const focus = $("rsFocus" + suffix);
+    if(!focus) continue;
+    clearTimeout(focus._cycleClassTimer);
+    focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
+    focus.removeAttribute("data-solo-carousel");
+    focus.removeAttribute("data-1v1-carousel");
+    focus.removeAttribute("tabindex");
+    focus.removeAttribute("role");
+    focus.removeAttribute("aria-roledescription");
+    focus.removeAttribute("aria-label");
+    delete focus.dataset.shotIndex;
+  }
 }
 
 /* ---------------- wiring ---------------- */
@@ -837,13 +1055,135 @@ export function wireResults(){
   $("rsNext").onclick = () => step(1);
   $("rsSaveStrip").onclick = savePhotoStrip;
   $("rsRematch").onclick = toggleRematchReady;
-  addEventListener("resize", scheduleAwardFit);
-  document.fonts?.ready.then(scheduleAwardFit);
+  addEventListener("resize", () => {
+    scheduleAwardFit();
+    fitPoseList();
+  });
+  document.fonts?.ready.then(() => {
+    scheduleAwardFit();
+    fitPoseList();
+  });
+  if("ResizeObserver" in globalThis && $("rsPoseList"))
+    new ResizeObserver(() => {
+      if(stage()?.dataset.page === "solo") fitPoseList();
+    }).observe($("rsPoseList"));
+
+  const focus = $("rsFocus");
+  focus?.addEventListener("click", () => {
+    if(soloSwipeHandled) return;
+    if(stage()?.dataset.page === "solo") stepSoloShot(1);
+  });
+  focus?.addEventListener("pointerdown", event => {
+    if(stage()?.dataset.page !== "solo" || event.button > 0) return;
+    soloPointerStart = { id:event.pointerId, x:event.clientX, y:event.clientY };
+  });
+  focus?.addEventListener("pointerup", event => {
+    if(!soloPointerStart || event.pointerId !== soloPointerStart.id) return;
+    const dx = event.clientX - soloPointerStart.x;
+    const dy = event.clientY - soloPointerStart.y;
+    soloPointerStart = null;
+    if(Math.abs(dx) < 34 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+    soloSwipeHandled = stepSoloShot(dx < 0 ? 1 : -1);
+    if(soloSwipeHandled)
+      setTimeout(() => { soloSwipeHandled = false; }, 0);
+  });
+  focus?.addEventListener("pointercancel", () => { soloPointerStart = null; });
+  focus?.addEventListener("pointerenter", () => {
+    if(stage()?.dataset.page === "solo") stopShotCycle();
+  });
+  focus?.addEventListener("pointerleave", () => {
+    soloPointerStart = null;
+    if(stage()?.dataset.page === "solo" && document.activeElement !== focus)
+      startShotCycle();
+  });
+  focus?.addEventListener("focus", stopShotCycle);
+  focus?.addEventListener("blur", () => {
+    if(stage()?.dataset.page === "solo") startShotCycle();
+  });
+
+  for(const suffix of ["", "B"]){
+    const reel = $("rsFocus" + suffix);
+    reel?.addEventListener("click", () => {
+      if(v1SwipeHandled || stage()?.dataset.page !== "breakdown" ||
+          (payload?.mode !== "1v1" && payload?.mode !== "vs")) return;
+      reel.focus({ preventScroll:true });
+      step1v1Shot(suffix, 1);
+    });
+    reel?.addEventListener("pointerdown", event => {
+      if(stage()?.dataset.page !== "breakdown" || event.button > 0 ||
+          (payload?.mode !== "1v1" && payload?.mode !== "vs")) return;
+      v1PointerStart = {
+        suffix, id:event.pointerId, x:event.clientX, y:event.clientY,
+      };
+    });
+    reel?.addEventListener("pointerup", event => {
+      if(!v1PointerStart || v1PointerStart.suffix !== suffix ||
+          event.pointerId !== v1PointerStart.id) return;
+      const dx = event.clientX - v1PointerStart.x;
+      const dy = event.clientY - v1PointerStart.y;
+      v1PointerStart = null;
+      if(Math.abs(dx) < 34 || Math.abs(dx) < Math.abs(dy) * 1.15) return;
+      v1SwipeHandled = step1v1Shot(suffix, dx < 0 ? 1 : -1);
+      if(v1SwipeHandled)
+        setTimeout(() => { v1SwipeHandled = false; }, 0);
+    });
+    reel?.addEventListener("pointercancel", () => { v1PointerStart = null; });
+    reel?.addEventListener("pointerenter", () => {
+      if(stage()?.dataset.page === "breakdown" &&
+          (payload?.mode === "1v1" || payload?.mode === "vs"))
+        stopShotCycle();
+    });
+    reel?.addEventListener("pointerleave", () => {
+      v1PointerStart = null;
+      if(stage()?.dataset.page === "breakdown" &&
+          (payload?.mode === "1v1" || payload?.mode === "vs") &&
+          document.activeElement !== reel)
+        startShotCycle();
+    });
+    reel?.addEventListener("focus", () => {
+      if(payload?.mode === "1v1" || payload?.mode === "vs") stopShotCycle();
+    });
+    reel?.addEventListener("blur", () => {
+      if(stage()?.dataset.page === "breakdown" &&
+          (payload?.mode === "1v1" || payload?.mode === "vs"))
+        startShotCycle();
+    });
+  }
 
   addEventListener("keydown", e => {
-    if(gameState() !== "results" || stage().dataset.page !== "breakdown") return;
+    if(gameState() !== "results") return;
+    const soloFocus = $("rsFocus");
+    if(stage().dataset.page === "solo" && document.activeElement === soloFocus &&
+       ["ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)){
+      const dir = e.key === "ArrowLeft" ? -1 : 1;
+      if(stepSoloShot(dir)) e.preventDefault();
+      return;
+    }
+    if(stage().dataset.page !== "breakdown") return;
+    if(payload?.mode === "1v1" || payload?.mode === "vs"){
+      const active = document.activeElement;
+      const suffix = active === $("rsFocus") ? "" :
+        active === $("rsFocusB") ? "B" : null;
+      if(suffix !== null &&
+         ["ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)){
+        if(step1v1Shot(suffix, e.key === "ArrowLeft" ? -1 : 1))
+          e.preventDefault();
+      }
+      return;
+    }
     if(e.key === "ArrowLeft") step(-1);
     if(e.key === "ArrowRight") step(1);
+  });
+
+  matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", event => {
+    if(gameState() !== "results") return;
+    if(event.matches) stopShotCycle();
+    else startShotCycle();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if(gameState() !== "results") return;
+    if(document.hidden) stopShotCycle();
+    else startShotCycle();
   });
 
   /* stills are for this results screen only */
@@ -852,6 +1192,7 @@ export function wireResults(){
       clearShots();
       teardownResultsMedia();
       cancelAnimationFrame(awardFitFrame);
+      cancelAnimationFrame(poseFitFrame);
       clearTimeout(rematchPulseTimer);
       clearTimeout(rematchPendingTimer);
       setRematchPending(false);
@@ -885,7 +1226,9 @@ export async function devResults(kind = "3v3"){
   /* ---- solo: results and breakdown on one screen ---- */
   if(kind === "solo"){
     const me = mk("me", "LOGAN", "blue", true, 0);
-    me.score = 1460;
+    /* The reference frame deliberately demonstrates a 420-point stat while
+       the whole run totals 1460; real matches continue to use their payload. */
+    me.score = 420;
     showResults({
       mode: "solo", size: 1, headline: "GAME OVER",
       teams: null, soloScore: 1460, players: [me],

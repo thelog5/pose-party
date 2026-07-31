@@ -409,6 +409,76 @@ ok(await page.evaluate(() =>
   getComputedStyle(document.getElementById("rsPoseList")).display !== "none"),
   "no breakdown button; the pose list is on the same screen");
 
+/* Latest REST frame 233:711. Compare paper children, not the wider Figma
+   INSTANCE unions whose text intentionally overflows the stat papers. Let the
+   authored 650ms stagger finish before measuring resting rectangles. */
+await sleep(720);
+const soloFigma = await page.evaluate(() => {
+  const rect = selector => {
+    const r=document.querySelector(selector).getBoundingClientRect();
+    return [r.x,r.y,r.width,r.height];
+  };
+  const css = selector => getComputedStyle(document.querySelector(selector));
+  return {
+    logo:rect("#rsHome"), exit:rect("#rsExit"),
+    yellowTape:rect(".rs-tape-logo-yellow"),
+    creamTape:rect(".rs-tape-logo-cream"),
+    headline:rect("#rsHeadline"), score:rect("#rsScoreLine"),
+    focus:rect("#rsFocus"), save:rect("#rsSaveStrip"),
+    award:rect("#rsAward"), stat1:rect("#rsStat1"),
+    stat2:rect("#rsStat2"), stat3:rect("#rsStat3"),
+    rematch:rect("#rsRematch"), rematchTape:rect(".rs-tape-rematch-stage"),
+    cols:[rect("#rsPoseColA"),rect("#rsPoseColB")],
+    headlineFont:parseFloat(css("#rsHeadline").fontSize),
+    scoreFont:parseFloat(css("#rsScoreLine").fontSize),
+    headlineShadow:css("#rsHeadline").textShadow,
+    scoreShadow:css("#rsScoreLine").textShadow,
+    rematchRotate:parseFloat(css("#rsRematch").rotate),
+    tapeRotate:parseFloat(css(".rs-tape-rematch-stage").rotate),
+    strayTape:css(".rs-tape-focus").display,
+    scoreZ:+css(".rs-scorechip").zIndex,
+    focusZ:+css("#rsFocus").zIndex,
+    dividerSrc:document.querySelector(".rs-divider").getAttribute("src"),
+    label:document.getElementById("rsRematchLabel").textContent.trim(),
+    scoreText:document.getElementById("rsScoreLine").textContent.trim(),
+    tabOrder:[...document.querySelectorAll("#resStage button")]
+      .filter(el => getComputedStyle(el).display !== "none").map(el => el.id),
+  };
+});
+const nearRect = (actual,want,tolerance=1.15) =>
+  actual.every((value,index) => Math.abs(value-want[index]) <= tolerance);
+ok(nearRect(soloFigma.logo,[10.019,.241,198.427,137.715]) &&
+   nearRect(soloFigma.exit,[1232.019,21.241,264,87.431]) &&
+   nearRect(soloFigma.yellowTape,[0,-6,72.549,69.115]) &&
+   nearRect(soloFigma.creamTape,[161.364,75.776,63.769,53.483]),
+  "Solo logo, LEAVE and both baked-angle logo tapes use the latest Figma rectangles");
+ok(nearRect(soloFigma.headline,[417.421,22.448,605.116,49.387]) &&
+   nearRect(soloFigma.score,[532,104,376,50]) &&
+   Math.abs(soloFigma.headlineFont-64.852)<.15 &&
+   Math.abs(soloFigma.scoreFont-70)<.15 &&
+   /255,\s*255,\s*255/.test(soloFigma.headlineShadow) &&
+   /255,\s*255,\s*255/.test(soloFigma.scoreShadow),
+  `Solo score typography keeps its independent Figma frames (${soloFigma.headlineFont.toFixed(2)}px / ${soloFigma.scoreFont.toFixed(2)}px)`);
+ok(nearRect(soloFigma.focus,[752,107,660,408]) &&
+   nearRect(soloFigma.save,[1152,444.051,241,50.95]) &&
+   soloFigma.strayTape === "none" && soloFigma.scoreZ > soloFigma.focusZ &&
+   /v1-divider\.png$/.test(soloFigma.dividerSrc),
+  "the 660×408 photo aperture uses the solid-blue divider and score-paper layering");
+ok(nearRect(soloFigma.award,[-5,645,223.774,150.283]) &&
+   nearRect(soloFigma.stat1,[213.042,688.424,162.307,77.492]) &&
+   nearRect(soloFigma.stat2,[374.893,694.227,160.212,71.802]) &&
+   nearRect(soloFigma.stat3,[535.831,696.394,158.497,67.471]),
+  "Solo award and the three rotated paper children match the REST render");
+ok(nearRect(soloFigma.rematch,[742,693,678.593,104.048]) &&
+   nearRect(soloFigma.rematchTape,[716.447,677.917,104.318,64.193]) &&
+   Math.abs(soloFigma.rematchRotate-(-.347283))<.02 &&
+   Math.abs(soloFigma.tapeRotate-(-15.253273))<.03,
+  "Solo REMATCH and its pre-rotation tape box land at the authored angles");
+ok(soloFigma.label === "REMATCH? READY UP!" &&
+   /POINTS$/.test(soloFigma.scoreText) &&
+   soloFigma.tabOrder.indexOf("rsSaveStrip") < soloFigma.tabOrder.indexOf("rsRematch"),
+  "Solo copy and keyboard order follow the combined visual flow");
+
 /* the run, pose by pose, with what each one paid */
 const poses = await page.evaluate(() =>
   [...document.querySelectorAll("#rsPoseList li")].map(li => ({
@@ -422,9 +492,11 @@ ok(poses.every(p => p.word && /Pts$/.test(p.pts)),
 ok(poses.some(p => p.got), "scored poses are marked as scored");
 ok(await page.evaluate(() => {
   const list = document.getElementById("rsPoseList");
-  return [...list.querySelectorAll(".rs-posecol")]
-    .every(c => c.scrollHeight <= c.clientHeight + 2);
-}), "the pose list fits its block instead of sliding under REMATCH");
+  const rematchTop=document.getElementById("rsRematch").getBoundingClientRect().top;
+  return [...list.querySelectorAll("li")].every(li => li.scrollWidth <= li.clientWidth + 1) &&
+    [...list.querySelectorAll(".rs-posecol")].every(col =>
+      col.getBoundingClientRect().top + col.scrollHeight <= rematchTop - 5);
+}), "each pose row fits without ellipsis and the columns stay clear of REMATCH");
 
 /* stills cycle themselves — no arrows to click */
 ok(await page.evaluate(() =>
@@ -447,7 +519,96 @@ const cycled = await page.evaluate(() => new Promise(resolve => {
   }, 80);
 }));
 ok(cycled !== "stuck", `stills cycle on their own (${cycled})`);
+const soloCarouselControls = await page.evaluate(async () => {
+  const focus=document.getElementById("rsFocus");
+  const count=document.querySelectorAll("#rsFocusShots img").length;
+  if(count < 2) return { count, keyboard:true, enter:true, guarded:true, swipe:true, a11y:true };
+  const at=()=>Number(focus.dataset.shotIndex);
+  focus.focus();
+  const start=at();
+  focus.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,30));
+  const afterArrow=at();
+  focus.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,30));
+  const afterEnter=at();
+  document.getElementById("rsSaveStrip").focus();
+  dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowRight",bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,30));
+  const afterGuard=at();
+  focus.dispatchEvent(new PointerEvent("pointerdown",{
+    pointerId:71,button:0,clientX:1100,clientY:300,bubbles:true}));
+  focus.dispatchEvent(new PointerEvent("pointerup",{
+    pointerId:71,button:0,clientX:990,clientY:302,bubbles:true}));
+  await new Promise(r=>setTimeout(r,30));
+  const afterSwipe=at();
+  return {
+    count,
+    keyboard:afterArrow !== start,
+    enter:afterEnter !== afterArrow,
+    guarded:afterGuard === afterEnter,
+    swipe:afterSwipe !== afterGuard,
+    a11y:focus.getAttribute("role") === "button" &&
+      /photo \d+ of \d+/.test(focus.getAttribute("aria-label") || ""),
+  };
+});
+ok(Object.values(soloCarouselControls).slice(1).every(Boolean),
+  `Solo reel supports focus-owned arrows, Enter and swipe (${soloCarouselControls.count} stills)`);
+
+await page.evaluate(() => document.activeElement?.blur());
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"reduce" }]);
+const reducedReelStart=await page.evaluate(() =>
+  document.getElementById("rsFocus").dataset.shotIndex);
+await sleep(2800);
+ok(await page.evaluate(start =>
+  document.getElementById("rsFocus").dataset.shotIndex === start, reducedReelStart),
+  "reduced motion stops the unsolicited Solo photo cycle");
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 ok(!!(await txt("#rsAwardTitle")), `solo still earns an award (${await txt("#rsAwardTitle")})`);
+
+/* Running out of time is the beat that has to be unmistakable — the Figma
+   TIMES UP paper, a shake, and a red wash, not a text burst. */
+console.log("time's up:");
+await page.click("#rsRematch");
+await page.waitForFunction(() => document.body.dataset.state === "playing", { timeout: 9000 });
+await sleep(400);
+await page.evaluate(async () => {
+  const { state } = await import(location.origin + "/js/state.js");
+  state.game.wordEnd = performance.now() + 300;   // let the real clock expire
+});
+await page.waitForFunction(() =>
+  document.getElementById("timesUp").classList.contains("fire"), { timeout: 8000 });
+ok(true, "the word clock running out fires the TIMES UP paper");
+await sleep(260);   // the slam rotates and starts at opacity 0
+const tu = await page.evaluate(() => {
+  const card = document.getElementById("timesUp");
+  const img = card.querySelector("img");
+  const flash = document.getElementById("timesUpFlash");
+  /* layout metrics, not a client rect: the paper is mid-rotation and a client
+     rect would report the rotated bounding box instead of the paper */
+  return {
+    src: img.getAttribute("src").split("/").pop(),
+    ratio: +(img.offsetWidth / img.offsetHeight).toFixed(2),
+    visible: Number(getComputedStyle(card).opacity) > .1,
+    shake: getComputedStyle(img).animationName,
+    glow: getComputedStyle(card, "::before").animationName,
+    flashing: flash.classList.contains("fire"),
+    flashLayer: getComputedStyle(flash).zIndex,
+  };
+});
+ok(tu.src === "rs-timesup.png", `it is the Figma asset, not a text burst (${tu.src})`);
+ok(Math.abs(tu.ratio - 2.65) < .12, `paper keeps its Figma proportions (${tu.ratio})`);
+ok(tu.visible && tu.shake === "tuShake", `the paper shakes (${tu.shake})`);
+ok(tu.glow === "tuGlow", `it glows (${tu.glow})`);
+/* the red must be its own layer: an inset shadow on the stage paints under
+   the video child and never shows */
+ok(tu.flashing && Number(tu.flashLayer) > 0,
+  `the red wash is a real layer over the stage (z ${tu.flashLayer})`);
+await page.waitForFunction(() =>
+  !document.getElementById("timesUp").classList.contains("fire"), { timeout: 4000 });
+ok(true, "it clears itself instead of sticking around");
+await page.click("#btnExitSolo");
+await page.waitForFunction(() => document.body.dataset.state === "results", { timeout: 8000 });
 
 console.log("replay + training:");
 await page.click("#rsRematch");
@@ -891,9 +1052,12 @@ ok(await page.evaluate(() =>
   !document.querySelector("#resStage .rs-seat video") &&
   !document.querySelector("#resStage .rs-seat[data-pid]") &&
   !document.getElementById("rsFocusShots").children.length &&
+  !document.getElementById("rsFocusShotsB").children.length &&
+  !document.getElementById("rsPoseColA").children.length &&
+  !document.getElementById("rsPoseColB").children.length &&
   !document.getElementById("rsStripBlue").children.length &&
   !document.getElementById("rsStripOrange").children.length),
-  "leaving results releases seat streams and result-only photo DOM");
+  "leaving results releases both reels, pose rows, seat streams and result-only DOM");
 
 console.log("reduced-motion gameplay:");
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"reduce" }]);
