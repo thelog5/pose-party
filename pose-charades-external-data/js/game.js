@@ -14,7 +14,7 @@ import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
-import { toast, flash, pointBurst, renderGuesses, topGuesses, fmtTime, fmtScore,
+import { toast, flash, renderGuesses, topGuesses, fmtTime, fmtScore,
          localMatchGuessIs, setCountdown, showTimesUp } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
@@ -24,7 +24,8 @@ import { partyCheck } from "./partyMatch.js";
 import { captureShot, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
-         ROUND_END_PAUSE_MS, showPointsAward, confettiFrom } from "./soloRound.js";
+         ROUND_END_PAUSE_MS, showPointsAward, confettiFrom,
+         clearCelebrations, resetSoloBoard } from "./soloRound.js";
 import {
   markGuessRecognized,
   prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
@@ -42,6 +43,7 @@ let preCountTimer = null;
 export function bindGameLifecycle(){
   onTransition((to, from)=>{
     const inGame = s => s==="countdown"||s==="playing"||s==="word-won";
+    if(!inGame(to)) clearCelebrations();
     if(inGame(from) && !inGame(to) && to!=="results" && state.game){
       cancelPreCount();
       clearInterval(state.game.timer);
@@ -113,9 +115,12 @@ export function startGame(mode="ai"){
   if(!transition("countdown")){ state.game=null; return; }
   updateHud();
   if(mode==="ai"){
+    /* The word card and guess stack are only cleared in beginRound, which
+       runs AFTER the 3·2·1 — so a second run counted in under the last word
+       of the previous one, its bar still full. Clear before the countdown. */
+    resetSoloBoard();
     setTxt("soloRoundTime", fmtTime(SOLO.roundMs,{compact:true}));
     setTxt("soloWordTime", fmtTime(SOLO.wordMs));
-    setTxt("soloSkipCost", "−"+SOLO.skipPenalty);
   }else{
     document.querySelector(".statpill.round .lab").textContent="Round";
     $("pillRound").textContent="1 / "+ROUNDS;
@@ -221,7 +226,6 @@ function finishWord(winner, opts={}){
     const pts=pointsForCurrentWord();
     game.score+=pts;
     game.results.push({word:game.word, ok:true, pts, confidence:opts.confidence||0});
-    pointBurst("+"+fmtScore(pts)+" points", game.word+(game.streak>1?" · streak x"+game.streak:""), "good");
     $("matchStage")?.classList.add("you-locked");
     markGuessRecognized($("myGuessTop"),true);
     blip([523]);
@@ -239,7 +243,7 @@ function finishWord(winner, opts={}){
     const pts=PTS_CORRECT;
     game.rivalScore+=pts;
     game.results.push({word:game.word, ok:false, rival:true, rivalPts:pts, thought:"Rival guessed it first"});
-    pointBurst("Rival wins!", game.word+" · +"+pts, "rival");
+    showPointsAward("v1RivalAward","v1RivalAwardPts",pts);
     $("matchStage")?.classList.add("rival-locked");
     markGuessRecognized($("rivalGuessTop"),true);
     playWordMissFeedback($("vsWordCard"),THRESH);
@@ -248,9 +252,8 @@ function finishWord(winner, opts={}){
   }else{
     game.streak=0;
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
-    const missMsg = opts.skip ? "Skipped" : "Time up";
-    if(!opts.skip) showTimesUp();
-    pointBurst(missMsg, opts.skip ? "−"+PTS_SKIP+" points" : "Next word coming up", "bad");
+    if(opts.skip) toast("Skipped — −"+PTS_SKIP+" points");
+    else showTimesUp();
     playWordMissFeedback($("vsWordCard"),THRESH);
     flash("bad");
     blip([220,165]);
@@ -398,7 +401,9 @@ export function endGame(){
     ? "GAME OVER"
     : (g.score>=g.rivalScore ? "YOU WIN!" : "RIVAL WINS");
   showResults({
-    mode: solo?"solo":"vs",
+    /* The practice rival is a 1v1 layout with a direct rematch — there is no
+       room and nobody to vote with, so it never takes the ready-vote path. */
+    mode: solo?"solo":"1v1",
     size: 2,
     headline,
     teams: solo ? null : { blue:g.score, orange:g.rivalScore },
@@ -416,7 +421,7 @@ export function endGame(){
       score:g.rivalScore, firsts:g.results.filter(r=>r.rival).length,
       fastest:null, avg:null, clutch:0, ready:false,
     }]),
-    rematch:{ ready:0, total:1, mine:false },
+    rematch:{ ready:0, total:1, mine:false, direct:true },
     onRematch: () => startGame(state.lastMode||"ai"),
   });
 }

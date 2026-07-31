@@ -75,6 +75,9 @@
 
 /* ---------- big action buttons ---------- */
 .bigbtn{display:flex;align-items:center;justify-content:center;gap:14px;border:2.5px solid var(--ink);border-radius:var(--r-lg);padding:18px 30px;font-family:var(--f-display);font-weight:800;font-size:34px;letter-spacing:2px;text-transform:uppercase;box-shadow:var(--sh-big);line-height:1}
+.bigbtn{transition:transform .14s ease,box-shadow .14s ease,filter .14s ease}
+.bigbtn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.05);
+  box-shadow:0 9px 0 rgba(21,42,110,.22)}
 .bigbtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(21,42,110,.18)}
 .bigbtn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .bigbtn.yellow{background:var(--yellow);color:var(--ink)}
@@ -83,6 +86,11 @@
 .bigbtn .arrow{font-family:var(--f-body)}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2.5px solid var(--ink);border-radius:var(--r-sm);padding:10px 18px;font-weight:900;font-size:15px;letter-spacing:.8px;text-transform:uppercase;box-shadow:var(--sh)}
+/* every control in this app reacts to hover AND to press; Training's buttons
+   were the one set that only had the press half */
+.btn{transition:transform .14s ease,box-shadow .14s ease,filter .14s ease}
+.btn:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.06);
+  box-shadow:0 5px 0 rgba(21,42,110,.2)}
 .btn:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(21,42,110,.18)}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
 .btn.blue{background:var(--blue);color:#fff}

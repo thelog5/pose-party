@@ -18,13 +18,14 @@
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
-import { toast, flash, pointBurst, fmtTime, fmtScore, fitMatchPaperText,
-         renderRemoteMatchGuess, setCountdown, showTimesUp } from "./ui.js";
+import { toast, flash, fmtTime, fmtScore, fitMatchPaperText,
+         renderRemoteMatchGuess, setCountdown, showTimesUp,
+         stopMatchFill } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
-import { showPointsAward, confettiFrom } from "./soloRound.js";
+import { showPointsAward, confettiFrom, flyPoints } from "./soloRound.js";
 import { THRESH } from "./constants.js";
 import {
   markGuessRecognized,
@@ -101,19 +102,28 @@ function fitLobbyNames(){
   });
 }
 
+/* The status line is anchored near the bottom of the stage and grows DOWNWARD
+   as it wraps, so "does it fit" means "does it still end above the stage
+   edge". Two changes from the old version: it measures every line rather than
+   only ones over 34 characters — "BARTHOLOMEW joined! Press START MATCH" is
+   34 wide characters and skipped the fit entirely — and it computes the scale
+   in one step instead of shrinking 10% at a time through up to twelve forced
+   reflows. Layout metrics only: getBoundingClientRect is inflated by whatever
+   lobby transition happens to be mid-flight. */
 function fitLobbyStatus(){
   cancelAnimationFrame(statusFitFrame);
   statusFitFrame=requestAnimationFrame(()=>{
     const line=$("lobbyStatus"), stage=$("lobbyStage");
-    if(!line || !stage) return;
+    if(!line || !stage || !line.clientWidth) return;
     line.style.removeProperty("font-size");
-    if(!line.classList.contains("compact") || !line.clientWidth) return;
-    const stageBox=stage.getBoundingClientRect();
-    const bottom=stageBox.bottom-Math.max(2,stageBox.height*.004);
-    let size=parseFloat(getComputedStyle(line).fontSize);
-    for(let pass=0; pass<12 && line.getBoundingClientRect().bottom>bottom; pass++){
-      size=Math.max(5.5,size*.9);
-      line.style.fontSize=size+"px";
+    const room=stage.clientHeight-line.offsetTop-Math.max(2,stage.clientHeight*.004);
+    if(room<=0 || line.offsetHeight<=room) return;
+    const base=parseFloat(getComputedStyle(line).fontSize);
+    line.style.fontSize=Math.max(5.5,base*room/line.offsetHeight*.98)+"px";
+    /* one reconciliation pass — shrinking can change the line count */
+    if(line.offsetHeight>room){
+      const size=parseFloat(getComputedStyle(line).fontSize);
+      line.style.fontSize=Math.max(5.5,size*room/line.offsetHeight*.98)+"px";
     }
   });
 }
@@ -177,6 +187,7 @@ function resetLobbyUi(){
   settings={ ...DEFAULT_SETTINGS };
   renderCode("");
   renderSettings(true);
+  $("joinCode").value="";
   $("lobbyStage").classList.remove("joined");
   $("lobbyOppName").textContent="RIVAL";
   $("lobbyYouName").textContent=(localStorage.getItem(NAME_KEY)||"YOU").slice(0,NAME_MAX);
@@ -197,7 +208,14 @@ function wireLobby(){
   };
   $("roomCodeText").onclick=async()=>{
     if(!roomCode) return;
-    try{ await navigator.clipboard.writeText(roomCode); toast("Room code copied!"); }catch(e){}
+    /* navigator.clipboard is undefined on an insecure origin — which is
+       exactly the http://<host>:3000 LAN setup this game is played on. An
+       empty catch made the click read as broken. */
+    try{
+      await navigator.clipboard.writeText(roomCode);
+      toast("Room code copied!");
+      blip([659,880],.05);
+    }catch(e){ toast("Copy failed — the code is "+roomCode); }
   };
   $("btnJoinRoom").onclick=()=>{
     const code=$("joinCode").value.trim().toUpperCase();
@@ -268,15 +286,27 @@ function wireStepper(key, apply, step){
 }
 
 function renderSettings(editable){
-  $("setMatch").textContent=fmtSecs(settings.matchSecs);
-  $("setWord").textContent=fmtSecs(settings.wordSecs);
+  /* A stepper that only rewrites a number reads as unresponsive on a paper
+     card. Pop the value that actually moved. */
+  setSettingValue("setMatch", fmtSecs(settings.matchSecs));
+  setSettingValue("setWord", fmtSecs(settings.wordSecs));
   for(const id of ["matchMinus","matchPlus","wordMinus","wordPlus"])
     $(id).disabled=!editable;
 }
 
+function setSettingValue(id, text){
+  const el=$(id);
+  if(!el || el.textContent===text) return;
+  el.textContent=text;
+  el.classList.remove("bump");
+  void el.offsetWidth;
+  el.classList.add("bump");
+  blip([440,554],.04);
+}
+
 function renderCode(code){
   const el=$("roomCodeText");
-  el.textContent=code||"— — — — — —";
+  el.textContent=code||"------";
   el.classList.toggle("loading", !code);
 }
 
@@ -531,14 +561,30 @@ function closePeer(){
 
 /* ---------------- match flow (server-driven) ---------------- */
 
+/* #rivalMeter and #rivalGuessList belonged to the old dashboard HUD and no
+   longer exist in the markup; the "?" they paired with also flashed for one
+   classifier tick before renderGuesses overwrote it with "0%". */
 function resetRivalPanel(){
   const word=$("rivalTopWord"), pct=$("rivalTopPct");
-  const meter=$("rivalMeter"), list=$("rivalGuessList");
   if(word) word.textContent="GUESSING…";
-  if(pct) pct.textContent="?";
-  if(meter) [...meter.children].forEach(seg=>seg.classList.remove("on"));
-  if(list) list.innerHTML='<div class="grow"><span class="gname" style="white-space:normal;text-transform:none">'+
-    esc(peerName)+"’s AI runs on their device — first to convince their AI wins the word!</span></div>";
+  if(pct) pct.textContent="0%";
+}
+
+/* Everything the split-screen board carries from one word to the next. Shared
+   by the countdown and each new round so the two can never drift. */
+function clearMatchBoard(){
+  const stage=$("matchStage");
+  if(stage){
+    stage.classList.remove("you-locked","rival-locked","chase-urgent","chase-final");
+    delete stage.dataset.chaseSecond;
+  }
+  $("vsWord").textContent="—";
+  scorePaintHeld=false;
+  stopMatchFill();
+  prepareWordFeedback($("vsWordCard"),$("v1WordFill"),THRESH,true);
+  for(const id of ["myGuessTop","rivalGuessTop"]) markGuessRecognized($(id),false);
+  $("v1Award")?.classList.remove("show");
+  $("v1RivalAward")?.classList.remove("show");
 }
 
 function onMatchStart({startAt, matchEndsAt, players}={}){
@@ -559,6 +605,10 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   if(!transition("countdown")){ state.game=null; return; }
 
   resetRivalPanel();
+  /* Clear last match's board BEFORE the 3·2·1: the lock classes pin the fill
+     bar at 95% green, so a rematch otherwise counts in under the word you
+     already won, apparently already solved. */
+  clearMatchBoard();
   $("pillScore").textContent="0";
   $("pillStreak").textContent="x1";
   /* time-based mode: the round pill becomes the match clock */
@@ -637,21 +687,12 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   game.wordStart=performance.now();
   game.wordEnd=perfFromServer(endsAt);
   if(state.smooth) state.smooth[game.word]=0;
+  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIME";
+  clearMatchBoard();
+  const stage=$("matchStage");
+  if(stage) stage.dataset.phase=suddenDeath?"sudden":"word";
   $("vsWord").textContent=game.word;
   fitGameplayText($("vsWord"));
-  if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIME";
-  const stage=$("matchStage");
-  if(stage){
-    stage.dataset.phase=suddenDeath?"sudden":"word";
-    stage.classList.remove("you-locked","rival-locked","chase-urgent","chase-final");
-    delete stage.dataset.chaseSecond;
-  }
-  const vw=$("vsWordCard");
-  prepareWordFeedback(vw,$("v1WordFill"),THRESH,true);
-  for(const id of ["myGuessTop","rivalGuessTop"])
-    markGuessRecognized($(id),false);
-  $("v1Award")?.classList.remove("show");
-  $("v1RivalAward")?.classList.remove("show");
   requestAnimationFrame(fitMatchPaperText);
   resetRivalPanel();
   if(!game.timer) game.timer=setInterval(gameTick,100);
@@ -692,8 +733,29 @@ function playLocalMatchLock(points){
       showMatchAward("you",points);
       flash("good");
       blip([523,659,784]);
+      /* Solo's signature beat, now shared: the points physically travel to
+         your card, and the number only moves when they land. The server is
+         still authoritative — we only hold the PAINT, never the value. */
+      holdScorePaint();
+      flyPoints(card,$("v1YouScore")?.closest(".v1-scorecard"),points,()=>{
+        releaseScorePaint();
+        blip([880]);
+      });
     },
   });
+}
+
+/* The lock sequence runs ~180ms of hitstop plus a 650ms flight, and the
+   server's score packet lands somewhere inside that. Buffer the repaint so
+   the number never jumps before the chip that is carrying it. */
+let scorePaintHeld=false;
+function holdScorePaint(){ scorePaintHeld=true; }
+function releaseScorePaint(){
+  scorePaintHeld=false;
+  const game=state.game;
+  if(!game) return;
+  setScoreText("v1YouScore",fmtScore(game.score));
+  setScoreText("v1RivalScore",fmtScore(game.rivalScore));
 }
 
 function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
@@ -771,7 +833,10 @@ function onRoundResult({
   }else if(winnerId){
     game.streak=0;
     game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
-    pointBurst("Chase missed", peerName+" +"+fmtScore(firstPoints)+" · you 0", "rival");
+    /* The rival's award paper already says exactly this, in the paper-craft
+       language the rest of the game speaks — the old square burst card was
+       the last piece of the pre-Figma HUD still showing during a match. */
+    showMatchAward("rival", firstPoints);
     flash("bad"); blip([330,247]);
   }else{
     game.streak=0;
@@ -798,6 +863,19 @@ function onRoundResult({
   if(gameState()==="playing") transition("word-won");
 }
 
+/* Writes a score and pops its paper — but only when the number actually
+   moved, so the per-round score sync doesn't bump on every packet. */
+function setScoreText(id, text){
+  const el=$(id);
+  if(!el || el.textContent===text) return;
+  el.textContent=text;
+  const card=el.closest(".v1-scorecard");
+  if(!card) return;
+  card.classList.remove("bump");
+  void card.offsetWidth;
+  card.classList.add("bump");
+}
+
 function applyScores(scores){
   const game=state.game;
   if(!game || !Array.isArray(scores)) return;
@@ -807,8 +885,12 @@ function applyScores(scores){
     else game.rivalScore=p.score|0;
   }
   $("pillScore").textContent=fmtScore(game.score);
-  if($("v1YouScore")) $("v1YouScore").textContent=fmtScore(game.score);
-  if($("v1RivalScore")) $("v1RivalScore").textContent=fmtScore(game.rivalScore);
+  /* Solo and Party both bump their score card when it changes; 1v1 was the
+     one mode where points appeared with no reaction at all. */
+  if(!scorePaintHeld){
+    setScoreText("v1YouScore",fmtScore(game.score));
+    setScoreText("v1RivalScore",fmtScore(game.rivalScore));
+  }
   const stage=$("matchStage");
   if(stage){
     stage.classList.toggle("you-leading", game.score>game.rivalScore);
@@ -822,7 +904,9 @@ function onMatchSudden({scores}={}){
   applyScores(scores);
   game.suddenDeath=true;
   if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent="SUDDEN DEATH";
-  pointBurst("SUDDEN DEATH", "First player recognized wins the match", "rival");
+  /* the stage already carries a sudden-death treatment (data-phase="sudden");
+     a toast says the rule once instead of a full-screen card interrupting it */
+  toast("SUDDEN DEATH — first player recognized wins the match!");
   blip([392,523,659,784]);
 }
 

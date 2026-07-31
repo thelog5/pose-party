@@ -39,7 +39,27 @@ function evaluate(testClips, evalModel){
   return { acc: tot ? Math.round(ok/tot*100) : null, missBy };
 }
 
+/* buildModel + evaluate run fully synchronously, and on a real dataset that
+   is a multi-second frozen tab off a single click. Paint "Training…" and
+   disable the button, then let the browser render before we block it. */
 export function train(opts={}){
+  const silent = !!opts.silent;
+  const rep0=$("trainReport"), btn=$("btnTrain");
+  if(!silent && rep0 && !train._busy){
+    train._busy=true;
+    rep0.style.display="block";
+    rep0.innerHTML="Training the AI on your clips…";
+    if(btn) btn.disabled=true;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      try{ runTraining(opts); }
+      finally{ train._busy=false; if(btn) btn.disabled=false; }
+    }));
+    return;
+  }
+  runTraining(opts);
+}
+
+function runTraining(opts={}){
   const silent = !!opts.silent;
   const counts={};
   for(const c of state.dataset.clips) counts[c.label]=(counts[c.label]||0)+1;

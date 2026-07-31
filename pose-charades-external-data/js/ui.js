@@ -25,24 +25,19 @@ export function showStatus(msg){
 }
 
 export function flash(kind){
-  const f=$("flash"); f.className="flash "+kind;
-  setTimeout(()=>f.className="flash",700);
+  const f=$("flash");
+  /* Re-assigning the same className is a no-op, so a second flash of the same
+     kind inside 700ms never replayed — and the shared timer cut it short. */
+  f.className="flash";
+  void f.offsetWidth;
+  f.className="flash "+kind;
+  clearTimeout(flash._t);
+  flash._t=setTimeout(()=>f.className="flash",700);
 }
 
 export function toast(msg){
   const t=$("toast"); t.textContent=msg; t.style.display="block";
   clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display="none",2600);
-}
-
-export function pointBurst(headline, detail, kind="good"){
-  const b=$("pointBurst"); if(!b) return;
-  $("pointHeadline").textContent=headline;
-  $("pointDetail").textContent=detail;
-  b.className="pointBurst "+kind;
-  void b.offsetWidth; // restart the animation
-  b.classList.add("show");
-  clearTimeout(pointBurst._t);
-  pointBurst._t=setTimeout(()=>b.classList.remove("show"),1300);
 }
 
 export const fmtTime = (ms, { compact=false }={}) => {
@@ -88,6 +83,45 @@ const matchGuess = {
   my:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
   rival:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
 };
+
+/* 1v1's word bar + confidence shake, driven at display rate. */
+let matchFillTarget = 0;
+let matchFillRaf = 0;
+
+function matchFillFrame(){
+  matchFillRaf = 0;
+  const g = state.game;
+  const fill = $("v1WordFill");
+  if(state.screen !== "match" || !g?.word || !fill) return;
+
+  const slot = matchGuess.my;
+  const stage = $("matchStage");
+  const locked = stage?.classList.contains("you-locked");
+  if(locked){
+    slot.shownFill = 1;
+    slot.fillAt = performance.now();
+  }else{
+    const next = advanceRecognitionFill(slot.shownFill, matchFillTarget, slot.fillAt);
+    slot.shownFill = next.value;
+    slot.fillAt = next.at;
+  }
+  fill.style.width = (slot.shownFill * 95) + "%";
+  const activePhase = g.mode === "vs" ||
+    ["word", "chase", "sudden"].includes(g.roundPhase);
+  setWordRecognitionMotion($("vsWordCard"),
+    slot.shownFill * THRESH, THRESH, activePhase && !locked);
+  matchFillRaf = requestAnimationFrame(matchFillFrame);
+}
+
+function startMatchFill(){
+  if(!matchFillRaf) matchFillRaf = requestAnimationFrame(matchFillFrame);
+}
+
+export function stopMatchFill(){
+  if(matchFillRaf) cancelAnimationFrame(matchFillRaf);
+  matchFillRaf = 0;
+  matchFillTarget = 0;
+}
 
 function resetMatchSide(prefix, key){
   const slot=matchGuess[prefix];
@@ -257,33 +291,20 @@ export function renderGuesses(){
       if(g?.mode==="online" && state.onlineGuess && top[0])
         state.onlineGuess(top[0][0],top[0][1]);
     }
-    const fill=$("v1WordFill");
-    if(fill && g?.word){
+    /* The bar and the shake are ANIMATION, not classifier output. Advancing
+       them here tied them to CLASSIFY_EVERY_MS (250ms), so 1v1's bar stepped
+       in four visible jumps while Solo and Party ran theirs off rAF. Record
+       where the bar is headed; the rAF loop below walks it there. */
+    if(g?.word){
       const current=mySlot?.history.items[0];
-      const targetIsDisplayed=current?.label===g.word;
-      const displayedConfidence=targetIsDisplayed
+      const displayedConfidence=current?.label===g.word
         ? Math.max(0,Math.min(1,current?.pct||0))
         : 0;
-      const targetProgress=localLocked
+      matchFillTarget=localLocked
         ? 1
         : Math.max(0,Math.min(1,displayedConfidence/THRESH));
-      if(localLocked){
-        mySlot.shownFill=1;
-        mySlot.fillAt=performance.now();
-      }else{
-        const next=advanceRecognitionFill(
-          mySlot.shownFill,targetProgress,mySlot.fillAt);
-        mySlot.shownFill=next.value;
-        mySlot.fillAt=next.at;
-      }
-      fill.style.width=(mySlot.shownFill*95)+"%";
-      const card=$("vsWordCard");
-      const activePhase=g.mode==="vs" ||
-        ["word","chase","sudden"].includes(g.roundPhase);
-      const canShake=activePhase && !localLocked;
-      setWordRecognitionMotion(card,mySlot.shownFill*THRESH,THRESH,canShake);
+      startMatchFill();
     }
-    fitMatchPaperText();
   } else if(s==="train"){
     guessRowsInto("trainGuessList", top, 0, 5);
   }
@@ -304,12 +325,27 @@ export function renderClasses(){
   ).join("") || '<div class="hint">No clips yet. Pick a word and hit record.</div>';
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{
     const lab=b.dataset.lab;
+    const before=state.dataset.clips.length;
     if(b.classList.contains("delall")){
       if(confirm('Delete ALL clips of “'+lab+'”?')) state.dataset.clips=state.dataset.clips.filter(c=>c.label!==lab);
     }else{
       const i=state.dataset.clips.map(c=>c.label).lastIndexOf(lab);
       if(i>=0) state.dataset.clips.splice(i,1);
     }
+    const removed=before-state.dataset.clips.length;
     renderClasses();
+    if(!removed) return;
+    /* The live guesser keeps classifying against the deleted clips until the
+       player happens to press TRAIN again — so the panel below silently
+       disagrees with the list above. Refit now, and say that we did. */
+    onDatasetEdited?.();
+    toast(removed===1
+      ? "Clip removed — AI retrained."
+      : removed+" clips removed — AI retrained.");
   });
 }
+
+/* training.js registers the retrain here; ui.js must not import it directly
+   (training.js already imports ui.js). */
+let onDatasetEdited=null;
+export function setDatasetEditedHandler(fn){ onDatasetEdited=fn; }

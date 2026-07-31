@@ -3,7 +3,7 @@
 import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { STARTERS } from "./constants.js";
-import { toast, renderClasses } from "./ui.js";
+import { toast, renderClasses, setDatasetEditedHandler } from "./ui.js";
 import { startRecording } from "./capture.js";
 import { train } from "./training.js";
 import { exportData, importData, preloadBundledDataset } from "./data.js";
@@ -12,7 +12,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
 import { wireResults, devResults } from "./results.js";
 import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
-import { enterParty, wireParty } from "./party.js";
+import { enterParty, wireParty, leaveParty } from "./party.js";
 import { wireHomeAlive } from "./homeAlive.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
 import { boot } from "./engine.js";
@@ -25,6 +25,9 @@ bindGameLifecycle();
 function wireControls(){
   $("logoHome").onclick=()=>transition("menu");
   $("logoHomeCraft").onclick=()=>transition("menu");
+  /* the lobby brand is the same quiet way home as its Home twin — it already
+     had the cursor, the hover lift and the alt text, just no handler */
+  $("logoLobby").onclick=()=>transition("menu");
   $("btnGear").onclick=()=>transition(gameState()==="training"?"menu":"training");
   $("btnDoneTrain").onclick=()=>transition("menu");
   $("btnFriends").onclick=()=>toast("Friends lists are coming soon — share a room link to play together!");
@@ -46,9 +49,12 @@ function wireControls(){
   wireHomeAlive();
   wireLobbyAlive();
 
-  /* in-game */
+  /* in-game. Solo just ends the run; the online modes have to tell the room
+     they are going, or everyone else waits out a player who is not there. */
   $("btnExitSolo").onclick=()=>state.game&&endGame();
   $("btnSkipSolo").onclick=()=>missWord(true);
+  $("btnExitMatch").onclick=()=>{ leaveRoom(); transition("menu"); };
+  $("btnExitParty").onclick=()=>{ leaveParty(); transition("menu"); };
 
   /* results — the screen owns its own buttons now (see results.js) */
   wireResults();
@@ -74,6 +80,8 @@ function wireControls(){
   /* training */
   $("btnRecord").onclick=startRecording;
   $("btnTrain").onclick=()=>train();
+  /* deleting clips has to refit the model the live panel is using */
+  setDatasetEditedHandler(()=>{ if(state.dataset.clips.length) train({silent:true}); });
   $("btnExport").onclick=exportData;
   $("btnImport").onclick=()=>$("fileImport").click();
   $("fileImport").onchange=e=>{ if(e.target.files[0]) importData(e.target.files[0]); e.target.value=""; };

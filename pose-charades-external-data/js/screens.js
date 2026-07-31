@@ -6,6 +6,7 @@
    Screens: home | solo | lobby | match | party | train | results */
 
 import { $ } from "./dom.js";
+import { resetAlphaHitAreas } from "./alphaHit.js";
 import { state } from "./state.js";
 import { ROUNDS } from "./constants.js";
 
@@ -66,6 +67,10 @@ function playGameplayEntrance(screen){
 
 export function render(fsmState){
   const s = screenFor(fsmState);
+  /* Alpha hit-testing disables a paper while the pointer sits on one of its
+     transparent pixels. Leaving the screen right then would strand that
+     inline pointer-events:none, so hand every paper back on each repaint. */
+  resetAlphaHitAreas();
   state.screen = s;
   document.body.dataset.screen = s;
   document.body.dataset.state = fsmState;

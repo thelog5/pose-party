@@ -133,7 +133,13 @@ try {
           const el=document.getElementById(id);
           return {src:el?.getAttribute('src') || '', rotate:getComputedStyle(el).rotate};
         }),
-      noExit: !document.getElementById('btnExitParty'),
+      exit: (() => {
+        const b = document.getElementById('btnExitParty');
+        if(!b) return null;
+        const cs = getComputedStyle(b), r = b.getBoundingClientRect();
+        return { opacity: parseFloat(cs.opacity), label: b.getAttribute('aria-label'),
+                 clickable: cs.pointerEvents !== 'none' && r.width > 0 && r.height > 0 };
+      })(),
       historyTapesHidden: ['pmMyPastTape','pmFoePastTape'].every(id =>
         Number.parseFloat(getComputedStyle(document.getElementById(id)).opacity) === 0),
       ratio: stage.width / stage.height,
@@ -150,7 +156,15 @@ try {
   ok(visualContract.tapes.every(t =>
       /pm-tape-[a-z-]+\.png$/.test(t.src) && (t.rotate === "none" || t.rotate === "0deg")),
     "all Party tapes use exact pre-rotated Figma node exports");
-  ok(visualContract.noExit, "Party has no in-match exit control");
+  /* A party match used to be a one-way door — the header is hidden here, so a
+     player who wanted out had to reload. It now carries Solo's ghosted LEAVE
+     paper: reachable, but faint enough never to compete with the round. */
+  ok(!!visualContract.exit && visualContract.exit.clickable,
+    "Party has a reachable in-match exit control");
+  ok(!!visualContract.exit?.label,
+    `the party exit is labelled (${visualContract.exit?.label})`);
+  ok(visualContract.exit?.opacity < .35,
+    `the party exit stays ghosted until sought out (${visualContract.exit?.opacity})`);
   ok(visualContract.historyTapesHidden,
     "previous-guess tape stays attached to state instead of floating by itself");
   ok(Math.abs(visualContract.ratio - 16 / 9) < .002 && visualContract.centred,

@@ -20,7 +20,7 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
-import { AWARD_MS, showPointsAward, confettiFrom } from "./soloRound.js";
+import { AWARD_MS, showPointsAward, confettiFrom, flyPoints } from "./soloRound.js";
 import {
   RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
   advanceRecognitionFill,
@@ -78,6 +78,7 @@ export function startPartyMatch(bridge, payload){
   if(!transition("countdown")){ state.game = null; return; }
 
   layoutSeats();
+  scorePaintHeld = false;
   applyScores(payload.scores);
   stage().dataset.phase = "waiting";
   setTxt("pmWord", "—");
@@ -134,7 +135,7 @@ function layoutSeats(){
     if(!el) continue;
     const pid = seats.get(key);
     el.classList.toggle("vacant", !pid && el.classList.contains("pm-tile"));
-    el.classList.remove("got");
+    el.classList.remove("got", "gone");
     el.classList.toggle("mine", pid === ctx.myId);
     const tag = el.querySelector(".pm-nametag b");
     const player = pid && ctx.roster.players.find(p => p.id === pid);
@@ -161,6 +162,24 @@ function mountSeatVideo(el, pid){
   }
   const stream = ctx.peers.get(pid)?.stream;
   if(stream && v.srcObject !== stream){ v.srcObject = stream; v.play().catch(() => {}); }
+}
+
+/* Somebody walked out mid-round. Their tile kept the last frame they sent,
+   which reads as a player standing perfectly still rather than a player who
+   is gone — so grey the seat out and stop the dead feed. */
+export function markPartyPlayerGone(pid){
+  const g = state.game;
+  if(!g || g.mode !== "party") return;
+  const key = seatOf(pid);
+  if(!key) return;
+  const el = seatEl(key);
+  if(!el) return;
+  el.classList.add("gone");
+  el.classList.remove("got");
+  for(const v of el.querySelectorAll("video")){ v.pause?.(); v.srcObject = null; }
+  const player = ctx.roster?.players.find(p => p.id === pid);
+  ctx.toast?.(disp(player?.name) + " left the party.");
+  if(pid === foeFeaturedId) resetGuessPapers();
 }
 
 /* party.js calls this when a mesh stream lands after the match began */
@@ -197,6 +216,8 @@ export function onPartyRound(payload){
 
   stage().dataset.phase = "round";
   stage().classList.remove("chase-urgent", "chase-final");
+  /* a new word can never inherit the previous one's in-flight chip */
+  scorePaintHeld = false;
   setTxt("pmWordTimerLabel", "WORD TIME");
   setTxt("pmWord", g.word);
   fitGameplayText($("pmWord"));
@@ -253,6 +274,16 @@ export function onPartyGot({ id, place } = {}){
         showPartyPlacement(place);
         confettiFrom(card);
         blip([523, 659, 784], .08);
+        /* the same physical hand-off Solo and 1v1 use: points travel from
+           the word you landed to your team's card, and the team total is
+           only repainted when they arrive */
+        const myCard = $(myTeam() === "orange" ? "pmScoreOrange" : "pmScoreBlue");
+        scorePaintHeld = true;
+        flyPoints(card, myCard, lastAwardPoints(), () => {
+          scorePaintHeld = false;
+          applyScores(state.game?.scores);
+          blip([880]);
+        });
       },
     });
   }else{
@@ -310,8 +341,10 @@ export function onPartyResult(payload){
   }
 
   const mine = (payload.results || []).find(r => r.id === ctx.myId);
-  /* everyone else landed it and the window shut on you */
-  if(!mine) showTimesUp();
+  /* TIME'S UP is the clock beating you, not five other people beating you.
+     Firing it whenever you simply didn't place made a normal round of party
+     read as a failure state; a miss gets the word card's miss beat instead. */
+  if(!mine && payload.reason === "timeout") showTimesUp();
   if(mine){
     setTxt("pmAwardTitle", "GOT IT " + (ORDINALS[mine.place] || "") + "!");
     setTxt("pmAwardLabel", "POINTS!");
@@ -381,8 +414,12 @@ function tick(){
       if(chaseSecond > 0) blip([chaseSecond <= 2 ? 294 : 392], .035);
     }
   }else if(g.phase === "word"){
-    setTxt("pmWordTime", fmtTime(Math.max(0, g.wordEnd - now)));
+    const wordLeft = Math.max(0, g.wordEnd - now);
+    setTxt("pmWordTime", fmtTime(wordLeft));
+    /* the same last-five-seconds reddening Solo and 1v1 already have */
+    $("pmWordTime")?.classList.toggle("low", wordLeft <= 5000 && wordLeft > 0);
   }
+  if(g.phase !== "word") $("pmWordTime")?.classList.remove("low");
 }
 
 /* ---------------- recognition -> claim ---------------- */
@@ -508,10 +545,23 @@ function showPartyPlacement(place){
 
 /* ---------------- scores ---------------- */
 
+/* Never let the team total jump ahead of the chip that is carrying it. */
+let scorePaintHeld = false;
+
+/* The award paper has already been given the value; reading it back means the
+   chip and the paper can never disagree about what you just earned. */
+function lastAwardPoints(){
+  const parsed = Number(($("pmAwardPts")?.textContent || "").replace(/[^0-9]/g, ""));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function applyScores(scores){
   if(!scores) return;
   const g = state.game;
+  /* Always keep the authoritative figure; only the PAINT waits for the chip,
+     so releasing the hold has a current total to show. */
   if(g) g.scores = scores;
+  if(scorePaintHeld) return;
   const prevB = $("pmBlueScore")?.textContent, prevO = $("pmOrangeScore")?.textContent;
   const b = fmtScore(scores.teams?.blue || 0), o = fmtScore(scores.teams?.orange || 0);
   setTxt("pmBlueScore", b);

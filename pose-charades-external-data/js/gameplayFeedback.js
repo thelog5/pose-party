@@ -189,7 +189,10 @@ export function playWordMissFeedback(card, threshold){
   setWordRecognitionMotion(card, 0, threshold, false);
   card.classList.remove("hit", "locked", "wordswap");
   restartFeedbackAnimation(card, "miss");
-  setTimeout(() => card.classList.remove("miss"),
+  /* keep the timer on the node, like the impact timer above: two misses
+     inside 500ms otherwise let the first one strip `.miss` off the second */
+  clearTimeout(card._missTimer);
+  card._missTimer = setTimeout(() => card.classList.remove("miss"),
     prefersReducedMotion() ? 0 : 500);
 }
 

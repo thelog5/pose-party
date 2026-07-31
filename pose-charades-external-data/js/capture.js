@@ -5,6 +5,25 @@ import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { flash, toast, renderClasses, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
+import { gameState, onTransition } from "./fsm.js";
+
+let countIn = null;
+
+/* Leaving Training mid-3·2·1 used to arm the recorder anyway: the interval
+   was never cancelled, so state.recording was set on whatever screen the
+   player had walked to, #recdot appeared over a live match, and the clip was
+   saved under the wrong label. Cancelling on the way out is the whole fix. */
+export function cancelRecording(){
+  if(countIn){ clearInterval(countIn); countIn = null; }
+  $("countdown").classList.add("hidden");
+  $("recdot").style.display = "none";
+  $("btnRecord").disabled = false;
+  state.recording = null;
+}
+
+onTransition((to, from) => {
+  if(from === "training" && to !== "training") cancelRecording();
+});
 
 export function startRecording(){
   const label=$("classInput").value.trim().toLowerCase();
@@ -13,9 +32,11 @@ export function startRecording(){
   const secs=+$("clipLen").value;
   let n=3; const cd=$("countdown"); cd.classList.remove("hidden"); setCountdown(n);
   $("btnRecord").disabled=true;
-  const t=setInterval(()=>{
+  clearInterval(countIn);
+  countIn=setInterval(()=>{
+    if(gameState()!=="training"){ cancelRecording(); return; }
     n--; if(n>0){ setCountdown(n); return; }
-    clearInterval(t); cd.classList.add("hidden");
+    clearInterval(countIn); countIn=null; cd.classList.add("hidden");
     $("recdot").style.display="flex";
     state.recording={ label, person, frames:[], endAt: performance.now()+secs*1000 };
   },800);

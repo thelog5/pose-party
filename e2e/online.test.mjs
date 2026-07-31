@@ -153,8 +153,26 @@ try {
   ok(rtcA > 0, `A sees B's video (${rtcA}px)`);
   ok(rtcB > 0, `B sees A's video (${rtcB}px)`);
 
-  ok(await A.evaluate(() => !document.getElementById("btnExitMatch")),
-    "1v1 has no in-match exit control");
+  /* A 1v1 match used to be a one-way door: the header is hidden on this
+     screen, so a player who wanted out had to reload. It now carries Solo's
+     ghosted LEAVE paper — present and reachable, but faint enough that it
+     never competes with the round. */
+  const exitProbe = await A.evaluate(() => {
+    const b = document.getElementById("btnExitMatch");
+    if (!b) return null;
+    const cs = getComputedStyle(b);
+    const r = b.getBoundingClientRect();
+    return {
+      label: b.getAttribute("aria-label"),
+      opacity: parseFloat(cs.opacity),
+      clickable: cs.pointerEvents !== "none" && r.width > 0 && r.height > 0,
+    };
+  });
+  ok(!!exitProbe, "1v1 has an in-match exit control");
+  ok(exitProbe?.clickable === true, "the match exit is hit-testable");
+  ok(!!exitProbe?.label, `the match exit is labelled (${exitProbe?.label})`);
+  ok(exitProbe?.opacity < .35,
+    `the match exit stays ghosted until sought out (${exitProbe?.opacity})`);
   ok(await A.evaluate(() =>
     parseFloat(getComputedStyle(document.getElementById("myGuessPastTape")).opacity)===0 &&
     parseFloat(getComputedStyle(document.getElementById("rivalGuessPastTape")).opacity)===0),

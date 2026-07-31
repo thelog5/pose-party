@@ -14,7 +14,7 @@ import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { toast } from "./ui.js";
 import { blip } from "./audio.js";
-import { gameState, onTransition } from "./fsm.js";
+import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { createPeer } from "./webrtc.js";
 import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
@@ -23,7 +23,7 @@ import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
 import { setRematchState, syncResultsRoster } from "./results.js";
 import { startPartyMatch, wirePartyMatch, attachPartyStream, onPartyRound,
          onPartyGot, onPartyChase, onPartyResult, onPartyEnd,
-         onPartyGuess } from "./partyMatch.js";
+         onPartyGuess, markPartyPlayerGone } from "./partyMatch.js";
 
 const TEAM_CAP = 3, MIN_PER_TEAM = 2;
 const TILES = { blue: ["ptB0", "ptB1", "ptB2"], orange: ["ptO0", "ptO1", "ptO2"] };
@@ -251,6 +251,25 @@ function wirePartySocket(s){
   s.on("party:left", ({id} = {}) => {
     const entry = peers.get(id);
     if(entry){ entry.peer.close(); peers.delete(id); }
+    /* the roster event repaints the lobby; a match in progress has to be told
+       separately, or the departed player's tile stays frozen and silent */
+    if(["countdown", "playing", "word-won"].includes(gameState()))
+      markPartyPlayerGone(id);
+  });
+
+  s.on("disconnect", () => {
+    /* countdown/playing/word-won/results are SHARED with 1v1, and online.js
+       has its own disconnect handler — only claim the drop when this module
+       is the one holding a room, or a 1v1 player gets bounced by the party. */
+    const screen = gameState();
+    const inParty = screen === "party" ||
+      (screen === "results" && $("resStage")?.dataset.mode === "party") ||
+      (state.game?.mode === "party" &&
+       ["countdown", "playing", "word-won"].includes(screen));
+    if(!inParty) return;
+    toast("Connection to the party was lost.");
+    leaveParty();
+    transition("menu");
   });
   s.on("party:started", () => { blip([523, 659, 784, 1047], 0.09); });
   s.on("party:error", ({error} = {}) => {

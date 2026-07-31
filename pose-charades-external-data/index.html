@@ -506,6 +506,13 @@
         <span class="aw-pts" id="v1RivalAwardPts">+0</span>
         <span class="aw-lbl">POINTS!</span>
       </div>
+
+      <!-- same ghosted LEAVE paper Solo uses: near-invisible until you go
+           looking for it, so it never competes with the round -->
+      <button class="sp-exit pbtn" id="btnExitMatch"
+              title="Leave the match" aria-label="Leave the match">
+        <img src="assets/ui/figma/sp-leave.png" alt="">
+      </button>
     </div>
   </section>
 
@@ -640,6 +647,11 @@
         <span class="aw-pts" id="pmAwardPts">+0</span>
         <span class="aw-lbl" id="pmAwardLabel">POINTS!</span>
       </div>
+
+      <button class="sp-exit pbtn" id="btnExitParty"
+              title="Leave the party" aria-label="Leave the party">
+        <img src="assets/ui/figma/sp-leave.png" alt="">
+      </button>
     </div>
   </section>
 
@@ -828,7 +840,6 @@
 </div>
 
 <div class="countdown hidden" id="countdown"></div>
-<div class="pointBurst" id="pointBurst"><div class="burstCard"><div class="headline" id="pointHeadline"></div><div class="detail" id="pointDetail"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script type="module" src="js/main.js"></script>

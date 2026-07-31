@@ -185,8 +185,29 @@ function greenFlash(){
   f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
 }
 
-/* The 1v1 match deliberately calls this same helper with its own instance of
-   the Solo paper. That keeps the asset, timing and motion completely shared. */
+/* Winning the LAST word of a run starts an 1850ms award paper and a 2500ms
+   confetti burst, but the screen leaves for Results 1250ms later — both used
+   to keep playing on top of the results papers. Every celebration registers
+   here so the FSM can sweep them the moment gameplay ends. */
+const liveAwards = new Set();
+const liveBursts = new Set();
+
+export function clearCelebrations(){
+  for(const a of liveAwards){
+    clearTimeout(a._awardTimer);
+    a.classList.remove("show");
+  }
+  liveAwards.clear();
+  for(const wrap of liveBursts){
+    clearTimeout(wrap._burstTimer);
+    wrap.remove();
+  }
+  liveBursts.clear();
+}
+
+/* The 1v1 match and Party deliberately call this same helper with their own
+   instance of the Solo paper. That keeps the asset, timing and motion
+   completely shared. */
 export function showPointsAward(awardId, pointsId, points){
   const a = el(awardId);
   if(!a) return;
@@ -197,7 +218,11 @@ export function showPointsAward(awardId, pointsId, points){
   }
   clearTimeout(a._awardTimer);
   a.classList.remove("show"); void a.offsetWidth; a.classList.add("show");
-  a._awardTimer=setTimeout(() => a.classList.remove("show"), AWARD_MS);
+  liveAwards.add(a);
+  a._awardTimer=setTimeout(() => {
+    a.classList.remove("show");
+    liveAwards.delete(a);
+  }, AWARD_MS);
 }
 
 function showAward(){
@@ -261,37 +286,39 @@ export function confettiFrom(node){
     wrap.appendChild(p);
   }
   host.appendChild(wrap);
-  setTimeout(() => wrap.remove(), 2500);
+  liveBursts.add(wrap);
+  wrap._burstTimer = setTimeout(() => {
+    wrap.remove();
+    liveBursts.delete(wrap);
+  }, 2500);
 }
 
-function flyPointsChip(){
-  const from = el("soloWordCard"), to = el("soloScoreCard");
-  const pts = state.game ? state.game.pendingPts : 0;
-  const settle = () => {
-    to?.classList.remove("awaiting");
-    if(rstate !== "locked") return;
-    setState("round_end");
-    blip([880]);
-    if(resolveCb) resolveCb({ won: true });
-  };
+/* Points physically travel from the word you just landed to the card that
+   holds your score, and the score only moves when they ARRIVE. Solo has had
+   this since the Figma build; 1v1 and Party now share the same flight, which
+   is why it takes its elements as arguments rather than reading Solo's.
 
-  /* With motion reduced there is no visible flight, so retaining its 650ms
-     timer would make the score feel broken. Commit the already-authoritative
-     Solo result immediately and leave the static award paper visible. */
-  if(prefersReducedMotion()){
-    settle();
-    return;
-  }
+   `onLand` is always called exactly once — including under reduced motion,
+   where there is no visible flight and holding the 650ms timer would just
+   make the score feel broken. */
+export function flyPoints(fromEl, toEl, points, onLand){
+  const land = () => {
+    toEl?.classList.remove("awaiting");
+    onLand?.();
+  };
+  if(prefersReducedMotion()){ land(); return; }
 
   const chip = document.createElement("div");
   chip.className = "sp-chip";
-  chip.textContent = "+" + (pts || 0).toLocaleString("en-US");
-  const fr = from ? from.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
-  const tr = to ? to.getBoundingClientRect() : { left: innerWidth - 160, top: 40, width: 120, height: 60 };
+  chip.textContent = "+" + (points || 0).toLocaleString("en-US");
+  const fr = fromEl ? fromEl.getBoundingClientRect()
+    : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+  const tr = toEl ? toEl.getBoundingClientRect()
+    : { left: innerWidth - 160, top: 40, width: 120, height: 60 };
   chip.style.left = (fr.left + fr.width / 2) + "px";
   chip.style.top = (fr.top + fr.height / 2) + "px";
   document.body.appendChild(chip);
-  to?.classList.add("awaiting");     // braces until the chip actually lands
+  toEl?.classList.add("awaiting");     // braces until the chip actually lands
   requestAnimationFrame(() => {
     chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.15,.5,1), opacity 140ms " + (CHIP_FLIGHT_MS - 120) + "ms";
     chip.style.transform = "translate(" +
@@ -301,8 +328,19 @@ function flyPointsChip(){
   });
   setTimeout(() => {
     chip.remove();
-    settle();                                  // score+streak apply NOW
+    land();
   }, CHIP_FLIGHT_MS);
+}
+
+function flyPointsChip(){
+  flyPoints(el("soloWordCard"), el("soloScoreCard"),
+    state.game ? state.game.pendingPts : 0,
+    () => {
+      if(rstate !== "locked") return;
+      setState("round_end");
+      blip([880]);
+      if(resolveCb) resolveCb({ won: true });
+    });
 }
 
 /* ---------------- failure (timeout / skip) ---------------- */
@@ -318,6 +356,21 @@ export function failRound(skipped){
 }
 
 /* ---------------- lifecycle (from game.js) ---------------- */
+
+/* Wipe the board back to "nothing has happened yet". Called before the 3·2·1
+   so a second run never counts in under the last word of the previous one. */
+export function resetSoloBoard(){
+  clearCelebrations();
+  shownFill = 0; fillAt = 0; overSince = 0;
+  target = null;
+  resetGuessHistory(guessHistory);
+  renderStack(false);
+  prepareWordFeedback(el("soloWordCard"), el("soloWordFill"), LOCK_THRESHOLD, true);
+  markGuessRecognized(el("spGuessTop"), false);
+  setTxt("soloWord", "—");
+  fitGameplayText(el("soloWord"));
+}
+
 export function beginRound(word, onResolve){
   target = word;
   resolveCb = onResolve;

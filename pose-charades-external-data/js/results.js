@@ -43,11 +43,36 @@ let soloPointerStart = null;
 let soloSwipeHandled = false;
 let v1PointerStart = null;
 let v1SwipeHandled = false;
+let enterTimer = 0;
+/* which pages have already played their assembly beat this results session */
+const entered = new Set();
 
 const stage = () => $("resStage");
 const seatEl = k => document.querySelector('#resStage [data-seat="' + k + '"]');
 const setTxt = (id, v) => { const e = $(id); if(e) e.textContent = v; };
 const disp = n => (n || "Player").trim().slice(0, 10).toUpperCase() || "PLAYER";
+const is1v1 = () => payload?.mode === "1v1";
+
+/* The paper-assembly beat is an ARRIVAL, not a page transition. Driving it
+   straight off [data-page] re-slammed every paper on screen each time you
+   flipped stage <-> breakdown; it now runs once per page per results session
+   under [data-enter], which is cleared as soon as the sequence lands. */
+function setResultsPage(page){
+  const st = stage();
+  if(!st) return;
+  st.dataset.page = page;
+  /* papers that were display:none measured 0 — re-fit now they have a box */
+  scheduleAwardFit();
+  clearTimeout(enterTimer);
+  if(entered.has(page)){ delete st.dataset.enter; return; }
+  entered.add(page);
+  st.dataset.enter = page;
+  enterTimer = setTimeout(() => {
+    enterTimer = 0;
+    const el = stage();
+    if(el && el.dataset.enter === page) delete el.dataset.enter;
+  }, 820);
+}
 
 /* ---------------- capture ---------------- */
 
@@ -134,21 +159,22 @@ export function showResults(next){
 
   const st = stage();
   const mode = payload.mode || "party";
-  const layoutMode = mode === "vs" ? "1v1" : mode;
+  entered.clear();
   /* Solo has no shared moment to hold, so its results and breakdown are one
      screen — the Figma frame carries both. Everyone else gets the two beats. */
-  st.dataset.page = mode === "solo" ? "solo" : "stage";
   st.dataset.size = String(payload.size || 3);
-  st.dataset.mode = layoutMode;
+  st.dataset.mode = mode;
+  setResultsPage(mode === "solo" ? "solo" : "stage");
   syncPhotoStripTarget();
   const divider = st.querySelector(".rs-divider");
   if(divider)
-    divider.src = layoutMode === "1v1" || layoutMode === "solo"
+    divider.src = mode === "1v1" || mode === "solo"
       ? "assets/ui/figma/v1-divider.png"
       : "assets/ui/figma/pm-divider.png";
   orderResultsControls(st.dataset.page);
 
   setTxt("rsHeadline", payload.headline || "GAME OVER");
+  scheduleHeadlineFit();
   renderScoreLine();
   renderSeats();
   setRematchPending(false);
@@ -244,11 +270,12 @@ function renderScoreLine(){
   if(!t){
     el.innerHTML = '<b class="blue">' + plain(payload.soloScore || 0) +
       '</b><i class="rs-score-sep"> POINTS</i>';
-    return;
+  }else{
+    el.innerHTML = '<b class="blue">' + plain(t.blue) +
+      '</b><i class="rs-score-sep"> - </i><b class="orange">' +
+      plain(t.orange) + "</b>";
   }
-  el.innerHTML = '<b class="blue">' + plain(t.blue) +
-    '</b><i class="rs-score-sep"> - </i><b class="orange">' +
-    plain(t.orange) + "</b>";
+  scheduleAwardFit();
 }
 const fmt = n => (n || 0).toLocaleString("en-US");
 const plain = n => String(Math.round(n || 0));
@@ -293,9 +320,15 @@ function renderSeats(){
     const el = seatEl(key);
     if(!el) continue;
     el.classList.toggle("vacant", !p);
-    el.classList.toggle("ready", !!(p && p.ready));
+    /* Pop the READY paper only when readiness actually turns on. Driving the
+       animation off `.ready` alone replayed it every time the seat came back
+       from display:none — i.e. on every flip to the breakdown and back. */
+    const wasReady = el.classList.contains("ready");
+    const nowReady = !!(p && p.ready);
+    el.classList.toggle("ready", nowReady);
     if(!p){ el.innerHTML = ""; delete el.dataset.pid; continue; }
-    if(el.dataset.pid !== p.id){
+    const rebuilt = el.dataset.pid !== p.id;
+    if(rebuilt){
       el.dataset.pid = p.id;
       el.innerHTML =
         '<div class="slot"></div>' +
@@ -304,6 +337,9 @@ function renderSeats(){
         '<img src="assets/ui/figma/rs-nametag-' + team + '.png" alt=""><b></b></div></div>' +
         '<div class="rs-ready"><img src="assets/ui/figma/rs-ready-paper.png" alt=""><b>READY</b></div>';
     }
+    /* after the rebuild, so a freshly built seat still has a paper to pop */
+    if(nowReady && !wasReady && !rebuilt) popReady(el);
+    else if(!nowReady) el.querySelector(".rs-ready")?.classList.remove("pop");
     el.querySelector(".rs-nametag b").textContent = disp(p.name);
   }
 
@@ -313,6 +349,21 @@ function renderSeats(){
   for(const entry of occupied)
     if(entry.p && !entry.p.mine) mountSeatVideo(seatEl(entry.key), entry.p);
 }
+
+function popReady(seat){
+  const paper = seat.querySelector(".rs-ready");
+  if(!paper) return;
+  paper.classList.remove("pop");
+  void paper.offsetWidth;
+  paper.classList.add("pop");
+  /* drop the class once it has played: a leftover .pop replays the whole pop
+     the next time the seat comes back from display:none */
+  clearTimeout(paper._popTimer);
+  paper._popTimer = setTimeout(() => paper.classList.remove("pop"), 420);
+}
+
+const streamIsLive = stream =>
+  stream.getVideoTracks?.().some(t => t.readyState === "live") ?? false;
 
 /* Live faces are the whole point of this page, so the feeds keep running. */
 function mountSeatVideo(el, p){
@@ -329,7 +380,10 @@ function mountSeatVideo(el, p){
   }
 
   if($("cameraDock")?.parentElement === slot) mountCamera($("slotHomePark"));
-  if(p.stream){
+  /* A rival who left ends the match with a stream whose tracks are already
+     stopped — attaching it paints a black rectangle where their face was.
+     Treat a dead stream as no stream and show their last still instead. */
+  if(p.stream && streamIsLive(p.stream)){
     removeDirect("img");
     const videos = [...slot.querySelectorAll(":scope > video")];
     const v = videos.shift() || document.createElement("video");
@@ -394,17 +448,16 @@ function renderRematch(animate = true){
     (teams.blue < 2 || teams.orange < 2);
   const previous = btn.dataset.ready === undefined ? null : Number(btn.dataset.ready);
   setTxt("rsRematchLabel",
-    r?.unavailable
-      ? "RIVAL LEFT"
-      : r?.direct
-        ? "PLAY AGAIN"
-      : payload.mode === "solo"
+    payload.mode === "solo"
       ? "REMATCH? READY UP!"
-      : payload.mode === "vs"
+      : r?.unavailable
+        ? "RIVAL LEFT"
+      : r?.direct
         ? "PLAY AGAIN"
       : needsTeams
         ? "NEED  2  PER  TEAM"
         : "REMATCH?  " + ready + "/" + total + "  READY");
+  scheduleRematchFit();
   btn.classList.toggle("mine", mine);
   btn.dataset.waiting = needsTeams ? "need-teams" : "";
   if((payload.mode === "party" || payload.mode === "1v1") && !r?.direct){
@@ -570,7 +623,7 @@ function toggleRematchReady(){
 function renderBreakdown(){
   for(const team of ["blue", "orange"]){
     const strip = $(team === "blue" ? "rsStripBlue" : "rsStripOrange");
-    if(!strip) return;
+    if(!strip) continue;
     strip.innerHTML = "";
     for(const p of payload.players.filter(x => x.team === team)){
       const t = document.createElement("button");
@@ -637,7 +690,7 @@ function paintPanel(suffix, p){
 
   const focus = $("rsFocus" + suffix);
   const soloCarousel = payload.mode === "solo" && suffix === "";
-  const v1Carousel = payload.mode === "1v1" || payload.mode === "vs";
+  const v1Carousel = is1v1();
   if(focus){
     focus.classList.remove("is-cycling", "cycle-auto", "cycle-next", "cycle-prev");
     focus.toggleAttribute("data-solo-carousel", soloCarousel);
@@ -679,7 +732,7 @@ function renderFocus(){
   syncThumbSelection();
   panelState.clear();
 
-  if(payload.mode === "1v1" || payload.mode === "vs"){
+  if(is1v1()){
     /* both players are on screen at once, so there is nothing to arrow past */
     paintPanel("", payload.players.find(x => x.team === "blue") || p);
     paintPanel("B", payload.players.find(x => x.team === "orange"));
@@ -727,6 +780,30 @@ function awardLineWidth(node, text = node.textContent || ""){
   const spacing = parseFloat(style.letterSpacing) || 0;
   return ctx.measureText(text).width +
     Math.max(0, text.length - 1) * spacing;
+}
+
+/* Figma sizes each paper against exactly one sample string — "LOGAN WINS!",
+   "REMATCH? 4/6 READY", "420 PTS". Real names, real tallies and six-figure
+   scores are longer. Shrink a single line until it fits its box, whatever
+   unit authored it: clear the inline size so the responsive rule recomputes,
+   measure with the canvas (never a transform-inflated client rect), then
+   translate the overflow back into px. `room` is the Figma text box as a
+   fraction of the paper, so type never touches a torn edge. */
+function fitLine(node, room = .95, floor = .58){
+  if(!node) return;
+  node.style.fontSize = "";
+  node.style.scale = "";
+  if(!node.clientWidth) return;
+  const base = parseFloat(getComputedStyle(node).fontSize) || 0;
+  if(!base) return;
+  const available = node.clientWidth * room;
+  const wanted = awardLineWidth(node);
+  if(wanted <= available || !wanted) return;
+  const fitted = Math.max(base * floor, base * available / wanted * .99);
+  node.style.fontSize = fitted + "px";
+  const remaining = awardLineWidth(node);
+  if(remaining > available)
+    node.style.scale = Math.min(1, available / remaining * .99) + " 1";
 }
 
 function fitAwardLine(id, baseCqw, minimumCqw){
@@ -802,14 +879,28 @@ function fitAwardDescription(id = "rsAwardSub"){
 function scheduleAwardFit(){
   cancelAnimationFrame(awardFitFrame);
   awardFitFrame = requestAnimationFrame(() => {
+    awardFitFrame = 0;
     fitAwardLine("rsAwardTitle", 20.603, 8.8);
     fitAwardDescription();
-    if(payload?.mode === "1v1" || payload?.mode === "vs"){
+    if(is1v1()){
       fitAwardLine("rsAwardTitleB", 20.603, 8.8);
       fitAwardDescription("rsAwardSubB");
     }
+    /* Figma text boxes as a fraction of their paper: headline 42.02/45.56,
+       rematch 46.94/51.50; the score line is already inset by CSS. */
+    fitLine($("rsHeadline"), .922);
+    fitLine($("rsScoreLine"), .97);
+    fitLine($("rsRematchLabel"), .911);
+    /* the stat chips sit at a Figma rotation and their type is nudged
+       sideways by --text-x, so they need more slack than a centred paper */
+    for(const id of ["rsStat1", "rsStat2", "rsStat3",
+                     "rsStatB1", "rsStatB2", "rsStatB3"])
+      fitLine($(id)?.querySelector("b"), .87);
   });
 }
+/* the same pass — named at each call site for what triggered it */
+const scheduleHeadlineFit = scheduleAwardFit;
+const scheduleRematchFit = scheduleAwardFit;
 
 /* The arrows move between PLAYERS. The stills cycle themselves — see
    startShotCycle — so there is nothing to step through by hand. */
@@ -838,7 +929,7 @@ function startShotCycle(){
   const soloFocus = payload?.mode === "solo" ? $("rsFocus") : null;
   if(soloFocus &&
      (document.activeElement === soloFocus || soloFocus.matches(":hover"))) return;
-  if((payload?.mode === "1v1" || payload?.mode === "vs") &&
+  if(is1v1() &&
      visiblePanels().some(panel => {
        const focus = $("rsFocus" + panel.suffix);
        return focus &&
@@ -918,7 +1009,7 @@ function stepSoloShot(dir){
 }
 
 function step1v1Shot(suffix, dir){
-  if(!payload || (payload.mode !== "1v1" && payload.mode !== "vs") ||
+  if(!payload || !is1v1() ||
       stage()?.dataset.page !== "breakdown") return false;
   const panel = panelState.get(suffix);
   const list = panel ? (shots.get(panel.pid) || []) : [];
@@ -939,7 +1030,7 @@ function step1v1Shot(suffix, dir){
 function syncPhotoStripTarget(){
   const save = $("rsSaveStrip");
   if(!save) return;
-  if(payload?.mode === "1v1" || payload?.mode === "vs"){
+  if(is1v1()){
     const local = payload.players.find(p => p.mine) || payload.players[0];
     save.setAttribute("aria-label", "Save your photo strip");
     save.title = "Save your photo strip";
@@ -954,7 +1045,7 @@ function syncPhotoStripTarget(){
 
 function savePhotoStrip(){
   const local = payload.players.find(player => player.mine) || payload.players[0];
-  const targetId = payload.mode === "1v1" || payload.mode === "vs"
+  const targetId = is1v1()
     ? local?.id
     : focusId;
   const p = payload.players.find(x => x.id === targetId);
@@ -996,6 +1087,10 @@ function savePhotoStrip(){
 function teardownResultsMedia(){
   stopShotCycle();
   panelState.clear();
+  entered.clear();
+  clearTimeout(enterTimer);
+  enterTimer = 0;
+  delete stage()?.dataset.enter;
   soloPointerStart = null;
   soloSwipeHandled = false;
   v1PointerStart = null;
@@ -1040,13 +1135,13 @@ export function wireResults(){
   wired = true;
 
   $("rsSeeBreakdown").onclick = () => {
-    stage().dataset.page = "breakdown";
+    setResultsPage("breakdown");
     renderBreakdown();
     orderResultsControls("breakdown");
     blip([659, 784], .06);
   };
   $("rsBack").onclick = () => {
-    stage().dataset.page = "stage";
+    setResultsPage("stage");
     orderResultsControls("stage");
     renderSeats();
     blip([494, 392], .06);
@@ -1105,13 +1200,13 @@ export function wireResults(){
     const reel = $("rsFocus" + suffix);
     reel?.addEventListener("click", () => {
       if(v1SwipeHandled || stage()?.dataset.page !== "breakdown" ||
-          (payload?.mode !== "1v1" && payload?.mode !== "vs")) return;
+          !is1v1()) return;
       reel.focus({ preventScroll:true });
       step1v1Shot(suffix, 1);
     });
     reel?.addEventListener("pointerdown", event => {
       if(stage()?.dataset.page !== "breakdown" || event.button > 0 ||
-          (payload?.mode !== "1v1" && payload?.mode !== "vs")) return;
+          !is1v1()) return;
       v1PointerStart = {
         suffix, id:event.pointerId, x:event.clientX, y:event.clientY,
       };
@@ -1130,22 +1225,22 @@ export function wireResults(){
     reel?.addEventListener("pointercancel", () => { v1PointerStart = null; });
     reel?.addEventListener("pointerenter", () => {
       if(stage()?.dataset.page === "breakdown" &&
-          (payload?.mode === "1v1" || payload?.mode === "vs"))
+          is1v1())
         stopShotCycle();
     });
     reel?.addEventListener("pointerleave", () => {
       v1PointerStart = null;
       if(stage()?.dataset.page === "breakdown" &&
-          (payload?.mode === "1v1" || payload?.mode === "vs") &&
+          is1v1() &&
           document.activeElement !== reel)
         startShotCycle();
     });
     reel?.addEventListener("focus", () => {
-      if(payload?.mode === "1v1" || payload?.mode === "vs") stopShotCycle();
+      if(is1v1()) stopShotCycle();
     });
     reel?.addEventListener("blur", () => {
       if(stage()?.dataset.page === "breakdown" &&
-          (payload?.mode === "1v1" || payload?.mode === "vs"))
+          is1v1())
         startShotCycle();
     });
   }
@@ -1160,7 +1255,7 @@ export function wireResults(){
       return;
     }
     if(stage().dataset.page !== "breakdown") return;
-    if(payload?.mode === "1v1" || payload?.mode === "vs"){
+    if(is1v1()){
       const active = document.activeElement;
       const suffix = active === $("rsFocus") ? "" :
         active === $("rsFocusB") ? "B" : null;
@@ -1254,7 +1349,7 @@ export async function devResults(kind = "3v3"){
     });
     await seed(players);
     if(kind === "1v1-breakdown"){
-      stage().dataset.page = "breakdown";
+      setResultsPage("breakdown");
       renderBreakdown();
     }
     return;
@@ -1280,7 +1375,7 @@ export async function devResults(kind = "3v3"){
   });
   await seed(players);
   if(kind === "breakdown"){
-    stage().dataset.page = "breakdown";
+    setResultsPage("breakdown");
     renderBreakdown();
   }
 }

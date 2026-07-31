@@ -154,7 +154,10 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 /* Arms are pointer-transparent (they animate constantly; taps land on the
    body/head). Small synchronized amplitudes keep every part inside the
    silhouette so nothing pops out from behind the body. */
-.rpart{cursor:pointer}
+.rpart{cursor:pointer;transition:filter .16s ease,scale .16s cubic-bezier(.2,1.4,.35,1)}
+.rpart:hover{filter:brightness(1.06) drop-shadow(0 min(.3vw,.53vh) min(.25vw,.44vh) rgba(0,0,0,.28));
+  scale:1.03}
+.rpart:active{scale:.98;filter:brightness(.98)}
 #robotArmR,#robotArmL{pointer-events:none}
 #robotArmR{animation:armwaveR 2.4s ease-in-out infinite;transform-origin:22% 88%}
 #robotArmL{animation:armwaveL 2.4s ease-in-out infinite;transform-origin:78% 12%}
@@ -184,6 +187,7 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .pp-corner.left{left:2%}
 .pp-circle{width:54px;height:54px;border-radius:50%;background:var(--fig-cream);border:none;display:flex;align-items:center;justify-content:center;color:var(--fig-blue);box-shadow:0 4px 10px rgba(23,53,111,.35);cursor:pointer;transition:transform .15s ease;opacity:.92}
 .pp-circle:hover{transform:scale(1.08) rotate(12deg)}
+.pp-circle:active{transform:scale(.94) rotate(0deg);box-shadow:0 2px 5px rgba(23,53,111,.35)}
 .pp-circle svg{width:24px;height:24px}
 
 /* =================== SHARED GAMEPLAY ENTRANCE ===================
@@ -506,7 +510,9 @@ body[data-screen="lobby"] .wrap{max-width:none;padding:0}
 .pbtn:active:not([disabled]){translate:0 1px;scale:.97;filter:brightness(.97)}
 
 /* video sandwich: slot sits between panel art and torn-frame overlay */
-.vidslot{overflow:hidden;border-radius:0;cursor:pointer}
+/* no handler has ever been attached to these — a pointer cursor over a video
+   panel promises a click that does nothing */
+.vidslot{overflow:hidden;border-radius:0}
 .vidslot .camdock{width:calc(100% + 2px);height:calc(100% + 2px);margin:-1px}
 body[data-screen="lobby"] .camdock .livebadge,
 body[data-screen="lobby"] .camdock .aipill,
@@ -558,8 +564,10 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .invite .inv-box{position:absolute;left:38.5%;width:36%}
 .invite .inv-box,.invite .inv-btn img{filter:drop-shadow(0 min(.222vw,.395vh) min(.128vw,.228vh) rgba(0,0,0,.35))}
 .invite .inv-code{position:absolute;left:38.5%;top:34.5%;width:36%;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(1.92vw,3.41vh),90px);letter-spacing:.01em}
-.invite .inv-code{cursor:pointer;transition:scale .16s ease,color .16s ease}
+.invite .inv-code{cursor:pointer;white-space:nowrap;
+  transition:scale .16s ease,color .16s ease}
 .invite .inv-code:hover{scale:1.035;color:#002a8d}
+.invite .inv-code:active{scale:.97;color:#0b3fa0}
 .invite input{position:absolute;left:40%;top:69%;width:33%;background:none;border:none;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(14px,min(1.6vw,2.84vh),72px);letter-spacing:.01em;text-transform:uppercase}
 .invite input::placeholder{color:#90867d}
 .invite input:focus{outline:none;background:rgba(255,255,255,.5);border-radius:min(.417vw,.741vh)}
@@ -602,7 +610,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .lobbystage:has(.party-blue-hit:hover) .party-blue-layer.party-panel-art,
 .lobbystage:has(.party-orange-hit:hover) .party-orange-layer.party-panel-art{
   filter:brightness(1.035) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.27))}
-.pt-tile{overflow:hidden;cursor:pointer;background:#eee5d8 url("../assets/ui/figma/pt-inner.png") center/cover no-repeat;
+.pt-tile{overflow:hidden;background:#eee5d8 url("../assets/ui/figma/pt-inner.png") center/cover no-repeat;
   box-shadow:0 0 0 min(.35vw,.62vh) #eee5d8}
 .pt-tile video,.pt-tile .camdock{width:100%;height:100%;object-fit:cover}
 .pt-tile video{display:block;transform:scaleX(-1)}
@@ -834,12 +842,16 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .wordchip{font-weight:800;font-size:13px;padding:0 14px;min-height:44px;display:inline-flex;align-items:center;border-radius:var(--r-pill);border:2px solid var(--line-soft);color:var(--ink-soft);background:var(--card)}
-.wordchip:hover{border-color:var(--blue);color:var(--blue-deep)}
+.wordchip{transition:border-color .14s ease,color .14s ease,transform .14s ease}
+.wordchip:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-1px)}
+.wordchip:active{transform:translateY(1px) scale(.97)}
 .classlist{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto}
 .classrow{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:2px solid var(--line-soft);border-radius:var(--r-sm);padding:8px 13px;font-weight:800;font-size:14px}
 .classrow .count{font-weight:900;font-size:13px;color:var(--blue-deep)}
 .classrow .del{color:var(--ink-soft);font-size:14px;padding:2px 7px;font-weight:900}
+.classrow .del{transition:color .14s ease,transform .14s ease}
 .classrow .del:hover{color:var(--red)}
+.classrow .del:active{transform:scale(.88)}
 .trainreport{font-weight:800;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--panel);border-radius:var(--r-sm);padding:11px 13px;display:none}
 .trainreport b{color:var(--blue-deep)} .trainreport .warn{color:var(--red)}
 .hint{font-size:12.5px;font-weight:800;color:var(--ink-soft);line-height:1.5}
@@ -961,6 +973,11 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pmstage[data-size="2"] [data-seat="blue2"],
 .pmstage[data-size="2"] [data-seat="orange2"]{display:none}
 .pm-tile.vacant{display:none}
+/* A player who left keeps their seat — pulling it would reshuffle the board
+   mid-round — but it stops pretending they are still in the game. */
+.pm-tile.gone .slot,.pm-side.gone .slot{
+  filter:grayscale(1) brightness(.42);transition:filter .5s ease}
+.pm-tile.gone .pm-nametag,.pm-side.gone .pm-nametag{opacity:.45}
 
 /* --- recognition: the frame goes green and a sticker lands on the player --- */
 .pm-tile.got .pm-border-team{opacity:0}
@@ -1063,7 +1080,9 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-guess.mine.past .glabel,.pm-guess.mine.past .gpct{color:#0d6ebb}
 .pm-guess.theirs.current .glabel,.pm-guess.theirs.current .gpct{color:#fd602f}
 .pm-guess.theirs.past .glabel,.pm-guess.theirs.past .gpct{color:#a90307}
-.pm-guess.past{opacity:.92}
+/* the previous guess is HISTORY; at .92 it competed with the live one,
+   unlike 1v1 (.56) and Solo (.38) */
+.pm-guess.past{opacity:.58}
 .pm-guess.empty{opacity:0}
 .pm-word{z-index:8}
 .pm-award{position:absolute;z-index:95}
@@ -1158,6 +1177,16 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
   animation:spwordhit .18s cubic-bezier(.2,.82,.3,1)}
 :is(.matchstage,.pmstage) .sp-word.locked{
   animation:spwordpop .5s cubic-bezier(.2,1.6,.4,1)}
+/* …and closing in on the word outranks the ambient chase/sudden wobble too.
+   Those phase rules are more specific than `.sp-word.tracking`, so the
+   confidence shake — the single best "you're nearly there" cue — silently
+   disappeared exactly when the tension peaked. Scoped to those phases only:
+   during a normal round `.sp-word.tracking` already wins on its own, and
+   re-declaring it here would restart the shake on every repaint. */
+.matchstage[data-phase="chase"] .sp-word.tracking:not(.hit):not(.locked),
+.matchstage[data-phase="sudden"] .sp-word.tracking:not(.hit):not(.locked),
+.pmstage[data-phase="chase"] .sp-word.tracking:not(.hit):not(.locked){
+  animation:spwordtracking var(--shake-speed,220ms) linear infinite}
 
 @media (prefers-reduced-motion: reduce){
   .burstwrap{display:none}
@@ -1167,6 +1196,9 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
 
 /* An empty room code is "being created", not "hidden" — say so quietly. */
 .invite .inv-code.loading{opacity:.55;letter-spacing:.06em}
+/* the settings value pops when a stepper actually moves it */
+.set-val.bump,#setMatch.bump,#setWord.bump{
+  animation:spbump .32s cubic-bezier(.2,1.6,.4,1)}
 
 /* =================== RESULTS (Figma 203:367 / 203:581 / 211:635) ===================
    One screen, two beats. data-page="stage" is the shared moment (live faces,
@@ -1275,9 +1307,10 @@ body[data-screen="results"] header{display:none}
 .rs-seat .rs-ready{position:absolute;z-index:4;left:61.759%;top:88.031%;width:33.556%;
   aspect-ratio:2.7021;container-type:inline-size;opacity:0;scale:.6;rotate:.0736deg;pointer-events:none;
   transition:opacity .2s ease,scale .3s cubic-bezier(.2,1.6,.4,1)}
-.rs-seat.ready .rs-ready{opacity:1;scale:1.025;
-  filter:none;
-  animation:rsSeatReadyIn 360ms var(--rs-pop)}
+/* the pop is a REACTION to readying up, so it rides a class results.js adds
+   only on the false->true edge — never on the seat merely reappearing */
+.rs-seat.ready .rs-ready{opacity:1;scale:1.025;filter:none}
+.rs-seat.ready .rs-ready.pop{animation:rsSeatReadyIn 360ms var(--rs-pop)}
 @keyframes rsSeatReadyIn{
   0%{scale:.96}
   58%{scale:1.07}
@@ -1814,29 +1847,32 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-mode="party"][data-page="breakdown"] .rs-focus.is-cycling .rs-focus-frame{
   animation:rs1v1FrameSlap 360ms var(--rs-pop)}
 
-/* A restrained, one-time assembly beat. Stable parent nodes carry these
-   animations, so READY votes and photo changes do not replay the entrance. */
-.resstage[data-mode="1v1"][data-page="stage"]
+/* A restrained, one-time assembly beat, gated on [data-enter] rather than
+   [data-page]: results.js sets it once per page per match, so flipping
+   stage <-> breakdown no longer re-slams every paper on screen. */
+.resstage[data-mode="1v1"][data-enter="stage"]
   :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,.rs-exit,.rs-board,.rs-scorechip){
   animation:rs1v1PaperIn 320ms 30ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="stage"] :is(.rs-divider,.rs-seat){
+.resstage[data-mode="1v1"][data-enter="stage"] :is(.rs-divider,.rs-seat){
   animation:rs1v1PaperIn 360ms 90ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-rematch>*,
-.resstage[data-mode="1v1"][data-page="stage"] .rs-tape-rematch-stage{
+.resstage[data-mode="1v1"][data-enter="stage"] .rs-rematch>*,
+.resstage[data-mode="1v1"][data-enter="stage"] .rs-tape-rematch-stage{
   animation:rs1v1PaperIn 340ms 170ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="stage"] .rs-breakdown{
+.resstage[data-mode="1v1"][data-enter="stage"] .rs-breakdown{
   animation:rs1v1PaperIn 320ms 230ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="breakdown"]
-  :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,.rs-exit,.rs-board,.rs-tape-score){
+/* The brand, LEAVE and the headline board do not move between the two pages,
+   so they are deliberately absent here — only the papers this page actually
+   introduces get assembled. */
+.resstage[data-mode="1v1"][data-enter="breakdown"] .rs-tape-score{
   animation:rs1v1PaperIn 320ms 30ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus{
+.resstage[data-mode="1v1"][data-enter="breakdown"] .rs-focus{
   animation:rs1v1PaperIn 360ms 90ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="breakdown"] :is(.rs-award,.rs-stat){
+.resstage[data-mode="1v1"][data-enter="breakdown"] :is(.rs-award,.rs-stat){
   animation:rs1v1PaperIn 350ms 150ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-rematch>*,
-.resstage[data-mode="1v1"][data-page="breakdown"] .rs-tape-rematch-breakdown{
+.resstage[data-mode="1v1"][data-enter="breakdown"] .rs-rematch>*,
+.resstage[data-mode="1v1"][data-enter="breakdown"] .rs-tape-rematch-breakdown{
   animation:rs1v1PaperIn 340ms 210ms var(--rs-pop) both}
-.resstage[data-mode="1v1"][data-page="breakdown"] :is(.rs-back,.rs-save){
+.resstage[data-mode="1v1"][data-enter="breakdown"] :is(.rs-back,.rs-save){
   animation:rs1v1PaperIn 320ms 260ms var(--rs-pop) both}
 @keyframes rs1v1PaperIn{
   from{opacity:0;transform:translateY(min(.7vw,1.24vh)) scale(.978)}
