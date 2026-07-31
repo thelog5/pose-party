@@ -1244,7 +1244,12 @@ body[data-screen="results"] header{display:none}
 .resstage[data-size="2"] .rs-tape-score{left:25.138889%;top:-4.938272%}
 
 /* ---- score board ---- */
-.rs-board{position:absolute;left:29.38%;top:1.85%;width:45.56%;z-index:5;
+/* Layer order inside the Score Board is the same in all five Figma results
+   frames: score-card-yellow FIRST (backmost), then secret-word-card-wide-cream,
+   then the type. So the yellow chip tucks BEHIND the cream headline paper —
+   we had them inverted, and the chip's top edge cut the headline's torn
+   bottom off. Band: bg 0 · divider/seats 3 (hover 4) · chip 5 · board 6. */
+.rs-board{position:absolute;left:29.38%;top:1.85%;width:45.56%;z-index:6;
   container-type:inline-size;pointer-events:auto;
   transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
     filter var(--rs-base) ease}
@@ -1254,7 +1259,7 @@ body[data-screen="results"] header{display:none}
   font-family:var(--f-lobby);font-size:9.886cqw;line-height:.75862;color:#17356f;
   letter-spacing:.01em;white-space:nowrap;translate:.152cqw .152cqw;
   text-shadow:.3802cqw .3802cqw 0 rgba(255,255,255,.9)}
-.rs-scorechip{position:absolute;left:37.93%;top:10.72%;width:28.44%;z-index:6;
+.rs-scorechip{position:absolute;left:37.93%;top:10.72%;width:28.44%;z-index:5;
   container-type:inline-size;pointer-events:auto;
   transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
     filter var(--rs-base) ease}
@@ -1270,7 +1275,7 @@ body[data-screen="results"] header{display:none}
 .rs-scorechip b.orange{color:#f4622e}
 
 /* ---- seats: video BEHIND the torn border ---- */
-.rs-seat{position:absolute;z-index:4;rotate:var(--rot,0deg);container-type:inline-size;
+.rs-seat{position:absolute;z-index:3;rotate:var(--rot,0deg);container-type:inline-size;
   transition:translate .18s ease,scale .18s cubic-bezier(.2,1.35,.35,1),filter .18s ease;
   filter:drop-shadow(0 min(.34722vw,.61728vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
 /* Figma reports an axis-aligned bounding box after rotation. These are the
@@ -1352,8 +1357,12 @@ body[data-screen="results"] header{display:none}
   left:37.9072%;top:17.5316%;width:24.1857%;aspect-ratio:.6617;
   --rot:1.5deg;--counter-rot:-1.5deg}
 @media (hover:hover){
+  /* The lift has to beat the neighbouring seats it overlaps — never the
+     score board above them. At z-index 5 it tied `.rs-board` and won on DOM
+     order, so hovering a 1v1 half-screen seat painted its navy video over
+     that half of the headline paper. */
   .rs-seat:not(.vacant):hover{translate:0 calc(-1 * min(.28vw,.5vh));scale:1.018;
-    z-index:5;filter:brightness(1.035)
+    z-index:4;filter:brightness(1.035)
       drop-shadow(0 min(.48vw,.85vh) min(.46vw,.82vh) rgba(0,0,0,.32))}
 }
 
@@ -1735,9 +1744,10 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-mode="solo"] .rs-divider{
   left:48.333333%;top:-19.753086%;width:1.805556%;height:139.506173%}
 
+/* The 1v1 halves are the BACKGROUND, not cards — they never lift or rise. */
 @media (hover:hover){
   .resstage[data-mode="1v1"][data-page="stage"] .rs-seat:hover{
-    translate:0 0;scale:1;filter:none}
+    translate:0 0;scale:1;filter:none;z-index:3}
 }
 
 /* ---- 1v1 BREAKDOWN: both players side by side, no thumbnails ---- */
@@ -1943,10 +1953,12 @@ body[data-screen="results"] .camdock .brackets{display:none}
   rotate:-10.884041deg;
   --tag-text-rot:0deg;--tag-font:20.886cqw;--tag-shadow:1.290cqw;
   --tag-fx:2.632cqw}
+/* Solo lifts both papers over the live camera half, but keeps the Figma
+   order between them: cream headline in front, yellow chip behind. */
 .resstage[data-page="solo"] .rs-board{
-  left:32.222222%;top:0;width:35.555556%;z-index:9}
+  left:32.222222%;top:0;width:35.555556%;z-index:10}
 .resstage[data-page="solo"] .rs-scorechip{
-  left:35.154028%;top:8.868642%;width:28.441944%;z-index:10}
+  left:35.154028%;top:8.868642%;width:28.441944%;z-index:9}
 .resstage[data-page="solo"] .rs-focus{
   display:block;left:52.222222%;top:13.209877%;width:45.833333%;
   aspect-ratio:660/408;cursor:pointer;touch-action:pan-y;
