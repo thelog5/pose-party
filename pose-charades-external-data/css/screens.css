@@ -1593,14 +1593,14 @@ body[data-screen="results"] .rs-save:active:not(:disabled){
   pointer-events:none;z-index:2;transition:filter var(--rs-base) ease}
 .rs-focus-shots{position:absolute;z-index:1;left:1.6%;right:1.6%;top:2%;bottom:2%;overflow:hidden;
   background:#0e1b4a;border-radius:min(.3vw,.55vh)}
+/* HARD CUT — no cross-fade, no scale, no animation of any kind. The old
+   .22s opacity transition ran on the outgoing still while the incoming one
+   animated up from opacity:.45, so both were partly visible every swap and
+   the reel read as a flash rather than a cut. A flipbook cuts. */
 .rs-focus-shots img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   object-position:50% 50%;min-width:100%;min-height:100%;display:block;
-  opacity:0;transition:opacity .22s ease}
-.rs-focus-shots img.on{opacity:1;animation:rsPhotoSet 280ms var(--rs-hover)}
-@keyframes rsPhotoSet{
-  from{opacity:.45;scale:1.025}
-  to{opacity:1;scale:1}
-}
+  opacity:0}
+.rs-focus-shots img.on{opacity:1}
 .rs-focus-shots .rs-empty{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;text-align:center;padding:0 8%;color:#cfd9ef;
   font-family:var(--f-sign);font-weight:800;font-size:4.2cqw;line-height:1.4}
@@ -1718,7 +1718,6 @@ body[data-screen="results"] .rs-save:active:not(:disabled){
     transition:none!important}
   .rs-title,.rs-title:hover,.rs-title:active{rotate:-2.52119deg!important}
   .rs-award,.rs-award:hover{rotate:-5.89592deg!important}
-  .rs-focus-shots img.on{animation:none!important}
 }
 
 /* dev shortcut — deliberately plain so it never reads as game UI */
@@ -1871,7 +1870,9 @@ body[data-screen="results"] .camdock .brackets{display:none}
 
 /* The photo reels auto-advance and are not interactive: no tap, no swipe,
    no keys, so no pointer cursor, press state or focus ring either. Each new
-   still simply cross-fades in (.rs-focus-shots img.on -> rsPhotoSet). */
+   still HARD CUTS in — no cross-fade, no scale. There is therefore nothing
+   for the reduced-motion blocks below to suppress on the reel, and they no
+   longer mention it. */
 
 /* A restrained, one-time assembly beat, gated on [data-enter] rather than
    [data-page]: results.js sets it once per page per match, so flipping
@@ -1910,11 +1911,8 @@ body[data-screen="results"] .camdock .brackets{display:none}
   .resstage[data-mode="1v1"] :is(.rs-title,.rs-tape-logo-yellow,.rs-tape-logo-cream,
     .rs-exit,.rs-board,.rs-scorechip,.rs-divider,.rs-seat,.rs-tape-rematch-stage,
     .rs-tape-rematch-breakdown,.rs-breakdown,.rs-focus,.rs-award,.rs-stat,.rs-back,.rs-save),
-  .resstage[data-mode="1v1"] .rs-rematch>*,
-  .resstage[data-mode="1v1"] .rs-focus-shots img.on{
+  .resstage[data-mode="1v1"] .rs-rematch>*{
     animation:none!important}
-  /* the auto-advance still runs; it just becomes a cut, not a cross-fade */
-  .resstage[data-mode="1v1"] .rs-focus-shots img{transition:none!important}
 }
 
 /* the mirrored set only exists for 1v1 */
@@ -2029,7 +2027,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
   justify-content:flex-start;
   font-size:min(4.861111vw,8.641975vh)!important;line-height:.702823}
 
-/* Solo's reel auto-advances like the others — the still cross-fades. */
+/* Solo's reel auto-advances like the others — the still hard cuts. */
 
 /* The combined screen assembles in readable beats while the camera remains
    live underneath. All rectangles finish at their authored resting values. */
@@ -2060,10 +2058,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
 
 @media (prefers-reduced-motion:reduce){
   .resstage[data-page="solo"] :is(.rs-board,.rs-scorechip,.rs-focus,.rs-poselist,
-    .rs-save,.rs-award,.rs-stat,.rs-rematch),
-  .resstage[data-page="solo"] .rs-focus-shots img.on{animation:none!important}
-  .resstage[data-page="solo"] .rs-focus-shots img{
-    transition:none!important}
+    .rs-save,.rs-award,.rs-stat,.rs-rematch){animation:none!important}
 }
 /* the logo sits on top of the breakdown frames, as Figma layers it */
 .rs-title{z-index:12}

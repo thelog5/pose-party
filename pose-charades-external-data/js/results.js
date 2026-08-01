@@ -29,7 +29,11 @@ let shotCanvas = null;
 
 let payload = null;       // the match summary being displayed
 let cycleTimer = 0;       // drives the GIF-style still cycle
-const CYCLE_MS = 2600;    // relaxed enough to read each physical-photo beat
+/* A flipbook of the round, not a slideshow. It reads as a GIF only if the
+   frames actually move; at 2600ms it read as a stalled slideshow that
+   happened to change. Paired with the hard cut in CSS (no cross-fade, no
+   scale) so each still simply replaces the last. */
+const CYCLE_MS = 900;
 let focusId = null;       // which player's carousel is open
 let wired = false;
 let awardFitFrame = 0;

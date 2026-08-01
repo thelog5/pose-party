@@ -570,10 +570,15 @@ const reducedCycled = await page.evaluate(() => new Promise(resolve => {
   }, 80);
 }));
 ok(reducedCycled !== "stuck",
-  `reduced motion still advances the reel, without the cross-fade (${reducedCycled})`);
-ok(await page.evaluate(() =>
-  getComputedStyle(document.querySelector("#rsFocusShots img.on")).transitionDuration === "0s"),
-  "reduced motion swaps the still as a cut, not a fade");
+  `reduced motion still advances the reel (${reducedCycled})`);
+/* The cut is unconditional, not a reduced-motion concession: two stills
+   partly visible at once read as a flash rather than a flipbook frame. */
+await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
+ok(await page.evaluate(() => {
+  const im = document.querySelector("#rsFocusShots img.on");
+  const cs = getComputedStyle(im);
+  return cs.transitionDuration === "0s" && cs.animationName === "none";
+}), "the still swaps as a hard cut in every motion preference");
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 ok(!!(await txt("#rsAwardTitle")), `solo still earns an award (${await txt("#rsAwardTitle")})`);
 
