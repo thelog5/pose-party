@@ -122,7 +122,7 @@ ok(await page.evaluate(() =>
   document.getElementById("soloStage").classList.contains("game-intro") &&
   getComputedStyle(document.getElementById("soloWordCard")).animationName === "gamePaperIn"),
   "Solo HUD papers use the shared gameplay entrance motion");
-await sleep(2900);
+await page.waitForFunction(() => document.body.dataset.state === "playing", { timeout: 8000 });
 ok(await fsmState() === "playing", "countdown -> playing");
 ok(await bodyScreen() === "solo", "solo screen shown");
 ok(await page.evaluate(() => document.querySelector("header").classList.contains("hidden")), "global header hidden (immersive overlay)");
@@ -381,7 +381,13 @@ await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rsta
 ok(await page.evaluate(() => !document.querySelector(".burstwrap")) || true, "skip: no new confetti (no payoff)");
 const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
-ok(await txt("#soloStreakVal") === "x1", "skip reset the streak");
+/* x0, not a clamped x1: clamping made streak 0 and 1 render identically, so
+   the first catch of a run — and losing a streak of one — changed nothing on
+   screen and never bumped the card. */
+ok(await txt("#soloStreakVal") === "x0", "skip reset the streak to a visible x0");
+ok(await page.evaluate(() =>
+  document.getElementById("soloStreakCard").classList.contains("cold")),
+  "a broken streak reads as cold, not as a live x1");
 
 // exit -> results
 await page.click("#btnExitSolo");
@@ -577,13 +583,25 @@ console.log("time's up:");
 await page.click("#rsRematch");
 await page.waitForFunction(() => document.body.dataset.state === "playing", { timeout: 9000 });
 await sleep(400);
+/* A word timeout is a routine miss and gets the card's miss beat — the paper
+   animates 1.5s while the next word arrives at 1250ms, so firing it per word
+   started the next word underneath it. The RUN clock expiring is what earns
+   the paper, so that is what this drives. */
 await page.evaluate(async () => {
   const { state } = await import(location.origin + "/js/state.js");
-  state.game.wordEnd = performance.now() + 300;   // let the real clock expire
+  state.game.wordEnd = performance.now() + 300;
+});
+await sleep(900);
+ok(await page.evaluate(() =>
+  !document.getElementById("timesUp").classList.contains("fire")),
+  "a missed word does NOT slam the full-screen TIMES UP paper");
+await page.evaluate(async () => {
+  const { state } = await import(location.origin + "/js/state.js");
+  state.game.roundEndsAt = performance.now() + 200;   // the run itself expires
 });
 await page.waitForFunction(() =>
   document.getElementById("timesUp").classList.contains("fire"), { timeout: 8000 });
-ok(true, "the word clock running out fires the TIMES UP paper");
+ok(true, "the RUN clock running out fires the TIMES UP paper");
 await sleep(260);   // the slam rotates and starts at opacity 0
 const tu = await page.evaluate(() => {
   const card = document.getElementById("timesUp");
@@ -612,13 +630,15 @@ ok(tu.flashing && Number(tu.flashLayer) > 0,
 await page.waitForFunction(() =>
   !document.getElementById("timesUp").classList.contains("fire"), { timeout: 4000 });
 ok(true, "it clears itself instead of sticking around");
-await page.click("#btnExitSolo");
+/* the run clock expiring IS the end of the run, so it carries itself to
+   results — no exit click needed */
 await page.waitForFunction(() => document.body.dataset.state === "results", { timeout: 8000 });
+ok(true, "the expired run lands on results by itself");
 
 console.log("replay + training:");
 await page.click("#rsRematch");
 ok(await fsmState() === "countdown", "rematch -> countdown");
-await sleep(2900);
+await page.waitForFunction(() => document.body.dataset.state === "playing", { timeout: 8000 });
 ok(await fsmState() === "playing", "replay reached playing");
 await page.click("#btnExitSolo");
 ok(await fsmState() === "results", "exit -> results again");

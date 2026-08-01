@@ -220,10 +220,18 @@ try {
     {timeout:5000,polling:100});
   await B.waitForFunction(() => document.getElementById("matchStage").dataset.phase === "chase",
     {timeout:5000,polling:100});
+  /* The chase opens immediately; the SCORE arrives with the points chip that
+     carries it (180ms hitstop + 650ms flight), exactly as Solo has always
+     worked. Waiting for the card is the assertion — a number that appears
+     before the chip lands is the bug, not the feature. */
+  ok(/5 SECONDS LEFT/.test(await txt(A,"#v1WordTimerLabel")),
+    "first recognition opened the chase immediately");
+  await A.waitForFunction(() =>
+    parseInt((document.getElementById("v1YouScore").textContent||"0")
+      .replace(/[^0-9]/g,""),10) > 0, {timeout:3000,polling:60});
   const immediateA=parseInt((await txt(A,"#v1YouScore")).replace(/[^0-9]/g,""));
-  ok(immediateA>=300 && immediateA<=500 &&
-    /5 SECONDS LEFT/.test(await txt(A,"#v1WordTimerLabel")),
-    `first recognition scored immediately and opened chase (${immediateA})`);
+  ok(immediateA>=300 && immediateA<=500,
+    `the chip delivered the score to the card (${immediateA})`);
   const chaseClockFit=await A.evaluate(() => {
     const value=document.getElementById("v1WordTime");
     const card=document.getElementById("v1WordTimerCard");

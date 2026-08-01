@@ -15,14 +15,14 @@ const PHRASES = [
   "I'm watching… in a friendly way!",
   "Bet I can guess your next move.",
   "I'll be back",
-  "Sometimes I don't understand human behvavior",
+  "Sometimes I don't understand human behavior",
   "A thing isn't beautiful because it lasts.",
   "Help me, Obi-Wan Kenobi. You're my only hope",
   "Fate rarely calls upon us at a moment of our choosing.",
-  "Autobots, rollout!",
+  "Autobots, roll out!",
   "EVE?",
   "Fist bump? Ba-la-la-la-la-la-la",
-  "Here? Or in a Jaegar?",
+  "Here? Or in a Jaeger?",
   "'Laptop'! You do realize that nickname is demeaning?",
   "Both of You, Dance Like You Want to Win!",
   "Can a robot write a symphony?"
@@ -137,6 +137,11 @@ export function wireHomeAlive(){
        while swallowing the click. */
     ".iv:not(.tape), #robotBody, #robotHead, .fh.bubble",
   );
-  onTransition(to=>{ if(to==="menu") requestAnimationFrame(revealHome); });
+  /* menu -> menu is a legal transition, so clicking the brand re-fired the
+     whole 2.1s entrance and the three mode cards vanished mid-click. Only
+     replay it when Home is actually being ARRIVED at. */
+  onTransition((to, from)=>{
+    if(to==="menu" && from!=="menu") requestAnimationFrame(revealHome);
+  });
   spinConfettiWhenHomeIsReady();
 }

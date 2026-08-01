@@ -33,7 +33,11 @@ import {
 } from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
 
-const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 800;
+/* One second a step, matching the server-driven 1v1/Party countdown
+   (config.preCountMs 3000 / 3). Solo used to count a third faster off the
+   same overlay, and its 2.4s barely cleared the 1.25s HUD entrance — so the
+   board was still landing on "2". */
+const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 1000;
 const WORD_WON_PAUSE_MS = 1050;
 
 let preCountTimer = null;
@@ -85,10 +89,12 @@ function bump(id){ const el=$(id); if(!el) return; el.classList.remove("bump"); 
 function updateHud(){
   const g=state.game; if(!g) return;
   setTxt("pillScore",fmtScore(g.score));
-  setTxt("pillStreak","x"+Math.max(1,g.streak));
   setTxt("pillRound",g.round+" / "+g.rounds);
   const prevScore=$("soloScoreVal")?.textContent, prevStreak=$("soloStreakVal")?.textContent;
-  const newScore=fmtScore(g.score), newStreak="x"+Math.max(1,g.streak);
+  /* Clamping to 1 made streak 0 and streak 1 render identically, so the first
+     catch of a run — and losing a streak of one — changed nothing on screen
+     and never bumped the card. x0 is a state worth showing. */
+  const newScore=fmtScore(g.score), newStreak="x"+(g.streak|0);
   setTxt("soloScoreVal",newScore);
   setTxt("soloStreakVal",newStreak);
   if(prevScore!==undefined && prevScore!==newScore) bump("soloScoreCard");
@@ -96,8 +102,9 @@ function updateHud(){
   /* 0: no run · 1: warming · 2: hot · 3: on fire — CSS owns the treatment */
   const streakCard=$("soloStreakCard");
   if(streakCard){
-    const n=Math.max(1,g.streak);
+    const n=g.streak|0;
     streakCard.dataset.tier = n>=6 ? "3" : n>=4 ? "2" : n>=2 ? "1" : "0";
+    streakCard.classList.toggle("cold", n===0);
   }
   if(state.screen==="match") renderDots(g.round, g.rounds);
 }
@@ -145,7 +152,7 @@ function nextWord(){
   game.round++;
   const ai=game.mode==="ai";
   if(!ai && game.round>game.rounds){ endGame(); return; }
-  if(ai && game.roundEndsAt-performance.now()<=0){ endGame(); return; }
+  if(ai && game.roundEndsAt-performance.now()<=0){ endSoloRun(); return; }
   if(!game.deck.length) game.deck=shuffledDeck();
   game.word=game.deck.pop();
   game.wordStart=performance.now();
@@ -156,7 +163,9 @@ function nextWord(){
   updateHud();
   if(ai){
     game.pendingPts=pointsForCurrentWord();
-    soloBegin(game.word, onSoloResolve);
+    /* the still is grabbed at recognition, not when the chip lands */
+    soloBegin(game.word, onSoloResolve,
+      ()=>captureShot("me", game.word, $("video"), true));
   }else{
     const stage=$("matchStage");
     stage?.classList.remove("you-locked","rival-locked");
@@ -182,20 +191,21 @@ function onSoloResolve({won, skip}){
     game.streak++;
     const pts=game.pendingPts||PTS_CORRECT;
     game.score+=pts;
-    /* the held pose at recognition — see results.js */
-    captureShot("me", game.word, $("video"), true);
     game.results.push({word:game.word, ok:true, pts,
       secs:Math.max(.1,(SOLO.wordMs-Math.max(0,game.wordEnd-performance.now()))/1000)});
   }else{
     game.streak=0;
-    if(skip) game.score=Math.max(0,game.score-SOLO.skipPenalty);
+    if(skip){
+      game.score=Math.max(0,game.score-SOLO.skipPenalty);
+      toast("Skipped — −"+SOLO.skipPenalty+" points");
+    }
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!skip});
   }
   updateHud();
 
   setTimeout(()=>{
     if(gameState()!=="word-won" || !state.game) return;
-    if(state.game.roundEndsAt-performance.now()<=0){ endGame(); return; }
+    if(state.game.roundEndsAt-performance.now()<=0){ endSoloRun(); return; }
     transition("playing");
     nextWord();
   }, ROUND_END_PAUSE_MS);
@@ -314,7 +324,9 @@ export function gameTick(){
     setTxt("soloRoundTime",fmtTime(roundLeft,{compact:true}));
     setTxt("soloWordTime",fmtTime(wordLeft));
     const wt=$("soloWordTime"); if(wt) wt.classList.toggle("low", wordLeft<=5000 && wordLeft>0);
-    if(roundLeft<=0){ if(gameState()==="playing") endGame(); return; }
+    const rt=$("soloRoundTime");
+    if(rt) rt.classList.toggle("low", roundLeft<=15000 && roundLeft>0);
+    if(roundLeft<=0){ if(gameState()==="playing") endSoloRun(); return; }
     if(soloState()==="guessing"){
       game.pendingPts=pointsForCurrentWord();
       if(wordLeft<=0 && gameState()==="playing") missWord(false);
@@ -361,6 +373,8 @@ export function gameTick(){
       game.matchEndsAt-performance.now()));
     setTxt("pillRound",fmtTime(matchLeft));
     setTxt("v1MatchTime",fmtTime(matchLeft,{compact:true}));
+    /* the match clock warns before it ends, like Solo's run clock */
+    $("v1MatchTime")?.classList.toggle("low", matchLeft<=15000 && matchLeft>0);
   }else if(game.mode==="vs"){
     setTxt("v1MatchTime",game.round+" / "+game.rounds);
   }
@@ -389,6 +403,16 @@ export function missWord(isSkip){
   }
   if(isSkip) game.score=Math.max(0,game.score-PTS_SKIP);
   finishWord("miss", {skip:isSkip});
+}
+
+/* The RUN clock expiring is what earns the full-screen paper — a missed word
+   only gets the card's miss beat (see soloRound.failRound). There are three
+   places the run can expire (the tick, the post-word pause, and nextWord)
+   because gameTick is frozen while a round resolves, so it goes through one
+   door. Leaving via the exit button is not "time's up" and stays quiet. */
+function endSoloRun(){
+  showTimesUp();
+  endGame();
 }
 
 export function endGame(){

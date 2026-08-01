@@ -19,7 +19,8 @@ import { fmtTime, fmtScore, setCountdown, showTimesUp } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
-import { PARTY_CHASE_WINDOW_MS } from "./scoring.js";
+import { PARTY_CHASE_WINDOW_MS,
+         calculatePartyPlayerPoints } from "./scoring.js";
 import { AWARD_MS, showPointsAward, confettiFrom, flyPoints,
          greenFlash } from "./soloRound.js";
 import {
@@ -88,6 +89,13 @@ export function startPartyMatch(bridge, payload){
     g.matchEndsAt - performance.now())), { compact:true }));
   setTxt("pmWordTime", fmtTime(g.wordLimitMs));
   resetGuessPapers();
+  /* Clear the board BEFORE the 3·2·1. onPartyRound only does this after the
+     countdown, so a rematch counted in on the previous match's completed word
+     — bar pinned at 95%, card still .locked. Same fix 1v1 and Solo already
+     have (clearMatchBoard / resetSoloBoard). */
+  shownFill = 0; fillAt = 0;
+  prepareWordFeedback($("pmWordCard"), $("pmWordFill"), CLAIM_THRESH, false);
+  $("pmAward")?.classList.remove("show");
 
   clearInterval(g.timer);
   g.timer = setInterval(tick, 100);
@@ -180,7 +188,17 @@ export function markPartyPlayerGone(pid){
   for(const v of el.querySelectorAll("video")){ v.pause?.(); v.srcObject = null; }
   const player = ctx.roster?.players.find(p => p.id === pid);
   ctx.toast?.(disp(player?.name) + " left the party.");
-  if(pid === foeFeaturedId) resetGuessPapers();
+  /* foeFeaturedId is otherwise only assigned in layoutSeats(), which runs once
+     at match start — so losing the featured opponent killed the rival guess
+     paper for the rest of the match. Promote the next one still seated. */
+  if(pid === foeFeaturedId){
+    const foeTeam = myTeam() === "blue" ? "orange" : "blue";
+    foeFeaturedId = [...seats]
+      .filter(([key, id]) => key.startsWith(foeTeam) && id !== pid &&
+        !seatEl(key)?.classList.contains("gone"))
+      .map(([, id]) => id)[0] || null;
+    resetGuessPapers();
+  }
 }
 
 /* party.js calls this when a mesh stream lands after the match began */
@@ -281,7 +299,12 @@ export function onPartyGot({ id, place } = {}){
            only repainted when they arrive */
         const myCard = $(myTeam() === "orange" ? "pmScoreOrange" : "pmScoreBlue");
         scorePaintHeld = true;
-        flyPoints(card, myCard, lastAwardPoints(), () => {
+        /* The paper shows a PLACE at this moment, so reading it back gave the
+           chip the ordinal — it always flew "+1".."+6". Compute the real
+           figure from the same shared formula the server scores with. */
+        const earned = calculatePartyPlayerPoints(
+          place, Math.max(0, live.wordEnd - performance.now()));
+        flyPoints(card, myCard, earned, () => {
           scorePaintHeld = false;
           applyScores(state.game?.scores);
           blip([880]);
@@ -401,9 +424,11 @@ function tick(){
   /* the shared 180ms recognition impact stops the clocks, as it does in Solo */
   if(impactFrozen($("pmWordCard"))) return;
   const now = performance.now();
-  setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
-    g.matchLimitMs || Infinity,
-    g.matchEndsAt - now)), { compact:true }));
+  const matchLeft = Math.max(0, Math.min(
+    g.matchLimitMs || Infinity, g.matchEndsAt - now));
+  setTxt("pmMatchTime", fmtTime(matchLeft, { compact:true }));
+  /* the match clock warns before it ends, like Solo's run clock */
+  $("pmMatchTime")?.classList.toggle("low", matchLeft <= 15000 && matchLeft > 0);
   if(g.phase === "chase"){
     const remaining = Math.max(0, (g.chaseEndsAt || 0) - now);
     const chaseSecond = Math.max(0, Math.ceil(remaining / 1000));
@@ -535,29 +560,17 @@ function resetGuessPapers(){
 /* The recognition moment reuses Solo/1v1's exact points-award paper and its
    .show keyframes. The server-sorted points replay on the same paper later. */
 function showPartyPlacement(place){
-  const award = $("pmAward");
-  if(!award) return;
   setTxt("pmAwardTitle", "GOT IT!");
-  setTxt("pmAwardPts", ORDINALS[place] || "✓");
   setTxt("pmAwardLabel", "PLACE!");
-  clearTimeout(award._awardTimer);
-  award.classList.remove("show");
-  void award.offsetWidth;
-  award.classList.add("show");
-  award._awardTimer = setTimeout(() => award.classList.remove("show"), AWARD_MS);
+  /* through the shared helper so this paper is swept by clearCelebrations
+     like every other award — it used to run its own timer and outlive the round */
+  showPointsAward("pmAward", "pmAwardPts", 0, ORDINALS[place] || "✓");
 }
 
 /* ---------------- scores ---------------- */
 
 /* Never let the team total jump ahead of the chip that is carrying it. */
 let scorePaintHeld = false;
-
-/* The award paper has already been given the value; reading it back means the
-   chip and the paper can never disagree about what you just earned. */
-function lastAwardPoints(){
-  const parsed = Number(($("pmAwardPts")?.textContent || "").replace(/[^0-9]/g, ""));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
 
 function applyScores(scores){
   if(!scores) return;

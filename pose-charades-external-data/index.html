@@ -100,7 +100,7 @@
     <canvas id="overlay"></canvas>
     <span class="livebadge left"><i></i>LIVE</span>
     <span class="brackets"><i></i><i></i><i></i><i></i></span>
-    <div class="recdot" id="recdot"><i></i>REC</div>
+    <div class="recdot" id="recdot"><i></i>REC<b id="recLeft"></b></div>
     <div class="flash" id="flash"></div>
     <div class="aipill" id="aiPill">
       <svg class="boticon"><use href="#botHead"/></svg>
@@ -709,7 +709,7 @@
             <select id="clipLen"><option value="3">3 seconds</option><option value="4" selected>4 seconds</option><option value="6">6 seconds</option><option value="8">8 seconds</option></select>
           </div>
         </div>
-        <button class="btn orange" id="btnRecord"><span class="dot"></span>Record clip (3·2·1)</button>
+        <button class="btn orange" id="btnRecord"><span class="dot"></span><span id="recordLabel">Record clip (3·2·1)</span></button>
         <div class="hint">Record <b>idle</b> too (stand, fidget, read) — it stops the AI guessing between words. Aim for 10–15 clips per word, full body in frame.</div>
         <div class="classlist" id="classList"></div>
         <button class="btn blue" id="btnTrain">Train the AI</button>
@@ -862,7 +862,7 @@
   <img src="assets/ui/figma/rs-timesup.png" alt="Time&rsquo;s up">
 </div>
 
-<div class="countdown hidden" id="countdown"></div>
+<div class="countdown hidden" id="countdown"><span class="cd-num" id="countdownNum"></span></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script type="module" src="js/main.js"></script>

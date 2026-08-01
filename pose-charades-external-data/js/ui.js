@@ -36,8 +36,14 @@ export function flash(kind){
 }
 
 export function toast(msg){
-  const t=$("toast"); t.textContent=msg; t.style.display="block";
-  clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display="none",2600);
+  const t=$("toast");
+  t.textContent=msg;
+  /* restart the entrance even when a second message lands inside the window */
+  t.classList.remove("show");
+  void t.offsetWidth;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t=setTimeout(()=>t.classList.remove("show"),2600);
 }
 
 export const fmtTime = (ms, { compact=false }={}) => {
@@ -148,11 +154,15 @@ function resetMatchSide(prefix, key){
    new value re-triggers the punch animation. */
 export function setCountdown(value){
   const cd=$("countdown");
-  if(!cd) return;
+  const num=$("countdownNum");
+  if(!cd || !num) return false;
   const next=String(value);
-  if(cd.textContent===next) return false;
-  cd.textContent=next;
-  cd.classList.remove("tick"); void cd.offsetWidth; cd.classList.add("tick");
+  if(num.textContent===next) return false;
+  num.textContent=next;
+  /* The punch rides the inner span. On the wrapper it also transformed the
+     full-bleed ::before dim layer, sweeping a skewed grey rectangle across
+     the header and camera instead of dimming the page evenly. */
+  num.classList.remove("tick"); void num.offsetWidth; num.classList.add("tick");
   return true;
 }
 

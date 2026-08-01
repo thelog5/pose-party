@@ -4,6 +4,7 @@ import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { buildModel, classify, windowsOf } from "./classifier.js";
 import { blip } from "./audio.js";
+import { clearModelStale } from "./capture.js";
 
 function shuffle(a){
   for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
@@ -44,11 +45,18 @@ function evaluate(testClips, evalModel){
    disable the button, then let the browser render before we block it. */
 export function train(opts={}){
   const silent = !!opts.silent;
+  /* `defer` is separate from `silent` on purpose: the bundled-data preload
+     wants the model to exist the moment it returns, while the retrain that
+     follows a clip delete must not block the click thread — evaluate() is
+     superlinear and a large deck freezes the tab for hundreds of ms. */
+  const defer = opts.defer ?? !silent;
   const rep0=$("trainReport"), btn=$("btnTrain");
-  if(!silent && rep0 && !train._busy){
+  if(defer && !train._busy){
     train._busy=true;
-    rep0.style.display="block";
-    rep0.innerHTML="Training the AI on your clips…";
+    if(!silent && rep0){
+      rep0.style.display="block";
+      rep0.innerHTML="Training the AI on your clips…";
+    }
     if(btn) btn.disabled=true;
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
       try{ runTraining(opts); }
@@ -64,14 +72,28 @@ function runTraining(opts={}){
   const counts={};
   for(const c of state.dataset.clips) counts[c.label]=(counts[c.label]||0)+1;
   const labels=Object.keys(counts);
-  const rep=$("trainReport"); rep.style.display="block";
-  if(labels.length<2){ rep.innerHTML='<span class="warn">Need at least 2 words (record “idle” plus one action).</span>'; return; }
+  const rep=$("trainReport");
+  if(labels.length<2){
+    /* Bailing here used to leave state.model holding the DELETED words, so
+       the live panel and every game mode kept classifying against clips that
+       no longer exist. There is no model below two words — say so. */
+    state.model=null;
+    state.smooth={};
+    /* and don't shout a red warning at someone who only deleted a clip */
+    if(!silent){
+      rep.style.display="block";
+      rep.innerHTML='<span class="warn">Need at least 2 words (record “idle” plus one action).</span>';
+    }
+    return;
+  }
+  rep.style.display="block";
 
   const { trainClips, testClips } = splitTrainTest(state.dataset.clips, labels);
   const { acc, missBy } = evaluate(testClips, buildModel(trainClips));
 
   state.model=buildModel(state.dataset.clips);
   state.smooth={}; for(const l of state.model.labels) state.smooth[l]=0;
+  clearModelStale();               // the model has caught up with the list
   if(!silent) blip([523,784]);
 
   const worst=Object.entries(missBy).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);

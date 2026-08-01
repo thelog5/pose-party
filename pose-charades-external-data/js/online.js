@@ -762,6 +762,11 @@ function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
   const mine=firstId===socket.id;
+  /* Hold BEFORE the scores land. The server has already banked the points, so
+     painting them here put the number on the card ~830ms ahead of the chip
+     carrying it — and left setScoreText with nothing to change on arrival, so
+     the landing bump never fired either. */
+  if(mine) holdScorePaint();
   applyScores(scores);
   game.firstId=firstId;
   game.firstPoints=firstPoints|0;
@@ -804,13 +809,16 @@ function onRoundResult({
   const game=state.game;
   if(!game || game.mode!=="online") return;
   const myId=socket.id;
-  applyScores(scores);
-  game.roundId=null;
-  game.roundPhase="between";
-
   const iWasFirst=firstId===myId;
   const iWasChaser=chaserId===myId;
   const caught=reason==="chase-success";
+  /* Same ordering as onRoundChase: the chip has to precede its number. Gate
+     this on exactly the condition that reaches playLocalMatchLock below —
+     holding without a landing to release it would freeze the score card. */
+  if(iWasChaser && caught) holdScorePaint();
+  applyScores(scores);
+  game.roundId=null;
+  game.roundPhase="between";
   if(caught){
     for(const id of [firstId,chaserId]){
       if(!id) continue;

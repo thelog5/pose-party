@@ -93,7 +93,7 @@ function wireControls(){
   $("btnRecord").onclick=startRecording;
   $("btnTrain").onclick=()=>train();
   /* deleting clips has to refit the model the live panel is using */
-  setDatasetEditedHandler(()=>{ if(state.dataset.clips.length) train({silent:true}); });
+  setDatasetEditedHandler(()=>{ train({silent:true, defer:true}); });
   $("btnExport").onclick=exportData;
   $("btnImport").onclick=()=>$("fileImport").click();
   $("fileImport").onchange=e=>{ if(e.target.files[0]) importData(e.target.files[0]); e.target.value=""; };

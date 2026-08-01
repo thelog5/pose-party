@@ -316,7 +316,14 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .sp-card.bump{animation:spbump .4s cubic-bezier(.2,1.6,.4,1)}
 @keyframes spbump{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
 /* word-timer runs red in the final seconds */
+/* The word clock's deadline red. The RUN/MATCH clock gets its own, softer
+   warning — it had none at all in any mode, so every game just stopped. The
+   :is() matters: #soloRoundTime/#v1MatchTime/#pmMatchTime all live inside
+   .sp-rtimer, which the old .sp-wtimer-only selector could never match. */
 .sp-wtimer .sp-val.low{color:#e8402a;animation:sppulse .6s ease-in-out infinite}
+.sp-rtimer .sp-val.low{color:#ffd04a;animation:sppulse 1s ease-in-out infinite}
+/* a streak of zero is a real state, not a hidden x1 */
+.sp-card.cold .sp-val{opacity:.55}
 @keyframes sppulse{0%,100%{opacity:1}50%{opacity:.45}}
 
 /* --- guess stack: one component at three scales, newest green on top --- */
@@ -871,6 +878,22 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .trainpanel{display:flex;flex-direction:column;gap:12px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
+/* the word field shakes when you try to record without naming the clip */
+#classInput.nudge{animation:inputNudge .34s cubic-bezier(.3,1.4,.4,1)}
+@keyframes inputNudge{
+  0%,100%{translate:0 0}
+  25%{translate:-5px 0}
+  60%{translate:4px 0}
+  85%{translate:-2px 0}}
+/* a freshly recorded clip is in the list but not in the model yet */
+#btnTrain.stale{animation:trainStale 1.6s ease-in-out infinite}
+@keyframes trainStale{
+  0%,100%{box-shadow:var(--sh)}
+  50%{box-shadow:0 4px 0 rgba(18,52,119,.13),0 0 0 4px rgba(255,208,74,.55)}}
+@media (prefers-reduced-motion:reduce){
+  #classInput.nudge,#btnTrain.stale{animation:none}
+  #btnTrain.stale{box-shadow:0 4px 0 rgba(18,52,119,.13),0 0 0 4px rgba(255,208,74,.55)}
+}
 .wordchip{font-weight:800;font-size:13px;padding:0 14px;min-height:44px;display:inline-flex;align-items:center;border-radius:var(--r-pill);border:2px solid var(--line-soft);color:var(--ink-soft);background:var(--card)}
 .wordchip{transition:border-color .14s ease,color .14s ease,transform .14s ease}
 .wordchip:hover{border-color:var(--blue);color:var(--blue-deep);transform:translateY(-1px)}

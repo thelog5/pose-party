@@ -45,7 +45,10 @@ export { setWordRecognitionMotion } from "./gameplayFeedback.js";
 
 /* ---------------- tuning (against real model logs) ---------------- */
 export const LOCK_THRESHOLD    = 0.80;  // smoothed target confidence that completes the bar & locks
-export const LOCK_HOLD_MS      = 160;   // must stay at/over threshold this long to lock
+/* Must exceed one classifier tick (CLASSIFY_EVERY_MS = 250) or a single
+   sample satisfies it — state.smooth cannot change inside a shorter window.
+   1v1 (HOLD_MS) and Party (CLAIM_HOLD_MS) both require 250. */
+export const LOCK_HOLD_MS      = 260;
 export const FILL_LERP         = RECOGNITION_FILL_LERP_60FPS;
 export const LABEL_DEBOUNCE_MS = GUESS_LABEL_DEBOUNCE_MS;
 export { WARM_AT, HOT_AT, CRITICAL_AT };
@@ -61,6 +64,7 @@ let shownFill = 0;          // 0..1 displayed progress toward the lock
 let fillAt = 0;
 let overSince = 0;          // when the smoothed conf first crossed threshold
 let resolveCb = null;
+let onLockCb = null;        // fires the instant the pose is recognised
 
 /* The shared history owns admission timing; Solo renders three entries. */
 const guessHistory = createGuessHistory(3);
@@ -170,6 +174,10 @@ function beginLock(){
     onImpact: () => {
       if(rstate !== "hitstop") return;
       setState("locked");
+      /* The held pose, grabbed HERE. game.js used to capture from the chip's
+         land callback — 830ms after recognition, by which time the player has
+         already dropped the pose and the "funny frame" is gone. */
+      onLockCb?.();
       greenFlash(card);
       confettiFrom(card);
       showAward();
@@ -196,6 +204,7 @@ export function greenFlash(node){
    here so the FSM can sweep them the moment gameplay ends. */
 const liveAwards = new Set();
 const liveBursts = new Set();
+const liveChips = new Set();
 
 export function clearCelebrations(){
   for(const a of liveAwards){
@@ -208,17 +217,31 @@ export function clearCelebrations(){
     wrap.remove();
   }
   liveBursts.clear();
+  /* A chip launched on the final word is position:fixed at z-index 96, so it
+     kept flying across the Results screen — the exact failure this function
+     exists to prevent. Land it (once) so no score hold is left dangling. */
+  for(const chip of liveChips){
+    clearTimeout(chip._flightTimer);
+    chip.remove();
+    const land = chip._land;
+    chip._land = null;
+    land?.();
+  }
+  liveChips.clear();
 }
 
 /* The 1v1 match and Party deliberately call this same helper with their own
    instance of the Solo paper. That keeps the asset, timing and motion
    completely shared. */
-export function showPointsAward(awardId, pointsId, points){
+export function showPointsAward(awardId, pointsId, points, valueText){
   const a = el(awardId);
   if(!a) return;
   const value = el(pointsId);
   if(value){
-    value.textContent = "+" + (points || 0).toLocaleString("en-US");
+    /* Party's provisional paper shows a PLACE, not a figure — the server has
+       not resolved points yet — so it passes its own valueText and still gets
+       the shared timing and the clearCelebrations registry. */
+    value.textContent = valueText ?? ("+" + (points || 0).toLocaleString("en-US"));
     fitGameplayText(value);
   }
   clearTimeout(a._awardTimer);
@@ -307,7 +330,10 @@ export function confettiFrom(node){
    where there is no visible flight and holding the 650ms timer would just
    make the score feel broken. */
 export function flyPoints(fromEl, toEl, points, onLand){
+  let landed = false;
   const land = () => {
+    if(landed) return;
+    landed = true;
     toEl?.classList.remove("awaiting");
     onLand?.();
   };
@@ -323,6 +349,8 @@ export function flyPoints(fromEl, toEl, points, onLand){
   chip.style.left = (fr.left + fr.width / 2) + "px";
   chip.style.top = (fr.top + fr.height / 2) + "px";
   document.body.appendChild(chip);
+  chip._land = land;
+  liveChips.add(chip);
   toEl?.classList.add("awaiting");     // braces until the chip actually lands
   requestAnimationFrame(() => {
     chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.15,.5,1), opacity 140ms " + (CHIP_FLIGHT_MS - 120) + "ms";
@@ -331,9 +359,12 @@ export function flyPoints(fromEl, toEl, points, onLand){
       (tr.top + tr.height / 2 - (fr.top + fr.height / 2)) + "px) scale(.5)";
     chip.style.opacity = "0";
   });
-  setTimeout(() => {
+  chip._flightTimer = setTimeout(() => {
     chip.remove();
-    land();
+    liveChips.delete(chip);
+    const done = chip._land;
+    chip._land = null;
+    done?.();
   }, CHIP_FLIGHT_MS);
 }
 
@@ -353,9 +384,13 @@ export function failRound(skipped){
   if(rstate !== "guessing") return false;
   setState("round_end");
   playWordMissFeedback(el("soloWordCard"), LOCK_THRESHOLD);
-  /* a skip is a choice; running out of time is the beat that needs the paper */
-  if(skipped) blip([294, 220]);
-  else showTimesUp();
+  /* TIME'S UP is a 1.5s full-screen paper but the next word arrives at
+     ROUND_END_PAUSE_MS (1250ms), so firing it on every ordinary word timeout
+     started the next word underneath it — and made a routine miss read like
+     the run ending. The RUN ending is what earns the paper; game.js calls
+     showTimesUp() there. Here a word timeout gets the miss beat and a
+     descending blip, and a skip gets its own two-note. */
+  blip(skipped ? [294, 220] : [330, 262, 196]);
   if(resolveCb) resolveCb({ won: false, skip: !!skipped });
   return true;
 }
@@ -376,9 +411,10 @@ export function resetSoloBoard(){
   fitGameplayText(el("soloWord"));
 }
 
-export function beginRound(word, onResolve){
+export function beginRound(word, onResolve, onLock){
   target = word;
   resolveCb = onResolve;
+  onLockCb = onLock || null;
   shownFill = 0; fillAt = 0; overSince = 0;
   /* Confidence has to be EARNED for this word. state.smooth carries over from
      the previous round, so if the new word is one the AI was already sure of,
@@ -402,6 +438,7 @@ export function beginRound(word, onResolve){
 export function endRound(){
   setState("idle");
   resolveCb = null;
+  onLockCb = null;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   const card = el("soloWordCard");
   if(card){

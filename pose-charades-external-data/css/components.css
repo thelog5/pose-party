@@ -30,6 +30,11 @@
 /* recording dot + train countdown reuse */
 .recdot{position:absolute;top:14px;right:14px;z-index:8;display:none;align-items:center;gap:8px;font-size:13px;font-weight:900;letter-spacing:1px;color:#fff;background:var(--red);border:2px solid #fff;border-radius:var(--r-sm);padding:5px 12px}
 .recdot i{width:9px;height:9px;border-radius:50%;background:#fff;animation:blink 1s infinite}
+/* how much of the clip is left — a static REC pill gave no sense of duration */
+.recdot b{font-variant-numeric:tabular-nums;opacity:.9}
+.recdot b:not(:empty)::before{content:"·";margin:0 .45em;opacity:.6}
+/* the record button doubles as CANCEL while a clip is arming or running */
+.btn.recording{background:var(--red);color:#fff}
 .flash{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:5}
 .flash.good{background:radial-gradient(circle, rgba(63,201,140,.5), transparent 70%);animation:pop .7s ease-out}
 .flash.bad{background:radial-gradient(circle, rgba(240,81,45,.4), transparent 70%);animation:pop .7s ease-out}
