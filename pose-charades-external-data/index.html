@@ -198,15 +198,18 @@
       <div class="sp-flash" id="soloFlash"></div>
 
       <!-- Exact Solo-frame tape exports. Their PNG bounds already include the
-           Figma angle, texture, and per-layer opacity — do not rotate again. -->
-      <img class="sp-tape" style="left:5.49%;top:.37%;width:7.50%" src="assets/ui/figma/sp-tape-top-left.png" alt="">
-      <img class="sp-tape" style="left:54.17%;top:-2.59%;width:6.70%" src="assets/ui/figma/sp-tape-word-timer.png" alt="">
-      <img class="sp-tape" style="left:80.28%;top:-2.59%;width:8.63%" src="assets/ui/figma/sp-tape-score.png" alt="">
-      <img class="sp-tape" style="left:94.58%;top:17.16%;width:5.70%" src="assets/ui/figma/sp-tape-streak.png" alt="">
+           Figma angle, texture, and per-layer opacity — do not rotate again.
+           `--gi` is the count-in beat index (see SHARED GAMEPLAY ENTRANCE in
+           screens.css): each tape slaps down just after the paper it pins.
+           It lives inline only because most tape has no id to key CSS off. -->
+      <img class="sp-tape" style="left:5.49%;top:.37%;width:7.50%;--gi:0" src="assets/ui/figma/sp-tape-top-left.png" alt="">
+      <img class="sp-tape" style="left:54.17%;top:-2.59%;width:6.70%;--gi:2" src="assets/ui/figma/sp-tape-word-timer.png" alt="">
+      <img class="sp-tape" style="left:80.28%;top:-2.59%;width:8.63%;--gi:3" src="assets/ui/figma/sp-tape-score.png" alt="">
+      <img class="sp-tape" style="left:94.58%;top:17.16%;width:5.70%;--gi:4" src="assets/ui/figma/sp-tape-streak.png" alt="">
       <img class="sp-tape sp-tape-history" id="spTapeGuessMid" style="left:75.69%;top:61.60%;width:7.41%" src="assets/ui/figma/sp-tape-guess-mid.png" alt="">
-      <img class="sp-tape" style="left:66.39%;top:79.26%;width:5.81%" src="assets/ui/figma/sp-tape-word-right.png" alt="">
+      <img class="sp-tape" style="left:66.39%;top:79.26%;width:5.81%;--gi:6.2" src="assets/ui/figma/sp-tape-word-right.png" alt="">
       <img class="sp-tape sp-tape-history" id="spTapeGuessBottom" style="left:91.60%;top:77.53%;width:5.97%" src="assets/ui/figma/sp-tape-guess-bottom.png" alt="">
-      <img class="sp-tape" style="left:27.43%;top:91.73%;width:6.77%" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
+      <img class="sp-tape" style="left:27.43%;top:91.73%;width:6.77%;--gi:6.9" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
 
       <!-- Round Timer (blue, top-left) -->
       <div class="sp-card sp-rtimer" style="left:1.46%;top:2.72%;width:16.04%">
@@ -265,7 +268,7 @@
 
       <!-- Fresh REST exports from Solo nodes 225:407 and 225:386. The text,
            arrows, torn edges, shadows and internal rotation are baked in. -->
-      <img class="sp-skip-tape" id="spTapeSkip"
+      <img class="sp-skip-tape" id="spTapeSkip" style="--gi:5.4"
            src="assets/ui/figma/sp-skip-tape.png" alt="">
       <button class="sp-skip pbtn" id="btnSkipSolo"
               title="Skip word (costs 250 points)"
@@ -434,16 +437,16 @@
       <img class="v1-divider" src="assets/ui/figma/v1-divider.png" alt="">
 
       <!-- Figma tape layer -->
-      <img class="v1-tape" style="left:5.49%;top:.37%;width:7.50%" src="assets/ui/figma/sp-tape-top-left.png" alt="">
-      <img class="v1-tape" style="left:46.39%;top:-2.22%;width:6.96%" src="assets/ui/figma/v1-tape-word-timer.png" alt="">
-      <img class="v1-tape" style="left:23.82%;top:-3.58%;width:6.82%" src="assets/ui/figma/v1-tape-score-blue.png" alt="">
-      <img class="v1-tape" style="left:68.96%;top:-3.33%;width:7.02%" src="assets/ui/figma/v1-tape-score-orange.png" alt="">
-      <img class="v1-tape" style="left:14.85%;top:65.30%;width:5.84%" src="assets/ui/figma/v1-tape-left-top.png" alt="">
+      <img class="v1-tape" style="left:5.49%;top:.37%;width:7.50%;--gi:0" src="assets/ui/figma/sp-tape-top-left.png" alt="">
+      <img class="v1-tape" style="left:46.39%;top:-2.22%;width:6.96%;--gi:2" src="assets/ui/figma/v1-tape-word-timer.png" alt="">
+      <img class="v1-tape" style="left:23.82%;top:-3.58%;width:6.82%;--gi:1" src="assets/ui/figma/v1-tape-score-blue.png" alt="">
+      <img class="v1-tape" style="left:68.96%;top:-3.33%;width:7.02%;--gi:3" src="assets/ui/figma/v1-tape-score-orange.png" alt="">
+      <img class="v1-tape" style="left:14.85%;top:65.30%;width:5.84%;--gi:4" src="assets/ui/figma/v1-tape-left-top.png" alt="">
       <img class="v1-tape v1-tape-history" id="myGuessPastTape" style="left:-1.94%;top:83.21%;width:5.92%" src="assets/ui/figma/v1-tape-left-mid.png" alt="">
-      <img class="v1-tape" style="left:79.31%;top:66.54%;width:5.94%" src="assets/ui/figma/v1-tape-right-top.png" alt="">
+      <img class="v1-tape" style="left:79.31%;top:66.54%;width:5.94%;--gi:5" src="assets/ui/figma/v1-tape-right-top.png" alt="">
       <img class="v1-tape v1-tape-history" id="rivalGuessPastTape" style="left:94.63%;top:84.07%;width:5.83%" src="assets/ui/figma/v1-tape-right-mid.png" alt="">
-      <img class="v1-tape" style="left:66.39%;top:79.26%;width:5.81%" src="assets/ui/figma/sp-tape-word-right.png" alt="">
-      <img class="v1-tape" style="left:27.43%;top:91.73%;width:6.77%" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
+      <img class="v1-tape" style="left:66.39%;top:79.26%;width:5.81%;--gi:6.2" src="assets/ui/figma/sp-tape-word-right.png" alt="">
+      <img class="v1-tape" style="left:27.43%;top:91.73%;width:6.77%;--gi:6.9" src="assets/ui/figma/sp-tape-word-bottom-left.png" alt="">
 
       <!-- match clock, word/chase clock, and total scores -->
       <div class="sp-card sp-rtimer v1-matchtimer" style="left:1.46%;top:2.72%;width:16.04%">
@@ -591,16 +594,16 @@
       <!-- Exact rendered tape nodes from the 1440×810 Party Figma frame.
            Each export already contains the intended angle and transparent
            bounds, so these use the parent node's coordinates verbatim. -->
-      <img class="pm-tape" id="pmMatchTimerTape" style="left:4.722%;top:-.617%;width:6.071%" src="assets/ui/figma/pm-tape-match-timer.png" alt="">
-      <img class="pm-tape" id="pmBlueScoreTape" style="left:25.625%;top:-3.704%;width:6.244%" src="assets/ui/figma/pm-tape-blue-score.png" alt="">
-      <img class="pm-tape" id="pmWordTimerTape" style="left:46.297%;top:-2.448%;width:6.374%" src="assets/ui/figma/pm-tape-word-timer.png" alt="">
-      <img class="pm-tape" id="pmOrangeScoreTape" style="left:66.969%;top:-3.465%;width:6.433%" src="assets/ui/figma/pm-tape-orange-score.png" alt="">
-      <img class="pm-tape" id="pmMyTopTape" style="left:12.779%;top:70.910%;width:4.716%" src="assets/ui/figma/pm-tape-my-top.png" alt="">
+      <img class="pm-tape" id="pmMatchTimerTape" style="left:4.722%;top:-.617%;width:6.071%;--gi:0" src="assets/ui/figma/pm-tape-match-timer.png" alt="">
+      <img class="pm-tape" id="pmBlueScoreTape" style="left:25.625%;top:-3.704%;width:6.244%;--gi:1" src="assets/ui/figma/pm-tape-blue-score.png" alt="">
+      <img class="pm-tape" id="pmWordTimerTape" style="left:46.297%;top:-2.448%;width:6.374%;--gi:2" src="assets/ui/figma/pm-tape-word-timer.png" alt="">
+      <img class="pm-tape" id="pmOrangeScoreTape" style="left:66.969%;top:-3.465%;width:6.433%;--gi:3" src="assets/ui/figma/pm-tape-orange-score.png" alt="">
+      <img class="pm-tape" id="pmMyTopTape" style="left:12.779%;top:70.910%;width:4.716%;--gi:4" src="assets/ui/figma/pm-tape-my-top.png" alt="">
       <img class="pm-tape pm-tape-history" id="pmMyPastTape" style="left:-.764%;top:85.369%;width:4.779%" src="assets/ui/figma/pm-tape-my-past.png" alt="">
-      <img class="pm-tape" id="pmFoeTopTape" style="left:81.672%;top:71.263%;width:5.139%" src="assets/ui/figma/pm-tape-foe-top.png" alt="">
+      <img class="pm-tape" id="pmFoeTopTape" style="left:81.672%;top:71.263%;width:5.139%;--gi:5" src="assets/ui/figma/pm-tape-foe-top.png" alt="">
       <img class="pm-tape pm-tape-history" id="pmFoePastTape" style="left:94.928%;top:86.435%;width:5.047%" src="assets/ui/figma/pm-tape-foe-past.png" alt="">
-      <img class="pm-tape" id="pmWordRightTape" style="left:66.389%;top:79.259%;width:5.808%" src="assets/ui/figma/pm-tape-word-right.png" alt="">
-      <img class="pm-tape" id="pmWordLeftTape" style="left:27.431%;top:91.728%;width:6.773%" src="assets/ui/figma/pm-tape-word-left.png" alt="">
+      <img class="pm-tape" id="pmWordRightTape" style="left:66.389%;top:79.259%;width:5.808%;--gi:6.2" src="assets/ui/figma/pm-tape-word-right.png" alt="">
+      <img class="pm-tape" id="pmWordLeftTape" style="left:27.431%;top:91.728%;width:6.773%;--gi:6.9" src="assets/ui/figma/pm-tape-word-left.png" alt="">
 
       <!-- match clock, word clock, team scores -->
       <div class="sp-card sp-rtimer" id="pmMatchTimerCard" style="left:1.18%;top:1.23%;width:12.99%">

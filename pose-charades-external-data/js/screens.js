@@ -52,17 +52,29 @@ const MODE_LABELS = {
   results:"GAME OVER!",
 };
 
+/* The count-in choreography (css/screens.css, SHARED GAMEPLAY ENTRANCE) runs
+   from .04s to ~2.12s: the last piece of tape starts at 1.616s and takes .5s
+   to settle. This MUST outlast it or the final tapes are cut off mid-slap —
+   `both` fill means pulling the class early snaps them to rest instead.
+   Measured end on a warm headless Chrome is ~2.16s across all three stages,
+   so this leaves ~240ms for a frame-starved start while still finishing well
+   inside the 3s countdown, which for 1v1 and Party is server-driven and
+   cannot be moved. */
+const GAME_INTRO_MS = 2400;
+const GAME_STAGE = { solo:"soloStage", match:"matchStage", pmatch:"pmStage" };
+
 let gameEntranceTimer = null;
 function playGameplayEntrance(screen){
-  const id = screen==="solo" ? "soloStage" : screen==="match" ? "matchStage" :
-    screen==="pmatch" ? "pmStage" : "";
-  const stage = id && $(id);
+  const stage = GAME_STAGE[screen] && $(GAME_STAGE[screen]);
   if(!stage) return;
   stage.classList.remove("game-intro");
   void stage.offsetWidth;
   stage.classList.add("game-intro");
   clearTimeout(gameEntranceTimer);
-  gameEntranceTimer = setTimeout(() => stage.classList.remove("game-intro"), 1250);
+  gameEntranceTimer = setTimeout(() => {
+    stage.classList.remove("game-intro");
+    delete document.body.dataset.intro;
+  }, GAME_INTRO_MS);
 }
 
 export function render(fsmState){
@@ -105,11 +117,33 @@ export function render(fsmState){
 
   /* Every mode receives the same paper-on-table entrance beat. The stage is
      already visible here, so one animation system works for Solo, 1v1 and
-     Party without changing any mode's game/network state. */
-  if(fsmState==="countdown" && (s==="solo" || s==="match" || s==="pmatch"))
-    requestAnimationFrame(() => {
-      if(document.body.dataset.state==="countdown") playGameplayEntrance(s);
-    });
+     Party without changing any mode's game/network state.
+
+     Both the flag and the class go on SYNCHRONOUSLY. All three callers run
+     transition("countdown") — i.e. this function — and then start their 3·2·1
+     immediately, so anything deferred to a rAF is already racing a clock that
+     is running: the flag has to be on the body the first time the scrim's own
+     animation is resolved (or the dim flashes on at full strength before it
+     yields), and the entrance loses a frame it does not have. */
+  const introScreen = s==="solo" || s==="match" || s==="pmatch";
+  if(fsmState==="countdown" && introScreen){
+    document.body.dataset.intro = "game";
+    playGameplayEntrance(s);
+  }else{
+    /* ANY transition out of the count-in ends it, not just backing out to a
+       menu. GAME_INTRO_MS is measured from the client's own render, while the
+       countdown it has to fit inside is measured from a server timestamp — so
+       a client that reaches `countdown` late (camera + model still coming up)
+       would otherwise still be flying paper around for a second of live play,
+       with every hover dead because `both` fill outranks a plain declaration.
+       In the normal case the timer has already fired here and this is a no-op;
+       when it has not, snapping the board to rest exactly as the round starts
+       is the right trade. It also covers backing out mid-count-in, which would
+       strand `.game-intro` and pin every paper at its keyframed transform. */
+    clearTimeout(gameEntranceTimer);
+    for(const k in GAME_STAGE) $(GAME_STAGE[k])?.classList.remove("game-intro");
+    delete document.body.dataset.intro;
+  }
 }
 
 /* round-progress dots under the logo on the match screen */

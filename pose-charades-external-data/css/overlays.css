@@ -29,6 +29,35 @@
   100%{transform:scale(1) rotate(0)}}
 @media (prefers-reduced-motion: reduce){ .countdown::before{animation:none} }
 
+/* ---- the countdown YIELDS while the board assembles ----
+   The 3·2·1 used to own the screen from frame one: a full-viewport
+   brightness(.66) scrim plus a numeral 19vw tall, both up before a single
+   paper had moved. The gameplay entrance therefore played in the dark behind
+   a giant number, which is why it read as "nothing pops up, they just
+   appear" — and because the entrance was ~1.5s of a 3s countdown, the last
+   half of the count was a completely static, dimmed board.
+
+   `body[data-intro="game"]` (set by screens.js for the life of `.game-intro`)
+   inverts that order without touching a millisecond of countdown timing —
+   which matters, because 1v1 and Party start theirs from a server timestamp:
+     · the dim holds at 0 and only starts washing in at 1.72s, as the last
+       pieces of tape slap down, reaching full just after the board is whole;
+     · the numeral still counts every second, but at reduced weight, and
+       grows to full size the moment the assembly finishes.
+   So the beat is: board builds in the clear → lights down → "1" → GO.
+   Under reduced motion none of this applies: the entrance does not run, so
+   the countdown keeps its original full-strength presentation. */
+@media (prefers-reduced-motion: no-preference){
+  /* the wash completes at 2.12s, exactly as the last tape settles, so that
+     removing the flag at 2.3s can never step the dim */
+  body[data-intro="game"] .countdown::before{
+    animation-duration:.46s;animation-delay:1.66s}
+  .countdown{transition:font-size .4s cubic-bezier(.2,.9,.3,1)}
+  body[data-intro="game"] .countdown{font-size:min(11vw,17.5vh)}
+  .cd-num{transition:opacity .4s ease}
+  body[data-intro="game"] .cd-num{opacity:.8}
+}
+
 /* The toast. It had NO stylesheet at all — it laid out static below the fold,
    so every message the game has ever sent (room errors, "X left the party",
    the skip penalty, SUDDEN DEATH, copy-failed fallbacks) was invisible.

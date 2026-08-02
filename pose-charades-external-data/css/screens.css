@@ -195,45 +195,128 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 .pp-circle svg{width:24px;height:24px}
 
 /* =================== SHARED GAMEPLAY ENTRANCE ===================
-   Solo, 1v1 and Party use one paper-placement language: HUD cards drop from
-   above, side guesses slide inward, the main word rises, then tape sticks.
-   Only presentation is animated; gameplay state and timing remain shared. */
-:is(.solostage,.matchstage,.pmstage).game-intro :is(.sp-card,.v1-scorecard){
-  --game-in-x:0%;--game-in-y:-42%;--game-in-r:-3deg;
-  animation:gamePaperIn .66s cubic-bezier(.16,1.38,.32,1) .06s both}
-:is(.solostage,.matchstage,.pmstage).game-intro .sp-word{
-  --game-in-x:0%;--game-in-y:68%;--game-in-r:2deg;
-  animation:gamePaperIn .72s cubic-bezier(.16,1.38,.32,1) .24s both}
-:is(.solostage,.matchstage,.pmstage).game-intro .sp-guess:not(.empty){
-  --game-in-x:55%;--game-in-y:8%;--game-in-r:5deg;
-  animation:gamePaperIn .68s cubic-bezier(.16,1.38,.32,1) .34s both}
-:is(.matchstage,.pmstage).game-intro
-  :is(.sp-guess.you,.sp-guess.mine,.sp-guess.current.you,.sp-guess.current.mine){
-  --game-in-x:-55%;--game-in-r:-5deg}
-:is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{
-  --game-in-x:-58%;--game-in-y:12%;--game-in-r:-5deg;
-  animation:gamePaperIn .62s cubic-bezier(.16,1.38,.32,1) .42s both}
-:is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{--game-intro-opacity:.55}
-:is(.solostage,.matchstage,.pmstage).game-intro
-  :is(.sp-tape,.v1-tape,.pm-tape,.sp-skip-tape){
-  animation:gameTapeStick .38s cubic-bezier(.16,1.55,.32,1) .72s both}
-:is(.matchstage,.pmstage).game-intro .pm-divider{
-  animation:gameDividerIn .58s cubic-bezier(.16,1.38,.32,1) .18s both}
+   Solo, 1v1 and Party count in with the SAME motion language as Home: every
+   piece travels a long way in from the edge it logically comes from, scales
+   .76 -> 1 with a settle, and the tape that pins it SLAPS down out of nowhere
+   about .58s later. The eye follows paper -> tape, paper -> tape across the
+   board instead of watching a HUD switch on.
+
+   What it replaced: every paper made the same small -42% drop in .66s, and
+   ALL the tape — nine or ten pieces — shared ONE .72s delay, so the whole
+   tape layer arrived in a single flash. That is the "nothing pops up, they
+   just appear, all the tape appears together" complaint.
+
+   ONE shared beat index, `--gi`, orders the composition:
+
+     0    run / match clock (top-left)      + its tape
+     1    left score card (1v1 you, party blue)   + tape
+     2    word clock (top-centre)           + tape
+     3    right score (solo SCORE, 1v1 rival, party orange) + tape
+     4    solo STREAK / the left guess paper       + tape
+     5    the right guess paper(s)          + tape
+     5.4  solo SKIP                         + tape
+     6.2  the WORD card — the hero, last, biggest travel + right tape
+     6.9  the word card's second tape
+
+   Papers land at `.04s + gi*.145s`; the tape that holds a paper down lands at
+   `.615s + gi*.145s`, the same paper->tape lag Home uses. Tapes are the only
+   elements carrying `--gi` inline in index.html, because most of them have no
+   id or distinguishing class — that is all `--gi` does there.
+
+   The whole sequence finishes at ~2.12s, inside the FIXED 3s countdown
+   (PRECOUNT_STEP_MS x3 locally, server `preCountMs` online), so no network
+   timing moves and the client never starts late. `body[data-intro="game"]`
+   in overlays.css holds the 3-2-1 scrim off the board until the assembly is
+   done — before that, this all played under a brightness(.66) wash behind a
+   giant numeral and was practically invisible.
+
+   Only presentation is animated; gameplay state and timing are untouched. */
+@media (prefers-reduced-motion:no-preference){
+  /* one rule animates every paper; each rule below only supplies the beat,
+     the direction it flies in from, and its duration */
+  :is(.solostage,.matchstage,.pmstage).game-intro
+    :is(.sp-card,.v1-scorecard,.sp-word,.sp-skip,.sp-guess:not(.empty)){
+    animation:gamePaperIn var(--gi-dur,.92s) cubic-bezier(.16,1.38,.32,1)
+      calc(.04s + var(--gi,0) * .145s) both}
+  /* run/match clock — slides in off the left edge */
+  :is(.solostage,.matchstage,.pmstage).game-intro .sp-rtimer{
+    --gi:0;--game-in-x:-270%;--game-in-y:-24%;--game-in-r:-9deg;--gi-dur:.9s}
+  /* the two score papers hang off the top edge, tipped away from centre */
+  :is(.matchstage,.pmstage).game-intro :is(.v1-scorecard.you,.pm-score.blue){
+    --gi:1;--game-in-x:-72%;--game-in-y:-400%;--game-in-r:-8deg;--gi-dur:.94s}
+  :is(.solostage,.matchstage,.pmstage).game-intro .sp-wtimer{
+    --gi:2;--game-in-x:0%;--game-in-y:-440%;--game-in-r:6deg;--gi-dur:.96s}
+  :is(.solostage).game-intro .sp-score{
+    --gi:3;--game-in-x:130%;--game-in-y:-330%;--game-in-r:9deg;--gi-dur:.94s}
+  :is(.matchstage,.pmstage).game-intro :is(.v1-scorecard.rival,.pm-score.orange){
+    --gi:3;--game-in-x:72%;--game-in-y:-400%;--game-in-r:8deg;--gi-dur:.94s}
+  /* streak lives against the right edge, so it comes straight off it */
+  :is(.solostage).game-intro .sp-streak{
+    --gi:4;--game-in-x:250%;--game-in-y:18%;--game-in-r:-8deg;--gi-dur:.9s}
+  /* guess papers slide in from whichever side of the board they sit on */
+  :is(.solostage,.matchstage,.pmstage).game-intro .sp-guess:not(.empty){
+    --gi:5;--game-in-x:180%;--game-in-y:26%;--game-in-r:7deg;--gi-dur:.88s}
+  :is(.matchstage,.pmstage).game-intro .sp-guess:is(.you,.mine):not(.empty){
+    --gi:4;--game-in-x:-180%;--game-in-r:-7deg}
+  :is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{
+    --gi:5.4;--game-in-x:-200%;--game-in-y:55%;--game-in-r:-8deg;--gi-dur:.86s;
+    --game-intro-opacity:.55}
+  /* the word is the hero: last in, furthest travel, longest settle */
+  :is(.solostage,.matchstage,.pmstage).game-intro .sp-word{
+    --gi:6.2;--game-in-x:0%;--game-in-y:210%;--game-in-r:3deg;--gi-dur:.98s}
+
+  /* Tape: the same slap Home uses — huge, rotated, several settling bounces —
+     one piece at a time, .145s apart, each landing after the paper it pins.
+     History tapes are excluded: their paper is `.empty` at count-in and the
+     :has() rules below hold them at opacity 0, so animating them would have
+     flashed a tape onto a card that is not there. */
+  :is(.solostage,.matchstage,.pmstage).game-intro
+    :is(.sp-tape,.v1-tape,.pm-tape,.sp-skip-tape):not(.sp-tape-history,
+      .v1-tape-history,.pm-tape-history){
+    animation:gameTapeStick .5s cubic-bezier(.16,1.5,.32,1)
+      calc(.615s + var(--gi,0) * .145s) both}
+
+  /* the split divider frames the board, so it draws itself first */
+  :is(.matchstage,.pmstage).game-intro :is(.pm-divider,.v1-divider){
+    animation:gameDividerIn .8s cubic-bezier(.16,1.38,.32,1) .09s both}
+  /* party's centre tiles are seats, not paper — they keep their Figma --rot */
+  .pmstage.game-intro .pm-tile{
+    animation:gameTileIn .88s cubic-bezier(.16,1.38,.32,1)
+      calc(.04s + var(--gi,0) * .145s) both}
+  .pmstage.game-intro .pm-tile.blue{--game-in-x:-120%;--game-in-r:-7deg}
+  .pmstage.game-intro .pm-tile.orange{--game-in-x:120%;--game-in-r:7deg}
+  .pmstage.game-intro [data-seat="blue1"]{--gi:0}
+  .pmstage.game-intro [data-seat="orange1"]{--gi:.5}
+  .pmstage.game-intro [data-seat="blue2"]{--gi:1}
+  .pmstage.game-intro [data-seat="orange2"]{--gi:1.5}
+}
 @keyframes gamePaperIn{
-  0%{opacity:0;translate:var(--game-in-x) var(--game-in-y);
-    rotate:var(--game-in-r);scale:.78}
-  68%{opacity:var(--game-intro-opacity,1);translate:0 1.5%;
-    rotate:calc(var(--game-in-r) * -.16);scale:1.045}
-  84%{translate:0 -.6%;rotate:.4deg;scale:.99}
+  0%{opacity:0;translate:var(--game-in-x,0%) var(--game-in-y,-40%);
+    rotate:var(--game-in-r,0deg);scale:.76}
+  68%{opacity:var(--game-intro-opacity,1);translate:0 1.6%;
+    rotate:calc(var(--game-in-r,0deg) * -.15);scale:1.045}
+  84%{translate:0 -.7%;rotate:.5deg;scale:.99}
   100%{opacity:var(--game-intro-opacity,1);translate:0 0;rotate:0deg;scale:1}}
+/* the tape arrives from way outside the frame and settles — same shape as
+   homeTapeSlap, so Home and a round in progress read as one game */
 @keyframes gameTapeStick{
-  0%{opacity:0;scale:1.55}
-  68%{opacity:1;scale:.94}
-  100%{opacity:1;scale:1}}
+  0%{opacity:0;transform:scale(2.5) rotate(-13deg)}
+  46%{opacity:1;transform:scale(1.2) rotate(5deg)}
+  74%{transform:scale(.94) rotate(-2.4deg)}
+  89%{transform:scale(1.03) rotate(.9deg)}
+  100%{opacity:1;transform:none}}
 @keyframes gameDividerIn{
-  0%{opacity:0;scale:.72 1.18}
-  70%{opacity:1;scale:1.04 .98}
-  100%{opacity:1;scale:1}}
+  0%{opacity:0;scale:.5 1.22;translate:0 -7%}
+  62%{opacity:1;scale:1.09 .98;translate:0 1%}
+  84%{scale:.98 1.01;translate:0 -.4%}
+  100%{opacity:1;scale:1;translate:0 0}}
+/* a party seat must finish on its authored Figma --rot, never on 0deg */
+@keyframes gameTileIn{
+  0%{opacity:0;translate:var(--game-in-x,0%) var(--game-in-y,0%);
+    rotate:calc(var(--rot,0deg) + var(--game-in-r,0deg));scale:.72}
+  66%{opacity:1;translate:0 1.4%;rotate:calc(var(--rot,0deg) * 1.6);scale:1.045}
+  85%{translate:0 -.5%;scale:.99}
+  100%{opacity:1;translate:0 0;rotate:var(--rot,0deg);scale:1}}
 
 /* =================== SOLO PLAY (Figma "Singe player" 150:454) =================== */
 /* HUD overlay on the full-bleed camera. body[data-screen] hides the header;
