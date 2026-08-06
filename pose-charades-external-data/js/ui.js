@@ -4,14 +4,19 @@ import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { blip } from "./audio.js";
 import { fakeRivalGuesses } from "./rival.js";
-import { THRESH } from "./constants.js";
 import {
-  advanceRecognitionFill,
   createGuessHistory, resetGuessHistory, updateGuessHistory,
   restartFeedbackAnimation, markGuessRecognized,
   setWordRecognitionMotion,
   fitGameplayText,
 } from "./gameplayFeedback.js";
+import { createChargeMeter, resetChargeMeter, advanceCharge,
+         chargePercent } from "./recognition.js";
+import { robotCharge, robotNewWord } from "./robot.js";
+
+/* Which rig belongs to which side of the split. `my` is yours and talks;
+   `rival` is muted in the markup and reacts in body only. */
+export const MATCH_ROBOT = Object.freeze({ my:"v1RobotYou", rival:"v1RobotRival" });
 
 /* ---------------- transient feedback ---------------- */
 export function showStatus(msg){
@@ -86,13 +91,38 @@ export function fillGuessPanel(prefix, top, rows=4){
    Keep the existing classifier output funnel, but render it through that
    smaller rolling stack rather than the old dashboard panels. */
 const matchGuess = {
-  my:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
-  rival:{ key:null,history:createGuessHistory(2),shownFill:0,fillAt:0 },
+  my:{ key:null,history:createGuessHistory(2) },
+  rival:{ key:null,history:createGuessHistory(2) },
 };
 
-/* 1v1's word bar + confidence shake, driven at display rate. */
-let matchFillTarget = 0;
+/* 1v1's word bar is the shared charge meter (recognition.js): the pose has to
+   be HELD over a gate that relaxes as the word clock runs down, and the claim
+   goes out when the meter fills. The bar is driven at display rate rather than
+   at CLASSIFY_EVERY_MS so it walks smoothly between inference ticks. */
+const matchMeter = createChargeMeter("match");
+let matchFillTarget = 0;        // last DISPLAYED confidence for the target, 0..1
 let matchFillRaf = 0;
+let matchLockHandler = null;
+
+/* game.js owns what a completed meter MEANS (claim the server round, or win
+   the practice word), and registers it here. ui.js must not import game.js —
+   game.js already imports ui.js. */
+export function setMatchLockHandler(fn){ matchLockHandler = fn; }
+export function matchChargePercent(){ return chargePercent(matchMeter); }
+export function resetMatchCharge(){
+  resetChargeMeter(matchMeter);
+  matchFillTarget = 0;
+}
+
+function matchWordElapsedFrac(g){
+  const now = performance.now();
+  if(!g?.wordEnd) return 0;
+  /* The chase and sudden-death windows are their own short clocks; either way
+     the meter wants how far through the CURRENT window we are. */
+  const limit = g.roundPhase === "chase" ? 5000
+    : (g.wordLimitMs || 20000);
+  return Math.max(0, Math.min(1, 1 - Math.max(0, g.wordEnd - now) / limit));
+}
 
 function matchFillFrame(){
   matchFillRaf = 0;
@@ -100,22 +130,23 @@ function matchFillFrame(){
   const fill = $("v1WordFill");
   if(state.screen !== "match" || !g?.word || !fill) return;
 
-  const slot = matchGuess.my;
   const stage = $("matchStage");
   const locked = stage?.classList.contains("you-locked");
   if(locked){
-    slot.shownFill = 1;
-    slot.fillAt = performance.now();
+    matchMeter.charge = 1;
+    matchMeter.display = 1;
+    matchMeter.locked = true;
+    matchMeter.at = performance.now();
   }else{
-    const next = advanceRecognitionFill(slot.shownFill, matchFillTarget, slot.fillAt);
-    slot.shownFill = next.value;
-    slot.fillAt = next.at;
+    advanceCharge(matchMeter, matchFillTarget, matchWordElapsedFrac(g));
+    if(matchMeter.locked) matchLockHandler?.();
   }
-  fill.style.width = (slot.shownFill * 95) + "%";
+  fill.style.width = (matchMeter.display * 95) + "%";
+  robotCharge(MATCH_ROBOT.my, matchMeter.display, matchMeter.locked || locked);
   const activePhase = g.mode === "vs" ||
     ["word", "chase", "sudden"].includes(g.roundPhase);
   setWordRecognitionMotion($("vsWordCard"),
-    slot.shownFill * THRESH, THRESH, activePhase && !locked);
+    matchMeter.display, 1, activePhase && !locked);
   matchFillRaf = requestAnimationFrame(matchFillFrame);
 }
 
@@ -126,16 +157,16 @@ function startMatchFill(){
 export function stopMatchFill(){
   if(matchFillRaf) cancelAnimationFrame(matchFillRaf);
   matchFillRaf = 0;
-  matchFillTarget = 0;
+  resetMatchCharge();
 }
 
 function resetMatchSide(prefix, key){
   const slot=matchGuess[prefix];
   if(slot.key===key) return slot;
   slot.key=key;
-  slot.shownFill=0;
-  slot.fillAt=0;
+  if(prefix==="my") resetMatchCharge();
   resetGuessHistory(slot.history);
+  robotNewWord(MATCH_ROBOT[prefix]);
   const topWord=$(prefix+"TopWord"), topPct=$(prefix+"TopPct");
   const topBox=$(prefix+"GuessTop");
   const pastWord=$(prefix+"PastWord"), pastPct=$(prefix+"PastPct"),
@@ -189,6 +220,35 @@ export function showTimesUp(){
   timesUpTimer = setTimeout(() => card.classList.remove("fire"), 1600);
 }
 
+/* Sudden death was a toast. In a mode where the whole screen is your own
+   camera and you are mid-pose, a line of text at the bottom edge is not a
+   rule change anybody notices — and this one inverts the entire match. It
+   gets the same treatment TIMES UP gets: a full-screen Figma paper that slams
+   in, plus the screen-edge pulse that keeps running underneath it for as long
+   as the phase lasts (overlays.css). */
+let suddenTimer = 0;
+export function showSuddenDeath(){
+  const card = $("suddenDeath");
+  if(!card) return;
+  clearTimeout(suddenTimer);
+  card.classList.remove("hidden", "fire");
+  void card.offsetWidth;
+  card.classList.add("fire");
+  blip([392, 330, 262, 196, 262, 330], .11);
+  suddenTimer = setTimeout(() => {
+    card.classList.remove("fire");
+    card.classList.add("hidden");
+  }, 1950);
+}
+
+export function hideSuddenDeath(){
+  const card = $("suddenDeath");
+  if(!card) return;
+  clearTimeout(suddenTimer);
+  card.classList.remove("fire");
+  card.classList.add("hidden");
+}
+
 export function fitMatchPaperText(){
   for(const id of [
     "vsWord", "v1YouName", "v1RivalName",
@@ -205,7 +265,12 @@ function paintMatchSide(prefix, slot, popped=false){
   if(current){
     const label=displayName(current.label).toUpperCase()+(current.locked?"":"?");
     if(word){ word.textContent=label; fitGameplayText(word); }
-    if(pct) pct.textContent=Math.round(current.pct*100)+"%";
+    /* your own paper reports CHARGE toward the claim while it is showing the
+       target word — the number must agree with the bar underneath it */
+    const live=prefix==="my" && !current.locked &&
+      current.label===state.game?.word;
+    if(pct) pct.textContent=(live?chargePercent(matchMeter)
+      :Math.round(current.pct*100))+"%";
   }
   if(past){
     const label=displayName(past.label).toUpperCase()+"?";
@@ -216,6 +281,13 @@ function paintMatchSide(prefix, slot, popped=false){
     pastBox?.classList.add("empty");
   }
   markGuessRecognized(topBox,!!current?.locked);
+  /* Recognition itself fires his celebration from inside markGuessRecognized,
+     which every mode routes through. What is left here is the rival rig's
+     CONTINUOUS read: yours runs off the charge meter each frame, but the only
+     confidence anyone has on the rival is the number his paper is showing —
+     which is exactly what a robot watching him across the split would know. */
+  if(prefix==="rival" && !current?.locked)
+    robotCharge(MATCH_ROBOT.rival,current?.pct||0);
   if(popped && topBox){
     restartFeedbackAnimation(topBox,"pop");
     if(past) restartFeedbackAnimation(pastBox,"shift");
@@ -310,9 +382,7 @@ export function renderGuesses(){
       const displayedConfidence=current?.label===g.word
         ? Math.max(0,Math.min(1,current?.pct||0))
         : 0;
-      matchFillTarget=localLocked
-        ? 1
-        : Math.max(0,Math.min(1,displayedConfidence/THRESH));
+      matchFillTarget=localLocked ? 1 : displayedConfidence;
       startMatchFill();
     }
   } else if(s==="train"){

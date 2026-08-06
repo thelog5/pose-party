@@ -543,14 +543,27 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 /* muted is a state, not a hover — it stays legible so you can see why it is quiet */
 .sp-sound.muted{opacity:.62;background:#f4622e;color:#fff}
 .sp-sound.muted:hover,.sp-sound.muted:focus-visible{opacity:1}
+/* 1v1 and Party no longer carry a mid-match LEAVE paper, so the volume moves
+   up into the slot it used to occupy — directly under the match clock, the
+   one place on both boards already proven clear of live HUD. It also sits a
+   little brighter there, because it is now the only chrome on the stage. */
+.matchstage .sp-sound,.pmstage .sp-sound{left:1.32%;top:15.6%;width:4%;opacity:.2}
 @media (prefers-reduced-motion:reduce){
   .sp-sound,.sp-sound:hover,.sp-sound:active{
     translate:0 0!important;scale:1!important;transition:opacity .18s ease}
 }
 
-/* --- points award (Figma "POINTS AWARD", 898px) --- */
-.sp-award{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%) scale(.6);z-index:95;
-  width:min(62vw,900px);pointer-events:none;opacity:0}
+/* --- points award (Figma "POINTS AWARD", 898px) ---
+   It used to land dead centre, which is exactly where the player's own camera
+   image — and their face — is. For half a second the one thing you are
+   watching while you hold a pose was covered by the paper telling you the
+   pose worked. It now lands in the empty left band of the board, opposite the
+   guess stack and the robot, and is flown from there into the score card.
+   `left`/`top` here are only the fallback: JS anchors it off the STAGE rect
+   (soloRound.js), because the stage letterboxes and a flat viewport
+   percentage lands outside the board entirely at 5:4. */
+.sp-award{position:fixed;left:26%;top:50%;transform:translate(-50%,-50%) scale(.6);z-index:95;
+  width:min(44vw,640px);pointer-events:none;opacity:0}
 .sp-award::before{content:"";position:absolute;left:50%;top:50%;width:122%;aspect-ratio:1;
   translate:-50% -50%;z-index:-1;opacity:0;
   background:radial-gradient(circle,rgba(255,231,150,.85) 0 26%,
@@ -564,26 +577,40 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .sp-award .aw-got{top:19.8%;font-size:7.8cqw}
 .sp-award .aw-pts{top:47.3%;font-size:18.93cqw}
 .sp-award .aw-lbl{top:75.6%;font-size:7.8cqw}
-.sp-award.show{animation:awshow 1.85s cubic-bezier(.16,1.4,.32,1) both}
-.sp-award.show::before{animation:awburst 1.85s ease-out both}
-@keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.18) rotate(-11deg)}
-  13%{opacity:1;transform:translate(-50%,-50%) scale(1.16) rotate(3deg)}
-  28%{transform:translate(-50%,-50%) scale(.96) rotate(-1.2deg)}
-  42%{transform:translate(-50%,-50%) scale(1.045) rotate(.5deg)}
-  78%{opacity:1;transform:translate(-50%,-50%) scale(1)}
-  100%{opacity:0;transform:translate(-50%,-61%) scale(.9)}}
-@keyframes awburst{0%{opacity:0;scale:.25;rotate:-18deg}12%{opacity:.85;scale:1.02}
-  62%{opacity:.42;scale:1.2;rotate:22deg}100%{opacity:0;scale:1.34;rotate:30deg}}
 
-/* points chip flying to the score card (created in JS) */
-.sp-chip{position:fixed;z-index:96;pointer-events:none;font-family:var(--f-lobby);font-weight:400;
-  background:#ffd964;border:3px solid #17356f;border-radius:var(--r-pill);padding:.4% 2%;color:#17356f;
-  font-size:clamp(16px,min(2.2vw,3.9vh),88px);box-shadow:0 4px 0 rgba(23,53,111,.25)}
+/* The payoff is ONE object in TWO beats. `.show` slams the paper down centre
+   stage and LEAVES IT THERE (it used to fade itself out over 1.85s, which is
+   why the whole thing read as a flash). `.deliver` then drags that same paper
+   into the score card, and the number only moves when it arrives — so what
+   you see is literally the points being carried into your total.
+   `.deliver` replaces the animation outright rather than layering on top, so
+   its 0% keyframe is exactly where `awshow` came to rest. */
+.sp-award.show{animation:awshow .5s cubic-bezier(.16,1.4,.32,1) both}
+.sp-award.show::before{animation:awburst 1.1s ease-out both}
+.sp-award.show.deliver{
+  animation:awdeliver var(--fly-ms,560ms) cubic-bezier(.5,-.28,.62,1) both}
+.sp-award.show.deliver::before{animation:awburstout .26s ease-in both}
+@keyframes awshow{0%{opacity:0;transform:translate(-50%,-50%) scale(.18) rotate(-11deg)}
+  46%{opacity:1;transform:translate(-50%,-50%) scale(1.16) rotate(3deg)}
+  72%{transform:translate(-50%,-50%) scale(.965) rotate(-1.2deg)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}}
+@keyframes awdeliver{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+  /* a short wind-up, so the paper is visibly PICKED UP before it is thrown */
+  16%{opacity:1;transform:translate(-50%,-46%) scale(1.075) rotate(-3deg)}
+  100%{opacity:.05;
+    transform:translate(calc(-50% + var(--fly-x,0px)),calc(-50% + var(--fly-y,0px)))
+      scale(var(--fly-s,.24)) rotate(var(--fly-r,14deg))}}
+@keyframes awburst{0%{opacity:0;scale:.25;rotate:-18deg}18%{opacity:.85;scale:1.02}
+  62%{opacity:.42;scale:1.2;rotate:22deg}100%{opacity:.22;scale:1.28;rotate:26deg}}
+@keyframes awburstout{from{opacity:.22}to{opacity:0}}
 
 /* theme.css kills every animation under reduced motion, which would leave the
    award paper stuck at opacity:0 — the payoff, and the points it reports,
-   would silently never appear. Show it plainly instead of animating it. The
-   screen flash stays suppressed: that one is pure motion, and unwelcome. */
+   would silently never appear. Show it plainly instead of animating it (JS
+   also pays the score out immediately in that case, so nothing waits on a
+   flight that is not running). The screen flash stays suppressed: that one is
+   pure motion, and unwelcome. */
 @media (prefers-reduced-motion: reduce){
   .sp-award.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
 }
@@ -875,11 +902,6 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
   50%{rotate:8deg;scale:1.08}
 }
 
-/* When the other player recognizes the word, the exact same GOT IT paper
-   celebrates on their camera half rather than implying the local player won. */
-.v1-rival-award{position:absolute;left:75%;top:45%;width:34%;z-index:94}
-.v1-rival-award .aw-got{font-size:6.8cqw}
-
 /* The local crown follows the already-local nose landmark; the remote crown
    uses the centred camera framing as a privacy-safe fallback. No landmarks
    are transmitted across the network. */
@@ -1134,49 +1156,107 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
   100%{opacity:1}
 }
 
-.pm-nametag,.pm-gotit{position:absolute;z-index:3;container-type:inline-size;
-  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.4))}
-.pm-nametag{pointer-events:auto;cursor:pointer;
+.pm-nametag{position:absolute;z-index:3;container-type:inline-size;
+  pointer-events:auto;cursor:pointer;
+  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.4));
   transition:translate .18s ease,scale .18s ease,filter .18s ease}
 .pm-nametag:hover{translate:0 calc(-1 * min(.25vw,.44vh));scale:1.04;
   filter:brightness(1.08)
     drop-shadow(0 min(.3vw,.53vh) min(.22vw,.39vh) rgba(0,0,0,.34))}
-.pm-gotit{pointer-events:none}
 .pm-nametag img{display:block;width:100%;aspect-ratio:3.55;object-fit:fill}
-.pm-gotit img{display:block;width:100%;aspect-ratio:4.2;object-fit:fill}
-.pm-nametag b,.pm-gotit b{position:absolute;inset:0;display:flex;align-items:center;
+.pm-nametag b{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;padding:0 7%;font-family:var(--f-lobby);font-weight:400;
-  color:#fff;white-space:nowrap;overflow:hidden;letter-spacing:.01em;
-  text-shadow:1.6cqw 1.6cqw 0 rgba(0,0,0,.45)}
-.pm-nametag b{font-size:20.9cqw}
-.pm-gotit b{font-size:13.17cqw}
+  font-size:20.9cqw;color:#fff;white-space:nowrap;overflow:hidden;
+  letter-spacing:.01em;text-shadow:1.6cqw 1.6cqw 0 rgba(0,0,0,.45)}
 /* orange seats reuse the blue chip paper, warmed to the team colour */
 .pm-tile.orange .pm-nametag img,.pm-side.orange .pm-nametag img{
   filter:hue-rotate(158deg) saturate(1.5) brightness(1.12)}
-.pm-gotit{opacity:0;scale:.55;transition:opacity .16s ease,
-  scale .24s cubic-bezier(.2,1.6,.4,1)}
-.pm-tile.got .pm-gotit,.pm-side.got .pm-gotit{
-  opacity:1;scale:1;animation:pmsticker .52s cubic-bezier(.16,1.55,.32,1)}
-@keyframes pmsticker{
-  0%{opacity:0;scale:.25;rotate:-8deg}
-  58%{opacity:1;scale:1.13;rotate:2deg}
-  100%{opacity:1;scale:1;rotate:0}
-}
 
-/* tile seating: blue tags hug the outer edge, orange mirror them */
+/* tile seating: blue tags hug the outer edge, orange mirror them; the score
+   sign takes the opposite corner so name and total read as one strip */
 .pm-tile .pm-nametag{top:3.4%;width:35%}
 .pm-tile.blue .pm-nametag{left:4%}
 .pm-tile.orange .pm-nametag{right:4%}
-.pm-tile .pm-gotit{left:50%;width:72%;top:13%;translate:-50% 0}
 /* the featured players get the frame-level Figma positions */
 .pm-side .pm-nametag{top:13.33%;width:15.75%}
 .pm-side.blue .pm-nametag{left:2.35%}
 .pm-side.orange .pm-nametag{right:3.05%}
-.pm-side .pm-gotit{width:24%;left:50%;top:14%;translate:-50% 0}
-/* while we can see the local player's head, the sticker rides their forehead */
-.pm-side .pm-gotit.tracked,.pm-tile .pm-gotit.tracked{
-  transition:opacity .16s ease,scale .24s cubic-bezier(.2,1.6,.4,1),
-             left .07s linear,top .07s linear,width .07s linear}
+
+/* ---- the seat award: the GOT IT paper, stamped on whoever earned it ----
+   This slot used to hold a standing score sign — a green box in every seat
+   holding a running total for the whole match. Six boxes of six numbers is a
+   spreadsheet, and it made the one figure that matters (what THIS word was
+   worth) a flash inside a permanent fixture. It is a stamp again, and it is
+   Solo's actual POINTS AWARD paper: it slams onto the seat at recognition,
+   holds there for the rest of the word, then is dragged into the score card
+   it pays. See js/seatAward.js — including why it is fixed to the viewport
+   rather than parented to the seat it is measured from. */
+.pp-award{position:fixed;z-index:95;container-type:inline-size;
+  pointer-events:none;opacity:0;translate:-50% -50%}
+.pp-award .sp-art{display:block;width:100%;aspect-ratio:2.098;object-fit:fill;
+  filter:drop-shadow(0 min(.5vw,.89vh) min(.32vw,.57vh) rgba(0,0,0,.42))}
+.pp-award span{position:absolute;left:0;width:100%;text-align:center;
+  translate:0 -50%;font-family:var(--f-lobby);font-weight:400;line-height:1;
+  color:#1b7532;white-space:nowrap;text-shadow:.6cqw .6cqw 0 rgba(0,0,0,.18)}
+.pp-award .aw-got{top:19.8%;font-size:7.8cqw}
+.pp-award .aw-pts{top:47.3%;font-size:18.93cqw}
+.pp-award .aw-lbl{top:75.6%;font-size:7.8cqw}
+
+/* Two beats, one object — the same contract `.sp-award` documents. `.show`
+   slams the paper onto the seat and LEAVES IT THERE; `.deliver` then replaces
+   the animation outright (rather than layering on it) so its 0% keyframe is
+   exactly where the slam came to rest. Centring lives on `translate`, so the
+   keyframes own `transform` alone and never have to restate it. */
+.pp-award.show{animation:ppawshow .52s cubic-bezier(.16,1.4,.32,1) both}
+.pp-award.show.deliver{
+  animation:ppawdeliver var(--fly-ms,560ms) cubic-bezier(.5,-.28,.62,1) both}
+@keyframes ppawshow{
+  0%{opacity:0;transform:scale(.22) rotate(-13deg)}
+  46%{opacity:1;transform:scale(1.15) rotate(3.5deg)}
+  72%{transform:scale(.96) rotate(-1.4deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes ppawdeliver{
+  0%{opacity:1;transform:translate(0,0) scale(1) rotate(0)}
+  /* a short wind-up, so the paper is visibly PICKED UP before it is thrown */
+  16%{opacity:1;transform:translate(0,-6%) scale(1.07) rotate(-3deg)}
+  100%{opacity:.05;
+    transform:translate(var(--fly-x,0px),var(--fly-y,0px))
+      scale(var(--fly-s,.24)) rotate(var(--fly-r,14deg))}}
+
+/* theme.css kills every animation under reduced motion, which would leave the
+   paper — and the points it reports — stuck at opacity:0. Show it plainly;
+   seatAward.js pays the score out immediately in that case, so nothing is
+   waiting on a flight that is not running. */
+@media (prefers-reduced-motion:reduce){
+  .pp-award.show{opacity:1;transform:none}
+}
+
+/* ---- the crown: FIRST place, not "recognized" ----
+   Party used to land the GOT IT paper on the forehead of everyone who got
+   the word, which said nothing about who won it. One crown per word now goes
+   to whoever the AI recognized first. The local player's rides their head
+   through the same face track the 1v1 crown uses; remote players keep this
+   authored head-band position, because their poses are never transmitted. */
+.pp-crown{position:absolute;left:50%;top:5%;width:30%;height:auto;z-index:6;
+  opacity:0;pointer-events:none;translate:-50% 0;rotate:-6deg;scale:.45;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.22vw,.39vh) rgba(0,0,0,.42));
+  transition:opacity .18s ease,scale .3s cubic-bezier(.2,1.65,.4,1)}
+.pm-side .pp-crown{width:13%;top:3.5%}
+.pm-tile.first .pp-crown,.pm-side.first .pp-crown{opacity:1;scale:1;
+  animation:ppcrownarrive .44s cubic-bezier(.18,1.6,.32,1) both}
+@keyframes ppcrownarrive{
+  0%{opacity:0;translate:-50% -70%;rotate:-24deg;scale:.5}
+  62%{opacity:1;translate:-50% 6%;rotate:5deg;scale:1.12}
+  100%{opacity:1;translate:-50% 0;rotate:-6deg;scale:1}
+}
+/* Head-tracked: JS writes left/top/width every frame, so those must ease
+   rather than animate. The arrival keyframe animates `translate`, which would
+   otherwise keep re-slamming the paper as the head moves — and it has to beat
+   the `.first` rule on specificity, not just on source order. */
+.pm-tile.first .pp-crown.tracked,.pm-side.first .pp-crown.tracked{
+  animation:none;opacity:1;scale:1;translate:-50% 0;rotate:-6deg;
+  transition:opacity .18s ease,left .07s linear,top .07s linear,
+    width .07s linear}
 
 .pm-tape{position:absolute;z-index:9;pointer-events:none;
   transition:opacity .2s ease,translate .18s ease,
@@ -1221,7 +1301,6 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-guess.past{opacity:.58}
 .pm-guess.empty{opacity:0}
 .pm-word{z-index:8}
-.pm-award{position:absolute;z-index:95}
 
 /* the word clock turns into the chase clock once a team is complete */
 .pm-chase-clock{position:absolute;left:7.5%;top:36%;width:20%;z-index:2;opacity:0;

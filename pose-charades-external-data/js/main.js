@@ -53,6 +53,19 @@ function wireControls(){
                    "btnSoloSound","btnMatchSound","btnPartySound"])
     $(id).onclick=toggleMute;
 
+  /* 1v1 and Party no longer show a LEAVE paper during a match. Esc is the
+     replacement, and it still does the thing that actually matters: tell the
+     room you are going, so five other people are not waiting out a player who
+     is not there. Without it, entering an online match would be a one-way
+     door — the header is hidden on every play stage. */
+  addEventListener("keydown", e => {
+    if(e.key!=="Escape" || e.repeat || isHowToPlayOpen()) return;
+    if(state.screen==="match"){ leaveRoom(); transition("menu"); }
+    else if(state.screen==="pmatch"){ leaveParty(); transition("menu"); }
+    else return;
+    toast("Left the match.");
+  });
+
   /* home (Figma v2): SOLO card -> solo, 1V1 -> lobby, PARTY -> party room */
   $("modeAI").onclick=()=>startGame("ai");
   $("modeVS").onclick=()=>enterLobby();

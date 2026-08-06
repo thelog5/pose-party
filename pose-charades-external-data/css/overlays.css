@@ -58,6 +58,83 @@
   body[data-intro="game"] .cd-num{opacity:.8}
 }
 
+/* ================= CHASE / SUDDEN DEATH URGENCY =================
+   Two beats that used to be text only. The final chase said "5 SECONDS LEFT"
+   on a small paper clock, and sudden death said nothing but a toast — in a
+   mode where the whole screen is a camera, neither one registered while you
+   were mid-pose and looking at your own body rather than the HUD.
+
+   The pulse is the peripheral one: the edges of the SCREEN breathe, so it
+   lands even when your eyes are nowhere near the clock. It is a fixed layer
+   of four edge gradients, never an inset shadow on the stage — an inset
+   shadow paints under the stage's own video child and is invisible (the same
+   trap the countdown scrim and the TIMES UP wash both hit). */
+.edgepulse{position:fixed;inset:0;z-index:78;pointer-events:none;opacity:0;
+  --pulse:rgba(244,98,46,.9);--reach:8%;
+  transition:opacity .32s ease;
+  background:
+    linear-gradient(to right,var(--pulse),transparent var(--reach)),
+    linear-gradient(to left,var(--pulse),transparent var(--reach)),
+    linear-gradient(to bottom,var(--pulse),transparent calc(var(--reach) * 1.3)),
+    linear-gradient(to top,var(--pulse),transparent calc(var(--reach) * 1.3))}
+body:has(.matchstage[data-phase="chase"]) .edgepulse,
+body:has(.pmstage[data-phase="chase"]) .edgepulse{opacity:1}
+body:has(.matchstage[data-phase="sudden"]) .edgepulse{
+  opacity:1;--pulse:rgba(216,32,26,.95);--reach:10%}
+/* the two escalations the stages already track drive the tempo */
+body:has(.chase-urgent) .edgepulse{--pulse:rgba(232,64,34,.95);--reach:10.5%}
+body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
+@media (prefers-reduced-motion:no-preference){
+  body:has(.matchstage[data-phase="chase"]) .edgepulse,
+  body:has(.pmstage[data-phase="chase"]) .edgepulse{
+    animation:edgeBeat .62s ease-in-out infinite alternate}
+  body:has(.matchstage[data-phase="sudden"]) .edgepulse{
+    animation:edgeBeat .46s ease-in-out infinite alternate}
+  body:has(.chase-urgent) .edgepulse{animation-duration:.38s}
+  body:has(.chase-final) .edgepulse{animation-duration:.24s}
+}
+@keyframes edgeBeat{from{opacity:.42;scale:1.015}to{opacity:1;scale:1}}
+
+/* SUDDEN DEATH: the Figma two-tone torn banner, full screen. The blue band
+   runs 9%-54% of the paper and the orange 41%-87%, so the rule sits on the
+   orange and the callout on the blue — type in cqw against the card, as
+   everywhere else. */
+.sudden{position:fixed;inset:0;z-index:88;display:grid;place-items:center;
+  pointer-events:none}
+.sudden.hidden{display:none}
+.sudden::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,rgba(150,14,10,.34) 0 32%,
+    rgba(20,8,30,.6) 100%);
+  animation:sdWash .5s ease-out both}
+@keyframes sdWash{from{opacity:0}to{opacity:1}}
+.sd-card{position:relative;container-type:inline-size;
+  width:min(66vw,118vh,920px);
+  filter:drop-shadow(0 min(.9vw,1.6vh) min(.6vw,1.07vh) rgba(0,0,0,.45))}
+.sd-card img{display:block;width:100%;aspect-ratio:1.3325;object-fit:fill}
+.sd-card span{position:absolute;left:0;width:100%;text-align:center;
+  translate:0 -50%;font-family:var(--f-lobby);font-weight:400;line-height:1;
+  white-space:nowrap}
+/* Sized to sit INSIDE the torn bands, not across the card: the blue starts
+   about 11% in and the orange about 8%, so type at the card's full width
+   hangs off both papers. */
+.sd-title{top:30.5%;font-size:9.8cqw;color:#fff8ec;
+  text-shadow:.9cqw .9cqw 0 rgba(9,22,62,.55)}
+.sd-sub{top:64%;font-size:5.6cqw;color:#fff8ec;letter-spacing:.03em;
+  text-shadow:.7cqw .7cqw 0 rgba(122,36,8,.6)}
+.sudden.fire .sd-card{animation:sdSlam 1.9s cubic-bezier(.16,1.5,.32,1) both}
+@keyframes sdSlam{
+  0%{opacity:0;transform:scale(2.1) rotate(-9deg)}
+  12%{opacity:1;transform:scale(.94) rotate(2.5deg)}
+  20%{transform:scale(1.04) rotate(-1.6deg)}
+  27%{transform:scale(.99) rotate(.8deg)}
+  34%{transform:scale(1.012) rotate(-.4deg)}
+  80%{opacity:1;transform:scale(1) rotate(0)}
+  100%{opacity:0;transform:scale(1.1) rotate(0)}}
+@media (prefers-reduced-motion:reduce){
+  .sudden::before,.sudden.fire .sd-card{animation:none}
+  .sudden.fire .sd-card{opacity:1}
+}
+
 /* The toast. It had NO stylesheet at all — it laid out static below the fold,
    so every message the game has ever sent (room errors, "X left the party",
    the skip penalty, SUDDEN DEATH, copy-failed fallbacks) was invisible.

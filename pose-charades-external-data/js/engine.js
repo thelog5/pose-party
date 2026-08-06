@@ -45,33 +45,38 @@ function mapVideoPoint(side, x, y){
   };
 }
 
-/* Party reuses this whole tracking path, but its GOT IT paper lands ON the
-   forehead instead of floating above the head like the 1v1 crown. */
-function placePartySticker(topX, topY, faceWidth, faceHeight){
-  const el=document.querySelector('#pmStage [data-seat].mine .pm-gotit');
+/* Party reuses this whole tracking path for the same paper crown 1v1 wears —
+   it sits ON the head of whoever the AI recognized FIRST this word, which is
+   the one thing worth marking. (It used to be the GOT IT sticker pasted onto
+   the forehead of everyone who got the word, so it said nothing about who
+   actually won it, and it covered the face while they were still posing.) */
+function placePartyCrown(topX, topY, faceWidth, faceHeight){
+  const el=document.querySelector('#pmStage [data-seat].mine .pp-crown');
   const seat=el && el.closest('[data-seat]');
-  if(!el || !seat || !seat.classList.contains("got")) return false;
+  if(!el || !seat || !seat.classList.contains("first")) return false;
   const mapped=mapVideoPoint(seat, topX, topY);
   if(!mapped) return false;
 
   const faceWidthPx=Math.max(1,faceWidth*mapped.renderedW);
   const faceHeightPx=Math.max(1,faceHeight*mapped.renderedH);
-  const stickerW=Math.max(mapped.w*.22,
-    Math.min(mapped.w*.94,faceWidthPx*1.5));
-  const stickerH=stickerW/4.2;
-  /* Span the hairline/forehead rather than drifting into the face. */
-  const centerY=mapped.y+faceHeightPx*.10;
+  /* Same distance-aware sizing as the 1v1 crown, in the seat's own box. */
+  const crownW=Math.max(mapped.w*.16,
+    Math.min(mapped.w*.62,faceWidthPx*1.18));
+  const crownH=crownW*(420/640);
+  const gapPx=Math.max(2,faceHeightPx*.04);
 
   el.classList.add("tracked");
-  el.style.width=(stickerW/mapped.w*100)+"%";
+  el.style.width=(crownW/mapped.w*100)+"%";
   el.style.left=Math.max(2,Math.min(98,mapped.x/mapped.w*100))+"%";
-  el.style.top=Math.max(-6,Math.min(90,(centerY-stickerH/2)/mapped.h*100))+"%";
-  el.style.translate="-50% 0";
+  /* top-left anchored (the CSS keeps translate:-50% 0), so subtract the paper
+     height to hang it above the crown of the head rather than over the eyes */
+  el.style.top=Math.max(-14,Math.min(72,
+    (mapped.y-crownH-gapPx)/mapped.h*100))+"%";
   return true;
 }
 
 function placeLocalCrown(topX, topY, faceWidth, faceHeight){
-  if(state.screen==="pmatch") return placePartySticker(topX,topY,faceWidth,faceHeight);
+  if(state.screen==="pmatch") return placePartyCrown(topX,topY,faceWidth,faceHeight);
   if(state.screen!=="match") return false;
   const crown=$("v1YouCrown"), side=crown?.closest(".v1-video-side");
   if(!crown || !side) return false;
@@ -85,7 +90,8 @@ function placeLocalCrown(topX, topY, faceWidth, faceHeight){
   const faceHeightPx=Math.max(1,faceHeight*mapped.renderedH);
   const crownWidthPx=Math.max(mapped.w*.10,
     Math.min(mapped.w*.38,faceWidthPx*1.10));
-  const crownHeightPx=crownWidthPx*(538/640);
+  /* the Figma paper crown (176:373) is 640×420 */
+  const crownHeightPx=crownWidthPx*(420/640);
   const gapPx=Math.max(3,faceHeightPx*.035);
   const crownCenterY=mapped.y-crownHeightPx*.54-gapPx;
 
@@ -140,7 +146,9 @@ function positionLocalCrownFromPose(lm){
 function faceTrackingInterval(){
   if(state.screen==="pmatch"){
     const mine=document.querySelector('#pmStage [data-seat].mine');
-    return mine?.classList.contains("got") ? 65 : 0;
+    /* only while YOU are wearing the crown — one player per word, so this is
+       strictly less face inference than the old every-seat sticker */
+    return mine?.classList.contains("first") ? 65 : 0;
   }
   if(state.screen==="match"){
     return $("matchStage")?.classList.contains("you-leading") ? 75 : 0;

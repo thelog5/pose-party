@@ -17,8 +17,9 @@
    plus the failure edge GUESSING → ROUND_END (timeout/skip: no payoff).
 
    Lock-on payoff, in order: hitstop → word turns green/pops → green screen
-   flash → confetti from the word → POINTS AWARD paper → points chip flies
-   to the Score card (score/streak apply on arrival) → ROUND_END. */
+   flash → confetti from the word → the POINTS AWARD paper lands centre-stage,
+   holds, and is then DRAGGED into the Score card, where the number goes up as
+   it arrives → ROUND_END. */
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
@@ -27,13 +28,11 @@ import { showTimesUp } from "./ui.js";
 import { SOLO } from "./constants.js";
 import { calculateFirstPoints } from "./scoring.js";
 import {
-  RECOGNITION_FILL_LERP_60FPS,
   RECOGNITION_IMPACT_MS,
   RECOGNITION_FILL_MIN,
   RECOGNITION_FILL_MAX,
   GUESS_LABEL_DEBOUNCE_MS,
   WARM_AT, HOT_AT, CRITICAL_AT,
-  advanceRecognitionFill,
   createGuessHistory, resetGuessHistory, updateGuessHistory,
   restartFeedbackAnimation, markGuessRecognized,
   setWordRecognitionMotion, prepareWordFeedback,
@@ -41,28 +40,39 @@ import {
   fitGameplayText, prefersReducedMotion,
 } from "./gameplayFeedback.js";
 
+import { createChargeMeter, resetChargeMeter, advanceCharge,
+         chargePercent } from "./recognition.js";
+import { clearSeatAwards } from "./seatAward.js";
+import { robotCharge, robotMiss, robotNewWord,
+         resetRobot, resetRobots } from "./robot.js";
+
 export { setWordRecognitionMotion } from "./gameplayFeedback.js";
 
 /* ---------------- tuning (against real model logs) ---------------- */
-export const LOCK_THRESHOLD    = 0.80;  // smoothed target confidence that completes the bar & locks
-/* Must exceed one classifier tick (CLASSIFY_EVERY_MS = 250) or a single
-   sample satisfies it — state.smooth cannot change inside a shorter window.
-   1v1 (HOLD_MS) and Party (CLAIM_HOLD_MS) both require 250. */
-export const LOCK_HOLD_MS      = 260;
-export const FILL_LERP         = RECOGNITION_FILL_LERP_60FPS;
+/* The lock is no longer "confidence crossed a line": it is a charge earned by
+   HOLDING the pose above a gate that relaxes across the word clock (see
+   recognition.js). This constant is now purely the scale the word card's
+   shake curve is read against — full charge is full urgency. */
+export const LOCK_THRESHOLD    = 1;
 export const LABEL_DEBOUNCE_MS = GUESS_LABEL_DEBOUNCE_MS;
 export { WARM_AT, HOT_AT, CRITICAL_AT };
 export const HITSTOP_MS        = RECOGNITION_IMPACT_MS;
-export const CHIP_FLIGHT_MS    = 650;   // points chip travel; score applies on arrival
-export const AWARD_MS          = 1850;  // POINTS AWARD paper on screen
+/* The payoff used to be two disconnected events: a paper that popped centre
+   screen and faded out over 1.85s, and — under it, unrelated — a small yellow
+   chip that flew to the score card. Nobody read the chip; the paper read as a
+   flash. Now there is ONE object. The award paper is the points: it lands, it
+   is held long enough to read, then it is dragged into the score card and the
+   total goes up exactly as it arrives. */
+export const AWARD_HOLD_MS     = 640;   // paper readable, centre stage
+export const AWARD_FLIGHT_MS   = 560;   // ...then dragged into the score card
+export const AWARD_MS          = AWARD_HOLD_MS + AWARD_FLIGHT_MS;
 export const ROUND_END_PAUSE_MS = 1250; // linger before the next word
 
 /* ---------------- state ---------------- */
 let rstate = "idle";
 let target = null;
-let shownFill = 0;          // 0..1 displayed progress toward the lock
-let fillAt = 0;
-let overSince = 0;          // when the smoothed conf first crossed threshold
+const meter = createChargeMeter("solo");
+export const soloCharge = () => meter;
 let resolveCb = null;
 let onLockCb = null;        // fires the instant the pose is recognised
 
@@ -103,7 +113,11 @@ function renderStack(popped){
     if(entry){
       box.classList.remove("empty");
       lab.textContent = disp(entry.label) + (entry.locked ? "" : "?");
-      pct.textContent = Math.round(entry.pct * 100) + "%";
+      /* the top slot showing the TARGET reports charge, not raw confidence */
+      const live = i === 0 && !entry.locked && entry.label === target &&
+        rstate === "guessing";
+      pct.textContent = (live ? chargePercent(meter)
+        : Math.round(entry.pct * 100)) + "%";
       fitGameplayText(lab);
     }else{
       box.classList.add("empty");
@@ -132,25 +146,34 @@ function frame(){
      the paper; its bar and lock begin only once that target paper pops in. */
   const targetIsDisplayed = !!target && guessHistory.items[0]?.label === target;
   const raw = targetIsDisplayed ? (state.smooth?.[target] || 0) : 0;
-  const wantFill = Math.max(0, Math.min(1, raw / LOCK_THRESHOLD));
-  const nextFill = advanceRecognitionFill(shownFill, wantFill, fillAt);
-  shownFill = nextFill.value;
-  fillAt = nextFill.at;
+  advanceCharge(meter, raw, wordElapsedFrac());
 
   const fillEl = el("soloWordFill");
   if(fillEl) fillEl.style.width = (RECOGNITION_FILL_MIN +
-    shownFill * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";
+    meter.display * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";
 
   const card = el("soloWordCard");
-  setWordRecognitionMotion(card,shownFill*LOCK_THRESHOLD,LOCK_THRESHOLD,true);
-
-  /* lock when the smoothed confidence holds at/over threshold */
-  if(raw >= LOCK_THRESHOLD){
-    if(!overSince) overSince = performance.now();
-    if(performance.now() - overSince >= LOCK_HOLD_MS) beginLock();
-  }else{
-    overSince = 0;
+  setWordRecognitionMotion(card, meter.display, LOCK_THRESHOLD, true);
+  /* The robot reads the same number the bar does, so his pose, his glow and
+     the fill can never tell you different things about the same pose. */
+  robotCharge("spRobot", meter.display, meter.locked);
+  /* The percentage on the robot's paper reports PROGRESS, not the classifier's
+     raw opinion — otherwise the number and the bar disagree about how close
+     you are, and the number is the one the player believes. */
+  if(targetIsDisplayed){
+    const pct = el("spGuessTopPct");
+    if(pct) pct.textContent = chargePercent(meter) + "%";
   }
+
+  if(meter.locked) beginLock();
+}
+
+/* How far through the word clock we are — the meter uses it to relax. */
+function wordElapsedFrac(){
+  const g = state.game;
+  if(!g || !g.wordEnd) return 0;
+  const left = Math.max(0, g.wordEnd - performance.now());
+  return Math.max(0, Math.min(1, 1 - left / SOLO.wordMs));
 }
 
 /* ---------------- lock payoff ---------------- */
@@ -159,10 +182,16 @@ function beginLock(){
     state.game.pendingPts=calculateFirstPoints(
       state.game.wordEnd-performance.now(),SOLO.wordMs);
   setState("hitstop");                 // freezes the game timers (timerFrozen)
+  meter.locked = true;
   const card = el("soloWordCard");
   const fillEl = el("soloWordFill");
   updateGuessHistory(guessHistory, target || "", 1, { force:true,locked:true });
   renderStack(false);
+  /* This is also what slams the robot: markGuessRecognized() is the shared
+     recognition signal (see GUESS_ROBOT in gameplayFeedback.js), so the
+     celebration arrives with the hitstop rather than when the paper lands —
+     and there must not be a second robotGot() call next to it, or his
+     "three in a row" run counts every catch twice. */
   markGuessRecognized(el("spGuessTop"));
   blip([523]);
 
@@ -179,10 +208,9 @@ function beginLock(){
          already dropped the pose and the "funny frame" is gone. */
       onLockCb?.();
       greenFlash(card);
-      confettiFrom(card);
-      showAward();
+      confettiFrom(card, AWARD_ANCHOR);
       blip([523, 659, 784, 1047], 0.08);
-      flyPointsChip();
+      payOutSoloWord();
     },
   });
 }
@@ -198,64 +226,150 @@ export function greenFlash(node){
   f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
 }
 
-/* Winning the LAST word of a run starts an 1850ms award paper and a 2500ms
+/* Winning the LAST word of a run starts a ~1200ms award delivery and a 2500ms
    confetti burst, but the screen leaves for Results 1250ms later — both used
    to keep playing on top of the results papers. Every celebration registers
    here so the FSM can sweep them the moment gameplay ends. */
 const liveAwards = new Set();
 const liveBursts = new Set();
-const liveChips = new Set();
+
+/* Land an award that is still in the air, exactly once. The paper is
+   position:fixed at z-index 95, so one left mid-flight would otherwise sail
+   across the Results screen — and any score paint it is holding would never
+   be released. */
+function settleAward(a){
+  clearTimeout(a._awardTimer);
+  a._awardTimer = null;
+  a.classList.remove("show", "deliver");
+  a.style.removeProperty("--fly-x");
+  a.style.removeProperty("--fly-y");
+  a.style.removeProperty("--fly-s");
+  a.style.removeProperty("--fly-r");
+  a.style.removeProperty("--fly-ms");
+  const land = a._land;
+  a._land = null;
+  land?.();
+}
 
 export function clearCelebrations(){
-  for(const a of liveAwards){
-    clearTimeout(a._awardTimer);
-    a.classList.remove("show");
-  }
+  /* 1v1 and Party stamp their award on the player who earned it instead of
+     centre stage (seatAward.js); those papers are fixed to the viewport for
+     the same reason this one is, so they need the same sweep. */
+  clearSeatAwards();
+  /* A robot mid-slam, or holding a bubble, is a celebration too — leaving one
+     running means the next board opens with the last word's reaction on it. */
+  resetRobots();
+  for(const a of [...liveAwards]) settleAward(a);
   liveAwards.clear();
   for(const wrap of liveBursts){
     clearTimeout(wrap._burstTimer);
     wrap.remove();
   }
   liveBursts.clear();
-  /* A chip launched on the final word is position:fixed at z-index 96, so it
-     kept flying across the Results screen — the exact failure this function
-     exists to prevent. Land it (once) so no score hold is left dangling. */
-  for(const chip of liveChips){
-    clearTimeout(chip._flightTimer);
-    chip.remove();
-    const land = chip._land;
-    chip._land = null;
-    land?.();
-  }
-  liveChips.clear();
 }
 
-/* The 1v1 match and Party deliberately call this same helper with their own
-   instance of the Solo paper. That keeps the asset, timing and motion
-   completely shared. */
-export function showPointsAward(awardId, pointsId, points, valueText){
+/* THE payoff. Solo, 1v1 and Party all call this with their own instance of
+   the same Figma paper, so the asset, the timing and the motion are shared.
+   `toEl` is the card that holds the score being paid into — the paper is
+   physically dragged there — and `onLand` fires once, on arrival, which is
+   the only moment any mode is allowed to repaint that score.
+   Under reduced motion the paper is shown plainly and lands immediately:
+   holding a score back for an animation nobody is playing just reads broken. */
+/* Where on the STAGE the paper lands, as a fraction of the stage box.
+   `position:fixed` is a viewport coordinate and every play stage letterboxes,
+   so this cannot be a flat CSS percentage: at 5:4 a viewport `left:24%` is out
+   in the black bar beside the board. Measured per show, which also means it
+   is correct after a resize between words. */
+export const AWARD_ANCHOR = Object.freeze({ x: .26, y: .5 });
+
+function anchorAward(a, stage){
+  const box = stage?.getBoundingClientRect();
+  if(!box?.width){
+    a.style.removeProperty("left");
+    a.style.removeProperty("top");
+    return;
+  }
+  a.style.left = (box.left + box.width * AWARD_ANCHOR.x) + "px";
+  a.style.top = (box.top + box.height * AWARD_ANCHOR.y) + "px";
+}
+
+export function deliverPointsAward({
+  awardId, pointsId, points = 0, toEl, onLand, stage,
+} = {}){
   const a = el(awardId);
-  if(!a) return;
+  if(!a){ onLand?.(); return; }
+  anchorAward(a, stage);
   const value = el(pointsId);
   if(value){
-    /* Party's provisional paper shows a PLACE, not a figure — the server has
-       not resolved points yet — so it passes its own valueText and still gets
-       the shared timing and the clearCelebrations registry. */
-    value.textContent = valueText ?? ("+" + (points || 0).toLocaleString("en-US"));
+    value.textContent = "+" + (points || 0).toLocaleString("en-US");
     fitGameplayText(value);
   }
-  clearTimeout(a._awardTimer);
-  a.classList.remove("show"); void a.offsetWidth; a.classList.add("show");
-  liveAwards.add(a);
-  a._awardTimer=setTimeout(() => {
-    a.classList.remove("show");
+
+  /* Re-entrancy: a chase can pay two players inside one word. Land whatever
+     is already in the air before this paper claims the element. */
+  if(liveAwards.has(a)) settleAward(a);
+
+  const land = () => {
     liveAwards.delete(a);
-  }, AWARD_MS);
+    toEl?.classList.remove("awaiting");
+    bumpTarget(toEl);
+    onLand?.();
+  };
+
+  a.classList.remove("show", "deliver");
+  void a.offsetWidth;
+  a.classList.add("show");
+  liveAwards.add(a);
+  toEl?.classList.add("awaiting");     // braces until the paper actually lands
+
+  if(prefersReducedMotion()){
+    /* There is no flight to wait on, so pay immediately and let the paper sit
+       for a readable beat. */
+    land();
+    a._land = null;
+    a._awardTimer = setTimeout(() => {
+      a._awardTimer = null;
+      a.classList.remove("show");
+      liveAwards.delete(a);
+    }, AWARD_MS);
+    liveAwards.add(a);
+    return;
+  }
+
+  a._land = land;
+  a._awardTimer = setTimeout(() => {
+    if(!liveAwards.has(a)) return;
+    aimAward(a, toEl);
+    a.classList.add("deliver");
+    a._awardTimer = setTimeout(() => settleAward(a), AWARD_FLIGHT_MS);
+  }, AWARD_HOLD_MS);
 }
 
-function showAward(){
-  showPointsAward("soloAward", "soloAwardPts",
-    state.game ? state.game.pendingPts : 0);
+/* Point the paper at the card that is about to receive the points. The paper
+   is centred with translate(-50%,-50%), so the flight is a centre-to-centre
+   delta plus the scale that shrinks it into the card. */
+function aimAward(a, toEl){
+  const from = a.getBoundingClientRect();
+  const to = toEl?.getBoundingClientRect();
+  if(!from.width || !to?.width) return;
+  a.style.setProperty("--fly-x",
+    (to.left + to.width / 2 - (from.left + from.width / 2)) + "px");
+  a.style.setProperty("--fly-y",
+    (to.top + to.height / 2 - (from.top + from.height / 2)) + "px");
+  a.style.setProperty("--fly-s",
+    Math.max(.12, Math.min(.55, (to.width * .82) / from.width)).toFixed(3));
+  a.style.setProperty("--fly-r",
+    (to.left + to.width / 2 < from.left + from.width / 2 ? -14 : 14) + "deg");
+  a.style.setProperty("--fly-ms", AWARD_FLIGHT_MS + "ms");
+}
+
+/* Every score surface in the game reacts with the same .bump keyframe —
+   .sp-card for Solo, .v1-scorecard for 1v1 and both Party team cards. */
+function bumpTarget(node){
+  if(!node) return;
+  node.classList.remove("bump");
+  void node.offsetWidth;
+  node.classList.add("bump");
 }
 
 /* The win burst is real paper: the same torn confetti the home screen uses,
@@ -266,7 +380,7 @@ const CONFETTI_ART = [
   "conf-blue-a.png", "conf-blue-b.png", "conf-red-a.png", "conf-red-b.png",
 ];
 
-export function confettiFrom(node){
+export function confettiFrom(node, origin){
   if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   /* Live inside the letterboxed stage: sizes and distances scale with it,
@@ -282,10 +396,11 @@ export function confettiFrom(node){
   wrap.className = "burstwrap";
   if(!stage) wrap.classList.add("viewport");
 
-  /* Erupt from where the eye already is — the award lands centre-stage.
-     Bursting from the word card put every piece in the bottom strip, where
-     it fell straight out of frame. */
-  const ox = box.width * .5, oy = box.height * .46;
+  /* Erupt from where the eye already is. Bursting from the word card put
+     every piece in the bottom strip, where it fell straight out of frame, so
+     this follows the award paper — `origin` is where that paper lands for
+     modes that moved it off centre (Solo). */
+  const ox = box.width * (origin?.x ?? .5), oy = box.height * (origin?.y ?? .46);
   const reach = Math.min(box.width, box.height * 1.9);
   const N = 54;
 
@@ -321,62 +436,19 @@ export function confettiFrom(node){
   }, 2500);
 }
 
-/* Points physically travel from the word you just landed to the card that
-   holds your score, and the score only moves when they ARRIVE. Solo has had
-   this since the Figma build; 1v1 and Party now share the same flight, which
-   is why it takes its elements as arguments rather than reading Solo's.
-
-   `onLand` is always called exactly once — including under reduced motion,
-   where there is no visible flight and holding the 650ms timer would just
-   make the score feel broken. */
-export function flyPoints(fromEl, toEl, points, onLand){
-  let landed = false;
-  const land = () => {
-    if(landed) return;
-    landed = true;
-    toEl?.classList.remove("awaiting");
-    onLand?.();
-  };
-  if(prefersReducedMotion()){ land(); return; }
-
-  const chip = document.createElement("div");
-  chip.className = "sp-chip";
-  chip.textContent = "+" + (points || 0).toLocaleString("en-US");
-  const fr = fromEl ? fromEl.getBoundingClientRect()
-    : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
-  const tr = toEl ? toEl.getBoundingClientRect()
-    : { left: innerWidth - 160, top: 40, width: 120, height: 60 };
-  chip.style.left = (fr.left + fr.width / 2) + "px";
-  chip.style.top = (fr.top + fr.height / 2) + "px";
-  document.body.appendChild(chip);
-  chip._land = land;
-  liveChips.add(chip);
-  toEl?.classList.add("awaiting");     // braces until the chip actually lands
-  requestAnimationFrame(() => {
-    chip.style.transition = "transform " + CHIP_FLIGHT_MS + "ms cubic-bezier(.3,-.15,.5,1), opacity 140ms " + (CHIP_FLIGHT_MS - 120) + "ms";
-    chip.style.transform = "translate(" +
-      (tr.left + tr.width / 2 - (fr.left + fr.width / 2)) + "px," +
-      (tr.top + tr.height / 2 - (fr.top + fr.height / 2)) + "px) scale(.5)";
-    chip.style.opacity = "0";
-  });
-  chip._flightTimer = setTimeout(() => {
-    chip.remove();
-    liveChips.delete(chip);
-    const done = chip._land;
-    chip._land = null;
-    done?.();
-  }, CHIP_FLIGHT_MS);
-}
-
-function flyPointsChip(){
-  flyPoints(el("soloWordCard"), el("soloScoreCard"),
-    state.game ? state.game.pendingPts : 0,
-    () => {
+function payOutSoloWord(){
+  deliverPointsAward({
+    awardId: "soloAward", pointsId: "soloAwardPts",
+    points: state.game ? state.game.pendingPts : 0,
+    toEl: el("soloScoreCard"),
+    stage: el("soloStage"),
+    onLand: () => {
       if(rstate !== "locked") return;
       setState("round_end");
       blip([880]);
       if(resolveCb) resolveCb({ won: true });
-    });
+    },
+  });
 }
 
 /* ---------------- failure (timeout / skip) ---------------- */
@@ -391,6 +463,7 @@ export function failRound(skipped){
      showTimesUp() there. Here a word timeout gets the miss beat and a
      descending blip, and a skip gets its own two-note. */
   blip(skipped ? [294, 220] : [330, 262, 196]);
+  robotMiss("spRobot", skipped ? "skip" : "timeout");
   if(resolveCb) resolveCb({ won: false, skip: !!skipped });
   return true;
 }
@@ -401,7 +474,8 @@ export function failRound(skipped){
    so a second run never counts in under the last word of the previous one. */
 export function resetSoloBoard(){
   clearCelebrations();
-  shownFill = 0; fillAt = 0; overSince = 0;
+  resetRobot("spRobot");
+  resetChargeMeter(meter);
   target = null;
   resetGuessHistory(guessHistory);
   renderStack(false);
@@ -415,7 +489,7 @@ export function beginRound(word, onResolve, onLock){
   target = word;
   resolveCb = onResolve;
   onLockCb = onLock || null;
-  shownFill = 0; fillAt = 0; overSince = 0;
+  resetChargeMeter(meter);
   /* Confidence has to be EARNED for this word. state.smooth carries over from
      the previous round, so if the new word is one the AI was already sure of,
      the bar would start full and lock instantly — a point for doing nothing.
@@ -428,7 +502,8 @@ export function beginRound(word, onResolve, onLock){
   const card = el("soloWordCard");
   prepareWordFeedback(card, fillEl, LOCK_THRESHOLD, true);
   markGuessRecognized(el("spGuessTop"), false);
-  el("soloAward")?.classList.remove("show");
+  robotNewWord("spRobot");
+  el("soloAward")?.classList.remove("show", "deliver");
   setTxt("soloWord", word);
   fitGameplayText(el("soloWord"));
   setState("guessing");

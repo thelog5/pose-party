@@ -425,13 +425,16 @@
        element below is an overlay at its exact 1440×810 Figma coordinate. -->
   <section class="screen hidden" id="scrMatch">
     <div class="matchstage" id="matchStage" data-phase="waiting">
+      <!-- The GOT IT paper is stamped onto whichever half earned it and is
+           built by js/seatAward.js — it is fixed to the viewport, because a
+           paper parented here would be clipped by the half it belongs to. -->
       <div class="v1-video-side you">
         <div class="slot" id="slotMatchYou"></div>
-        <img class="v1-crown" id="v1YouCrown" src="assets/ui/figma/leader-crown.png" alt="Leading">
+        <img class="v1-crown" id="v1YouCrown" src="assets/ui/figma/crown-paper.png" alt="Leading">
       </div>
       <div class="v1-video-side rival">
         <div class="slot" id="slotMatchRival"></div>
-        <img class="v1-crown" id="v1RivalCrown" src="assets/ui/figma/leader-crown.png" alt="Leading">
+        <img class="v1-crown" id="v1RivalCrown" src="assets/ui/figma/crown-paper.png" alt="Leading">
       </div>
 
       <img class="v1-divider" src="assets/ui/figma/v1-divider.png" alt="">
@@ -502,34 +505,17 @@
         <span class="sp-word-text" id="vsWord">—</span>
       </div>
 
-      <!-- Reuse Solo's exact GOT IT paper and payoff animation in 1v1. -->
-      <div class="sp-award v1-award" id="v1Award">
-        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
-        <span class="aw-got">GOT IT!</span>
-        <span class="aw-pts" id="v1AwardPts">+0</span>
-        <span class="aw-lbl">POINTS!</span>
-      </div>
-      <div class="sp-award v1-award v1-rival-award" id="v1RivalAward" aria-live="polite">
-        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
-        <span class="aw-got" id="v1RivalAwardTitle">RIVAL GOT IT!</span>
-        <span class="aw-pts" id="v1RivalAwardPts">+0</span>
-        <span class="aw-lbl">POINTS!</span>
-      </div>
 
       <!-- the win wash covers the whole split, not just your camera -->
       <div class="sp-flash" id="matchFlash"></div>
 
-      <!-- same ghosted LEAVE paper Solo uses: near-invisible until you go
-           looking for it, so it never competes with the round -->
-      <!-- the header (and its volume control) is hidden during a round,
-           so each stage carries its own, ghosted like the LEAVE paper -->
+      <!-- The header (and its volume control) is hidden during a round, so the
+           stage carries its own. It sits in the slot the LEAVE paper used to
+           hold — the online modes no longer offer a mid-match exit button, so
+           this is the only chrome on the board. Esc still leaves the room. -->
       <button class="sp-sound" id="btnMatchSound" title="Mute" aria-label="Mute sound">
         <svg class="snd-on"><use href="#icoSpeaker"/></svg>
         <svg class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
-      </button>
-      <button class="sp-exit pbtn" id="btnExitMatch"
-              title="Leave the match" aria-label="Leave the match">
-        <img src="assets/ui/figma/sp-leave.png" alt="">
       </button>
     </div>
   </section>
@@ -542,15 +528,18 @@
        bottom pair so a 2v2 keeps just the top centre cards. -->
   <section class="screen hidden" id="scrPartyMatch">
     <div class="pmstage" id="pmStage" data-phase="waiting" data-size="3">
+      <!-- Every seat carries the paper crown, worn only by whoever the AI
+           recognized FIRST this word. The GOT IT paper each of them earns is
+           stamped over the seat by js/seatAward.js, not parented into it. -->
       <div class="pm-side blue"  data-seat="blue0">
         <div class="slot"></div>
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
       <div class="pm-side orange" data-seat="orange0">
         <div class="slot"></div>
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
       <!-- Exact blue/orange strip exported from the Party Match frame. -->
       <div class="pm-divider" aria-hidden="true">
@@ -564,7 +553,7 @@
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
       <div class="pm-tile blue" data-seat="blue2"
            style="left:32.57%;top:50.86%;width:15.86%;aspect-ratio:1.130;--rot:2.8deg">
@@ -572,7 +561,7 @@
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-blue.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
       <div class="pm-tile orange" data-seat="orange1"
            style="left:51.39%;top:14.07%;width:16.32%;aspect-ratio:.675;--rot:2.2deg">
@@ -580,7 +569,7 @@
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
       <div class="pm-tile orange" data-seat="orange2"
            style="left:51.39%;top:50.00%;width:15.14%;aspect-ratio:.864;--rot:-0.2deg">
@@ -588,7 +577,7 @@
         <img class="pm-border pm-border-team" src="assets/ui/figma/pm-border-orange.png" alt="">
         <img class="pm-border pm-border-got" src="assets/ui/figma/pm-border-green.png" alt="">
         <div class="pm-nametag"><img src="assets/ui/figma/lb-name-chip.png" alt=""><b></b></div>
-        <div class="pm-gotit"><img src="assets/ui/figma/pm-got-it.png" alt=""><b></b></div>
+        <img class="pp-crown" src="assets/ui/figma/crown-paper.png" alt="First!">
       </div>
 
       <!-- Exact rendered tape nodes from the 1440×810 Party Figma frame.
@@ -659,24 +648,13 @@
         <span class="sp-word-text" id="pmWord">—</span>
       </div>
 
-      <div class="sp-award pm-award" id="pmAward">
-        <img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">
-        <span class="aw-got" id="pmAwardTitle">GOT IT!</span>
-        <span class="aw-pts" id="pmAwardPts">+0</span>
-        <span class="aw-lbl" id="pmAwardLabel">POINTS!</span>
-      </div>
-
       <div class="sp-flash" id="pmFlash"></div>
 
-      <!-- the header (and its volume control) is hidden during a round,
-           so each stage carries its own, ghosted like the LEAVE paper -->
+      <!-- as in 1v1: no mid-match exit paper, so the volume control takes the
+           slot it vacated. Esc still leaves the party. -->
       <button class="sp-sound" id="btnPartySound" title="Mute" aria-label="Mute sound">
         <svg class="snd-on"><use href="#icoSpeaker"/></svg>
         <svg class="snd-off hidden"><use href="#icoSpeakerOff"/></svg>
-      </button>
-      <button class="sp-exit pbtn" id="btnExitParty"
-              title="Leave the party" aria-label="Leave the party">
-        <img src="assets/ui/figma/sp-leave.png" alt="">
       </button>
     </div>
   </section>
