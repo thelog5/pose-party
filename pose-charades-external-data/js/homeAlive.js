@@ -7,11 +7,14 @@ import { $ } from "./dom.js";
 import { blip } from "./audio.js";
 import { wireAlphaHitAreas } from "./alphaHit.js";
 import { onTransition } from "./fsm.js";
+import { fitWrappedTextToBox } from "./textFit.js";
 
-/* The bubble keeps the designed voice but never repeats the file's exact
-   line twice in a row — tap the bubble (or the robot) to cycle. */
-const PHRASES = [
-  "Strike a pose. Let the AI guess!",
+/* Keep the project's authored dialogue bank. Figma's visible Home overlay
+   (302:635) supplies the first line; the remaining entries are the existing
+   bank that shipped in this file before the paper refresh. Tap the bubble or
+   robot to advance deterministically, so every tap differs from the last. */
+export const HOME_ROBOT_PHRASES = Object.freeze([
+  "STRIKE A POSE!",
   "I'm watching… in a friendly way!",
   "Bet I can guess your next move.",
   "I'll be back",
@@ -25,15 +28,29 @@ const PHRASES = [
   "Here? Or in a Jaeger?",
   "'Laptop'! You do realize that nickname is demeaning?",
   "Both of You, Dance Like You Want to Win!",
-  "Can a robot write a symphony?"
-];
+  "Can a robot write a symphony?",
+]);
 let phraseIx = 0;
 
+function fitHomePhrase(){
+  /* EVERY phrase is measured, Figma's canonical STRIKE A POSE! included.
+     That line used to be exempted to preserve its authored 51.88px, but at
+     that size Fredoka One draws it ~394px wide — wider than the 360px paper
+     itself — so the browser wrapped it and the box clipped "A POSE!" clean
+     off. The fitter only ever shrinks from the authored `14.411cqw`, so a
+     phrase that genuinely fits still renders at Figma's size. */
+  return fitWrappedTextToBox($("bubbleText"), { minSize:8 });
+}
+
 function cyclePhrase(){
-  phraseIx = (phraseIx + 1) % PHRASES.length;
+  phraseIx = (phraseIx + 1) % HOME_ROBOT_PHRASES.length;
   const t = $("bubbleText");
-  t.textContent = PHRASES[phraseIx];
+  t.textContent = HOME_ROBOT_PHRASES[phraseIx];
+  /* Fit before the paper pops so no tap can expose an overflowing frame. */
+  fitHomePhrase();
   const b = $("speechBubble");
+  b.setAttribute("aria-label",
+    "Robot says: " + HOME_ROBOT_PHRASES[phraseIx] + " Tap for another phrase.");
   b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
   blip([392, 523], 0.07);
 }
@@ -113,6 +130,10 @@ function spinConfettiWhenHomeIsReady(){
 }
 
 export function wireHomeAlive(){
+  fitHomePhrase();
+  document.fonts?.ready?.then(fitHomePhrase);
+  if("ResizeObserver" in globalThis)
+    new ResizeObserver(fitHomePhrase).observe($("speechBubble"));
   $("speechBubble").onclick = cyclePhrase;
   $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
   $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
