@@ -117,6 +117,7 @@ Usage:
   node scripts/figma-rest.mjs me
   node scripts/figma-rest.mjs file <figma-url-or-file-key>
   node scripts/figma-rest.mjs overview <figma-url-or-file-key> [page-name]
+  node scripts/figma-rest.mjs find <figma-url-or-file-key> <text> [depth]
   node scripts/figma-rest.mjs nodes <figma-node-url>
   node scripts/figma-rest.mjs tree <figma-node-url>
   node scripts/figma-rest.mjs snapshot <figma-node-url> <output-json>
@@ -262,6 +263,55 @@ try {
       file: file.name,
       lastModified: file.lastModified,
       pages,
+    }, null, 2));
+  } else if (command === "find") {
+    /* `overview` only reaches depth 2 — page children. Anything the designer
+       parked inside a SECTION, a group or a component set is invisible to it,
+       which is exactly how a finished ENABLE CAMERA SCREEN sat in this file
+       while a whole popup got rebuilt from scratch beside it. This walks the
+       WHOLE document and matches node names AND text content, so "the asset I
+       already made" is always findable by the words that are on it. */
+    if (!input) throw new Error("Provide a Figma file URL or file key.");
+    if (!extra) throw new Error("Provide the text to search for.");
+    const params = {};
+    if (option) params.depth = String(option);
+    const file = await figmaGet(
+      `/v1/files/${encodeURIComponent(fileKeyFrom(input))}`, params);
+    const needles = extra.toLowerCase().split(/\s+/).filter(Boolean);
+    const hits = [];
+    const walk = (node, path) => {
+      const name = node.name || "";
+      const chars = node.characters || "";
+      const hay = (name + "   " + chars).toLowerCase();
+      if (needles.every(n => hay.includes(n))) {
+        const b = node.absoluteBoundingBox;
+        hits.push({
+          id: node.id,
+          name,
+          type: node.type,
+          path,
+          box: b && {
+            x: Math.round(b.x * 100) / 100,
+            y: Math.round(b.y * 100) / 100,
+            width: Math.round(b.width * 100) / 100,
+            height: Math.round(b.height * 100) / 100,
+          },
+          ...(chars ? { characters: chars.slice(0, 120) } : {}),
+        });
+      }
+      for (const child of node.children || []) walk(child, path + "/" + name);
+    };
+    walk(file.document, "");
+    /* Biggest first: the thing someone means by "the screen I made" is the
+       frame, not the one text layer inside it that also matched. */
+    hits.sort((a, b) =>
+      (b.box ? b.box.width * b.box.height : 0) - (a.box ? a.box.width * a.box.height : 0));
+    console.log(JSON.stringify({
+      file: file.name,
+      lastModified: file.lastModified,
+      query: extra,
+      matches: hits.length,
+      hits: hits.slice(0, 60),
     }, null, 2));
   } else if (command === "nodes") {
     if (!input) throw new Error("Provide a Figma URL containing node-id.");

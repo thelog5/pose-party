@@ -15,12 +15,16 @@ import { showStatus, renderGuesses } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
 import { setModelOutput } from "./soloRound.js";
+import { requestCameraConsent, retryCameraConsent, closeCameraGate,
+         hasCameraGate, setBootProgress, setBootReady,
+         setBootFailed } from "./cameraGate.js";
 
 const CLASSIFY_EVERY_MS = 250;
 /* The classifier samples at ~15 Hz. Party caps landmark inference at 30 Hz,
    leaving a full extra pose frame between samples while freeing headroom for
    its WebRTC mesh and remote-video decoding. */
 const PARTY_VISION_MIN_MS = 30;
+const CAMERA_PLAY_TIMEOUT_MS = 1400;
 let video, overlay, ctx;
 let lastClassifyT = 0;
 let lastVisionT = -Infinity;
@@ -177,21 +181,175 @@ function ensureFaceLandmarker(){
   });
 }
 
+/* Camera consent and model loading deliberately run in parallel. The old boot
+   started the consent promise here, but did not call getUserMedia until after
+   every MediaPipe download had finished. An early click therefore changed the
+   button to ASKING… and then appeared to do nothing for the whole model load.
+
+   A live video track is the browser's successful camera hand-off. Once we have
+   one, attach it and release the ENABLE CAMERA gate immediately. Playback is
+   started at the same time, but its promise is diagnostic rather than a lock:
+   Safari/Chrome can transiently reject play() while metadata settles, and a
+   usable stream must never leave the permission card stuck on screen. */
+function liveVideoTrack(stream){
+  return stream?.getVideoTracks?.().find(track => track.readyState !== "ended");
+}
+
+function stopStream(stream){
+  for(const track of stream?.getTracks?.() || []){
+    try{ track.stop(); }catch(e){}
+  }
+}
+
+function playCamera(){
+  video.autoplay = true;
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute("autoplay", "");
+  try{
+    const attempt = video.play();
+    /* Some WebKit/Chromium media states return a promise that neither resolves
+       nor rejects until another gesture. Bound it so camera boot and the
+       inference loop cannot remain suspended behind an already-closed gate. */
+    return new Promise(resolve => {
+      let settled = false;
+      const finish = error => {
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(error || null);
+      };
+      const timer = setTimeout(() => {
+        const error = new Error("Camera preview did not start in time.");
+        error.name = "TimeoutError";
+        finish(error);
+      }, CAMERA_PLAY_TIMEOUT_MS);
+      Promise.resolve(attempt).then(() => finish(null), finish);
+    });
+  }catch(error){
+    return Promise.resolve(error);
+  }
+}
+
+async function acquireCamera(consent, control){
+  while(!control.cancelled){
+    await consent;
+    if(control.cancelled) return null;
+    let candidate = null;
+    try{
+      candidate = await navigator.mediaDevices.getUserMedia({
+        video:{ width:640, height:480 }, audio:false,
+      });
+      if(control.cancelled){
+        stopStream(candidate);
+        return null;
+      }
+      if(!liveVideoTrack(candidate)){
+        const error = new Error("The camera returned no live video track.");
+        error.name = "NotFoundError";
+        throw error;
+      }
+
+      state.mediaStream = candidate;
+      video.srcObject = candidate;
+      const playback = playCamera();
+
+      /* Do not await playback here. A rejected or slow play() used to strand
+         a successfully-authorized player behind this popup indefinitely. */
+      closeCameraGate();
+      return { stream:candidate, playback };
+    }catch(e){
+      stopStream(candidate);
+      if(video.srcObject === candidate) video.srcObject = null;
+      if(state.mediaStream === candidate) state.mediaStream = null;
+      if(control.cancelled) return null;
+
+      /* A refusal is recoverable on the same card. The no-card branch is only
+         for incomplete/embedded markup where there is nowhere to offer retry. */
+      if(!hasCameraGate()){
+        showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally — see README.)");
+        return null;
+      }
+      consent = retryCameraConsent(e);
+    }
+  }
+  return null;
+}
+
+function sizeCameraOverlay(){
+  overlay.width = video.videoWidth || 640;
+  overlay.height = video.videoHeight || 480;
+}
+
+/* Muted inline video normally starts immediately. If a browser still rejects
+   that first attempt, retry after models/metadata settle and finally on the
+   next real gesture. The gate is already gone because the stream is live; a
+   later click can recover playback without asking for camera permission twice. */
+async function settleCameraPlayback(firstAttempt){
+  let error = await firstAttempt;
+  if(error) error = await playCamera();
+  if(!error) return true;
+
+  console.warn("Camera stream connected; preview will resume on the next interaction.", error);
+  const resume = () => {
+    playCamera().then(nextError => {
+      if(nextError) return;
+      removeEventListener("pointerdown", resume, true);
+      removeEventListener("keydown", resume, true);
+      sizeCameraOverlay();
+    });
+  };
+  addEventListener("pointerdown", resume, true);
+  addEventListener("keydown", resume, true);
+  return false;
+}
+
 export async function boot(){
   video=$("video"); overlay=$("overlay"); ctx=overlay.getContext("2d");
 
+  /* Ask for consent FIRST, but don't wait on it yet. The card goes up now,
+     Home is held behind it (see .home-held), and the several megabytes of
+     wasm and model below download while the player reads it. Nothing here
+     gates the download — the gate only holds `getUserMedia`, which is the
+     single call that needs a human. A returning player whose grant is still
+     on file never sees the card and this resolves immediately. */
+  const consent = requestCameraConsent();
+  /* Start this worker now, not below the model downloads. It waits on the
+     card's button promise, so getUserMedia remains a direct consequence of
+     the player's click even when the pose engine is still downloading. */
+  const cameraControl = { cancelled:false };
+  const cameraReady = acquireCamera(consent, cameraControl);
+
   let vision;
   try{
+    setBootProgress("STARTING THE POSE ENGINE…", .12);
     vision = await FilesetResolver.forVisionTasks(WASM_URL);
     visionRuntime = vision;
+    setBootProgress("LOADING THE BODY MODEL…", .45);
     state.landmarker = await PoseLandmarker.createFromOptions(vision,{
       baseOptions:{ modelAssetPath:POSE_MODEL_URL, delegate:"GPU" },
       runningMode:"VIDEO", numPoses:1
     });
-  }catch(e){ return showStatus("Couldn’t load the pose engine. Check your internet connection and refresh."); }
+  }catch(e){
+    cameraControl.cancelled = true;
+    /* getUserMedia itself cannot be aborted. If it is already in flight, stop
+       the returned tracks as soon as it settles so a failed pose engine never
+       leaves the camera light on behind an unusable app. */
+    cameraReady.then(camera => {
+      if(!camera) return;
+      stopStream(camera.stream);
+      if(state.mediaStream === camera.stream) state.mediaStream = null;
+      if(video.srcObject === camera.stream) video.srcObject = null;
+    });
+    /* showStatus paints the camera dock, which on Home is parked out of
+       sight — so the card the player is actually looking at has to say it. */
+    setBootFailed("COULDN’T LOAD THE POSE ENGINE");
+    return showStatus("Couldn’t load the pose engine. Check your internet connection and refresh.");
+  }
 
   /* Hands are a nice-to-have: the body model alone still plays the game. */
   try{
+    setBootProgress("LOADING HAND TRACKING…", .78);
     state.handmarker = await HandLandmarker.createFromOptions(vision,{
       baseOptions:{ modelAssetPath:HAND_MODEL_URL, delegate:"GPU" },
       runningMode:"VIDEO", numHands:2
@@ -205,14 +363,12 @@ export async function boot(){
      Until then the recognition loop has the exact same pose/hand workload it
      had before head tracking existed. Face points remain crown-only. */
   state.faceLandmarker = null;
+  setBootReady();
 
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({ video:{width:640,height:480}, audio:false });
-    state.mediaStream=stream;
-    video.srcObject=stream; await video.play();
-  }catch(e){ return showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally — see README.)"); }
-
-  overlay.width=video.videoWidth; overlay.height=video.videoHeight;
+  const camera = await cameraReady;
+  if(!camera) return;
+  await settleCameraPlayback(camera.playback);
+  sizeCameraOverlay();
   showStatus(null);
   scheduleLoop();
 }

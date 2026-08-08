@@ -8,8 +8,10 @@
    Mode controllers still decide when a claim is valid and when points are
    awarded. Nothing here can score a word or acknowledge a network claim. */
 
+import { robotGot } from "./robot.js";
+import { fitWrappedTextToBox } from "./textFit.js";
+
 export const GUESS_LABEL_DEBOUNCE_MS = 420;
-export const RECOGNITION_FILL_LERP_60FPS = 0.16;
 export const RECOGNITION_IMPACT_MS = 180;
 export const RECOGNITION_FILL_MIN = 0;
 export const RECOGNITION_FILL_MAX = 95;
@@ -18,22 +20,9 @@ export const WARM_AT = 0.01;
 export const HOT_AT = 0.42;
 export const CRITICAL_AT = 0.78;
 
-const FRAME_MS = 1000 / 60;
-
-/* Make the old 0.16-per-frame ease independent of inference/display rate.
-   Party and Solo update on RAF; 1v1 updates when inference paints. Using
-   elapsed time gives all three the same perceived meter speed. */
-export function advanceRecognitionFill(current, target, lastAt=0, now=performance.now()){
-  const from = Math.max(0, Math.min(1, Number(current) || 0));
-  const to = Math.max(0, Math.min(1, Number(target) || 0));
-  const elapsed = lastAt
-    ? Math.max(0, Math.min(120, now - lastAt))
-    : FRAME_MS;
-  const alpha = 1 - Math.pow(1 - RECOGNITION_FILL_LERP_60FPS,
-    elapsed / FRAME_MS);
-  const value = Math.abs(to - from) < .0005 ? to : from + (to - from) * alpha;
-  return { value, at: now };
-}
+/* The meter itself moved to recognition.js: it is no longer an ease toward
+   "confidence / threshold" but a charge earned by holding the pose, so all
+   three modes share that instead of this. */
 
 /* A mode can render two or three papers, but label admission is identical:
    the first useful read appears immediately; a later read must remain on top
@@ -98,11 +87,28 @@ export function restartFeedbackAnimation(node, className){
   node.classList.add(className);
 }
 
+/* Which robot rig stands with which guess paper. Recognition is signalled
+   through markGuessRecognized() in EVERY mode and on every path — solo,
+   practice 1v1, online 1v1 (which writes its papers directly rather than
+   through paintMatchSide), and party — so this is the one call that can fire
+   his celebration exactly once per word without each of those paths having to
+   remember to. The `.recognized` guard below is what makes it once. */
+const GUESS_ROBOT = Object.freeze({
+  spGuessTop:   "spRobot",
+  myGuessTop:   "v1RobotYou",
+  rivalGuessTop:"v1RobotRival",
+  pmMyTop:      "pmRobotMine",
+  pmFoeTop:     "pmRobotFoe",
+});
+
 export function markGuessRecognized(node, active=true){
   if(!node) return;
   if(active){
-    if(!node.classList.contains("recognized"))
+    if(!node.classList.contains("recognized")){
       restartFeedbackAnimation(node, "recognized");
+      const robot = GUESS_ROBOT[node.id];
+      if(robot) robotGot(robot);
+    }
   }else{
     node.classList.remove("recognized");
   }
@@ -114,7 +120,9 @@ export function setWordRecognitionMotion(card, confidence, threshold, enabled=tr
   if(!card) return 0;
   const limit = Math.max(.01, Number(threshold) || 1);
   const value = Math.max(0, Math.min(limit, Number(confidence) || 0));
-  const start = Math.min(.28, limit * .45);
+  /* The card starts reacting inside the meter's approach band, so the paper
+     answers your body before the AI has committed to listening. */
+  const start = Math.min(.18, limit * .45);
   const intensity = enabled
     ? Math.max(0, Math.min(1, (value - start) / Math.max(.01, limit - start)))
     : 0;
@@ -218,8 +226,6 @@ const TEXT_PROFILES = Object.freeze({
   soloScore: { base:31.97, min:10.5, maxLines:1, safety:.88 },
   streak:    { base:27.96, min:11.5, maxLines:1, safety:.88 },
   matchScore:{ base:31.70, min:10.5, maxLines:1, safety:.88 },
-  awardText: { base:7.80, min:4.2, maxLines:1, safety:.88 },
-  rivalAwardText:{ base:6.80, min:3.9, maxLines:1, safety:.88 },
   awardPoint:{ base:18.93, min:6.5, maxLines:1, safety:.86 },
 });
 
@@ -237,17 +243,15 @@ const PROFILE_IDS = Object.freeze({
   soloScoreVal:"soloScore", soloStreakVal:"streak",
   v1YouScore:"matchScore", v1RivalScore:"matchScore",
   pmBlueScore:"matchScore", pmOrangeScore:"matchScore",
-  soloAwardPts:"awardPoint", v1AwardPts:"awardPoint",
-  v1RivalAwardPts:"awardPoint", pmAwardPts:"awardPoint",
-  v1RivalAwardTitle:"rivalAwardText", pmAwardTitle:"awardText",
-  pmAwardLabel:"awardText",
+  soloAwardPts:"awardPoint",
 });
 
 /* Roster-driven labels do not have stable IDs. They still follow the same
    contract, but read their authored component size from computed CSS so a
    normal short name/value remains exactly at its Figma size. */
 const REPEATED_TEXT_SELECTOR =
-  ".pm-nametag b,.pm-gotit b,.rs-nametag b,.rs-scorechip span,.rs-stat b,#rsHeadline";
+  ".pm-nametag b,.pp-award span,.rs-nametag b,.rs-scorechip span,.rs-stat b," +
+  "#rsHeadline,.rb-bubble b,.fh.bubble span,.robotwait .signtext,.cg-title";
 
 let measureCanvas = null;
 let fitFrame = 0;
@@ -348,8 +352,21 @@ function fitRepeatedPaperText(node){
     return fitSingleLinePaperText(node, { safety:.88, minScale:.40 });
   if(node.matches("#rsHeadline"))
     return fitSingleLinePaperText(node, { safety:.91, minScale:.38 });
-  if(node.matches(".pm-gotit b"))
-    return fitSingleLinePaperText(node, { safety:.86, minScale:.42 });
+  /* Six seat awards share one component, so they cannot carry stable IDs the
+     way Solo's does. "GOT IT 3RD!" and a five-figure total both have to hold
+     the same paper the sample "GOT IT!" was drawn against. */
+  if(node.matches(".pp-award span"))
+    return fitSingleLinePaperText(node, { safety:.9, minScale:.42 });
+  /* The robot's copy is editable in robotDialogue.js and may wrap. Use the
+     two-axis fitter so every edit stays inside the dedicated Figma bubble. */
+  if(node.matches(".rb-bubble b,.fh.bubble span,.robotwait .signtext"))
+    return fitWrappedTextToBox(node);
+  /* The boot card's headline is authored against "CAMERA TIME!" but swaps to
+     "CAMERA BLOCKED" / "NO CAMERA FOUND" when the request fails. Its box was
+     sized with real margin, so it keeps almost all of its width rather than
+     the default safety a crowded gameplay paper needs. */
+  if(node.matches(".cg-title"))
+    return fitSingleLinePaperText(node, { safety:.97, minScale:.5, widthOnly:true });
   return fitSingleLinePaperText(node, { safety:.86, minScale:.44 });
 }
 
@@ -404,10 +421,15 @@ export function fitGameplayText(nodeOrId, explicitProfile=null){
   node.classList.add("fit-wrap");
   let size = profile.base;
   node.style.fontSize = size + "cqw";
+  /* Overflow is scroll box vs PADDING box. Measuring it against innerBox()
+     — which subtracts the padding — made a wrapped label overflow by exactly
+     its own horizontal padding no matter how small the type got, so every
+     `.fit-wrap` rule here (all of which set one) ran the loop to its 3.8cqw
+     floor. That is the "spiking a volleyball renders at 3mm" bug: it was
+     never about the word being long, only about it wrapping at all. */
   for(let pass=0; pass<24; pass++){
-    const bounds = innerBox(node);
-    const fits = node.scrollWidth <= bounds.width + .75 &&
-      node.scrollHeight <= bounds.height + .75;
+    const fits = node.scrollWidth <= node.clientWidth + .75 &&
+      node.scrollHeight <= node.clientHeight + .75;
     if(fits) break;
     size *= .92;
     if(size < 3.8){ size = 3.8; break; }

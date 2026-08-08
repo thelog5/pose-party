@@ -21,11 +21,9 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS,
          calculatePartyPlayerPoints } from "./scoring.js";
-import { AWARD_MS, showPointsAward, confettiFrom, flyPoints,
-         greenFlash } from "./soloRound.js";
+import { confettiFrom, greenFlash } from "./soloRound.js";
 import {
   RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
-  advanceRecognitionFill,
   createGuessHistory, resetGuessHistory, updateGuessHistory,
   restartFeedbackAnimation, markGuessRecognized,
   setWordRecognitionMotion, prepareWordFeedback, playWordLockFeedback,
@@ -33,19 +31,27 @@ import {
   fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
 import { captureShot, showResults, setRematchState } from "./results.js";
+import { stampSeatAward, deliverSeatAward, clearSeatAward,
+         setSeatAwardPoints, seatAwardIsUp,
+         SEAT_AWARD_HOLD_MS } from "./seatAward.js";
+import { createChargeMeter, resetChargeMeter, advanceCharge,
+         chargePercent } from "./recognition.js";
+import { robotCharge, robotMiss, robotNewWord } from "./robot.js";
+import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
 
-/* Recognition uses the same stability window as the rest of the game: the
-   target must stay on top and over threshold before we dare claim. */
-const CLAIM_THRESH = 0.60, CLAIM_HOLD_MS = 250;
-const LOCK_FILL = CLAIM_THRESH;      // the bar completes at the real claim threshold
+/* Recognition is the shared charge meter (recognition.js): the pose has to be
+   HELD over a gate that relaxes across the word clock, and the claim goes out
+   when the meter fills. Party charges fastest of the three modes — six people
+   are racing the same word, so a slow board would just hand it to whoever the
+   model happens to like. */
+const CLAIM_THRESH = 1;              // the meter's own full-charge scale
 const GUESS_SEND_MS = 240;
 const ORDINALS = ["1ST", "2ND", "3RD", "4TH", "5TH", "6TH"];
 
 let ctx = null;          // {socket, roster, myId, peers, myName}
 let seats = new Map();   // seatKey -> playerId
 let rafId = null;
-let shownFill = 0;
-let fillAt = 0;
+const meter = createChargeMeter("party");
 let lastGuessAt = 0, lastGuessLabel = "", lastGuessConf = -1;
 let foeFeaturedId = null;
 const partyGuess = {
@@ -63,12 +69,14 @@ const disp = name => (name || "Player").trim().slice(0, 10).toUpperCase() || "PL
 
 export function startPartyMatch(bridge, payload){
   ctx = bridge;
+  if(typeof payload?.tutorialId !== "string" || !payload.tutorialId) return;
   const g = {
-    mode: "party", word: null, roundId: null, claimed: false,
+    mode: "party", tutorialId: payload.tutorialId,
+    word: null, roundId: null, claimed: false,
     holdSince: 0, phase: "countdown",
-    matchEndsAt: bridge.perfFromServer(payload.matchEndsAt),
-    matchLimitMs: Math.max(0,
-      Number(payload.matchEndsAt) - Number(payload.startAt)),
+    matchEndsAt: 0,
+    matchLimitMs: Math.max(0, Number(payload.matchMs)) ||
+      Number(payload.roster?.settings?.matchSecs) * 1000 || 120000,
     wordEnd: 0, wordLimitMs: payload.wordMs || 20000,
     scores: payload.scores, myPlace: null,
     lastChaseSecond: null,
@@ -84,23 +92,42 @@ export function startPartyMatch(bridge, payload){
   applyScores(payload.scores);
   stage().dataset.phase = "waiting";
   setTxt("pmWord", "—");
-  setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
-    g.matchLimitMs || Infinity,
-    g.matchEndsAt - performance.now())), { compact:true }));
+  setTxt("pmMatchTime", fmtTime(g.matchLimitMs, { compact:true }));
   setTxt("pmWordTime", fmtTime(g.wordLimitMs));
   resetGuessPapers();
   /* Clear the board BEFORE the 3·2·1. onPartyRound only does this after the
      countdown, so a rematch counted in on the previous match's completed word
      — bar pinned at 95%, card still .locked. Same fix 1v1 and Solo already
      have (clearMatchBoard / resetSoloBoard). */
-  shownFill = 0; fillAt = 0;
+  resetChargeMeter(meter);
   prepareWordFeedback($("pmWordCard"), $("pmWordFill"), CLAIM_THRESH, false);
-  $("pmAward")?.classList.remove("show");
 
+  clearInterval(g.timer);
+  clearInterval(ctx.countdownTimer);
+  $("countdown").classList.add("hidden");
+  const tutorialId = payload.tutorialId;
+  const acknowledge = () => {
+    if(!ctx.socket?.connected) return;
+    ctx.socket.emit("party:tutorial-ready", { tutorialId }, res => {
+      if(res?.error && res.error !== "match-in-progress")
+        ctx.toast?.("Couldn’t ready the party (" + res.error + ")");
+    });
+  };
+  showHowToPlay({ mode:"party", ready:acknowledge, back:acknowledge });
+}
+
+export function startPartyCountdown({tutorialId, startAt, matchEndsAt}={}){
+  const g = state.game;
+  if(!g || g.mode !== "party" || g.tutorialId !== tutorialId) return;
+  g.matchEndsAt = ctx.perfFromServer(matchEndsAt);
+  g.matchLimitMs = Math.max(0, Number(matchEndsAt) - Number(startAt)) ||
+    g.matchLimitMs;
+  setTxt("pmMatchTime", fmtTime(Math.max(0, Math.min(
+    g.matchLimitMs, g.matchEndsAt - performance.now())), { compact:true }));
   clearInterval(g.timer);
   g.timer = setInterval(tick, 100);
   if(!rafId) rafId = requestAnimationFrame(frame);
-  runCountdown(payload.startAt);
+  runCountdown(startAt);
 }
 
 function runCountdown(startAt){
@@ -144,19 +171,36 @@ function layoutSeats(){
     if(!el) continue;
     const pid = seats.get(key);
     el.classList.toggle("vacant", !pid && el.classList.contains("pm-tile"));
-    el.classList.remove("got", "gone");
+    el.classList.remove("got", "gone", "first");
     el.classList.toggle("mine", pid === ctx.myId);
     const tag = el.querySelector(".pm-nametag b");
     const player = pid && ctx.roster.players.find(p => p.id === pid);
     if(tag) tag.textContent = player ? disp(player.name) : "";
-    const sticker = el.querySelector(".pm-gotit");
-    if(sticker){
-      sticker.classList.remove("tracked");
-      sticker.removeAttribute("style");
-      sticker.querySelector("b").textContent = "";
-    }
+    resetSeatCrown(el);
+    clearSeatAward(el);
     if(pid) mountSeatVideo(el, pid);
   }
+}
+
+/* The crown is the FIRST-place mark, not a "you were recognised" sticker —
+   only one of the six wears it per word. engine.js head-tracks it onto the
+   local player's brow; everyone else keeps the head-band fallback position
+   the CSS authors, because remote poses are never transmitted. */
+function resetSeatCrown(el){
+  const crown = el?.querySelector(".pp-crown");
+  if(!crown) return;
+  crown.classList.remove("tracked");
+  crown.removeAttribute("style");
+}
+
+function crownSeat(key){
+  for(const other of seats.keys()){
+    const el = seatEl(other);
+    if(el && other !== key){ el.classList.remove("first"); resetSeatCrown(el); }
+  }
+  const el = seatEl(key);
+  if(!el) return;
+  el.classList.add("first");
 }
 
 function mountSeatVideo(el, pid){
@@ -184,7 +228,8 @@ export function markPartyPlayerGone(pid){
   const el = seatEl(key);
   if(!el) return;
   el.classList.add("gone");
-  el.classList.remove("got");
+  el.classList.remove("got", "first");
+  resetSeatCrown(el);
   for(const v of el.querySelectorAll("video")){ v.pause?.(); v.srcObject = null; }
   const player = ctx.roster?.players.find(p => p.id === pid);
   ctx.toast?.(disp(player?.name) + " left the party.");
@@ -218,6 +263,10 @@ const myTeam = () =>
 export function onPartyRound(payload){
   const g = state.game;
   if(!g || g.mode !== "party") return;
+  /* A non-responsive tab gets the entire bounded tutorial window plus the
+     synchronized count-in; once the authoritative word arrives, never leave
+     live play obscured behind the modal. */
+  hideHowToPlay();
   if(gameState() !== "playing" && !transition("playing")) return;
   g.roundId = payload.roundId;
   g.word = String(payload.word || "");
@@ -227,8 +276,7 @@ export function onPartyRound(payload){
   g.lastChaseSecond = null;
   g.phase = "word";
   g.wordEnd = ctx.perfFromServer(payload.endsAt);
-  shownFill = 0;
-  fillAt = 0;
+  resetChargeMeter(meter);
   lastGuessAt = 0; lastGuessLabel = ""; lastGuessConf = -1;
   /* confidence must be re-earned for this word — see soloRound.js */
   if(state.smooth) state.smooth[g.word] = 0;
@@ -241,39 +289,48 @@ export function onPartyRound(payload){
   setTxt("pmWord", g.word);
   fitGameplayText($("pmWord"));
   resetGuessPapers();
-  $("pmAward")?.classList.remove("show");
-  setTxt("pmAwardLabel", "POINTS!");
   for(const key of seats.keys()){
     const el = seatEl(key);
     if(!el) continue;
-    el.classList.remove("got");
-    const sticker = el.querySelector(".pm-gotit");
-    if(sticker){
-      sticker.classList.remove("tracked");
-      sticker.removeAttribute("style");
-      sticker.querySelector("b").textContent = "";
-    }
+    /* Last word's paper is gone by now — it was thrown into the team card at
+       the end of that word — but a round that ends while one is still in the
+       air must not carry it into this one. */
+    clearSeatAward(el);
+    el.classList.remove("got", "first");
+    resetSeatCrown(el);
   }
   applyScores(payload.scores);
   const card = $("pmWordCard");
   prepareWordFeedback(card, $("pmWordFill"), CLAIM_THRESH, true);
 }
 
-/* Someone — anyone — was recognized. Green border + placement sticker. */
+/* Someone — anyone — was recognized. Green border, the crown if they got there
+   first, and the GOT IT paper STAMPED on their seat. The paper stays put for
+   the rest of the word: while the other team is still chasing, the board reads
+   as "these four are in, these two are not", which is the whole shape of a
+   party round. It is thrown into the team card at the end of the word, by
+   onPartyResult. */
 export function onPartyGot({ id, place } = {}){
   const key = seatOf(id);
   if(!key) return;
   const el = seatEl(key);
   if(!el || el.classList.contains("got")) return;
   el.classList.add("got");
-  const sticker = el.querySelector(".pm-gotit");
-  if(sticker) sticker.querySelector("b").textContent = "I GOT IT " + (ORDINALS[place] || "");
+  if(place === 0) crownSeat(key);
   const g = state.game;
   /* the pose they were holding when the AI got it is the funny frame */
   const slot = el.querySelector(".slot");
   const vid = slot?.querySelector("video") || (id === ctx.myId ? $("video") : null);
   captureShot(id, g?.word, vid, id === ctx.myId);
   if(g) recordFinish(g, id, place);
+  /* The server sorts finishes by timestamp at the END of the word, so nothing
+     authoritative exists yet — quote the same shared formula it scores with,
+     and let onPartyResult correct the paper before it is thrown. */
+  const earned = g ? calculatePartyPlayerPoints(
+    place, Math.max(0, g.wordEnd - performance.now())) : 0;
+  stampSeatAward(el, {
+    title: "GOT IT " + (ORDINALS[place] || "") + "!", points: earned,
+  });
   if(id === ctx.myId){
     if(g) g.myPlace = place;
     const card = $("pmWordCard");
@@ -290,25 +347,9 @@ export function onPartyGot({ id, place } = {}){
       onImpact: () => {
         const live = state.game;
         if(!live || live.mode !== "party" || live.roundId !== roundId) return;
-        showPartyPlacement(place);
         greenFlash(card);
         confettiFrom(card);
         blip([523, 659, 784], .08);
-        /* the same physical hand-off Solo and 1v1 use: points travel from
-           the word you landed to your team's card, and the team total is
-           only repainted when they arrive */
-        const myCard = $(myTeam() === "orange" ? "pmScoreOrange" : "pmScoreBlue");
-        scorePaintHeld = true;
-        /* The paper shows a PLACE at this moment, so reading it back gave the
-           chip the ordinal — it always flew "+1".."+6". Compute the real
-           figure from the same shared formula the server scores with. */
-        const earned = calculatePartyPlayerPoints(
-          place, Math.max(0, live.wordEnd - performance.now()));
-        flyPoints(card, myCard, earned, () => {
-          scorePaintHeld = false;
-          applyScores(state.game?.scores);
-          blip([880]);
-        });
       },
     });
   }else{
@@ -350,33 +391,69 @@ export function onPartyResult(payload){
   stage().dataset.phase = "between";
   stage().classList.remove("chase-urgent", "chase-final");
   setWordRecognitionMotion($("pmWordCard"), 0, CLAIM_THRESH, false);
-  applyScores(payload.scores);
   if(gameState() === "playing") transition("word-won");
 
-  /* Placement events are optimistic and arrive live. Reconcile every sticker
-     to the server's timestamp-sorted final order before the next word. */
-  for(const result of payload.results || []){
-    const resultSeat = seatEl(seatOf(result.id));
+  /* Placement events are optimistic and arrive live. Reconcile the crown and
+     every stamped paper to the server's timestamp-sorted final order before
+     the word is banked — a late packet with an earlier stamp can move who
+     actually came first, and therefore what each paper is worth. */
+  const results = payload.results || [];
+  for(const result of results){
+    const resultKey = seatOf(result.id);
+    const resultSeat = seatEl(resultKey);
     if(!resultSeat) continue;
     resultSeat.classList.add("got");
-    const resultSticker = resultSeat.querySelector(".pm-gotit b");
-    if(resultSticker){
-      resultSticker.textContent = "I GOT IT " + (ORDINALS[result.place] || "");
-    }
+    if(result.place === 0) crownSeat(resultKey);
+    setSeatAwardPoints(resultSeat, result.points || 0);
   }
 
-  const mine = (payload.results || []).find(r => r.id === ctx.myId);
+  /* THE payoff, once per word: every paper on the board is thrown into the
+     team card it pays, and the team totals are only repainted once the last
+     one has arrived. Held rather than painted now — the figures in
+     payload.scores are already authoritative, it is the PAINT that waits. */
+  bankRoundAwards(payload.scores, results);
+
+  const mine = results.find(r => r.id === ctx.myId);
   /* TIME'S UP is the clock beating you, not five other people beating you.
      Firing it whenever you simply didn't place made a normal round of party
      read as a failure state; a miss gets the word card's miss beat instead. */
   if(!mine && payload.reason === "timeout") showTimesUp();
-  if(mine){
-    setTxt("pmAwardTitle", "GOT IT " + (ORDINALS[mine.place] || "") + "!");
-    setTxt("pmAwardLabel", "POINTS!");
-    showPointsAward("pmAward", "pmAwardPts", mine.points);
-  }else{
+  if(!mine){
     playWordMissFeedback($("pmWordCard"), CLAIM_THRESH);
+    robotMiss("pmRobotMine");
   }
+}
+
+/* Papers are thrown in placement order, a beat apart, so six of them read as a
+   sequence of contributions rather than one shower. The stagger plus the flight
+   has to finish inside config.betweenRoundsMs (1800ms), which is why the last
+   throw starts at 5 × 90ms and not later. */
+const AWARD_STAGGER_MS = 90;
+
+function bankRoundAwards(scores, results){
+  const thrown = results
+    .map(result => ({ result, key: seatOf(result.id) }))
+    .filter(entry => entry.key && seatAwardIsUp(seatEl(entry.key)));
+  if(!thrown.length){ applyScores(scores); return; }
+  /* Hold BEFORE banking: applyScores stores the authoritative figures either
+     way, and only the repaint waits for the papers carrying them. */
+  scorePaintHeld = true;
+  applyScores(scores);
+  let landed = 0;
+  thrown.forEach(({ key }, i) => {
+    deliverSeatAward(seatEl(key),
+      $(key.startsWith("orange") ? "pmScoreOrange" : "pmScoreBlue"), {
+        holdMs: SEAT_AWARD_HOLD_MS + i * AWARD_STAGGER_MS,
+        onLand: () => {
+          blip([880]);
+          if(++landed < thrown.length) return;
+          scorePaintHeld = false;
+          /* the round's own figures, not whatever has arrived since — a match
+             can end on this word and repaint from a later packet */
+          applyScores(scores);
+        },
+      });
+  });
 }
 
 export function onPartyEnd(payload){
@@ -408,14 +485,29 @@ function frame(){
   const targetIsDisplayed = !!g.word &&
     partyGuess.pmMyTop.items[0]?.label === g.word;
   const raw = targetIsDisplayed ? (state.smooth?.[g.word] || 0) : 0;
-  const want = Math.max(0, Math.min(1, raw / LOCK_FILL));
-  const next = advanceRecognitionFill(shownFill, want, fillAt);
-  shownFill = next.value;
-  fillAt = next.at;
+  advanceCharge(meter, raw, wordElapsedFrac(g));
   const fill = $("pmWordFill");
   if(fill) fill.style.width = (RECOGNITION_FILL_MIN +
-    shownFill * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";
-  setWordRecognitionMotion(card, shownFill * LOCK_FILL, CLAIM_THRESH, true);
+    meter.display * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";
+  setWordRecognitionMotion(card, meter.display, CLAIM_THRESH, true);
+  robotCharge("pmRobotMine", meter.display, meter.locked);
+  if(targetIsDisplayed) setTxt("pmMyTopPct", chargePercent(meter) + "%");
+  /* The claim goes out the instant the meter fills — not on the next
+     classifier tick, which in a six-way race is 250ms of nothing. */
+  if(meter.locked && !g.claimed) claim();
+}
+
+/* The chase runs on its own short clock; either way the meter wants "how far
+   through the window am I", because that is what relaxes the gate. */
+function wordElapsedFrac(g){
+  const now = performance.now();
+  if(g.phase === "chase"){
+    const left = Math.max(0, (g.chaseEndsAt || 0) - now);
+    return Math.max(0, Math.min(1, 1 - left / PARTY_CHASE_WINDOW_MS));
+  }
+  if(!g.wordEnd || !g.wordLimitMs) return 0;
+  return Math.max(0, Math.min(1,
+    1 - Math.max(0, g.wordEnd - now) / g.wordLimitMs));
 }
 
 function tick(){
@@ -462,14 +554,8 @@ export function partyCheck(topLabel, topP){
 
   pushGuess("pmMyTop", "pmMyPast", topLabel, topP);
   sendGuess(topLabel, topP);
-
-  const targetIsDisplayed = partyGuess.pmMyTop.items[0]?.label === g.word;
-  if(targetIsDisplayed && topLabel === g.word && topP >= CLAIM_THRESH){
-    if(!g.holdSince) g.holdSince = performance.now();
-    if(performance.now() - g.holdSince >= CLAIM_HOLD_MS) claim();
-  }else{
-    g.holdSince = 0;
-  }
+  /* The claim itself is decided by the charge meter in frame(); this only
+     keeps the robot papers and the relay fed. */
 }
 
 function claim(){
@@ -518,7 +604,16 @@ function renderPartyGuess(topId, pastId, history, popped=false){
   const currentText = (current.label === "idle" ? "just standing" :
     current.label).toUpperCase() + (current.locked ? "" : "?");
   setTxt(wordEl, currentText);
-  setTxt(pctEl, Math.round(current.pct * 100) + "%");
+  /* your own paper reports CHARGE toward the claim when it is showing the
+     target word, so the number and the meter never disagree */
+  const live = topId === "pmMyTop" && !current.locked &&
+    current.label === state.game?.word;
+  setTxt(pctEl, (live ? chargePercent(meter)
+    : Math.round(current.pct * 100)) + "%");
+  /* Yours runs off the meter each frame; the foe rig has only the number on
+     his own paper to read, which is all anyone watching him would have. */
+  if(topId === "pmFoeTop" && !current.locked)
+    robotCharge("pmRobotFoe", current.pct || 0);
   fitGameplayText($(wordEl));
 
   if(past){
@@ -543,6 +638,8 @@ function renderPartyGuess(topId, pastId, history, popped=false){
 function resetGuessPapers(){
   resetGuessHistory(partyGuess.pmMyTop);
   resetGuessHistory(partyGuess.pmFoeTop);
+  robotNewWord("pmRobotMine");
+  robotNewWord("pmRobotFoe");
   setTxt("pmMyTopWord", "GUESSING…"); setTxt("pmMyTopPct", "0%");
   setTxt("pmFoeTopWord", "GUESSING…"); setTxt("pmFoeTopPct", "0%");
   for(const id of ["pmMyTop", "pmFoeTop"]){
@@ -557,26 +654,16 @@ function resetGuessPapers(){
     fitGameplayText($(id));
 }
 
-/* The recognition moment reuses Solo/1v1's exact points-award paper and its
-   .show keyframes. The server-sorted points replay on the same paper later. */
-function showPartyPlacement(place){
-  setTxt("pmAwardTitle", "GOT IT!");
-  setTxt("pmAwardLabel", "PLACE!");
-  /* through the shared helper so this paper is swept by clearCelebrations
-     like every other award — it used to run its own timer and outlive the round */
-  showPointsAward("pmAward", "pmAwardPts", 0, ORDINALS[place] || "✓");
-}
-
 /* ---------------- scores ---------------- */
 
-/* Never let the team total jump ahead of the chip that is carrying it. */
+/* Never let the team total jump ahead of the paper that is carrying it. */
 let scorePaintHeld = false;
 
 function applyScores(scores){
   if(!scores) return;
   const g = state.game;
-  /* Always keep the authoritative figure; only the PAINT waits for the chip,
-     so releasing the hold has a current total to show. */
+  /* Always keep the authoritative figure; only the PAINT waits for the award
+     paper, so releasing the hold has a current total to show. */
   if(g) g.scores = scores;
   if(scorePaintHeld) return;
   const prevB = $("pmBlueScore")?.textContent, prevO = $("pmOrangeScore")?.textContent;

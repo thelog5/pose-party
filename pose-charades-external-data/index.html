@@ -12,7 +12,11 @@
 <link rel="stylesheet" href="css/screens.css">
 <link rel="stylesheet" href="css/overlays.css">
 </head>
-<body>
+<!-- data-boot is set here, in the markup, and cleared the frame the boot gate
+     lets go (js/cameraGate.js -> js/homeAlive.js). Setting it from JS instead
+     would let a fully built Home paint for a frame or two before the ENABLE
+     CAMERA card went up, which is the one thing the hold exists to prevent. -->
+<body data-boot="loading">
 
 <!-- ============ shared SVG placeholder art (see ASSETS-NEEDED.md) ============ -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -910,6 +914,205 @@
 <div class="timesup-flash" id="timesUpFlash" aria-hidden="true"></div>
 <div class="timesup" id="timesUp" aria-hidden="true">
   <img src="assets/ui/figma/rs-timesup.png" alt="Time&rsquo;s up">
+</div>
+
+<!-- Three Figma components sharing one DOM: Solo "How to Play" (268:596),
+     "1V1 How to Play" (312:642), "Party How to Play" (312:641) — all
+     1088x643, all the SAME backing/title/three-torn-square/READY chrome, so
+     that chrome is written once. #howToPlay[data-mode] (js/howToPlay.js)
+     picks which column content shows via [data-htp-for] (css/overlays.css).
+     Solo gates the count-in locally (camera+HUD already live, I'M READY starts
+     it); 1v1/Party acknowledge a server-owned tutorial barrier. Once every
+     current player is ready (or the bounded fallback expires), the server
+     publishes one future 3-2-1 timestamp so every client remains synchronized.
+     Every
+     percentage below is the Figma rect divided by its OWN parent, not the
+     frame; per-mode column content was pulled from each component's own
+     node tree independently, not assumed shared. -->
+<div class="htp hidden" id="howToPlay" role="dialog" aria-modal="true"
+     aria-labelledby="htpTitle">
+  <div class="htp-panel" id="htpPanel">
+    <img class="htp-paper" src="assets/ui/figma/htp-panel.png" alt="">
+    <span class="htp-title" id="htpTitle">HOW TO PLAY</span>
+
+    <!-- COLUMN 1 — Solo splits "see the word" / "act it out" across cols 1
+         and 2; 1v1/Party merge both into col 1 (pose silhouette + mini word
+         card together) and use col 2 for the new "get AI to guess" beat. -->
+    <div class="htp-step" style="left:3.952%;top:24.572%;width:28.676%;height:47.745%">
+      <img class="htp-sq" src="assets/ui/figma/htp-square.png" alt="">
+
+      <span class="htp-lab" data-htp-for="ai"
+            style="left:6.731%;top:9.121%;width:88.141%;height:20.521%;font-size:11.218cqw;line-height:22.126cqw">SEE THE WORD</span>
+      <div class="htp-word" data-htp-for="ai" style="left:10.26%;top:44.95%;width:78.2%">
+        <img class="htp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
+        <img class="htp-word-fill" src="assets/ui/figma/sp-pill.png" alt="">
+        <span>JUMP</span>
+      </div>
+
+      <span class="htp-lab htp-wrap" data-htp-for="1v1 party"
+            style="left:2.564%;top:9.121%;width:96.795%;height:20.521%;font-size:10.256cqw;line-height:12.821cqw">SEE THE WORD AND ACT IT OUT</span>
+      <img class="htp-pose" data-htp-for="1v1 party" style="left:5.13%;top:32.25%;width:84.94%"
+           src="assets/ui/figma/htp-pose.png" alt="">
+      <div class="htp-word" data-htp-for="1v1 party" style="left:20.51%;top:65.15%;width:54.49%">
+        <img class="htp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
+        <img class="htp-word-fill" src="assets/ui/figma/sp-pill.png" alt="">
+        <span>JUMP</span>
+      </div>
+    </div>
+
+    <!-- COLUMN 2 — Solo: "act it out" (pose silhouette). 1v1/Party: the new
+         "get AI to guess first" beat (thumbsup robot + mini points award). -->
+    <div class="htp-step" style="left:35.018%;top:26.439%;width:29.983%;height:47.009%">
+      <img class="htp-sq" src="assets/ui/figma/htp-square.png" alt="">
+
+      <span class="htp-lab" data-htp-for="ai"
+            style="left:17.167%;top:5.293%;width:70.201%;height:20.842%;font-size:10.729cqw;line-height:21.163cqw">ACT IT OUT</span>
+      <img class="htp-pose" data-htp-for="ai" style="left:7.36%;top:27.13%;width:81.2%"
+           src="assets/ui/figma/htp-pose.png" alt="">
+
+      <span class="htp-lab htp-wrap" data-htp-for="1v1 party"
+            style="left:.920%;top:5.293%;width:93.806%;height:20.842%;font-size:8.277cqw;line-height:12.262cqw">GET AI TO GUESS YOUR ACTION FIRST</span>
+      <div class="htp-rig htp-rig-thumbsup" data-htp-for="1v1 party" style="left:40.16%;top:28.45%;width:59.9%">
+        <img class="rb-body" src="assets/ui/figma/rb-body-thumbsup.png" alt="">
+        <img class="rb-face" src="assets/ui/figma/rb-face-joyful.png" alt="">
+      </div>
+      <div class="htp-award" data-htp-for="1v1" style="left:4.905%;top:42.02%;width:45.02%">
+        <img src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got">GOT IT!</span>
+        <span class="aw-pts">+500</span>
+        <span class="aw-lbl">POINTS!</span>
+      </div>
+      <div class="htp-award" data-htp-for="party" style="left:4.905%;top:42.02%;width:45.02%">
+        <img src="assets/ui/figma/sp-award.png" alt="">
+        <span class="aw-got">GOT IT!</span>
+        <span class="aw-pts">+200</span>
+        <span class="aw-lbl">POINTS!</span>
+      </div>
+    </div>
+
+    <!-- COLUMN 3 — the mode-specific rule. Solo: the run is timed, so it's a
+         thinking robot + mini TIMES UP badge. 1v1: a 5s sudden-death-style
+         chase clock. Party: bonus points for the whole team, text only —
+         Figma authors no icon for this one. -->
+    <div class="htp-step" style="left:66.268%;top:25.661%;width:29.153%;height:48.566%">
+      <img class="htp-sq" src="assets/ui/figma/htp-square.png" alt="">
+
+      <span class="htp-lab htp-wrap" data-htp-for="ai"
+            style="left:3.783%;top:6.724%;width:90.481%;height:20.174%;font-size:7.251cqw;line-height:12.611cqw">GET AI TO GUESS BEFORE TIME RUNS OUT</span>
+      <div class="htp-rig htp-rig-thinking" data-htp-for="ai" style="left:39.72%;top:29.46%;width:60.22%">
+        <img class="rb-body" src="assets/ui/figma/rb-body-thinking.png" alt="">
+        <img class="rb-face" src="assets/ui/figma/rb-face-thinking.png" alt="">
+      </div>
+      <div class="htp-timesup" data-htp-for="ai" style="left:15.76%;top:46.11%;width:34.35%">
+        <img class="htp-tu-bg" src="assets/ui/figma/sp-guess.png" alt="">
+        <span class="htp-tu-clock" aria-hidden="true"></span>
+        <span>TIMES UP!</span>
+      </div>
+
+      <span class="htp-lab htp-wrap" data-htp-for="1v1"
+            style="left:4.729%;top:8.966%;width:91.426%;height:20.174%;font-size:8.197cqw;line-height:11.034cqw">5 SECONDS TO ACT IF YOUR OPPONENT GETS IT FIRST</span>
+      <div class="htp-timer" data-htp-for="1v1" style="left:17.34%;top:45.79%;width:81.02%">
+        <img src="assets/ui/figma/sp-wtimer.png" alt="">
+        <span class="htp-tlab">TIME LEFT</span>
+        <span class="htp-tval">0:05</span>
+      </div>
+
+      <span class="htp-lab htp-wrap" data-htp-for="party"
+            style="left:.946%;top:6.085%;width:96.786%;height:20.174%;font-size:8.512cqw;line-height:12.611cqw">BONUS POINTS IF YOUR ENTIRE TEAM GETS IT</span>
+    </div>
+
+    <button class="htp-ready pbtn" id="htpReady">
+      <img src="assets/ui/figma/htp-ready.png" alt="">
+      <span>I&rsquo;M READY</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============ ENABLE CAMERA — the boot gate (js/cameraGate.js).
+     Figma "ENABLE CAMERA SCREEN" 322:717, 1539x1460. Every left/top/width
+     below is that component's percentage. The paper, the three info rows,
+     their icons, the tapes and the pointing robot are all its own art
+     (cam-*.png); the title card is the same 34:2 instance Home uses.
+
+     The robot HANGS OFF the right edge (69.5% + 32.1% = 101.6%) and the
+     title card off the top — both authored, so .cg-panel must not clip.
+
+     He is the square tutorial-style rig, not the tall 520x610 gameplay one:
+     `body_point_bottom_left` (322:713) is unique to this screen and points
+     down-left at the button, which is the whole reason he is here. The other
+     five bodies are the RObot Sprites section's raw square fills, in register
+     with it, and the faces are the shared union-box rb-face-* set — see the
+     measured offsets in overlays.css. -->
+<div class="cg hidden" id="camGate" role="dialog" aria-modal="true"
+     aria-labelledby="cgTitle">
+  <div class="cg-panel" id="cgPanel">
+    <img class="cg-paper" src="assets/ui/figma/cam-panel.png" alt="">
+    <img class="cg-titlecard" src="assets/ui/figma/title-card.png" alt="Pose Party">
+    <img class="cg-tape cg-tape-y" src="assets/ui/figma/cam-tape-yellow.png" alt="">
+    <img class="cg-tape cg-tape-c" src="assets/ui/figma/cam-tape-cream.png" alt="">
+
+    <span class="cg-title" id="cgTitle">ACT OUT THE WORD. LET THE AI GUESS</span>
+
+    <img class="cg-row cg-row1" src="assets/ui/figma/cam-row.png" alt="">
+    <img class="cg-icon cg-icon-cam" src="assets/ui/figma/cam-icon-camera.png" alt="">
+    <span class="cg-head cg-head1">ENABLE YOUR CAMERA</span>
+    <span class="cg-sub cg-sub1">Pose Party needs camera access to recognize
+      your movements.</span>
+
+    <img class="cg-row cg-row2" src="assets/ui/figma/cam-row.png" alt="">
+    <img class="cg-icon cg-icon-hi5" src="assets/ui/figma/cam-icon-highfive.png" alt="">
+    <span class="cg-head cg-head2">YOUR VIDEO STAYS PRIVATE</span>
+    <span class="cg-sub cg-sub2">Your video is streamed directly to players in
+      your lobby, never sent to our servers</span>
+
+    <img class="cg-row cg-row3" src="assets/ui/figma/cam-row.png" alt="">
+    <img class="cg-icon cg-icon-room" src="assets/ui/figma/cam-icon-room.png" alt="">
+    <span class="cg-head cg-head3">MAKE SOME ROOM</span>
+    <span class="cg-sub cg-sub3">Step back until your full body is visible,
+      then act out the word!</span>
+
+    <div class="cg-rig" id="cgRobot" data-pose="point">
+      <img class="cg-rig-body" id="cgRobotBody" src="assets/ui/figma/cam-robot-point.png" alt="">
+      <img class="cg-rig-face" id="cgRobotFace" src="assets/ui/figma/rb-face-joyful.png" alt="">
+    </div>
+
+    <button class="cg-enable" id="cgEnable">
+      <img src="assets/ui/figma/cam-enable.png" alt="">
+      <span id="cgEnableLabel">ENABLE CAMERA</span>
+    </button>
+
+    <!-- The boot readout lives on the scrim BELOW the card: 322:717 is a
+         finished composition with no slot for it, and one note at a time is
+         picked by the card's own data-state. A permission dialog that can
+         only say the happy-path sentence is one that strands people. -->
+    <div class="cg-status" role="status" aria-live="polite">
+      <div class="cg-load" id="cgLoad">
+        <span class="cg-load-lab" id="cgLoadLab">WAKING THE ROBOT&hellip;</span>
+        <span class="cg-load-track"><i class="cg-load-fill" id="cgLoadFill"></i></span>
+      </div>
+      <span class="cg-note" data-cg-note="blocked">Camera access was blocked.
+        Open the camera icon in your address bar, allow this page, then try
+        again.</span>
+      <span class="cg-note" data-cg-note="failed">No camera answered. Check
+        that nothing else is using it, then try again.</span>
+    </div>
+  </div>
+</div>
+
+<!-- The chase / sudden-death screen-edge pulse. Its own fixed layer, not an
+     inset shadow on the stage: an inset shadow paints UNDER the stage's video
+     child and is invisible — the same trap the countdown scrim and the TIMES
+     UP wash both hit. Driven purely by the stage's data-phase. -->
+<div class="edgepulse" id="edgePulse" aria-hidden="true"></div>
+
+<!-- SUDDEN DEATH — the Figma two-tone torn banner (27:58) with live type, so
+     the copy can carry the rule rather than being baked into a bitmap. -->
+<div class="sudden hidden" id="suddenDeath" role="status">
+  <div class="sd-card">
+    <img src="assets/ui/figma/sd-title.png" alt="">
+    <span class="sd-title">SUDDEN DEATH</span>
+    <span class="sd-sub">FIRST POSE WINS IT</span>
+  </div>
 </div>
 
 <div class="countdown hidden" id="countdown"><span class="cd-num" id="countdownNum"></span></div>

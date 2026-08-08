@@ -94,6 +94,8 @@ function spinConfetti(){
 }
 
 let entranceTimer = null;
+let arrivalTimer = null;
+let lastEntranceAt = -Infinity;
 function playHomeEntrance(){
   const stage = $("homeStage");
   if(!stage) return;
@@ -101,16 +103,48 @@ function playHomeEntrance(){
   void stage.offsetWidth;
   stage.classList.add("home-entering");
   clearTimeout(entranceTimer);
+  lastEntranceAt = performance.now();
   /* must outlast the last tape (1.26s delay + .66s slap) or it snaps */
   entranceTimer = setTimeout(() => stage.classList.remove("home-entering"), 2100);
 }
 
 function revealHome(){
+  /* Boot now has two things that both want to reveal Home — the gate letting
+     go and the status overlay hiding — and they fire within a frame of each
+     other. Whichever gets there first owns the entrance; a replay would send
+     three cards that are already mid-flight back to the start. */
+  if(performance.now() - lastEntranceAt < 400) return;
   playHomeEntrance();
   spinConfetti();
 }
 
+/* The boot gate held every paper at the state its entrance starts from (see
+   .home-held in screens.css). Take the handover: start the entrance and drop
+   the hold in ONE frame, so the papers fly in from where they were parked
+   instead of appearing and then animating. `preventDefault` is how the gate
+   knows Home claimed it and must not clear the attribute itself. */
+function claimBootRelease(e){
+  const stage = $("homeStage");
+  if(!stage || !document.body.dataset.boot) return;
+  e.preventDefault();
+  playHomeEntrance();
+  /* .home-arriving carries the logo/robot/bubble/boat in; the cards and
+     tapes already have their own beats inside .home-entering. */
+  stage.classList.add("home-arriving");
+  clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => stage.classList.remove("home-arriving"), 1800);
+  delete document.body.dataset.boot;
+  spinConfetti();
+}
+
 function spinConfettiWhenHomeIsReady(){
+  document.addEventListener("pose-party:boot-released", claimBootRelease);
+  /* Belt and braces: if boot dies somewhere that never reaches the gate at
+     all, Home must not stay parked at opacity 0 forever. */
+  setTimeout(() => {
+    if(document.body.dataset.boot) claimBootRelease(new Event("x", { cancelable:true }));
+  }, 45000);
+
   const status = $("status");
   if(!status || status.style.display === "none"){
     revealHome();

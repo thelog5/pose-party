@@ -21,7 +21,7 @@ import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
          lobbySettings, renderLobbySettings, setLobbyCode,
          serverNow, perfFromServer } from "./online.js";
 import { setRematchState, syncResultsRoster } from "./results.js";
-import { startPartyMatch, wirePartyMatch, attachPartyStream, onPartyRound,
+import { startPartyMatch, startPartyCountdown, wirePartyMatch, attachPartyStream, onPartyRound,
          onPartyGot, onPartyChase, onPartyResult, onPartyEnd,
          onPartyGuess, markPartyPlayerGone } from "./partyMatch.js";
 
@@ -286,6 +286,7 @@ function wirePartySocket(s){
       serverNow, perfFromServer, toast,
     }, payload);
   });
+  s.on("party:countdown", p => startPartyCountdown(p));
   s.on("party:round",  p => onPartyRound(p));
   s.on("party:got",    p => onPartyGot(p));
   s.on("party:chase",  p => onPartyChase(p));

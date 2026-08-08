@@ -17,6 +17,11 @@ export const config = {
   matchMs: int(process.env.MATCH_MS, 120000),
   wordMs: int(process.env.WORD_MS, 20000),
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
+  /* Multiplayer waits here for every current client to dismiss HOW TO PLAY.
+     A bounded fallback keeps an abandoned/backgrounded tab from deadlocking
+     the whole room; once the barrier releases, preCountMs still supplies the
+     complete shared 3-2-1 before the first word is dealt. */
+  tutorialTimeoutMs: int(process.env.TUTORIAL_TIMEOUT_MS, 15000),
   betweenRoundsMs: int(process.env.BETWEEN_ROUNDS_MS, 1800),
   /* A claim is scored from its synchronized recognition timestamp, not its
      arrival time. This short grace only lets an in-flight claim arrive; it

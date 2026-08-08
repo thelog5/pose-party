@@ -15,6 +15,8 @@ import { wireResults, devResults } from "./results.js";
 import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty, leaveParty } from "./party.js";
 import { wireHomeAlive } from "./homeAlive.js";
+import { wireHowToPlay, isHowToPlayOpen } from "./howToPlay.js";
+import { wireCameraGate } from "./cameraGate.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
 import { boot } from "./engine.js";
 
@@ -73,13 +75,15 @@ function wireControls(){
   $("btnHomeGear").onclick=()=>transition("training");
   wireHomeAlive();
   wireLobbyAlive();
+  wireHowToPlay();
+  /* Must be wired before boot() so the ENABLE CAMERA card's one button is
+     live the instant the card goes up. */
+  wireCameraGate();
 
-  /* in-game. Solo just ends the run; the online modes have to tell the room
-     they are going, or everyone else waits out a player who is not there. */
+  /* in-game. Solo keeps its LEAVE paper: there is no room to tell, and no
+     Esc-only affordance is warranted when the run is entirely local. */
   $("btnExitSolo").onclick=()=>state.game&&endGame();
   $("btnSkipSolo").onclick=()=>missWord(true);
-  $("btnExitMatch").onclick=()=>{ leaveRoom(); transition("menu"); };
-  $("btnExitParty").onclick=()=>{ leaveParty(); transition("menu"); };
 
   /* results — the screen owns its own buttons now (see results.js) */
   wireResults();

@@ -135,6 +135,380 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
   .sudden.fire .sd-card{opacity:1}
 }
 
+/* ================= HOW TO PLAY (Figma 268:596, 1088x643) =================
+   Shown over the live Solo board before the count-in. Type is authored in
+   `cqw` against the container it belongs to — the panel for the title, each
+   yellow square for its own label, the mini word card for JUMP — which is
+   exactly how Figma sizes it, so it reproduces at any viewport. */
+.htp{position:fixed;inset:0;z-index:90;display:grid;place-items:center;
+  padding:2vh 2vw;
+  background:radial-gradient(circle at 50% 46%,rgba(9,22,62,.5) 0 34%,
+    rgba(9,22,62,.72) 100%);
+  backdrop-filter:brightness(.72) saturate(1.02);
+  -webkit-backdrop-filter:brightness(.72) saturate(1.02);
+  animation:htpScrim .3s ease-out both}
+.htp.hidden{display:none}
+@keyframes htpScrim{from{opacity:0}to{opacity:1}}
+
+.htp-panel{position:relative;container-type:inline-size;
+  width:min(74vw,152vh,1088px);aspect-ratio:1088/643;
+  font-family:var(--f-lobby);font-weight:400;
+  animation:htpDrop .52s cubic-bezier(.16,1.5,.32,1) both}
+@keyframes htpDrop{
+  0%{opacity:0;transform:translateY(-7%) scale(.9) rotate(-2.4deg)}
+  58%{opacity:1;transform:translateY(0) scale(1.028) rotate(.7deg)}
+  100%{opacity:1;transform:none}}
+
+/* Every paper here is a RENDER of its Figma node, not the raw imageRef the
+   node points at. That matters twice over: the cream backing carries Figma
+   image filters (exposure -.09, contrast +.10, highlights -.19, shadows -.28)
+   that give it its depth, and the yellow squares carry an imageTransform that
+   crops the source's transparent margin away so the paper fills its whole
+   rectangle. Pulling the raw refs gave a washed-out sheet and squares floating
+   inside their own boxes — recognisably the wrong art. */
+/* the cream backing stops at 88.8% — the READY paper hangs off the bottom */
+.htp-paper{position:absolute;left:0;top:0;width:100%;aspect-ratio:1.9054;
+  object-fit:fill;
+  filter:drop-shadow(0 min(.55vw,.98vh) min(.42vw,.75vh) rgba(0,0,0,.35))}
+.htp-title{position:absolute;left:15.993%;top:6.221%;width:67.923%;height:15.397%;
+  text-align:left;font-size:9.191cqw;line-height:9.064cqw;color:#17356f;
+  letter-spacing:.092cqw;text-shadow:.46cqw .46cqw 0 rgba(255,255,255,.9)}
+
+.htp-step{--htp-paper-rotate:0deg;--htp-paper-width:100%;--htp-paper-height:100%;
+  position:absolute;container-type:inline-size;
+  transition:translate .2s cubic-bezier(.2,1.3,.35,1),
+    scale .2s cubic-bezier(.2,1.3,.35,1),filter .2s ease}
+/* Figma rotates only yellow papers 2/3; their captions and illustrations stay
+   level. The REST boxes are the rotated axis-aligned bounds, so recover each
+   paper's pre-rotation width/height and rotate it about the same centre. This
+   preserves both authored angles (+1.56178deg / +3.12452deg) without also
+   tilting the text, robot or timer nested in our shared DOM wrapper. */
+.htp-step:nth-of-type(2){--htp-paper-rotate:1.56178deg;
+  --htp-paper-width:97.582295%;--htp-paper-height:97.165941%}
+.htp-step:nth-of-type(3){--htp-paper-rotate:3.124524deg;
+  --htp-paper-width:95.049936%;--htp-paper-height:94.878709%}
+.htp-sq{position:absolute;left:50%;top:50%;
+  width:var(--htp-paper-width);height:var(--htp-paper-height);
+  translate:-50% -50%;rotate:var(--htp-paper-rotate);object-fit:fill;
+  filter:drop-shadow(0 min(.42vw,.75vh) min(.3vw,.53vh) rgba(0,0,0,.35))}
+/* Each caption uses its own Figma text rectangle. Several authored layers
+   deliberately overflow a fixed 63px-high box (most visibly Party's three
+   lines), so the inline geometry is the text box's top/left/size rather than
+   a centre point derived from however many lines the browser happened to
+   wrap. Font size and line height are both cqw values from that column. */
+.htp-lab{position:absolute;text-align:center;
+  color:#17356f;white-space:nowrap;overflow:visible;
+  text-shadow:.5cqw .5cqw 0 rgba(255,255,255,.55)}
+/* the cards are inert illustrations, so the whole step reacts as one paper */
+@media (prefers-reduced-motion:no-preference){
+  .htp-step:hover{translate:0 calc(-1 * min(.5vw,.89vh));scale:1.035;
+    filter:brightness(1.04)}
+}
+
+/* step 1: the word card in miniature. Figma stretches this paper to 2.238,
+   not its natural 4.507 — take the aspect from the RECTANGLE. */
+.htp-word{position:absolute;container-type:inline-size}
+.htp-word-bg{display:block;width:100%;aspect-ratio:2.238;object-fit:fill;
+  filter:drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.htp-word-fill{position:absolute;left:3.46%;top:11.6%;width:46.9%;height:76.8%;
+  object-fit:fill}
+.htp-word span{position:absolute;left:0;top:49.9%;width:100%;text-align:center;
+  translate:0 -50%;font-size:29.63cqw;line-height:1;color:#17356f;
+  text-shadow:1.2cqw 1.2cqw 0 rgba(255,255,255,.9)}
+
+/* step 2 */
+.htp-pose{position:absolute;aspect-ratio:1.3184;object-fit:fill}
+
+/* step 3: the same award paper and the same cqw type as the live payoff */
+.htp-award{position:absolute;container-type:inline-size}
+.htp-award img{display:block;width:100%;aspect-ratio:2.098;object-fit:fill;
+  filter:drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.htp-award span{position:absolute;left:0;width:100%;text-align:center;
+  translate:0 -50%;line-height:1;color:#1b7532;white-space:nowrap;
+  text-shadow:.6cqw .6cqw 0 rgba(0,0,0,.18)}
+.htp-award .aw-got{top:19.8%;font-size:7.8cqw}
+.htp-award .aw-pts{top:47.3%;font-size:18.93cqw}
+.htp-award .aw-lbl{top:75.6%;font-size:7.8cqw}
+
+/* ---- mode-scoped column content (data-mode: ai | 1v1 | party) ----
+   The chrome above (backing/title/three squares/READY) is pixel-identical
+   across Figma's three components (268:596, 312:642, 312:641); only what
+   sits inside each torn-paper square differs, and by how much per column —
+   so rather than three parallel DOMs, every mode-specific piece carries
+   data-htp-for and only #howToPlay's own data-mode picks which show. */
+[data-htp-for]{display:none}
+#howToPlay[data-mode="ai"]    [data-htp-for~="ai"]{display:block}
+#howToPlay[data-mode="1v1"]   [data-htp-for~="1v1"]{display:block}
+#howToPlay[data-mode="party"] [data-htp-for~="party"]{display:block}
+
+/* 1v1/Party's captions run longer than Solo's two-word originals and wrap to
+   two lines rather than the single nowrap line the first three used.
+   Namespaced .htp-wrap, not .wrap — .wrap is the page-layout wrapper
+   (theme.css, min-height:100vh) and collides silently on class name alone. */
+.htp-lab.htp-wrap{white-space:normal}
+
+/* col 2 (1v1/Party) and col 3 (Solo) use static body/face composites. These
+   are square image-fill groups in the tutorial components, not the
+   tall 520×610 live gameplay rig. Reusing .grobot's aspect ratio made every
+   instructional mascot 33–34 design pixels too tall. */
+.htp-rig{position:absolute;aspect-ratio:1}
+.htp-rig .rb-body{position:absolute;inset:0;width:100%;height:100%;
+  filter:drop-shadow(0 min(.3vw,.53vh) min(.34vw,.6vh) rgba(0,0,0,.34))}
+.htp-rig .rb-face{position:absolute;object-fit:fill}
+.htp-rig-thinking .rb-face{left:35.047%;top:20.561%;width:30.453%;height:21.028%}
+.htp-rig-thumbsup .rb-face{left:35.348%;top:20.975%;width:29.309%;height:18.318%}
+
+/* col 3 (1v1 only): the mini word-timer card, same paper/aspect-from-rect
+   convention as the live .sp-wtimer, just this instance's own Figma rect
+   (257x117.21, not the live HUD card's 252px/2.250) and the matching cqw
+   type — this component scales identically wherever it's placed. */
+.htp-timer{position:absolute;container-type:inline-size}
+.htp-timer img{display:block;width:100%;aspect-ratio:257/117.21;object-fit:fill;
+  filter:drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.htp-timer span{position:absolute;left:18.527%;width:57.245%;text-align:center;
+  color:#17356f;line-height:23.41cqw;text-shadow:1.19cqw 1.19cqw 0 rgba(255,255,255,.9)}
+.htp-timer .htp-tlab{top:0;font-family:var(--f-sign);font-weight:800;
+  font-size:11.88cqw;white-space:nowrap;word-spacing:.16em}
+.htp-timer .htp-tval{top:38.542%;font-size:22.06cqw}
+
+/* col 3 (Solo only): the mini TIMES UP chip — the same guess-card paper and
+   clock icon the live board already uses, at a bespoke small size. Figma
+   left-aligns this one's copy against the clock rather than centering it. */
+.htp-timesup{position:absolute;container-type:inline-size}
+.htp-timesup .htp-tu-bg{display:block;width:100%;aspect-ratio:2.724;object-fit:fill;
+  filter:drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
+.htp-timesup .htp-tu-clock{position:absolute;left:1.74%;top:20.7%;width:20.29%;
+  aspect-ratio:1;background:#f28d40;
+  /* Figma node I309:558;245:896 filters the shared white clock fill orange.
+     Use that rendered color through the source alpha instead of showing the
+     raw white PNG; the hard .727px shadow remains a separate node effect. */
+  -webkit-mask:url("../assets/ui/figma/sp-clock.png") center/contain no-repeat;
+  mask:url("../assets/ui/figma/sp-clock.png") center/contain no-repeat;
+  filter:drop-shadow(.67cqw .67cqw 0 rgba(0,0,0,.5))}
+.htp-timesup > span:not(.htp-tu-clock){position:absolute;left:22.03%;top:48.4%;width:76.5%;
+  translate:0 -50%;text-align:left;font-size:14.68cqw;line-height:1;
+  color:#17356f;text-shadow:.67cqw .67cqw 0 rgba(255,255,255,.9)}
+
+.htp-ready{position:absolute;left:28.125%;top:77.605%;width:43.75%;height:22.395%;
+  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size;
+  transition:translate .18s cubic-bezier(.2,1.3,.35,1),
+    scale .18s cubic-bezier(.2,1.3,.35,1),filter .18s ease}
+.htp-ready img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  filter:drop-shadow(0 min(.5vw,.89vh) min(.36vw,.64vh) rgba(0,0,0,.38))}
+.htp-ready span{position:absolute;left:0;top:49.5%;width:100%;translate:0 -50%;
+  text-align:center;font-size:16.77cqw;line-height:1;color:#fff;
+  text-shadow:1.1cqw 1.1cqw 0 rgba(0,0,0,.3)}
+.htp-ready:hover,.htp-ready:focus-visible{
+  translate:0 calc(-1 * min(.34vw,.6vh));scale:1.035;filter:brightness(1.06)}
+.htp-ready:active{scale:.975;filter:brightness(.97)}
+.htp-ready:focus-visible{outline:min(.208vw,.37vh) solid #fff;
+  outline-offset:min(.28vw,.5vh)}
+
+@media (prefers-reduced-motion:reduce){
+  .htp,.htp-panel{animation:none}
+}
+/* portrait / very tall viewports: the panel is width-bound, so let it use
+   nearly the full width rather than shrinking against a height it never hits */
+@media (max-aspect-ratio:1/1){ .htp-panel{width:min(94vw,152vh)} }
+
+/* ================= ENABLE CAMERA — the boot gate =================
+   Figma "ENABLE CAMERA SCREEN" 322:717, 1539x1460 (aspect 1.0541). Every
+   left/top/width here is a percentage of THAT component, and every font-size
+   is its Figma px over 1539 — the panel is a container, so 1cqw is 1% of it
+   and the type reproduces at any size exactly as Figma authors it.
+
+   Two things overflow the component on purpose and must not be clipped: the
+   title card hangs off the top (T0.685) and the robot off the right
+   (69.526 + 32.099 = 101.6%).
+
+   The scrim is lighter than HOW TO PLAY's. HOW TO PLAY sits over a live board
+   the player must not act on; this sits over a Home that is deliberately
+   mid-assembly (see .home-held in screens.css) and dimming it to the same
+   depth hides the very thing it is there to show. */
+.cg{position:fixed;inset:0;z-index:92;display:grid;place-items:center;
+  padding:2vh 2vw;
+  background:radial-gradient(circle at 50% 46%,rgba(9,22,62,.34) 0 34%,
+    rgba(9,22,62,.58) 100%);
+  backdrop-filter:brightness(.84) saturate(1.02);
+  -webkit-backdrop-filter:brightness(.84) saturate(1.02);
+  animation:htpScrim .3s ease-out both}
+.cg.hidden{display:none}
+
+/* .cg's own 2vh padding plus the component's near-square 1.054 aspect leave
+   room under the card for the boot readout, which is not part of 322:717. */
+.cg-panel{position:relative;container-type:inline-size;overflow:visible;
+  width:min(66vw,88vh,1539px);aspect-ratio:1539/1460;
+  font-family:var(--f-lobby);font-weight:400;color:#17356f;
+  animation:htpDrop .52s cubic-bezier(.16,1.5,.32,1) both}
+
+/* Every paper on this component carries the same authored DROP_SHADOW —
+   rgba(0,0,0,.35), y 7, blur 4 on a 1539px frame. drop-shadow, never
+   box-shadow: these are torn papers in transparent bounding boxes. */
+.cg-panel img{position:absolute;display:block;
+  filter:drop-shadow(0 .455cqw .26cqw rgba(0,0,0,.35))}
+
+.cg-paper{left:0;top:16.301%;width:100%;aspect-ratio:1539/1211;object-fit:fill}
+/* the same Title Card instance (34:2) Home hangs off its own top-left */
+.cg-panel img.cg-titlecard{left:28.135%;top:.685%;width:42.122%;aspect-ratio:1.3982;
+  object-fit:cover;
+  filter:drop-shadow(0 .373cqw .213cqw rgba(0,0,0,.35))}
+/* These are rendered INSTANCE exports, not the raw imageRefs. Both source
+   images live on large transparent canvases and Figma applies an imageTransform
+   plus a strong instance rotation; stretching those raw PNGs produced the two
+   tiny, almost-horizontal scraps this screen used to show. Rendering 321:667
+   and 321:666 bakes crop + rotation + shadow together. Their CSS rectangles
+   are therefore the nodes' absoluteRenderBounds relative to 322:717, and no
+   second browser drop-shadow is applied. */
+.cg-panel img.cg-tape{filter:none;object-fit:fill}
+.cg-tape-y{left:27.5236%;top:0;width:13.1335%;aspect-ratio:405/383}
+.cg-tape-c{left:59.1293%;top:20.4794%;width:13.8453%;aspect-ratio:427/312}
+
+/* Figma gives this line a 98.62px line box for 50px type, i.e. the glyphs sit
+   centred in a box twice their height. Centre it rather than reproducing the
+   leading, so a fitted (smaller) size stays on the same optical line. */
+.cg-title{position:absolute;left:16.959%;top:28.151%;width:69.396%;height:6.781%;
+  display:grid;align-content:center;align-content:safe center;
+  text-align:center;white-space:nowrap;
+  font-size:3.249cqw;line-height:1.06;letter-spacing:.0325cqw;
+  text-shadow:.325cqw .325cqw 0 rgba(255,255,255,.9)}
+
+/* three identical torn strips (321:658/676/678, one shared imageRef) */
+.cg-row{left:13.06%;width:73.879%;aspect-ratio:4.679;object-fit:fill}
+.cg-row1{top:34.315%}
+.cg-row2{top:50.959%}
+.cg-row3{top:67.603%}
+
+/* scaleMode FILL on all three -> object-fit:cover, and each keeps its own
+   authored rectangle: they are different shapes, not one icon slot */
+.cg-panel img.cg-icon{object-fit:cover;filter:none}
+.cg-icon-cam {left:18.129%;top:37.397%;width:16.439%;aspect-ratio:1.6536}
+.cg-icon-hi5 {left:16.959%;top:52.671%;width:16.049%;aspect-ratio:1.479}
+.cg-icon-room{left:16.504%;top:66.986%;width:17.024%;aspect-ratio:1}
+
+.cg-head{position:absolute;width:46.589%;height:6.781%;
+  display:grid;align-content:center;align-content:safe center;
+  font-size:3.249cqw;line-height:1.06;letter-spacing:.0325cqw;
+  text-shadow:.325cqw .325cqw 0 rgba(255,255,255,.9)}
+.cg-head1{left:36.452%;top:36.37%}
+.cg-head2{left:35.802%;top:52.808%}
+.cg-head3{left:35.802%;top:69.178%}
+
+/* The running copy is Beiruti 800 with a 40px line box on a 1539px frame.
+   Figma's boxes are one line high and its sample copy overflows them, so the
+   height here is the authored top plus room for the wrap the browser
+   genuinely needs — the text is centred on the authored line either way. */
+.cg-sub{position:absolute;
+  display:grid;align-content:center;align-content:safe center;
+  font-family:var(--f-sign);font-weight:800;
+  line-height:2.599cqw;letter-spacing:.0325cqw;text-wrap:pretty;
+  text-shadow:.325cqw .325cqw 0 rgba(255,255,255,.65)}
+.cg-sub1{left:36.452%;top:41.5%;width:46.589%;height:8%;font-size:3.249cqw}
+.cg-sub2{left:35.802%;top:57.8%;width:49.123%;height:8%;font-size:3.054cqw}
+.cg-sub3{left:35.802%;top:74.4%;width:40.481%;height:8%;font-size:3.249cqw}
+
+/* ---- the boot readout: ON THE SCRIM, not on the paper ----
+   322:717 is a finished composition — three rows butted against the button
+   with about 22 authored pixels between them. There is no slot on it for a
+   progress strip or an error line, and inventing one means covering the
+   robot or a row of the design. Both therefore live in their own band just
+   below the card, unmistakably chrome rather than part of the paper, and
+   they share the slot: an error replaces the progress, because once the
+   camera has been refused the download finishing is not the news. */
+.cg-status{position:absolute;left:6%;top:100.9%;width:88%;text-align:center;
+  font-family:var(--f-sign);font-weight:800}
+.cg-note{display:none;font-size:2.3cqw;line-height:1.3;color:#ffc4b2;
+  text-shadow:0 .12cqw .3cqw rgba(0,0,0,.5)}
+.cg[data-state="blocked"] [data-cg-note="blocked"],
+.cg[data-state="failed"]  [data-cg-note="failed"]{display:block}
+.cg[data-state] .cg-load{display:none}
+
+/* THE ROBOT (322:713 body_point_bottom_left + 322:714 face_joyful).
+   `point` is unique to this screen: he is pointing DOWN-LEFT, at the button.
+   The other five bodies are the RObot Sprites section's raw square fills —
+   1254x1254, same framing, so one rule dresses all six — and the faces are
+   the shared union-box rb-face-* set the whole app already uses.
+
+   The face rectangle is NOT the authored 322:714 rect. That rect is sized to
+   face_joyful's RAW canvas (aspect 1.60); the union-box exports are 1.744 and
+   cropped tight to their ink. The values below are the rect that lands the
+   union art's ink exactly where Figma draws the raw art's ink, and the
+   per-pose left/top are each sprite's measured head-screen centre relative to
+   `point`. Eyeballing either one puts the eyes off the screen. */
+ /* z-index 4 because 322:713 is the LAST child of the component: Figma
+    paints him over the ENABLE CAMERA paper, and his pointing hand crossing
+    in front of it is the whole gesture. He is pointer-events:none, so
+    standing on the button costs it nothing. */
+.cg-rig{position:absolute;left:69.526%;top:66.164%;width:32.099%;z-index:4;
+  aspect-ratio:1;pointer-events:none}
+.cg-rig-body{left:0;top:0;width:100%;height:100%;object-fit:cover}
+.cg-panel img.cg-rig-face{left:41.503%;top:24.711%;width:22.799%;aspect-ratio:300/172;
+  object-fit:fill;filter:none}
+.cg-rig[data-pose="idle"]      .cg-rig-face{left:38.832%;top:25.110%}
+.cg-rig[data-pose="present"]   .cg-rig-face{left:42.659%;top:24.950%}
+.cg-rig[data-pose="thumbsup"]  .cg-rig-face{left:38.832%;top:25.110%}
+.cg-rig[data-pose="surprised"] .cg-rig-face{left:38.832%;top:25.030%}
+.cg-rig[data-pose="thinking"]  .cg-rig-face{left:38.951%;top:24.870%}
+@media (prefers-reduced-motion:no-preference){
+  .cg-rig{animation:cgBob 2.9s ease-in-out infinite;transform-origin:50% 96%}
+}
+@keyframes cgBob{
+  0%,100%{translate:0 0;rotate:-1deg}
+  50%    {translate:0 -1.5%;rotate:1deg}}
+
+.cg-enable{position:absolute;left:17.414%;top:85.753%;width:54.451%;
+  aspect-ratio:838/208;z-index:3;
+  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size;
+  transition:translate .18s cubic-bezier(.2,1.3,.35,1),
+    scale .18s cubic-bezier(.2,1.3,.35,1),filter .18s ease}
+.cg-enable img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  /* 322:712's own shadow: y 7, blur 4 on an 838px component */
+  filter:drop-shadow(0 .835cqw .477cqw rgba(0,0,0,.35))}
+.cg-enable span{position:absolute;left:0;top:49.5%;width:100%;translate:0 -50%;
+  text-align:center;font-size:9.1cqw;line-height:1;letter-spacing:.1cqw;
+  color:#17356f;text-shadow:.6cqw .6cqw 0 rgba(255,255,255,.9)}
+.cg-enable:not(:disabled):hover,.cg-enable:focus-visible{
+  translate:0 calc(-1 * min(.34vw,.6vh));scale:1.035;filter:brightness(1.06)}
+.cg-enable:not(:disabled):active{scale:.975;filter:brightness(.96)}
+.cg-enable:focus-visible{outline:min(.208vw,.37vh) solid #fff;
+  outline-offset:min(.28vw,.5vh)}
+/* Between the click and the browser's own prompt the engine may still be
+   downloading. Say so on the button rather than leaving one that visibly did
+   nothing — and stop it taking a second click while it waits. */
+.cg[data-pending] .cg-enable{pointer-events:none;cursor:wait;filter:saturate(.72)}
+@media (prefers-reduced-motion:no-preference){
+  .cg[data-pending] .cg-enable{animation:cgWait 1.15s ease-in-out infinite}
+  /* The paper twitches every few seconds until it is pressed, so the one
+     control on the card is never mistaken for part of the illustration. It
+     animates `rotate`, which the hover lift's translate/scale do not touch,
+     so the two compose instead of one killing the other. */
+  .cg:not([data-pending]) .cg-enable{animation:cgBeckon 3.4s ease-in-out infinite}
+}
+@keyframes cgWait{0%,100%{opacity:.72}50%{opacity:1}}
+@keyframes cgBeckon{0%,72%,100%{rotate:0deg}84%{rotate:-.9deg}92%{rotate:.7deg}}
+
+/* The engine really is downloading behind this card, so the strip reports the
+   stages engine.js actually reaches (setBootProgress) rather than sweeping
+   decoratively. A fake bar over a real wait is the only thing worse than no
+   bar. */
+.cg-load-lab{display:block;font-size:2.08cqw;line-height:1.2;
+  letter-spacing:.1em;color:#cfdcf7;
+  text-shadow:0 .12cqw .3cqw rgba(0,0,0,.5)}
+.cg-load-track{display:block;margin:1cqw auto 0;width:34%;height:.8cqw;
+  border-radius:999px;background:rgba(255,255,255,.22);overflow:hidden}
+.cg-load-fill{display:block;height:100%;width:6%;border-radius:999px;
+  background:linear-gradient(90deg,#f7b91f,#ffd04a);
+  transition:width .45s cubic-bezier(.3,1,.4,1)}
+.cg[data-ready] .cg-load-lab{color:#a9e8b6}
+
+@media (prefers-reduced-motion:reduce){
+  .cg,.cg-panel{animation:none}
+}
+/* portrait / very tall viewports: the panel is width-bound there, so let it
+   use nearly the full width rather than shrinking against a height it never
+   hits — the robot's 1.6% right overhang is inside .cg's own 2vw padding. */
+@media (max-aspect-ratio:1/1){ .cg-panel{width:min(92vw,82vh)} }
+
+
 /* The toast. It had NO stylesheet at all — it laid out static below the fold,
    so every message the game has ever sent (room errors, "X left the party",
    the skip penalty, SUDDEN DEATH, copy-failed fallbacks) was invisible.

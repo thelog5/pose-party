@@ -21,9 +21,10 @@ const ENV = {
   ROUNDS: "3",
   WORD_MS: "1200",
   PRECOUNT_MS: "250",
+  TUTORIAL_TIMEOUT_MS: "1000",
   BETWEEN_ROUNDS_MS: "150",
   RATE_JOIN: "50",
-  RATE_CREATE: "8",
+  RATE_CREATE: "10",
 };
 
 let fails = 0;
@@ -98,12 +99,39 @@ try {
   r = await emit(B, "room:settings", { settings: { matchSecs: 120, wordSecs: 15 } });
   ok(r.error === "not-host", `non-host cannot change settings (${r.error})`);
 
-  const aStart = once(A, "match:start"), bStart = once(B, "match:start");
+  const aPrepare = once(A, "match:prepare"), bPrepare = once(B, "match:prepare");
   r = await emit(A, "match:begin", {});
   ok(r.ok === true, "host begins the match");
+  const [prepA, prepB] = await Promise.all([aPrepare, bPrepare]);
+  ok(prepA.tutorialId === prepB.tutorialId &&
+    prepA.tutorialTimeoutAt > Date.now(),
+    "both clients receive the same bounded tutorial barrier");
+
+  let earlyRound = false;
+  const earlyRoundProbe = () => { earlyRound = true; };
+  A.on("round:start", earlyRoundProbe);
+  await sleep(350); // longer than PRECOUNT_MS: the old flow had dealt by now
+  A.off("round:start", earlyRoundProbe);
+  ok(!earlyRound, "no round is dealt while HOW TO PLAY is awaiting acknowledgements");
+
+  const aStart = once(A, "match:start"), bStart = once(B, "match:start");
+  const staleTutorial = await emit(A, "match:tutorial-ready",
+    { tutorialId:"0123456789abcdef" });
+  ok(staleTutorial.error === "stale-tutorial",
+    "a stale tutorial token cannot release a later match");
+  r = await emit(A, "match:tutorial-ready", { tutorialId: prepA.tutorialId });
+  ok(r.ok === true && r.ready === 1 && !r.started,
+    "one tutorial acknowledgement does not release the other player");
+  const duplicateReady = await emit(A, "match:tutorial-ready",
+    { tutorialId: prepA.tutorialId });
+  ok(duplicateReady.ready === 1 && !duplicateReady.started,
+    "duplicate tutorial acknowledgement is idempotent");
+  r = await emit(B, "match:tutorial-ready", { tutorialId: prepB.tutorialId });
+  ok(r.ok === true && r.started === true,
+    "the final tutorial acknowledgement releases the synchronized count-in");
   const [ms] = await Promise.all([aStart, bStart]);
   ok(ms.matchEndsAt > ms.startAt, "match:start carries the match deadline");
-  ok(ms.startAt > Date.now() - 100, "startAt in the future");
+  ok(ms.startAt - Date.now() > 140, "startAt remains a full shared grace count in the future");
   const bobName = ms.players.find(p => p.name !== "Alice")?.name;
   ok(bobName === "Bobscript", `name sanitized server-side ("${bobName}")`);
 
@@ -209,10 +237,16 @@ try {
   ok(r.ok === true && r.ready === 0 && r.mine === false,
     "the 1v1 rematch vote is an undoable toggle");
 
-  const rematchStartA = once(A, "match:start");
-  const rematchStartB = once(B, "match:start");
+  const rematchPrepareA = once(A, "match:prepare");
+  const rematchPrepareB = once(B, "match:prepare");
   await emit(A, "match:rematch", {});
   r = await emit(B, "match:rematch", {});
+  const [rematchPrepA, rematchPrepB] =
+    await Promise.all([rematchPrepareA, rematchPrepareB]);
+  const rematchStartA = once(A, "match:start");
+  const rematchStartB = once(B, "match:start");
+  await emit(A, "match:tutorial-ready", { tutorialId:rematchPrepA.tutorialId });
+  await emit(B, "match:tutorial-ready", { tutorialId:rematchPrepB.tutorialId });
   const [rematchPayloadA, rematchPayloadB] =
     await Promise.all([rematchStartA, rematchStartB]);
   ok(r.started === true &&
@@ -240,6 +274,20 @@ try {
   r = await emit(D, "rtc:signal", { data: { blob: "x".repeat(30000) } });
   ok(r.error === "bad-payload", `oversized signal rejected (${r.error})`);
 
+  const dRoomReady = once(D, "room:ready");
+  await emit(D, "player:ready", {});
+  await emit(E, "player:ready", {});
+  await dRoomReady;
+  const fallbackPrepare = once(D, "match:prepare");
+  const fallbackStart = once(D, "match:start", 3000);
+  const fallbackBeganAt = Date.now();
+  await emit(D, "match:begin", {});
+  await fallbackPrepare;
+  const fallbackPayload = await fallbackStart;
+  ok(Date.now() - fallbackBeganAt >= 900 &&
+    fallbackPayload.startAt > Date.now(),
+    "bounded tutorial fallback prevents a missing acknowledgement from deadlocking the room");
+
   const peerLeft = once(E, "peer:left");
   D.disconnect();
   await peerLeft;
@@ -262,8 +310,13 @@ try {
   const hReady = once(H, "room:ready");
   await emit(H, "player:ready", {}); await emit(I, "player:ready", {});
   await hReady;
-  const hStart = once(H, "match:start");
+  const hPrepare = once(H, "match:prepare");
+  const iPrepare = once(I, "match:prepare");
   await emit(H, "match:begin", {});
+  const [hp, ip] = await Promise.all([hPrepare, iPrepare]);
+  const hStart = once(H, "match:start");
+  await emit(H, "match:tutorial-ready", { tutorialId:hp.tutorialId });
+  await emit(I, "match:tutorial-ready", { tutorialId:ip.tutorialId });
   const hs = await hStart;
   ok(hs.matchEndsAt - Date.now() <= 10500, "deadline ≈ startAt + 10s");
   // Trigger a chase just before the 10s match deadline. It must own its full
@@ -333,10 +386,12 @@ try {
   r = await emit(P[1], "party:start", {});
   ok(r.error === "not-host", `non-host start refused (${r.error})`);
   const startedAll = P.map(s => once(s, "party:started"));
+  const preparedAll = P.map(s => once(s, "party:match"));
   r = await emit(P[0], "party:start", {});
   ok(r.ok === true, "host start accepted at 3v3");
   await Promise.all(startedAll);
   ok(true, "party:started broadcast to all six");
+  const prepared = await Promise.all(preparedAll);
 
   // targeted signaling
   const sigTo = roster.players.find(p => p.name === "P2").id;
@@ -346,11 +401,17 @@ try {
   const psig = await gotSig;
   ok(psig.data.sdp === "v=0 party" && !!psig.from, "peer got targeted signal with sender id");
 
-  // leave updates roster
+  // A tutorial leaver is removed from the barrier as well as the roster. If
+  // every survivor already accepted, their synchronized countdown releases
+  // immediately instead of waiting for the bounded fallback.
+  for(let i = 0; i < P.length - 1; i++)
+    await emit(P[i], "party:tutorial-ready", { tutorialId:prepared[i].tutorialId });
+  const survivorCountdown = once(P[0], "party:countdown");
   const rosterAfter = once(P[0], "party:roster");
   P[5].disconnect();
-  const ros2 = await rosterAfter;
-  ok(ros2.players.length === 5, "roster shrank on disconnect");
+  const [ros2, survivorStart] = await Promise.all([rosterAfter, survivorCountdown]);
+  ok(ros2.players.length === 5 && survivorStart.startAt > Date.now(),
+    "tutorial disconnect shrinks the roster and releases ready survivors together");
   for (const s of P) s.disconnect();
 
   /* The 2v2 gate needs its own room: the six-player room above has already
@@ -364,6 +425,34 @@ try {
   r = await emit(GATE[0], "party:start", {});
   ok(r.error === "need-teams", `start refused below 2v2 (${r.error})`);
   for (const s of GATE) s.disconnect();
+
+  // The complementary tutorial-disconnect path ends safely if a side empties.
+  // It must never release an unopposed countdown or wait for the fallback.
+  const DISC = [];
+  for(let i = 0; i < 4; i++) DISC.push(connect(URL, { transports:["websocket"] }));
+  await Promise.all(DISC.map(s => once(s, "connect")));
+  r = await emit(DISC[0], "party:create", { name:"D0", labels:PARTY_LABELS });
+  const dcode = r.code;
+  let droster = r.roster;
+  for(let i = 1; i < DISC.length; i++){
+    r = await emit(DISC[i], "party:join",
+      { code:dcode, name:"D" + i, labels:PARTY_LABELS });
+    droster = r.roster;
+  }
+  const discPrepared = DISC.map(s => once(s, "party:match"));
+  await emit(DISC[0], "party:start", {});
+  await Promise.all(discPrepared);
+  const blue = DISC.filter(s =>
+    droster.players.find(p => p.id === s.id)?.team === "blue");
+  const orange = DISC.find(s =>
+    droster.players.find(p => p.id === s.id)?.team === "orange");
+  const endedOnEmpty = once(orange, "party:end");
+  blue[0].disconnect();
+  blue[1].disconnect();
+  const emptyEnd = await endedOnEmpty;
+  ok(!!emptyEnd.scores && emptyEnd.rematch?.total === 2,
+    "empty team during tutorial ends safely for the surviving side");
+  for(const s of DISC) s.disconnect();
 
   // ---- party match: simultaneous play, placement, completion bonus, chase ----
   console.log("party match:");
@@ -381,12 +470,38 @@ try {
   ok(r.ok === true, "host started a 2v2 party match");
   const pm = await matchAll[0];
   await Promise.all(matchAll);
-  ok(pm.matchEndsAt > pm.startAt, "party:match carries the match clock");
+  ok(!!pm.tutorialId && pm.tutorialTimeoutAt > Date.now(),
+    "party:match opens a bounded tutorial barrier before timing begins");
   const byId = Object.fromEntries(pm.roster.players.map(p => [p.id, p]));
   const teamOfSocket = s => byId[s.id].team;
   const blueSockets = M.filter(s => teamOfSocket(s) === "blue");
   const orangeSockets = M.filter(s => teamOfSocket(s) === "orange");
   ok(blueSockets.length === 2 && orangeSockets.length === 2, "2v2 teams formed");
+
+  let earlyPartyRound = false;
+  const earlyPartyProbe = () => { earlyPartyRound = true; };
+  M[0].on("party:round", earlyPartyProbe);
+  await sleep(350);
+  M[0].off("party:round", earlyPartyProbe);
+  ok(!earlyPartyRound, "Party deals no word before all current players accept HOW TO PLAY");
+
+  const partyCountdowns = M.map(s => once(s, "party:countdown"));
+  for(let i = 0; i < M.length - 1; i++){
+    r = await emit(M[i], "party:tutorial-ready", { tutorialId:pm.tutorialId });
+    ok(r.ok === true && !r.started,
+      `Party acknowledgement ${i + 1}/4 keeps the barrier closed`);
+  }
+  const dupPartyReady = await emit(M[0], "party:tutorial-ready",
+    { tutorialId:pm.tutorialId });
+  ok(dupPartyReady.ready === 3 && !dupPartyReady.started,
+    "duplicate Party acknowledgement is idempotent");
+  r = await emit(M[3], "party:tutorial-ready", { tutorialId:pm.tutorialId });
+  ok(r.started === true, "the final Party acknowledgement releases everyone together");
+  const partyCountdown = await partyCountdowns[0];
+  await Promise.all(partyCountdowns);
+  ok(partyCountdown.matchEndsAt > partyCountdown.startAt &&
+    partyCountdown.startAt - Date.now() > 140,
+    "Party countdown carries one future shared start and match deadline");
 
   const round = await once(M[0], "party:round", 8000);
   ok(!!round.roundId && !!round.word, `party round dealt "${round.word}"`);

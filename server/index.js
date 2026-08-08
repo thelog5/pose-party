@@ -141,6 +141,14 @@ io.on("connection", socket => {
     cb(res);
   });
 
+  socket.on("match:tutorial-ready", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload) || typeof payload.tutorialId !== "string")
+      return cb({ error: "bad-payload" });
+    cb(store.matchTutorialReady(socket.id, payload.tutorialId));
+  });
+
   socket.on("match:rematch", (payload, cb) => {
     cb = ack(cb);
     if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
@@ -216,6 +224,13 @@ io.on("connection", socket => {
     const res = store.partyStart(socket.id);
     log(`party start by ${socket.id.slice(0,6)} -> ${res.error ? "ERROR " + res.error : "ok"}`);
     cb(res);
+  });
+  socket.on("party:tutorial-ready", (payload, cb) => {
+    cb = ack(cb);
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload) || typeof payload.tutorialId !== "string")
+      return cb({ error: "bad-payload" });
+    cb(store.partyTutorialReady(socket.id, payload.tutorialId));
   });
   socket.on("party:signal", (payload, cb) => {
     cb = ack(cb);

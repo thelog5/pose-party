@@ -59,7 +59,7 @@ export function createRoomStore({ config, emit }){
         matchMs: settings?.matchMs ?? config.matchMs,
         wordMs: settings?.wordMs ?? config.wordMs,
       },
-      phase: "lobby",              // lobby | starting | round | chase | sudden | between | done
+      phase: "lobby",              // lobby | tutorial | starting | round | chase | sudden | between | done
       roundNum: 0,
       roundId: null,
       word: null,
@@ -165,19 +165,67 @@ export function createRoomStore({ config, emit }){
       p.score = 0;
       p.ready = false;
     }
-    room.phase = "starting";
+    room.phase = "tutorial";
     room.deck = shuffledDeck(room);
     room.matchExpired = false;
     room.suddenDeath = false;
     room.firstClaim = null;
+    room.tutorialId = crypto.randomBytes(8).toString("hex");
+    room.tutorialReady = new Set();
+    room.tutorialTimeoutAt = Date.now() + config.tutorialTimeoutMs;
+    for(const p of room.players)
+      emit(p.id, "match:prepare", {
+        tutorialId: room.tutorialId,
+        tutorialTimeoutAt: room.tutorialTimeoutAt,
+        matchMs: room.settings.matchMs,
+        players: scoresPayload(room),
+      });
+    /* The normal path is every client acknowledging the tutorial. This is a
+       safety release only: a crashed/backgrounded tab cannot hold the other
+       player forever, and the full synchronized count-in still follows. */
+    room.timer = setTimeout(() => releaseMatchCountdown(room),
+      config.tutorialTimeoutMs);
+  }
+
+  function releaseMatchCountdown(room){
+    if(!rooms.has(room.code) || room.phase !== "tutorial") return false;
+    clearTimeout(room.timer);
+    room.phase = "starting";
     const startAt = Date.now() + config.preCountMs;
     /* time-based mode: the match clock starts when round 1 does */
     room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
-      emit(p.id, "match:start", { startAt, matchEndsAt: room.matchEndsAt, players: scoresPayload(room) });
+      emit(p.id, "match:start", {
+        tutorialId: room.tutorialId,
+        startAt,
+        matchEndsAt: room.matchEndsAt,
+        players: scoresPayload(room),
+      });
     room.timer = setTimeout(() => startRound(room), config.preCountMs);
     room.matchTimer = setTimeout(() => onMatchDeadline(room),
       Math.max(0, room.matchEndsAt - Date.now()));
+    return true;
+  }
+
+  function matchTutorialReady(socketId, tutorialId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "1v1") return { error: "not-in-room" };
+    if(typeof tutorialId !== "string" || tutorialId !== room.tutorialId)
+      return { error: "stale-tutorial" };
+    if(room.phase !== "tutorial"){
+      /* A duplicate can cross the release broadcast. Treat it as the same
+         idempotent acknowledgement instead of surfacing a false failure. */
+      if(room.tutorialReady?.has(socketId) &&
+         ["starting", "round", "chase", "sudden", "between"].includes(room.phase))
+        return { ok: true, started: true,
+          ready: room.tutorialReady.size, total: room.players.length };
+      return { error: "match-in-progress" };
+    }
+    room.tutorialReady.add(socketId);
+    const ready = room.players.filter(p => room.tutorialReady.has(p.id)).length;
+    const total = room.players.length;
+    const started = ready === total && releaseMatchCountdown(room);
+    return { ok: true, ready, total, started: !!started };
   }
 
   function startRound(room){
@@ -588,20 +636,41 @@ export function createRoomStore({ config, emit }){
   }
 
   function startPartyMatch(room){
-    room.phase = "starting";
+    clearTimeout(room.timer);
+    clearTimeout(room.matchTimer);
+    room.phase = "tutorial";
     room.deck = shuffledDeck(room);
     room.roundNum = 0;
     room.matchExpired = false;
     room.teamBonus = { blue: 0, orange: 0 };
     room.roundWins = { blue: 0, orange: 0 };
     for(const p of room.players) p.score = 0;
+    room.tutorialId = crypto.randomBytes(8).toString("hex");
+    room.tutorialReady = new Set();
+    room.tutorialTimeoutAt = Date.now() + config.tutorialTimeoutMs;
+    for(const p of room.players)
+      emit(p.id, "party:match", {
+        tutorialId: room.tutorialId,
+        tutorialTimeoutAt: room.tutorialTimeoutAt,
+        matchMs: room.settings.matchMs,
+        wordMs: room.settings.wordMs,
+        roster: partyRoster(room), scores: partyScores(room),
+      });
+    room.timer = setTimeout(() => releasePartyCountdown(room),
+      config.tutorialTimeoutMs);
+  }
+
+  function releasePartyCountdown(room){
+    if(!rooms.has(room.code) || room.phase !== "tutorial") return false;
+    clearTimeout(room.timer);
+    room.phase = "starting";
     const startAt = Date.now() + config.preCountMs;
     room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
-      emit(p.id, "party:match", {
-        startAt, matchEndsAt: room.matchEndsAt,
-        wordMs: room.settings.wordMs,
-        roster: partyRoster(room), scores: partyScores(room),
+      emit(p.id, "party:countdown", {
+        tutorialId: room.tutorialId,
+        startAt,
+        matchEndsAt: room.matchEndsAt,
       });
     room.timer = setTimeout(() => startPartyRound(room), config.preCountMs);
     room.matchTimer = setTimeout(() => {
@@ -612,6 +681,26 @@ export function createRoomStore({ config, emit }){
       if(room.phase === "round" || room.phase === "chase") return;
       endPartyMatch(room);
     }, Math.max(0, room.matchEndsAt - Date.now()));
+    return true;
+  }
+
+  function partyTutorialReady(socketId, tutorialId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    if(typeof tutorialId !== "string" || tutorialId !== room.tutorialId)
+      return { error: "stale-tutorial" };
+    if(room.phase !== "tutorial"){
+      if(room.tutorialReady?.has(socketId) &&
+         ["starting", "round", "chase", "between"].includes(room.phase))
+        return { ok: true, started: true,
+          ready: room.tutorialReady.size, total: room.players.length };
+      return { error: "match-in-progress" };
+    }
+    room.tutorialReady.add(socketId);
+    const ready = room.players.filter(p => room.tutorialReady.has(p.id)).length;
+    const total = room.players.length;
+    const started = ready === total && releasePartyCountdown(room);
+    return { ok: true, ready, total, started: !!started };
   }
 
   function startPartyRound(room){
@@ -825,6 +914,19 @@ export function createRoomStore({ config, emit }){
     }
     if(room.phase === "lobby"){ broadcastRoster(room); return; }
 
+    if(room.phase === "tutorial"){
+      room.tutorialReady?.delete(socketId);
+      /* Re-evaluate the barrier against the CURRENT roster. A player who
+         disconnects after everyone else accepted must not leave a phantom
+         acknowledgement behind and deadlock the survivors until fallback. */
+      if(!teamCount(room, "blue") || !teamCount(room, "orange"))
+        return endPartyMatch(room);
+      broadcastRoster(room);
+      if(room.players.every(p => room.tutorialReady?.has(p.id)))
+        releasePartyCountdown(room);
+      return;
+    }
+
     /* Mid-match: a side that empties ends the match. Otherwise the leaver may
        have been the only one holding up a team, so re-test completion —
        without this the round would stall until the word timer expired. */
@@ -919,9 +1021,10 @@ export function createRoomStore({ config, emit }){
     return { ok:true };
   }
 
-  return { createRoom, joinRoom, ready, begin, setSettings, claim, matchRematch, leave,
+  return { createRoom, joinRoom, ready, begin, setSettings, claim,
+           matchTutorialReady, matchRematch, leave,
            relaySignal, relayGuess, sweep,
            partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart,
-           partySignal, partyClaim, relayPartyGuess, partyRematch,
+           partyTutorialReady, partySignal, partyClaim, relayPartyGuess, partyRematch,
            _rooms: rooms };
 }

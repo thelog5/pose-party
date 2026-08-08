@@ -20,12 +20,14 @@ import { $, esc } from "./dom.js";
 import { state } from "./state.js";
 import { toast, fmtTime, fmtScore, fitMatchPaperText,
          renderRemoteMatchGuess, setCountdown, showTimesUp,
-         stopMatchFill } from "./ui.js";
+         showSuddenDeath, hideSuddenDeath, stopMatchFill,
+         MATCH_ROBOT } from "./ui.js";
+import { robotMiss } from "./robot.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
-import { showPointsAward, confettiFrom, flyPoints, greenFlash } from "./soloRound.js";
+import { confettiFrom, greenFlash } from "./soloRound.js";
 import { THRESH } from "./constants.js";
 import {
   markGuessRecognized,
@@ -38,6 +40,10 @@ import {
   setRematchUnavailable,
   showResults,
 } from "./results.js";
+import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
+import { stampSeatAward, deliverSeatAward, clearSeatAward,
+         setSeatAwardPoints, seatAwardIsUp,
+         SEAT_AWARD_HOLD_MS } from "./seatAward.js";
 
 const NAME_KEY = "poseCharadesName";
 /* time-based mode: the match runs for matchSecs total, most points wins */
@@ -395,6 +401,7 @@ function wireSocket(s){
 
   s.on("rtc:signal", ({data}={}) => { if(peer) peer.handleSignal(data); });
 
+  s.on("match:prepare", payload => onMatchPrepare(payload));
   s.on("match:start", payload => onMatchStart(payload));
   s.on("round:start", payload => onRoundStart(payload));
   s.on("round:guess", ({roundId,label,confidence}={}) =>
@@ -573,6 +580,7 @@ function resetRivalPanel(){
 /* Everything the split-screen board carries from one word to the next. Shared
    by the countdown and each new round so the two can never drift. */
 function clearMatchBoard(){
+  hideSuddenDeath();
   const stage=$("matchStage");
   if(stage){
     stage.classList.remove("you-locked","rival-locked","chase-urgent","chase-final");
@@ -583,20 +591,23 @@ function clearMatchBoard(){
   stopMatchFill();
   prepareWordFeedback($("vsWordCard"),$("v1WordFill"),THRESH,true);
   for(const id of ["myGuessTop","rivalGuessTop"]) markGuessRecognized($(id),false);
-  $("v1Award")?.classList.remove("show");
-  $("v1RivalAward")?.classList.remove("show");
+  /* Last word's papers were thrown into the score cards when it resolved, but
+     a word that ends while one is still in the air must not carry it into the
+     next — and settling it releases whatever repaint it was holding. */
+  clearSeatAward(v1Seat(false));
+  clearSeatAward(v1Seat(true));
 }
 
-function onMatchStart({startAt, matchEndsAt, players}={}){
+function onMatchPrepare({tutorialId, matchMs, players}={}){
+  if(typeof tutorialId!=="string" || !tutorialId) return;
   const myId=socket.id;
   const rec=(players||[]).find(p=>p.id!==myId);
   if(rec && rec.name) peerName=rec.name;
   if(!peer) openPeer(isHost);
 
-  state.game={ mode:"online", word:null, round:0, rounds:0,
-               matchEndsAt:perfFromServer(matchEndsAt),
-               matchLimitMs:Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
-                 settings.matchSecs*1000,
+  state.game={ mode:"online", tutorialId, word:null, round:0, rounds:0,
+               matchEndsAt:0,
+               matchLimitMs:Math.max(0,Number(matchMs)) || settings.matchSecs*1000,
                wordEnd:0, wordStart:0, wordLimitMs:settings.wordSecs*1000,
                holdSince:0, score:0, rivalScore:0,
                results:[], roundId:null, claimed:false, bestWrong:{},
@@ -612,8 +623,7 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   $("pillScore").textContent="0";
   /* time-based mode: the round pill becomes the match clock */
   document.querySelector(".statpill.round .lab").textContent="Match";
-  const initialMatchLeft=Math.min(state.game.matchLimitMs,
-    state.game.matchEndsAt-performance.now());
+  const initialMatchLeft=state.game.matchLimitMs;
   $("pillRound").textContent=fmtTime(initialMatchLeft);
   if($("v1MatchTime")) $("v1MatchTime").textContent=fmtTime(
     initialMatchLeft, {compact:true});
@@ -622,15 +632,20 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   requestAnimationFrame(fitMatchPaperText);
   applyScores(players);
 
-  const cd=$("countdown");
-  cd.classList.remove("hidden");
+  /* The board may assemble behind the modal, but neither the 3-2-1 nor a
+     word is live until every current player has acknowledged this exact
+     tutorialId. Esc counts as an acknowledgement too: it dismisses the same
+     modal decision and must not strand the peer at the barrier. */
   clearInterval(countdownTimer);
-  countdownTimer=setInterval(()=>{
-    if(gameState()!=="countdown" && gameState()!=="playing"){ clearInterval(countdownTimer); cd.classList.add("hidden"); return; }
-    const left=Math.ceil((startAt-serverNow())/1000);
-    if(left>0){ if(setCountdown(left)) blip([440]); }
-    else { clearInterval(countdownTimer); cd.classList.add("hidden"); }
-  },100);
+  $("countdown").classList.add("hidden");
+  const acknowledge=()=>{
+    if(!socket?.connected) return;
+    socket.emit("match:tutorial-ready", { tutorialId }, res=>{
+      if(res?.error && res.error!=="match-in-progress")
+        toast("Couldn’t ready the match ("+res.error+")");
+    });
+  };
+  showHowToPlay({ mode:"1v1", ready:acknowledge, back:acknowledge });
 
   state.onlineClaim = () => {
     const g=state.game;
@@ -666,9 +681,37 @@ function onMatchStart({startAt, matchEndsAt, players}={}){
   };
 }
 
+function onMatchStart({tutorialId, startAt, matchEndsAt, players}={}){
+  const game=state.game;
+  if(!game || game.mode!=="online" || game.tutorialId!==tutorialId) return;
+  game.matchEndsAt=perfFromServer(matchEndsAt);
+  game.matchLimitMs=Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
+    game.matchLimitMs;
+  applyScores(players);
+  const initialMatchLeft=Math.max(0,Math.min(game.matchLimitMs,
+    game.matchEndsAt-performance.now()));
+  $("pillRound").textContent=fmtTime(initialMatchLeft);
+  if($("v1MatchTime")) $("v1MatchTime").textContent=fmtTime(
+    initialMatchLeft,{compact:true});
+
+  const cd=$("countdown");
+  cd.classList.remove("hidden");
+  clearInterval(countdownTimer);
+  countdownTimer=setInterval(()=>{
+    if(gameState()!=="countdown" && gameState()!=="playing"){ clearInterval(countdownTimer); cd.classList.add("hidden"); return; }
+    const left=Math.ceil((startAt-serverNow())/1000);
+    if(left>0){ if(setCountdown(left)) blip([440]); }
+    else { clearInterval(countdownTimer); cd.classList.add("hidden"); }
+  },100);
+}
+
 function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
+  /* The bounded server fallback can release a room whose tab never clicked.
+     Give it the whole fallback + count-in to read, then guarantee live play
+     is never hidden behind the tutorial. */
+  hideHowToPlay();
   if(gameState()!=="playing" && !transition("playing")) return;
   game.roundId=roundId;
   game.word=String(word||"");
@@ -678,8 +721,10 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   lastGuessSentAt=0;
   lastGuessLabel="";
   lastGuessConfidence=-1;
+  const enteringSudden=!!suddenDeath && !game.suddenDeath;
   game.roundPhase=suddenDeath?"sudden":"word";
   game.suddenDeath=!!suddenDeath;
+  if(enteringSudden) showSuddenDeath();
   game.firstId=null;
   game.firstPoints=0;
   game.chaseSecond=null;
@@ -697,22 +742,27 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   if(!game.timer) game.timer=setInterval(gameTick,100);
 }
 
-/* Both halves use Solo's existing award paper. Only the latest recognition
-   stays on screen, so a quick chase reads as a clean handoff from the first
-   player to the chaser instead of two overlapping papers. */
+/* Recognition STAMPS the GOT IT paper on that player's own half — Solo's exact
+   paper, on the face that earned it. It stays there for the rest of the word,
+   which is precisely what the five-second chase needs the board to say: one
+   player is already in, the other has until the clock runs out. Nothing is
+   paid here; bankWordAwards throws both papers into their score cards when the
+   word resolves. */
+const v1Seat = rival =>
+  document.querySelector(rival?".v1-video-side.rival":".v1-video-side.you");
+
 function showMatchAward(side, points){
   const rival=side==="rival";
-  const awardId=rival?"v1RivalAward":"v1Award";
-  const pointsId=rival?"v1RivalAwardPts":"v1AwardPts";
-  const other=$(rival?"v1Award":"v1RivalAward");
-  if(other){
-    clearTimeout(other._awardTimer);
-    other.classList.remove("show");
-  }
-  if(rival && $("v1RivalAwardTitle"))
-    $("v1RivalAwardTitle").textContent=peerName.toUpperCase()+" GOT IT!";
-  showPointsAward(awardId, pointsId, points);
-  /* your win earns the paper burst; the rival's award stays informational */
+  const seat=v1Seat(rival);
+  /* The resolving packet repeats what the chase packet already said. That
+     player's paper is on their half from then; correct the figure in place
+     rather than slamming a second one on top of it. */
+  if(seatAwardIsUp(seat)){ setSeatAwardPoints(seat, points); return; }
+  stampSeatAward(seat, {
+    title:rival?peerName.toUpperCase()+" GOT IT!":"GOT IT!",
+    points,
+  });
+  /* your win earns the paper burst; the rival's stamp stays informational */
   if(!rival) confettiFrom($("vsWordCard"));
   /* grab whoever was recognised, from the feed already showing them */
   const word = state.game?.word;
@@ -720,7 +770,31 @@ function showMatchAward(side, points){
   else captureShot("me", word, $("video"), true);
 }
 
-function playLocalMatchLock(points){
+/* End of the word: every paper still on the board is carried into the card it
+   pays, and the totals are repainted only once the last one has landed. */
+function bankWordAwards(){
+  const sides=[v1Seat(false),v1Seat(true)].filter(seatAwardIsUp);
+  if(!sides.length){ releaseScorePaint(); return; }
+  holdScorePaint();
+  let landed=0;
+  sides.forEach((seat,i)=>{
+    const rival=seat.classList.contains("rival");
+    deliverSeatAward(seat,
+      $(rival?"v1RivalScore":"v1YouScore")?.closest(".v1-scorecard"), {
+        holdMs:SEAT_AWARD_HOLD_MS+i*140,
+        onLand:()=>{
+          blip([880]);
+          if(++landed<sides.length) return;
+          releaseScorePaint();
+        },
+      });
+  });
+}
+
+/* `onStamped` exists because the stamp lands on the far side of the hitstop:
+   a chaser caught on the resolving packet has no paper on the board yet when
+   onRoundResult wants to bank the word. */
+function playLocalMatchLock(points,onStamped){
   const card=$("vsWordCard");
   markGuessRecognized($("myGuessTop"),true);
   blip([523]);
@@ -729,31 +803,28 @@ function playLocalMatchLock(points){
     fill:$("v1WordFill"),
     threshold:THRESH,
     onImpact:()=>{
-      showMatchAward("you",points);
       /* the wash covers the whole split — flash() is bounded by #cameraDock */
       greenFlash(card);
       blip([523,659,784]);
-      /* Solo's signature beat, now shared: the points physically travel to
-         your card, and the number only moves when they land. The server is
-         still authoritative — we only hold the PAINT, never the value. */
-      holdScorePaint();
-      flyPoints(card,$("v1YouScore")?.closest(".v1-scorecard"),points,()=>{
-        releaseScorePaint();
-        blip([880]);
-      });
+      showMatchAward("you",points);
+      onStamped?.();
     },
   });
 }
 
-/* The lock sequence runs ~180ms of hitstop plus a 650ms flight, and the
-   server's score packet lands somewhere inside that. Buffer the repaint so
-   the number never jumps before the chip that is carrying it. */
+/* The papers are not thrown until the word resolves, and the server's score
+   packet lands well before that. Buffer the repaint so the number never jumps
+   ahead of the paper carrying it. */
 let scorePaintHeld=false;
 function holdScorePaint(){ scorePaintHeld=true; }
 function releaseScorePaint(){
   scorePaintHeld=false;
   const game=state.game;
   if(!game) return;
+  paintMatchScores(game);
+}
+
+function paintMatchScores(game){
   setScoreText("v1YouScore",fmtScore(game.score));
   setScoreText("v1RivalScore",fmtScore(game.rivalScore));
 }
@@ -762,11 +833,12 @@ function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
   const mine=firstId===socket.id;
-  /* Hold BEFORE the scores land. The server has already banked the points, so
-     painting them here put the number on the card ~830ms ahead of the chip
-     carrying it — and left setScoreText with nothing to change on arrival, so
-     the landing bump never fired either. */
-  if(mine) holdScorePaint();
+  /* Hold BEFORE the scores land, whoever was first. The server has already
+     banked the points, so painting them here puts the number on the card a
+     whole chase window ahead of the paper carrying it — and leaves
+     setScoreText with nothing to change on arrival, so the landing bump never
+     fires either. onRoundResult's bankWordAwards releases it. */
+  holdScorePaint();
   applyScores(scores);
   game.firstId=firstId;
   game.firstPoints=firstPoints|0;
@@ -812,10 +884,8 @@ function onRoundResult({
   const iWasFirst=firstId===myId;
   const iWasChaser=chaserId===myId;
   const caught=reason==="chase-success";
-  /* Same ordering as onRoundChase: the chip has to precede its number. Gate
-     this on exactly the condition that reaches playLocalMatchLock below —
-     holding without a landing to release it would freeze the score card. */
-  if(iWasChaser && caught) holdScorePaint();
+  /* Same ordering as onRoundChase: the paper has to precede its number. */
+  holdScorePaint();
   applyScores(scores);
   game.roundId=null;
   game.roundPhase="between";
@@ -829,13 +899,17 @@ function onRoundResult({
       markGuessRecognized($(prefix+"GuessTop"),true);
     }
   }
+  /* Every branch below only STAMPS. The word is banked once, at the bottom —
+     one payoff per word, no matter how many players got it. */
+  let bankAfterStamp=null;
   if(iWasFirst){
     game.results.push({word, ok:true, pts:firstPoints, rivalPts:chaserPoints, first:true});
     if(caught) showMatchAward("rival", chaserPoints);
     blip(caught?[523,659]:[523,659,784]);
   }else if(iWasChaser && caught){
     game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true});
-    playLocalMatchLock(chaserPoints);
+    /* the local stamp lands on the far side of the hitstop */
+    bankAfterStamp=fn=>playLocalMatchLock(chaserPoints,fn);
   }else if(winnerId){
     game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
     /* The rival's award paper already says exactly this, in the paper-craft
@@ -848,7 +922,10 @@ function onRoundResult({
     showTimesUp();
   }
   const localSucceeded=iWasFirst || (caught&&iWasChaser);
-  if(!localSucceeded) playWordMissFeedback($("vsWordCard"),THRESH);
+  if(!localSucceeded){
+    playWordMissFeedback($("vsWordCard"),THRESH);
+    robotMiss(MATCH_ROBOT.my);
+  }
   const stage=$("matchStage");
   if(stage){
     stage.dataset.phase="between";
@@ -862,6 +939,8 @@ function onRoundResult({
     stage.classList.toggle("you-locked",youSucceeded);
     stage.classList.toggle("rival-locked",rivalSucceeded);
   }
+  if(bankAfterStamp) bankAfterStamp(bankWordAwards);
+  else bankWordAwards();
   if(gameState()==="playing") transition("word-won");
 }
 
@@ -889,10 +968,7 @@ function applyScores(scores){
   $("pillScore").textContent=fmtScore(game.score);
   /* Solo and Party both bump their score card when it changes; 1v1 was the
      one mode where points appeared with no reaction at all. */
-  if(!scorePaintHeld){
-    setScoreText("v1YouScore",fmtScore(game.score));
-    setScoreText("v1RivalScore",fmtScore(game.rivalScore));
-  }
+  if(!scorePaintHeld) paintMatchScores(game);
   const stage=$("matchStage");
   if(stage){
     stage.classList.toggle("you-leading", game.score>game.rivalScore);
@@ -906,10 +982,12 @@ function onMatchSudden({scores}={}){
   applyScores(scores);
   game.suddenDeath=true;
   if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent="SUDDEN DEATH";
-  /* the stage already carries a sudden-death treatment (data-phase="sudden");
-     a toast says the rule once instead of a full-screen card interrupting it */
+  /* The stage carries a sudden-death treatment and the screen edges pulse red
+     for as long as it lasts, but the RULE CHANGE itself needs to land once,
+     loudly — this inverts the match and a toast at the bottom edge of a
+     full-screen camera is not something a player mid-pose ever reads. */
+  showSuddenDeath();
   toast("SUDDEN DEATH — first player recognized wins the match!");
-  blip([392,523,659,784]);
 }
 
 function onMatchEnd({scores, winnerId, suddenDeath=false, rematch}={}){

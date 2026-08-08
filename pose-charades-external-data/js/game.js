@@ -1,5 +1,5 @@
 /* Round loop for the local modes.
-   "ai": solo — score when the AI holds the right guess above THRESH.
+   "ai": solo — score when the shared charge meter fills on the target word.
    "vs": practice 1v1 — the simulated robot rival races you.
 
    All flow control goes through the FSM:
@@ -12,10 +12,12 @@
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
-import { ROUNDS, WORD_MS, THRESH, RIVAL_THRESH, HOLD_MS, SOLO,
+import { ROUNDS, WORD_MS, RIVAL_THRESH, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
 import { toast, flash, renderGuesses, topGuesses, fmtTime, fmtScore,
-         localMatchGuessIs, setCountdown, showTimesUp } from "./ui.js";
+         localMatchGuessIs, setCountdown, showTimesUp,
+         setMatchLockHandler, MATCH_ROBOT } from "./ui.js";
+import { robotMiss } from "./robot.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
@@ -24,21 +26,28 @@ import { partyCheck } from "./partyMatch.js";
 import { captureShot, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
-         ROUND_END_PAUSE_MS, showPointsAward, confettiFrom,
+         ROUND_END_PAUSE_MS, confettiFrom,
          clearCelebrations, resetSoloBoard } from "./soloRound.js";
+import { stampSeatAward, deliverSeatAward, clearSeatAward,
+         SEAT_AWARD_HOLD_MS } from "./seatAward.js";
 import {
   markGuessRecognized,
   prepareWordFeedback, playWordLockFeedback, playWordMissFeedback,
   fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
+import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
 
 /* One second a step, matching the server-driven 1v1/Party countdown
    (config.preCountMs 3000 / 3). Solo used to count a third faster off the
    same overlay, and its 2.4s barely cleared the 1.25s HUD entrance — so the
    board was still landing on "2". */
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 1000;
-const WORD_WON_PAUSE_MS = 1050;
+/* Long enough for the whole payoff to finish: 180ms of recognition impact,
+   then the award paper's 640ms hold and 560ms delivery into the score card.
+   At the old 1050ms the next word started while the points were still in the
+   air, which is precisely the "what is it even doing" reading. */
+const WORD_WON_PAUSE_MS = 1500;
 
 let preCountTimer = null;
 
@@ -47,7 +56,12 @@ let preCountTimer = null;
 export function bindGameLifecycle(){
   onTransition((to, from)=>{
     const inGame = s => s==="countdown"||s==="playing"||s==="word-won";
-    if(!inGame(to)) clearCelebrations();
+    if(!inGame(to)){
+      clearCelebrations();
+      /* the rules card is only ever up during `countdown`; leaving by any
+         other route (menu, results, a stray transition) has to take it down */
+      hideHowToPlay();
+    }
     if(inGame(from) && !inGame(to) && to!=="results" && state.game){
       cancelPreCount();
       clearInterval(state.game.timer);
@@ -86,6 +100,39 @@ const setTxt=(id,v)=>{ const el=$(id); if(el) el.textContent=v; };
 
 function bump(id){ const el=$(id); if(!el) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
 
+/* The practice 1v1 borrows the online split-screen board, but nothing was
+   ever painting its two score cards — only the legacy header pill. That was
+   survivable while the payoff was a paper that faded on the spot; now the
+   award is physically delivered INTO those cards, so they have to hold the
+   number. Held exactly like the online path: the value is already decided,
+   only the PAINT waits for the paper to land. */
+let scorePaintHeld=false;
+function paintPracticeScores(){
+  const g=state.game;
+  if(!g || g.mode!=="vs" || scorePaintHeld) return;
+  setTxt("v1YouScore",fmtScore(g.score));
+  setTxt("v1RivalScore",fmtScore(g.rivalScore));
+}
+
+/* The practice board is the online one, so the payoff is the online one: the
+   GOT IT paper is stamped on the half that earned it and then carried into
+   that half's score card. Practice resolves the word at the instant of
+   recognition, so the stamp and the throw are one beat apart rather than a
+   chase window. */
+const practiceSeat = rival =>
+  document.querySelector(rival?".v1-video-side.rival":".v1-video-side.you");
+
+function payPracticeWord(rival, points, title){
+  const seat=practiceSeat(rival);
+  scorePaintHeld=true;
+  stampSeatAward(seat,{title,points});
+  deliverSeatAward(seat,
+    $(rival?"v1RivalScore":"v1YouScore")?.closest(".v1-scorecard"),{
+      holdMs:SEAT_AWARD_HOLD_MS,
+      onLand:()=>{ scorePaintHeld=false; paintPracticeScores(); },
+    });
+}
+
 function updateHud(){
   const g=state.game; if(!g) return;
   setTxt("pillScore",fmtScore(g.score));
@@ -107,6 +154,7 @@ function updateHud(){
     streakCard.classList.toggle("cold", n===0);
   }
   if(state.screen==="match") renderDots(g.round, g.rounds);
+  paintPracticeScores();
 }
 
 export function startGame(mode="ai"){
@@ -120,6 +168,11 @@ export function startGame(mode="ai"){
                results:[], bestWrong:{},
                roundEndsAt: mode==="ai" ? performance.now()+SOLO.roundMs : 0 };
   if(!transition("countdown")){ state.game=null; return; }
+  scorePaintHeld=false;
+  if(mode!=="ai"){
+    clearSeatAward(practiceSeat(false));
+    clearSeatAward(practiceSeat(true));
+  }
   updateHud();
   if(mode==="ai"){
     /* The word card and guess stack are only cleared in beginRound, which
@@ -132,12 +185,21 @@ export function startGame(mode="ai"){
     document.querySelector(".statpill.round .lab").textContent="Round";
     $("pillRound").textContent="1 / "+ROUNDS;
   }
-  runPreCount(()=>{
+  const begin=()=>runPreCount(()=>{
     if(gameState()!=="countdown" || !state.game) return; // user backed out
     transition("playing");
     nextWord();
     state.game.timer=setInterval(gameTick,100);
   });
+
+  /* Solo gets the rules card first. The board and the camera are already up
+     behind it (we are in `countdown`), so the count-in only starts once the
+     player says they are ready — which is also their chance to get into
+     frame. Online modes use the equivalent server-side barrier: every client
+     acknowledges its tutorial token before the server publishes the shared
+     future 3·2·1 timestamp. */
+  if(mode==="ai") showHowToPlay({ ready:begin, back:()=>transition("menu"), mode:"ai" });
+  else begin();
 }
 
 function animateWordChange(){
@@ -156,7 +218,8 @@ function nextWord(){
   if(!game.deck.length) game.deck=shuffledDeck();
   game.word=game.deck.pop();
   game.wordStart=performance.now();
-  game.wordEnd=game.wordStart+(ai ? SOLO.wordMs : WORD_MS);
+  game.wordLimitMs=ai ? SOLO.wordMs : WORD_MS;
+  game.wordEnd=game.wordStart+game.wordLimitMs;
   game.holdSince=0; game.bestWrong={};
   setTxt("vsWord",game.word);
   setTxt("soloWord",game.word);
@@ -169,11 +232,13 @@ function nextWord(){
   }else{
     const stage=$("matchStage");
     stage?.classList.remove("you-locked","rival-locked");
-    prepareWordFeedback($("vsWordCard"),$("v1WordFill"),THRESH,true);
+    prepareWordFeedback($("vsWordCard"),$("v1WordFill"),1,true);
     markGuessRecognized($("myGuessTop"),false);
     markGuessRecognized($("rivalGuessTop"),false);
-    $("v1Award")?.classList.remove("show");
-    $("v1RivalAward")?.classList.remove("show");
+    /* a paper still in the air from the last word must not survive into this
+       one — settling it also releases the repaint it is holding */
+    clearSeatAward(practiceSeat(false));
+    clearSeatAward(practiceSeat(true));
     fitGameplayText($("vsWord"));
   }
   animateWordChange();
@@ -240,12 +305,12 @@ function finishWord(winner, opts={}){
     markGuessRecognized($("myGuessTop"),true);
     blip([523]);
     playWordLockFeedback({
-      card:$("vsWordCard"),fill:$("v1WordFill"),threshold:THRESH,
+      card:$("vsWordCard"),fill:$("v1WordFill"),threshold:1,
       onImpact:()=>{
-        showPointsAward("v1Award","v1AwardPts",pts);
         confettiFrom($("vsWordCard"));
         flash("good");
         blip([523,659,784]);
+        payPracticeWord(false,pts,"GOT IT!");
       },
     });
   }else if(winner==="rival"){
@@ -253,10 +318,13 @@ function finishWord(winner, opts={}){
     const pts=PTS_CORRECT;
     game.rivalScore+=pts;
     game.results.push({word:game.word, ok:false, rival:true, rivalPts:pts, thought:"Rival guessed it first"});
-    showPointsAward("v1RivalAward","v1RivalAwardPts",pts);
+    payPracticeWord(true,pts,"RIVAL GOT IT!");
     $("matchStage")?.classList.add("rival-locked");
     markGuessRecognized($("rivalGuessTop"),true);
-    playWordMissFeedback($("vsWordCard"),THRESH);
+    playWordMissFeedback($("vsWordCard"),1);
+    /* the rival's rig celebrates off markGuessRecognized above; yours takes
+       the loss, which is the whole reason there are two of them */
+    robotMiss(MATCH_ROBOT.my);
     flash("bad");
     blip([330,247]);
   }else{
@@ -264,7 +332,8 @@ function finishWord(winner, opts={}){
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
     if(opts.skip) toast("Skipped — −"+PTS_SKIP+" points");
     else showTimesUp();
-    playWordMissFeedback($("vsWordCard"),THRESH);
+    playWordMissFeedback($("vsWordCard"),1);
+    robotMiss(MATCH_ROBOT.my, opts.skip ? "skip" : "timeout");
     flash("bad");
     blip([220,165]);
   }
@@ -278,8 +347,9 @@ function finishWord(winner, opts={}){
   }, WORD_WON_PAUSE_MS);
 }
 
-/* Called from the classifier whenever fresh guesses land. Awards only when
-   the right word stays over THRESH for HOLD_MS (stability window). */
+/* Called from the classifier whenever fresh guesses land. Keeps the robot
+   papers and the rival relay fed; the award itself is decided by the charge
+   meter (see setMatchLockHandler below). */
 export function gameCheck(){
   const game=state.game;
   if(!game || gameState()!=="playing") return;
@@ -292,24 +362,27 @@ export function gameCheck(){
     if((game.bestWrong.p||0)<topP) game.bestWrong={lab:topLab, p:topP};
   }
 
-  /* renderGuesses() runs immediately before this check. Requiring its local
-     paper to show the target keeps the visible robot, progress bar and score
-     claim in one order even when a previous label is being debounced out. */
-  if(topLab===game.word && localMatchGuessIs(game.word) && topP>=THRESH){
-    if(!game.holdSince) game.holdSince=performance.now();
-    if(performance.now()-game.holdSince>=HOLD_MS){
-      if(game.mode==="online"){
-        // point claims are validated and awarded by the server
-        if(state.onlineClaim) state.onlineClaim(topP);
-        game.holdSince=0;
-      }else{
-        finishWord("you", {confidence:topP});
-      }
-    }
-  } else {
-    game.holdSince=0;
-  }
+  /* The claim itself is decided by the shared charge meter, which runs on the
+     display loop in ui.js — waiting for the next classifier tick to notice a
+     completed meter would cost up to CLASSIFY_EVERY_MS in a race. */
 }
+
+/* Fires the frame the local 1v1 meter fills. renderGuesses() has already
+   painted the robot paper by then, so requiring it to show the target keeps
+   the visible robot, the progress bar and the score claim in one order even
+   while a previous label is being debounced out. */
+setMatchLockHandler(()=>{
+  const game=state.game;
+  if(!game || gameState()!=="playing") return;
+  if(game.mode!=="online" && game.mode!=="vs") return;
+  if(!game.word || !localMatchGuessIs(game.word)) return;
+  if(game.mode==="online"){
+    // point claims are validated and awarded by the server
+    if(!game.claimed) state.onlineClaim?.(1);
+  }else{
+    finishWord("you", {confidence:1});
+  }
+});
 
 export function gameTick(){
   const game=state.game;
