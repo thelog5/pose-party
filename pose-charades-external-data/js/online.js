@@ -69,6 +69,7 @@ let lastGuessLabel = "";
 let lastGuessConfidence = -1;
 let roomAttemptVersion = 0;
 let statusFitFrame = 0;
+let retryTimer = 0;
 
 const serverNow = () => Date.now() + clockOffset;
 const perfFromServer = tServer => performance.now() + (tServer - serverNow());
@@ -444,16 +445,37 @@ function wireSocket(s){
   });
 }
 
+/* The room is created FOR you the moment you walk into the lobby, so when
+   that create fails there is no button on the screen to press again — the
+   code paper just sits at `------` with a line of grey text in the corner,
+   which is exactly what "1v1 doesn't work" looks like from the sofa. Say it
+   out loud on the toast, and keep trying: `rate-limited` clears itself as the
+   server's per-minute bucket refills, and a dropped server comes back. */
+const RETRY_MS = 4000;
+function retryCreateLater(attempt){
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(() => {
+    if(attempt === roomAttemptVersion && roomAttemptActive(attempt)) createRoom();
+  }, RETRY_MS);
+}
+
 async function createRoom(){
   const attempt = ++roomAttemptVersion;
   const name=myName();
+  clearTimeout(retryTimer);
   try{
     const s=await ensureSocket();
     if(!roomAttemptActive(attempt)) return;
     setLobbyStatus("Creating room…");
     s.emit("room:create", { name, labels:state.model.labels, settings }, res=>{
       if(!roomAttemptActive(attempt)) return;
-      if(!res || res.error) return setLobbyStatus(lobbyError(res));
+      if(!res || res.error){
+        const why = lobbyError(res);
+        setLobbyStatus(why + " Retrying…");
+        toast(why);
+        retryCreateLater(attempt);
+        return;
+      }
       isHost=true; roomCode=res.code;
       renderCode(res.code);
       renderSettings(true);
@@ -479,7 +501,12 @@ async function joinRoom(code){
         partyBridge.join?.(code);
         return;
       }
-      if(!res || res.error) return setLobbyStatus(lobbyError(res));
+      if(!res || res.error){
+        const why = lobbyError(res);
+        setLobbyStatus(why);
+        toast(why);   // the JOIN button is right there; this one is not retried
+        return;
+      }
       isHost=false; roomCode=code;
       peerName=String(res.peerName||"Rival");
       if(res.settings){ settings={...settings, ...res.settings}; }
@@ -1046,6 +1073,7 @@ function endOnline(scores, why, outcome={}){
 
 export function leaveRoom(){
   roomAttemptVersion++;
+  clearTimeout(retryTimer);
   /* Also send during a pending create/join. Socket.IO preserves ordering, so
      create → leave reaches the server even before the create ack sets code. */
   if(socket && socket.connected) socket.emit("room:leave", {}, ()=>{});

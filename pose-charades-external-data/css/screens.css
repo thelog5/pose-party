@@ -325,13 +325,16 @@ body[data-boot] .homestage
     --gi:5;--game-in-x:180%;--game-in-y:26%;--game-in-r:7deg;--gi-dur:.88s}
   :is(.matchstage,.pmstage).game-intro .sp-guess:is(.you,.mine):not(.empty){
     --gi:4;--game-in-x:-180%;--game-in-r:-7deg}
-  /* the robot walks on just before his own papers, from whichever edge he
-     stands against — `data-side` is which way his bubble opens, so a bubble
-     opening right means he is on the LEFT of the board */
+  /* The robot walks on just AFTER the guess paper he leans on, from whichever
+     edge he stands against — `data-side` is which way his bubble opens, so a
+     bubble opening right means he is on the LEFT of the board, propped on the
+     `you`/`mine` paper at beat 4; everyone else props on the beat-5 paper.
+     He used to land at a flat 4.6, which put the two outer rigs on screen
+     before the paper under their feet existed. */
   :is(.solostage,.matchstage,.pmstage).game-intro .grobot{
-    --gi:4.6;--game-in-x:165%;--game-in-y:26%;--game-in-r:9deg;--gi-dur:.9s}
+    --gi:5.15;--game-in-x:165%;--game-in-y:26%;--game-in-r:9deg;--gi-dur:.9s}
   :is(.solostage,.matchstage,.pmstage).game-intro .grobot[data-side="right"]{
-    --game-in-x:-165%;--game-in-r:-9deg}
+    --gi:4.15;--game-in-x:-165%;--game-in-r:-9deg}
   :is(.solostage,.matchstage,.pmstage).game-intro .sp-skip{
     --gi:5.4;--game-in-x:-200%;--game-in-y:55%;--game-in-r:-8deg;--gi-dur:.86s;
     --game-intro-opacity:.55}

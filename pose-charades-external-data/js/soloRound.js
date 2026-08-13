@@ -119,6 +119,18 @@ function renderStack(popped){
       pct.textContent = (live ? chargePercent(meter)
         : Math.round(entry.pct * 100)) + "%";
       fitGameplayText(lab);
+    }else if(i === 0){
+      /* THE ROBOT LEANS ON THIS PAPER. `.sp-guess.empty` is opacity:0, so
+         until the first debounced label arrived he walked on during the
+         count-in and then stood propped against nothing at all — 1v1 and
+         Party never looked like that because their current paper is seeded
+         with GUESSING… from the first frame. Seed Solo's the same way: the
+         paper and the character arrive together, and the stack still only
+         grows downward as real history accumulates. */
+      box.classList.remove("empty", "recognized");
+      lab.textContent = "GUESSING…";
+      pct.textContent = "0%";
+      fitGameplayText(lab);
     }else{
       box.classList.add("empty");
       box.classList.remove("recognized");

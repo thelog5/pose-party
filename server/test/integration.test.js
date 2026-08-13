@@ -585,7 +585,12 @@ try {
   ok(rBegin.error === "no-shared-words", `begin with disjoint word lists rejected (${rBegin.error})`);
   ok((await errF).error === "no-shared-words", "both players told no-shared-words");
 
-  // rate limit: creates share one IP (localhost), so the earlier creates count too
+  // rate limit: creates share one IP (localhost), so the earlier creates count
+  // too. RATE_CREATE is pinned to 10 at the top of this file PURELY so the
+  // limiter can be provoked in a few round trips — the shipped default is 30
+  // and must stay well clear of real play, because walking into a lobby
+  // creates a room and everyone behind one NAT shares this key. Do not "align"
+  // config.js down to the number below.
   let limited = false;
   for (let i = 0; i < 8; i++) {
     const rr = await emit(C, "room:create", { name: "Spam", labels: ["idle", "x"] });

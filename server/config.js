@@ -29,9 +29,17 @@ export const config = {
   claimGraceMs: int(process.env.CLAIM_GRACE_MS, 600),
   claimFutureSkewMs: int(process.env.CLAIM_FUTURE_SKEW_MS, 900),
 
-  /* Rate limits (per minute). */
-  rateCreate: int(process.env.RATE_CREATE, 5),
-  rateJoin: int(process.env.RATE_JOIN, 10),
+  /* Rate limits (per minute). Both buckets are keyed by IP, and that is the
+     whole reason these numbers cannot be small: walking into the 1v1 or party
+     lobby AUTO-CREATES a room, two tabs on one machine share one bucket, and
+     a party of six behind one household NAT is a single key. At the old 5/10
+     you ran out after six trips into a lobby — the code paper stayed at
+     `------`, "Slow down a little" appeared in the corner waitline, and for
+     the rest of that minute the game genuinely could not be played online.
+     30/60 still bounds a script spraying rooms; it never fires during play,
+     which is why both E2E suites already had to override it. */
+  rateCreate: int(process.env.RATE_CREATE, 30),
+  rateJoin: int(process.env.RATE_JOIN, 60),
 
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),

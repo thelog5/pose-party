@@ -257,8 +257,11 @@
            through also answers what he IS.
 
            He is a SIBLING of the guess stack, not a child: `.sp-guess.empty`
-           is opacity:0 until the first guess lands, and a character who is
-           invisible until the AI has an opinion is not a character. -->
+           is opacity:0, and a character who is invisible until the AI has an
+           opinion is not a character. The other half of that is that the TOP
+           card is never empty — soloRound.js seeds it with GUESSING… exactly
+           as 1v1 and Party seed theirs, so he is never leaning on a paper
+           that isn't there. -->
       <div class="grobot" id="spRobot" data-side="left" data-pose="idle"
            style="left:70%;top:25.1%;width:12.2%">
         <div class="rb-rig">
@@ -1045,9 +1048,15 @@
      measured offsets in overlays.css. -->
 <div class="cg hidden" id="camGate" role="dialog" aria-modal="true"
      aria-labelledby="cgTitle">
+  <!-- The card and the boot readout are ONE centred column. The readout is not
+       part of 322:717, so centring the component on its own left the whole
+       screen sitting low: everything the player can see ran from the top of
+       the title card to the bottom of the progress strip, and only the first
+       of those two was being balanced in the viewport. -->
+  <div class="cg-stack">
   <div class="cg-panel" id="cgPanel">
     <img class="cg-paper" src="assets/ui/figma/cam-panel.png" alt="">
-    <img class="cg-titlecard" src="assets/ui/figma/title-card.png" alt="Pose Party">
+    <img class="cg-titlecard" src="assets/ui/figma/cam-titlecard.png" alt="Pose Party">
     <img class="cg-tape cg-tape-y" src="assets/ui/figma/cam-tape-yellow.png" alt="">
     <img class="cg-tape cg-tape-c" src="assets/ui/figma/cam-tape-cream.png" alt="">
 
@@ -1081,21 +1090,28 @@
       <span id="cgEnableLabel">ENABLE CAMERA</span>
     </button>
 
-    <!-- The boot readout lives on the scrim BELOW the card: 322:717 is a
-         finished composition with no slot for it, and one note at a time is
-         picked by the card's own data-state. A permission dialog that can
-         only say the happy-path sentence is one that strands people. -->
-    <div class="cg-status" role="status" aria-live="polite">
-      <div class="cg-load" id="cgLoad">
-        <span class="cg-load-lab" id="cgLoadLab">WAKING THE ROBOT&hellip;</span>
-        <span class="cg-load-track"><i class="cg-load-fill" id="cgLoadFill"></i></span>
-      </div>
-      <span class="cg-note" data-cg-note="blocked">Camera access was blocked.
-        Open the camera icon in your address bar, allow this page, then try
-        again.</span>
-      <span class="cg-note" data-cg-note="failed">No camera answered. Check
-        that nothing else is using it, then try again.</span>
+  </div>
+
+  <!-- The boot readout lives on the scrim BELOW the card: 322:717 is a
+       finished composition with no slot for it, and one note at a time is
+       picked by the card's own data-state. A permission dialog that can
+       only say the happy-path sentence is one that strands people.
+
+       It is a SIBLING of the panel, in flow, so the column is what gets
+       centred. Absolutely positioned off the panel's bottom it was invisible
+       to centring, and the blocked note (three lines) made the imbalance
+       worse exactly when the player most needs to read it. -->
+  <div class="cg-status" role="status" aria-live="polite">
+    <div class="cg-load" id="cgLoad">
+      <span class="cg-load-lab" id="cgLoadLab">WAKING THE ROBOT&hellip;</span>
+      <span class="cg-load-track"><i class="cg-load-fill" id="cgLoadFill"></i></span>
     </div>
+    <span class="cg-note" data-cg-note="blocked">Camera access was blocked.
+      Open the camera icon in your address bar, allow this page, then try
+      again.</span>
+    <span class="cg-note" data-cg-note="failed">No camera answered. Check
+      that nothing else is using it, then try again.</span>
+  </div>
   </div>
 </div>
 

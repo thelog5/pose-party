@@ -85,9 +85,19 @@ function resetPartyUi(){
 
 /* ---------------- socket flows ---------------- */
 
+const PARTY_RETRY_MS = 4000;
+let partyRetryTimer = 0;
+function retryCreateLater(request){
+  clearTimeout(partyRetryTimer);
+  partyRetryTimer = setTimeout(() => {
+    if(request === partyRequestVersion && partyRequestActive(request)) createParty();
+  }, PARTY_RETRY_MS);
+}
+
 async function createParty(){
   const request = ++partyRequestVersion;
   pendingPartyRequest = request;
+  clearTimeout(partyRetryTimer);
   resetPartyUi();
   try{
     const nextSocket = await ensureSocket();
@@ -106,7 +116,17 @@ async function createParty(){
         cleanLatePartyRoom(request, nextSocket, res);
         return;
       }
-      if(!res || res.error) return setLobbyStatus(partyError(res));
+      if(!res || res.error){
+        /* Nothing on this screen creates the party but walking into it, so a
+           failed create leaves a player with `------` and no control to press.
+           Say it on the toast and keep trying — `rate-limited` refills on its
+           own, and the per-IP bucket is shared by everyone in the house. */
+        const why = partyError(res);
+        setLobbyStatus(why + " Retrying…");
+        toast(why);
+        retryCreateLater(request);
+        return;
+      }
       setLobbyCode(res.code);
       applyRoster(res.roster);
       setLobbyStatus(null);
@@ -144,7 +164,10 @@ async function joinParty(code){
           partyBridge.rejoin1v1?.(code);   // typed a 1v1 code — hop over
           return;
         }
-        return setLobbyStatus(partyError(res));
+        const why = partyError(res);
+        setLobbyStatus(why);
+        toast(why);   // JOIN is on screen; this one the player retries
+        return;
       }
       setLobbyCode(res.code);
       applyRoster(res.roster);
@@ -227,6 +250,7 @@ export function leaveParty(){
   partyRequestVersion++;
   setLobbyCode(null);
   clearTimeout(renameTimer);
+  clearTimeout(partyRetryTimer);
   for(const [, entry] of peers) entry.peer.close();
   peers.clear();
   resetPartyUi();
