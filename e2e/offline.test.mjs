@@ -712,7 +712,9 @@ const robotBands = await page.evaluate(async () => {
   const read = () => ({
     pose: node.dataset.pose,
     body: node.querySelector(".rb-body").getAttribute("src"),
-    face: node.querySelector(".rb-face").getAttribute("src"),
+    /* the face is two layers cut from one sprite — both must dress together */
+    eyes: node.querySelector(".rb-eyes").getAttribute("src"),
+    mouth: node.querySelector(".rb-mouth").getAttribute("src"),
     hype: parseFloat(getComputedStyle(node).getPropertyValue("--rb-hype")) || 0,
   });
   const seen = {};
@@ -768,6 +770,19 @@ const robotBands = await page.evaluate(async () => {
      through the pose/bottom transition, then measure its visible tip against
      the idle face. It must stay on the mouth line but sit outside the head. */
   await new Promise(done => setTimeout(done, 340));
+  /* This measures AUTHORED geometry — where the paper hangs relative to his
+     mouth. The face is a live element now: the life loop slides it a couple
+     of px either way as his gaze follows the player, which is a real and
+     wanted effect but is not what this assertion is about. Park it so the
+     tail is measured against his rest pose rather than against whatever he
+     happened to be looking at.
+     ALL of it has to be parked, not just the gaze: --rb-tilt rotates him
+     about his feet, so a couple of degrees of breath swings his head
+     sideways relative to a bubble anchored much lower down. */
+  for(const k of ["--rb-gaze-x", "--rb-gaze-y", "--rb-eye-x", "--rb-eye-y",
+                  "--rb-shift-x", "--rb-shift-y"])
+    node.style.setProperty(k, "0%");
+  node.style.setProperty("--rb-tilt", "0deg");
   const bubble = bubbleNode.getBoundingClientRect();
   const face = node.querySelector(".rb-face").getBoundingClientRect();
   const tailX = node.dataset.side === "left" ? 1 - .2050147493 : .2050147493;
@@ -795,9 +810,14 @@ const robotBands = await page.evaluate(async () => {
 const robotPoses = ["cold", "watch", "read", "close", "got"].map(k => robotBands[k].pose);
 ok(new Set(robotPoses).size === 5,
   `the robot has a different body at every band of the meter (${robotPoses.join(" -> ")})`);
-ok(["cold", "watch", "read", "close", "got"]
-  .every(k => /rb-body-/.test(robotBands[k].body) && /rb-face-/.test(robotBands[k].face)),
-  "each mood dresses BOTH layers of the rig — a body sprite and a face sprite");
+ok(["cold", "watch", "read", "close", "got"].every(k => {
+    const m = robotBands[k];
+    const mood = /rb-eyes-(.+)\.png/.exec(m.eyes)?.[1];
+    /* eyes and mouth are the SAME cut of the SAME face: if they ever drift
+       apart he is wearing one expression's eyes over another's mouth */
+    return /rb-body-/.test(m.body) && mood && m.mouth.endsWith(`rb-mouth-${mood}.png`);
+  }),
+  "every mood dresses all three layers — body, eyes and mouth, eyes and mouth in step");
 ok(robotBands.close.hype > robotBands.watch.hype &&
    robotBands.watch.hype > robotBands.cold.hype,
   `his glow and scale climb with the meter (${robotBands.cold.hype} -> ` +

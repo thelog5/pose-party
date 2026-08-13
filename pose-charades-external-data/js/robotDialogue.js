@@ -15,4 +15,16 @@ export const ROBOT_DIALOGUE = Object.freeze({
   skip:    ["FINE, NEXT!", "NO SHAME", "MOVING ON"],
   nudge:   ["SHOW ME SOMETHING!", "STRIKE A POSE", "I'M WATCHING…",
             "ANY TIME NOW", "GIVE ME A HINT"],
+  /* He can see the camera, so this one is not a reaction — it is the only
+     thing on the board that knows you have walked out of frame, and the fix
+     ("step back into shot") is the single most useful thing anyone can be
+     told in a game played with your whole body. */
+  missing: ["HELLO? WHERE'D YOU GO?", "I LOST YOU!", "STEP BACK IN!",
+            "I CAN'T SEE YOU…"],
+  /* You are moving, and he still has nothing. NOTHING in this list is a note
+     on your performance: the meter being empty while you work is the model's
+     failure, and a character who blames you for it is a character nobody
+     wants in the room. */
+  struggling: ["THAT'S ON ME…", "MY CIRCUITS ARE SLOW TODAY",
+               "BIGGER? MAYBE BIGGER", "I ALMOST HAVE IT", "HOLD THAT — LET ME LOOK"],
 });

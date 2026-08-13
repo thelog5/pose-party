@@ -529,27 +529,47 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    leans right) and `sad` (head slumps) need a nudge, which is why one rule
    dresses all eight poses.
 
-   Three transforms, three owners, deliberately on three elements so none of
-   them can clobber another:
-     .grobot      `scale` from the meter (JS writes --rb-scale), and the
-                  count-in entrance, which is an animation and outranks it.
-     .rb-rig      the idle bob — and the recognition SLAM, which replaces it.
+   Transforms are split across elements so none of them can clobber another —
+   `animation-fill-mode:both` beats a plain declaration, and stacking two
+   owners on one element was the whole reason the old robot could not move:
+     .grobot      `scale` from the meter, plus the BREATH/LEAN/RECOIL that
+                  js/robot.js writes into --rb-shift-* / --rb-tilt every
+                  frame. The count-in entrance is an animation on this element
+                  and outranks all of it for its ~1s, then hands back.
+     .rb-rig      the recognition SLAM, and nothing else.
+     .rb-body     the pose-swap snap (a sprite change is an impact, not a cut).
+     .rb-face     the GAZE — where he is looking, as an offset inside the head
+                  screen. Written by robot.js off the player's own landmarks.
+     .rb-eyes     a little more gaze than the mouth gets (that difference is
+                  what reads as a head turning rather than a decal sliding),
+                  and the blink.
      .rb-bubble   its own pop.
-   Stacking one of these on top of another was the whole reason the old robot
-   could not move: `animation-fill-mode:both` beats a plain declaration. */
+
+   The breath used to be a CSS keyframe: a symmetric sine on translate+rotate.
+   It moved to JS because a sine is the universal signature of a cheap sprite
+   — real breathing is asymmetric, and because the same loop has to lag the
+   face behind the body, which needs a phase this side of the animation. */
 /* z-index 2 puts him above the camera (0) and under every paper in all three
    modes — .sp-guess 3, .sp-card/.sp-word/.v1-guess 4, .pm-guess 7. He is a
    character standing BEHIND the board, so a slam can grow as big as it likes
    without ever covering a clock, a score or the word you are playing. */
 .grobot{position:absolute;z-index:2;pointer-events:none;
   aspect-ratio:520/610;container-type:inline-size;
-  scale:var(--rb-scale,1);transform-origin:50% 94%;
+  scale:var(--rb-scale,1);
+  /* percentages resolve against his own box, so every one of these is
+     resolution-independent without a single px anywhere */
+  translate:var(--rb-shift-x,0%) var(--rb-shift-y,0%);
+  rotate:var(--rb-tilt,0deg);
+  transform-origin:50% 94%;   /* his feet: a lean pivots there, not at his waist */
   transition:scale .3s cubic-bezier(.2,1.5,.4,1)}
 /* The warmth behind him climbs with the meter, so "you are getting through"
    is legible from the corner of the eye without reading the number. */
 .grobot::before{content:"";position:absolute;left:50%;top:44%;width:155%;
   aspect-ratio:1;translate:-50% -50%;z-index:-1;pointer-events:none;
-  opacity:calc(var(--rb-hype,0) * .8);transition:opacity .3s ease;
+  opacity:calc(var(--rb-hype,0) * .8);
+  /* rbBurst is fill:both and ends at scale 1.3 / rotate 18deg, so dropping the
+     slam class snapped the glow back to 1/0deg with only opacity easing. */
+  transition:opacity .3s ease,scale .34s ease,rotate .34s ease;
   /* no blur filter: the gradient's own stops are already soft, and this layer
      animates its opacity every frame he charges — a filter pass on top of that
      is paint work for nothing, on a board that can have two rigs up at once */
@@ -565,18 +585,47 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    and the whole face reads as stretched wide. Two thirds keeps the features
    clustered in the middle of the screen, which is what reads as cute. */
 .grobot .rb-face{position:absolute;left:50.1%;top:30.6%;width:27.8%;
-  aspect-ratio:300/172;translate:-50% -50%}
+  aspect-ratio:300/172;
+  /* the -50% is the centring; the gaze rides on top of it */
+  translate:calc(-50% + var(--rb-gaze-x,0%)) calc(-50% + var(--rb-gaze-y,0%))}
 .grobot[data-pose="present"] .rb-face{left:54.9%}
 .grobot[data-pose="sad"] .rb-face{left:49.3%;top:33.1%}
 .grobot[data-pose="celebrate"] .rb-face{top:31%;width:27%}
 
-@media (prefers-reduced-motion:no-preference){
-  /* one bob for every rig; the meter only changes how fast it runs */
-  .grobot .rb-rig{animation:rbBob var(--rb-bob,2600ms) ease-in-out infinite}
+/* THE FACE IS TWO LAYERS, CUT FROM THE ONE SPRITE, NOT REDRAWN.
+   Every rb-face-*.png was two eye blobs above a mouth blob with clear air
+   between them, so a horizontal cut through that band splits each into
+   rb-eyes-* and rb-mouth-* ON THE SAME CANVAS. That is why there is not a
+   single offset to author here: `inset:0` on both stacks them back into the
+   original image exactly, and at rest this rig is pixel-identical to the
+   single <img> it replaced.
+
+   What the split buys is DEPTH. When a head turns, features nearer the viewer
+   travel further than features behind them — that parallax is what the eye
+   reads as rotation. The mouth rides the face group alone; the eyes take an
+   extra slice on top. Two layers is enough: he is a robot with a flat screen
+   for a face, so overdoing it would look like a decal peeling off. */
+.grobot .rb-eyes,.grobot .rb-mouth{position:absolute;inset:0;
+  width:100%;height:100%;object-fit:fill}
+/* The blink scales about the measured eye centroid (28% down the face canvas
+   across all eight faces) — about the box centre it would slide the eyes down
+   the screen as they close, which reads as melting rather than blinking. */
+.grobot .rb-eyes{translate:var(--rb-eye-x,0%) var(--rb-eye-y,0%);
+  scale:1 var(--rb-blink,1);transform-origin:50% 28%}
+
+/* A pose change used to be a hard cut between two stills — a slideshow. The
+   sprite still cuts, but it cuts on the compressed frame of a squash, so the
+   change reads as him MOVING into the pose. It lives on .rb-body because
+   .rb-rig is the slam's and a recognition fires both at once. */
+.grobot .rb-body.swap{animation:rbSwap .34s cubic-bezier(.2,1.45,.35,1)}
+@keyframes rbSwap{
+  0%  {scale:1 1}
+  24% {scale:1.06 .915}
+  58% {scale:.972 1.042}
+  100%{scale:1 1}}
+@media (prefers-reduced-motion:reduce){
+  .grobot .rb-body.swap{animation:none}
 }
-@keyframes rbBob{
-  0%,100%{translate:0 0;rotate:-1.1deg}
-  50%    {translate:0 -2.4%;rotate:1.1deg}}
 
 /* The recognition slam. He punches in oversized and wobbles like a sticker
    being stuck down, then settles back to his own size — ending at scale 1 so

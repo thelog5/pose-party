@@ -15,6 +15,7 @@ import { showStatus, renderGuesses } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
 import { setModelOutput } from "./soloRound.js";
+import { notePresence } from "./presence.js";
 import { requestCameraConsent, retryCameraConsent, closeCameraGate,
          hasCameraGate, setBootProgress, setBootReady,
          setBootFailed } from "./cameraGate.js";
@@ -421,6 +422,10 @@ function loop(){
   ctx.clearRect(0,0,overlay.width,overlay.height);
 
   const lm = res.landmarks && res.landmarks[0];
+  /* Unconditional, and ahead of the crown/skeleton/sample block so it reads
+     the landmarks before anything else can consume them: presence.js needs the
+     empty frames too, or its "how long since we saw you" clock never runs. */
+  notePresence(lm, now);
   if(lm){
     if(faceEvery && now-lastFaceSeenT>350) positionLocalCrownFromPose(lm);
     drawSkeleton(lm, handRes, ctx, overlay);
