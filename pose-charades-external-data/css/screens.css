@@ -537,12 +537,12 @@ body[data-screen="solo"] .camdock .brackets{display:none}
                   frame. The count-in entrance is an animation on this element
                   and outranks all of it for its ~1s, then hands back.
      .rb-rig      the recognition SLAM, and nothing else.
-     .rb-body     the pose-swap snap (a sprite change is an impact, not a cut).
-     .rb-face     the GAZE — where he is looking, as an offset inside the head
-                  screen. Written by robot.js off the player's own landmarks.
-     .rb-eyes     a little more gaze than the mouth gets (that difference is
-                  what reads as a head turning rather than a decal sliding),
-                  and the blink.
+     .rp          EVERY puppet part: js/robot.js composes that part's whole
+                  joint chain (torso -> upper arm -> forearm -> hand, or
+                  torso -> head -> eye) into one transform per part per frame.
+     .rb-eye-*    a little more travel than the mouth gets, on top of the head
+                  chain — that difference is the parallax that reads as a head
+                  turning rather than a decal sliding.
      .rb-bubble   its own pop.
 
    The breath used to be a CSS keyframe: a symmetric sine on translate+rotate.
@@ -575,57 +575,61 @@ body[data-screen="solo"] .camdock .brackets{display:none}
      is paint work for nothing, on a board that can have two rigs up at once */
   background:radial-gradient(circle,rgba(255,228,145,.6) 0 22%,
     rgba(255,203,66,.3) 44%,transparent 70%)}
-.grobot .rb-rig{position:absolute;inset:0;transform-origin:50% 92%}
-.grobot .rb-body{position:absolute;inset:0;width:100%;height:100%;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.34vw,.6vh) rgba(0,0,0,.34))}
+/* THE PUPPET PAINTS OVER HIS OWN SPEECH PAPER (z 3 against the bubble's 2).
+   The Solo bubble's side gap was tuned against the old bust, whose head sat
+   lower and narrower in the same box; this head is 81% of his width, so the
+   opaque cream paper landed across his face — including one eye — during the
+   recognition slam, which is the loudest beat in the game. Rather than push
+   the paper further out (where it collides with WORD TIME), let him stand in
+   front of it: a tail disappearing behind his head still reads as speech, a
+   robot with his face covered does not. */
+.grobot .rb-rig{position:absolute;inset:0;transform-origin:50% 92%;z-index:3}
+
+/* ---- THE PUPPET (assets/ui/rig/) ----
+   Ten body parts, four eye states, six mouth shapes; every one authored on the
+   SAME 640x640 canvas so all of them are drawn at inset:0 and registration is
+   a property of the art rather than of twenty-six numbers in this file.
+
+   .rb-canvas is that square, sized and offset so the robot's INK lands exactly
+   where the old single-sprite robot's ink landed — his ink is 92.58% of the
+   canvas tall and centred at 50.01% across, and .grobot's box is 520/610. So
+   the five rig placements in index.html, the count-in entrance, the z-band and
+   the speech-bubble tail geometry all keep working untouched; the swap is
+   entirely inside this box. overflow stays visible: an arm thrown up in a
+   celebration is allowed to leave the square. */
+.grobot .rb-canvas{position:absolute;left:-13.66%;top:-5.69%;
+  height:108.01%;aspect-ratio:1;pointer-events:none}
+/* Every part is the whole canvas. `transform-origin:0 0` because js/robot.js
+   writes the full joint chain as translate/rotate pairs in PERCENTAGES of this
+   box — percentages resolve against the element's own border box, which is the
+   same box for all thirteen, so one composed transform per part is exact at
+   any size with not a pixel value anywhere. */
+.grobot .rp{position:absolute;inset:0;width:100%;height:100%;
+  transform-origin:0 0;will-change:transform}
+/* One shadow for the whole assembly, not one per limb — thirteen stacked
+   drop-shadows darken every overlap into a seam and cost thirteen filter
+   passes a frame on a board that can have two rigs up. */
+.grobot .rb-canvas{filter:drop-shadow(0 min(.3vw,.53vh) min(.34vw,.6vh) rgba(0,0,0,.34))}
 /* The face is 27.8% of the body, which is 66% of the head screen's width —
    NOT a fill. Nothing here is stretched (the sprites were cropped and resized
    at a constant ratio), but the face art is a 1.74 rectangle sitting in a 1.41
    screen, so filling the screen's width pushes the eyes almost edge to edge
    and the whole face reads as stretched wide. Two thirds keeps the features
    clustered in the middle of the screen, which is what reads as cute. */
-.grobot .rb-face{position:absolute;left:50.1%;top:30.6%;width:27.8%;
-  aspect-ratio:300/172;
-  /* the -50% is the centring; the gaze rides on top of it */
-  translate:calc(-50% + var(--rb-gaze-x,0%)) calc(-50% + var(--rb-gaze-y,0%))}
-.grobot[data-pose="present"] .rb-face{left:54.9%}
-.grobot[data-pose="sad"] .rb-face{left:49.3%;top:33.1%}
-.grobot[data-pose="celebrate"] .rb-face{top:31%;width:27%}
 
-/* THE FACE IS TWO LAYERS, CUT FROM THE ONE SPRITE, NOT REDRAWN.
-   Every rb-face-*.png was two eye blobs above a mouth blob with clear air
-   between them, so a horizontal cut through that band splits each into
-   rb-eyes-* and rb-mouth-* ON THE SAME CANVAS. That is why there is not a
-   single offset to author here: `inset:0` on both stacks them back into the
-   original image exactly, and at rest this rig is pixel-identical to the
-   single <img> it replaced.
+/* THE FACE. The pack ships the eyes as two SEPARATE layers with four states
+   each (open / happy / blink / worried) and the mouth as six shapes — a smile
+   plus five visemes. Both are parented to the head, so they inherit its whole
+   chain from js/robot.js and need no geometry here at all.
 
-   What the split buys is DEPTH. When a head turns, features nearer the viewer
-   travel further than features behind them — that parallax is what the eye
-   reads as rotation. The mouth rides the face group alone; the eyes take an
-   extra slice on top. Two layers is enough: he is a robot with a flat screen
-   for a face, so overdoing it would look like a decal peeling off. */
-.grobot .rb-eyes,.grobot .rb-mouth{position:absolute;inset:0;
-  width:100%;height:100%;object-fit:fill}
-/* The blink scales about the measured eye centroid (28% down the face canvas
-   across all eight faces) — about the box centre it would slide the eyes down
-   the screen as they close, which reads as melting rather than blinking. */
-.grobot .rb-eyes{translate:var(--rb-eye-x,0%) var(--rb-eye-y,0%);
-  scale:1 var(--rb-blink,1);transform-origin:50% 28%}
+   Only the extra eye-look rides on top: the eyes travel a little further than
+   the mouth does, and that difference is the parallax that reads as a head
+   turning rather than a decal sliding across a screen. The blink is ART now,
+   not a scaleY — swapping open_* for blink_* is what the pack is built for,
+   and a drawn closed eyelid beats a squashed open one every time. */
+.grobot .rb-eye-l,.grobot .rb-eye-r{
+  translate:var(--rb-eye-x,0%) var(--rb-eye-y,0%)}
 
-/* A pose change used to be a hard cut between two stills — a slideshow. The
-   sprite still cuts, but it cuts on the compressed frame of a squash, so the
-   change reads as him MOVING into the pose. It lives on .rb-body because
-   .rb-rig is the slam's and a recognition fires both at once. */
-.grobot .rb-body.swap{animation:rbSwap .34s cubic-bezier(.2,1.45,.35,1)}
-@keyframes rbSwap{
-  0%  {scale:1 1}
-  24% {scale:1.06 .915}
-  58% {scale:.972 1.042}
-  100%{scale:1 1}}
-@media (prefers-reduced-motion:reduce){
-  .grobot .rb-body.swap{animation:none}
-}
 
 /* The recognition slam. He punches in oversized and wobbles like a sticker
    being stuck down, then settles back to his own size — ending at scale 1 so
@@ -663,7 +667,11 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   position:absolute;bottom:calc(97.70% - var(--talk-y));width:122%;
   aspect-ratio:1356/880;z-index:2;opacity:0;pointer-events:none;
   container-type:inline-size;
-  transition:bottom .2s ease,left .2s ease,right .2s ease}
+  /* NO transition on the anchor. It eased because the anchor used to jump
+     between per-pose constants; robot.js now recomputes it every frame from
+     the head's live transform, so an ease is not smoothing anything — it is a
+     200ms lag that leaves the tail pointing at where his mouth was, measurably
+     11px above where it is. Continuous input, no easing. */}
 /* The slam belongs to .rb-rig, not to the speech paper. Keeping the paper on
    its normal mouth anchor prevents the Solo catch line from climbing through
    the WORD TIME card while the body celebrates. */
@@ -683,10 +691,6 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    below the tail so its tip stays on the mouth line, not the antenna. The
    generic 122% route serves multiplayer; Solo gets its collision-safe
    override immediately below. */
-.grobot[data-pose="present"]  .rb-bubble{--talk-x:55%}
-.grobot[data-pose="thinking"] .rb-bubble{--talk-x:48.7%}
-.grobot[data-pose="sad"]      .rb-bubble{--talk-x:49.3%;--talk-y:33.1%}
-.grobot[data-pose="celebrate"] .rb-bubble{--talk-y:31%}
 .grobot[data-side="left"]  .rb-bubble{
   right:calc(74.99% - var(--talk-x) + var(--talk-gap-x));
   transform-origin:79.4985% 96.5909%}

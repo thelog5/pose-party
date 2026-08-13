@@ -265,10 +265,29 @@
       <div class="grobot" id="spRobot" data-side="left" data-pose="idle"
            style="left:70%;top:25.1%;width:12.2%">
         <div class="rb-rig">
-          <img class="rb-body" src="assets/ui/figma/rb-body-idle.png" alt="Robot">
-          <div class="rb-face">
-            <img class="rb-mouth" src="assets/ui/figma/rb-mouth-neutral.png" alt="">
-            <img class="rb-eyes" src="assets/ui/figma/rb-eyes-neutral.png" alt="">
+          <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
+               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
+               canvas precisely so there is not a single offset to hand-place:
+               registration is a property of the art, not of this markup.
+               Order is the pack's own back-to-front list — legs, upper arms,
+               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
+               forearms so the blue wrist cuff hides the wrist tab, exactly as
+               the upper arms sit behind the torso to hide the elbow caps. Get
+               this order wrong and the joins show the moment a limb turns. -->
+          <div class="rb-canvas" role="img" aria-label="Robot">
+            <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
+            <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
+            <img class="rp" data-j="uarmR"  src="assets/ui/rig/upper_arm_character_right.png" alt="">
+            <img class="rp" data-j="uarmL"  src="assets/ui/rig/upper_arm_character_left.png" alt="">
+            <img class="rp" data-j="handR"  src="assets/ui/rig/hand_character_right.png" alt="">
+            <img class="rp" data-j="handL"  src="assets/ui/rig/hand_character_left.png" alt="">
+            <img class="rp" data-j="farmR"  src="assets/ui/rig/forearm_character_right.png" alt="">
+            <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
+            <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
+            <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -522,10 +541,29 @@
       <div class="grobot" id="v1RobotYou" data-side="right" data-pose="idle"
            style="left:-1.8%;top:50.3%;width:9.7%">
         <div class="rb-rig">
-          <img class="rb-body" src="assets/ui/figma/rb-body-idle.png" alt="Robot">
-          <div class="rb-face">
-            <img class="rb-mouth" src="assets/ui/figma/rb-mouth-neutral.png" alt="">
-            <img class="rb-eyes" src="assets/ui/figma/rb-eyes-neutral.png" alt="">
+          <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
+               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
+               canvas precisely so there is not a single offset to hand-place:
+               registration is a property of the art, not of this markup.
+               Order is the pack's own back-to-front list — legs, upper arms,
+               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
+               forearms so the blue wrist cuff hides the wrist tab, exactly as
+               the upper arms sit behind the torso to hide the elbow caps. Get
+               this order wrong and the joins show the moment a limb turns. -->
+          <div class="rb-canvas" role="img" aria-label="Robot">
+            <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
+            <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
+            <img class="rp" data-j="uarmR"  src="assets/ui/rig/upper_arm_character_right.png" alt="">
+            <img class="rp" data-j="uarmL"  src="assets/ui/rig/upper_arm_character_left.png" alt="">
+            <img class="rp" data-j="handR"  src="assets/ui/rig/hand_character_right.png" alt="">
+            <img class="rp" data-j="handL"  src="assets/ui/rig/hand_character_left.png" alt="">
+            <img class="rp" data-j="farmR"  src="assets/ui/rig/forearm_character_right.png" alt="">
+            <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
+            <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
+            <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -535,10 +573,29 @@
       <div class="grobot" id="v1RobotRival" data-side="left" data-pose="idle"
            data-mute style="left:92.1%;top:51.6%;width:9.7%">
         <div class="rb-rig">
-          <img class="rb-body" src="assets/ui/figma/rb-body-idle.png" alt="">
-          <div class="rb-face">
-            <img class="rb-mouth" src="assets/ui/figma/rb-mouth-neutral.png" alt="">
-            <img class="rb-eyes" src="assets/ui/figma/rb-eyes-neutral.png" alt="">
+          <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
+               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
+               canvas precisely so there is not a single offset to hand-place:
+               registration is a property of the art, not of this markup.
+               Order is the pack's own back-to-front list — legs, upper arms,
+               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
+               forearms so the blue wrist cuff hides the wrist tab, exactly as
+               the upper arms sit behind the torso to hide the elbow caps. Get
+               this order wrong and the joins show the moment a limb turns. -->
+          <div class="rb-canvas" role="img" aria-label="Robot">
+            <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
+            <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
+            <img class="rp" data-j="uarmR"  src="assets/ui/rig/upper_arm_character_right.png" alt="">
+            <img class="rp" data-j="uarmL"  src="assets/ui/rig/upper_arm_character_left.png" alt="">
+            <img class="rp" data-j="handR"  src="assets/ui/rig/hand_character_right.png" alt="">
+            <img class="rp" data-j="handL"  src="assets/ui/rig/hand_character_left.png" alt="">
+            <img class="rp" data-j="farmR"  src="assets/ui/rig/forearm_character_right.png" alt="">
+            <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
+            <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
+            <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
           </div>
         </div>
       </div>
@@ -689,10 +746,29 @@
       <div class="grobot" id="pmRobotMine" data-side="right" data-pose="idle"
            style="left:-.8%;top:58.7%;width:7.9%">
         <div class="rb-rig">
-          <img class="rb-body" src="assets/ui/figma/rb-body-idle.png" alt="Robot">
-          <div class="rb-face">
-            <img class="rb-mouth" src="assets/ui/figma/rb-mouth-neutral.png" alt="">
-            <img class="rb-eyes" src="assets/ui/figma/rb-eyes-neutral.png" alt="">
+          <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
+               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
+               canvas precisely so there is not a single offset to hand-place:
+               registration is a property of the art, not of this markup.
+               Order is the pack's own back-to-front list — legs, upper arms,
+               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
+               forearms so the blue wrist cuff hides the wrist tab, exactly as
+               the upper arms sit behind the torso to hide the elbow caps. Get
+               this order wrong and the joins show the moment a limb turns. -->
+          <div class="rb-canvas" role="img" aria-label="Robot">
+            <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
+            <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
+            <img class="rp" data-j="uarmR"  src="assets/ui/rig/upper_arm_character_right.png" alt="">
+            <img class="rp" data-j="uarmL"  src="assets/ui/rig/upper_arm_character_left.png" alt="">
+            <img class="rp" data-j="handR"  src="assets/ui/rig/hand_character_right.png" alt="">
+            <img class="rp" data-j="handL"  src="assets/ui/rig/hand_character_left.png" alt="">
+            <img class="rp" data-j="farmR"  src="assets/ui/rig/forearm_character_right.png" alt="">
+            <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
+            <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
+            <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -702,10 +778,29 @@
       <div class="grobot" id="pmRobotFoe" data-side="left" data-pose="idle"
            data-mute style="left:92.9%;top:59.4%;width:7.9%">
         <div class="rb-rig">
-          <img class="rb-body" src="assets/ui/figma/rb-body-idle.png" alt="">
-          <div class="rb-face">
-            <img class="rb-mouth" src="assets/ui/figma/rb-mouth-neutral.png" alt="">
-            <img class="rb-eyes" src="assets/ui/figma/rb-eyes-neutral.png" alt="">
+          <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
+               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
+               canvas precisely so there is not a single offset to hand-place:
+               registration is a property of the art, not of this markup.
+               Order is the pack's own back-to-front list — legs, upper arms,
+               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
+               forearms so the blue wrist cuff hides the wrist tab, exactly as
+               the upper arms sit behind the torso to hide the elbow caps. Get
+               this order wrong and the joins show the moment a limb turns. -->
+          <div class="rb-canvas" role="img" aria-label="Robot">
+            <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
+            <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
+            <img class="rp" data-j="uarmR"  src="assets/ui/rig/upper_arm_character_right.png" alt="">
+            <img class="rp" data-j="uarmL"  src="assets/ui/rig/upper_arm_character_left.png" alt="">
+            <img class="rp" data-j="handR"  src="assets/ui/rig/hand_character_right.png" alt="">
+            <img class="rp" data-j="handL"  src="assets/ui/rig/hand_character_left.png" alt="">
+            <img class="rp" data-j="farmR"  src="assets/ui/rig/forearm_character_right.png" alt="">
+            <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
+            <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
+            <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
           </div>
         </div>
       </div>

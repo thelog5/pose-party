@@ -64,22 +64,80 @@ import { presence, resetPresence } from "./presence.js";
 const reducedMotion = () => typeof matchMedia === "function" &&
   matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const ART = "assets/ui/figma/";
+const ART = "assets/ui/rig/";
 
-/* mood -> [body sprite, face sprite] */
-const MOODS = Object.freeze({
-  idle:  ["idle",      "neutral"],
-  watch: ["thinking",  "thinking"],
-  read:  ["present",   "speaking"],
-  close: ["surprised", "surprised"],
-  got:   ["celebrate", "joyful"],
-  proud: ["thumbsup",  "happy"],
-  lost:  ["shrug",     "confused"],
-  down:  ["sad",       "sad"],
-  /* idle-only: the body stays put and just the face changes, which is what
-     keeps a still pose from reading as a frozen sprite */
-  peek:  ["idle",      "happy"],
+/* ================= THE SKELETON =================
+   Straight out of the pack's rig.json, converted from its 1024px canvas into
+   FRACTIONS of the shared canvas, because everything downstream is expressed
+   in percentages of that box and so survives any viewport.
+
+   `parent` is the real thing this buys us. A hand is parented to a forearm is
+   parented to an upper arm is parented to the torso, so lifting one shoulder
+   carries the whole arm — which is the entire difference between a puppet and
+   a pile of stickers that each have to be keyframed in agreement. */
+const P = 1 / 1024;
+const JOINTS = Object.freeze({
+  torso: { px: 512 * P, py: 675 * P, parent: null },
+  head:  { px: 512 * P, py: 526 * P, parent: "torso" },
+  /* character-left is the VIEWER'S RIGHT — the pack is explicit about this and
+     it is the easiest thing in here to get backwards. */
+  uarmL: { px: 675 * P, py: 584 * P, parent: "torso" },
+  farmL: { px: 678 * P, py: 660 * P, parent: "uarmL" },
+  handL: { px: 677 * P, py: 776 * P, parent: "farmL" },
+  uarmR: { px: 349 * P, py: 584 * P, parent: "torso" },
+  farmR: { px: 346 * P, py: 660 * P, parent: "uarmR" },
+  handR: { px: 347 * P, py: 776 * P, parent: "farmR" },
+  legL:  { px: 571 * P, py: 762 * P, parent: "torso" },
+  legR:  { px: 453 * P, py: 762 * P, parent: "torso" },
 });
+/* Root-first, so a chain can be folded in one pass with no recursion. */
+const CHAIN = Object.freeze(Object.fromEntries(Object.keys(JOINTS).map(k => {
+  const out = [];
+  for(let j = k; j; j = JOINTS[j].parent) out.unshift(j);
+  return [k, Object.freeze(out)];
+})));
+
+/* The mouth's rest centre on the canvas — where the speech tail is aimed. */
+const MOUTH = Object.freeze({ x: 511.5 * P, y: 400 * P });
+
+/* mood -> eye state, mouth shape, and a POSE: the angle every joint wants, in
+   degrees. `arm` is written as a RAISE, positive = outward and up, and the
+   sign is flipped per side when it is applied — otherwise every pose has to be
+   authored twice and the two drift apart the first time one is edited.
+
+   Nothing here is a keyframe. The rig springs toward these, so a mood change
+   is a move rather than a cut, and two moods blend if they land close
+   together. That is what the eight baked sprites could never do.
+
+   THE LIMITS BELOW ARE MEASURED, AND THEY ARE TIGHTER THAN THE PACK CLAIMS.
+   · SHOULDER: only 17% of the upper arm is tucked behind the torso at rest and
+     0.2% at a 66-degree raise, so the README's "these overlaps prevent gaps
+     during rotation" does not hold. A connectivity check passes the whole way
+     — the pieces still touch — which is exactly why it is the wrong check: the
+     failure is the arm becoming a separate capsule with its own closed
+     outline lying against the body. `socket()` slides it back into the joint
+     as it turns, which buys the range back; raises are still kept under ~60.
+   · ELBOW: it can only bend OUTWARD, because the forearm is drawn behind the
+     torso and an inward bend simply swallows the arm. Outward past ~30 reads
+     as hyperextension. So bends live in 0..26, never negative.
+   · WRIST: the blue cuff covers it cleanly past 60 — the one join the art
+     genuinely handles — so the hands are free, and they are what stop a
+     raised arm ending in a flat plank. */
+const MOODS = Object.freeze({
+  idle:  { name:"idle",      eyes:"open",    mouth:"smile",  pose:{ uaL:0,  faL:0,  haL:0,   uaR:0,  faR:0,  haR:0,   head:0,  torso:0 } },
+  watch: { name:"thinking",  eyes:"open",    mouth:"M_BP",   pose:{ uaL:6,  faL:14, haL:-6,  uaR:22, faR:26, haR:-10, head:-5, torso:-1 } },
+  read:  { name:"present",   eyes:"open",    mouth:"A_AH",   pose:{ uaL:20, faL:16, haL:10,  uaR:18, faR:14, haR:8,   head:3,  torso:1 } },
+  close: { name:"surprised", eyes:"open",    mouth:"O_OH",   pose:{ uaL:34, faL:20, haL:14,  uaR:32, faR:18, haR:12,  head:5,  torso:2 } },
+  got:   { name:"celebrate", eyes:"happy",   mouth:"A_AH",   pose:{ uaL:58, faL:22, haL:22,  uaR:58, faR:22, haR:22,  head:0,  torso:0 } },
+  proud: { name:"thumbsup",  eyes:"happy",   mouth:"smile",  pose:{ uaL:48, faL:26, haL:18,  uaR:12, faR:8,  haR:4,   head:-3, torso:0 } },
+  lost:  { name:"shrug",     eyes:"worried", mouth:"E_EE",   pose:{ uaL:30, faL:18, haL:-12, uaR:30, faR:18, haR:-12, head:6,  torso:0 } },
+  down:  { name:"sad",       eyes:"worried", mouth:"FV",     pose:{ uaL:-4, faL:4,  haL:-4,  uaR:-4, faR:4,  haR:-4,  head:13, torso:3 } },
+  /* idle-only: he stays put and only the face moves, which is what keeps a
+     still pose from reading as a frozen sprite */
+  peek:  { name:"peek",      eyes:"happy",   mouth:"smile",  pose:{ uaL:2,  faL:2,  haL:2,   uaR:4,  faR:3,  haR:2,   head:-4, torso:0 } },
+});
+
+const REST = MOODS.idle.pose;
 
 /* Where the meter puts him, highest band first. These read the meter's
    DISPLAY value (recognition.js), so .42 is exactly APPROACH_MAX — the line
@@ -116,21 +174,27 @@ const NUDGE_MS = 8500;   // silence before he pokes you
 const robots = new Map();
 let preloaded = false;
 
-/* Every sprite, warmed once. A mood swap is a `src` change, so the first
-   time each pose is used it would otherwise pop in a frame late — most
-   visibly on the recognition slam, which is the one that has to be instant. */
+/* Every layer, warmed once. A mood change swaps the eye and mouth art, and
+   the first use of each would otherwise pop a frame late — most visibly on
+   the recognition slam, which is the one beat that has to be instant. */
 function preload(){
   if(preloaded || typeof Image !== "function") return;
   preloaded = true;
-  for(const [body, face] of Object.values(MOODS)){
-    new Image().src = ART + "rb-body-" + body + ".png";
-    /* the two cut layers, NOT rb-face-*: warming the whole face warmed a file
-       the live rig never loads, and left both real layers to pop a frame late
-       on the slam — the one swap that has to be instant */
-    new Image().src = ART + "rb-eyes-" + face + ".png";
-    new Image().src = ART + "rb-mouth-" + face + ".png";
+  const want = new Set();
+  for(const m of Object.values(MOODS)){
+    want.add(EYE_FILE(m.eyes, "left"));
+    want.add(EYE_FILE(m.eyes, "right"));
+    want.add(MOUTH_FILE(m.mouth));
   }
+  /* every viseme, not just the resting shapes — they are what he speaks with */
+  for(const v of ["A_AH", "E_EE", "O_OH", "M_BP", "FV"]) want.add(MOUTH_FILE(v));
+  want.add(EYE_FILE("blink", "left"));
+  want.add(EYE_FILE("blink", "right"));
+  for(const f of want) new Image().src = ART + f;
 }
+const EYE_FILE = (state, side) => state + "_" + side + ".png";
+const MOUTH_FILE = shape =>
+  shape === "smile" ? "smile.png" : "phoneme_" + shape + ".png";
 
 function get(id){
   const cached = robots.get(id);
@@ -141,9 +205,11 @@ function get(id){
   const r = {
     node,
     rig:    node.querySelector(".rb-rig"),
-    body:   node.querySelector(".rb-body"),
-    face:   node.querySelector(".rb-face"),
-    eyes:   node.querySelector(".rb-eyes"),
+    /* every .rp keyed by the joint it hangs off, so the render loop can walk
+       the parts without touching the DOM again */
+    parts:  [...node.querySelectorAll(".rp")].map(el => ({ el, j: el.dataset.j })),
+    eyeL:   node.querySelector(".rb-eye-l"),
+    eyeR:   node.querySelector(".rb-eye-r"),
     mouth:  node.querySelector(".rb-mouth"),
     bubble: node.querySelector(".rb-bubble"),
     line:   node.querySelector(".rb-bubble b"),
@@ -195,32 +261,33 @@ function bandRank(name){
 
 function setMood(r, mood){
   if(!r || r.mood === mood) return;
-  const pair = MOODS[mood] || MOODS.idle;
-  const dressing = r.mood === null;   // first mount is not a pose CHANGE
+  const m = MOODS[mood] || MOODS.idle;
   r.mood = mood;
-  /* the pose name is what the CSS keys the two face nudges off */
-  r.node.dataset.pose = pair[0];
-  if(r.body) r.body.src = ART + "rb-body-" + pair[0] + ".png";
-  /* The face is two layers cut from one sprite — see the note in screens.css.
-     Both are set from the same mood name, so they can never disagree. */
-  if(r.eyes)  r.eyes.src  = ART + "rb-eyes-"  + pair[1] + ".png";
-  if(r.mouth) r.mouth.src = ART + "rb-mouth-" + pair[1] + ".png";
-  if(!dressing) snapIntoPose(r);
+  /* The DESCRIPTIVE name, not the internal band name — this is what CSS and
+     the E2E suites read as "what is he doing", and `celebrate` says more than
+     `got` to anyone debugging. Nothing about his body is keyed off it any
+     more: the pose is a set of joint angles the rig springs toward, so a mood
+     change is a movement rather than one picture cutting to another. */
+  r.node.dataset.pose = m.name;
+  r.want = m.pose;
+  /* Blink art wins over the mood's eyes while a blink is running, so a mood
+     that lands mid-blink does not snap his eyes back open. */
+  r.eyeState = m.eyes;
+  if(!r.blinking) dressEyes(r, m.eyes);
+  /* Keep stepMouth's write-guard in step. Setting src without updating
+     mouthSrc left the guard believing the old shape was still on screen, so
+     the next frame skipped its write and a mood change mid-line flipped his
+     mouth to the resting shape until the viseme track happened to move. */
+  r.restMouth = m.mouth;
+  if(r.mouth && !r.viseme){
+    r.mouthSrc = ART + MOUTH_FILE(m.mouth);
+    r.mouth.src = r.mouthSrc;
+  }
 }
 
-/* A sprite change is an IMPACT, not a cut. The squash fires on the same frame
-   the src changes, so the new pose arrives compressed and springs out of it —
-   which is the difference between him moving and a slideshow advancing.
-   Suppressed while a payoff owns him: the slam is already a much bigger
-   version of this beat and the two fight. */
-function snapIntoPose(r){
-  if(!r.body || reducedMotion()) return;
-  if(performance.now() < r.holdUntil) return;
-  r.body.classList.remove("swap");
-  void r.body.offsetWidth;
-  r.body.classList.add("swap");
-  clearTimeout(r.swapTimer);
-  r.swapTimer = setTimeout(() => r.body.classList.remove("swap"), 360);
+function dressEyes(r, state){
+  if(r.eyeL) r.eyeL.src = ART + EYE_FILE(state, "left");
+  if(r.eyeR) r.eyeR.src = ART + EYE_FILE(state, "right");
 }
 
 /* One number drives his scale, his glow and how fast he bobs. Quantised so a
@@ -252,6 +319,12 @@ function say(r, poolName, force = false){
   r.lastSaidAt = now;
   r.lineUntil = now + LINE_MS;
   r.line.textContent = text;
+  /* AND HE MOUTHS IT. The pack ships five visemes, so the line above can
+     actually run through his face instead of text appearing over a robot
+     holding one expression. Built from the real characters, so the rhythm
+     belongs to the sentence. */
+  r.viseme = speakTrack(text);
+  r.visemeAt = now;
   /* Fit synchronously before `.show` reveals the paper. The shared observer
      repeats this after fonts/viewport changes, but waiting for its next frame
      here would expose one overflowing frame whenever dialogue changes. */
@@ -267,6 +340,7 @@ function hush(r){
   clearTimeout(r.bubbleTimer);
   r.bubbleTimer = 0;
   r.lineUntil = 0;
+  r.viseme = null;          // ...and shut his mouth with the paper
   r.bubble?.classList.remove("show");
 }
 
@@ -339,14 +413,7 @@ function slam(r){
 const BREATH_AMP   = 1.9;    // % of his own height, the rise of one breath
 const BREATH_TILT  = 1.15;   // deg, the roll that goes with it
 const FACE_LAG_MS  = 85;     // the face trails the body — overlapping action
-/* A translate-Y percentage resolves against the element's own HEIGHT, so this
-   is the face's height fraction, not its width fraction: .rb-face is 27.8% of
-   his width at aspect 300/172, and he is 520/610 — 13.59% of his height. Using
-   the width fraction here made the lag 2.05x short. */
-const FACE_SCALE   = 1 / .1359;
 const GAZE_MIN_REACH = .30;  // floor for a rig standing on the stage edge
-const GAZE_FACE_X  = 7.5;    // % of the face box
-const GAZE_FACE_Y  = 5.5;
 const GAZE_EYE_X   = 3.6;    // the EXTRA the eyes take over the mouth: this
 const GAZE_EYE_Y   = 2.4;    // difference is the whole parallax effect
 const LEAN_X       = 1.5;    // % of his box
@@ -359,6 +426,26 @@ const TAU_GAZE = 80;
 const TAU_LEAN = 300;
 const TAU_NEAR = 500;
 const TAU_AMP  = 220;   // how fast the breath grows in and out of a held beat
+/* Limbs are heavy. Slower than the gaze on purpose: the eyes get there first
+   and the arms catch up, which is the same lead-and-follow that makes the
+   look read as intent rather than as a slider being dragged. */
+const TAU_POSE = 190;
+
+/* HOW HARD THE NECK WORKS. His head is a real joint now, so a look can be a
+   head turn instead of the whole body leaning — which is all the sprite rig
+   could ever do, because head and torso were one picture. HEAD_COUNTER keeps
+   his face upright through the torso's breath roll; without it he nods along
+   with his own chest, which reads as a bobblehead. */
+const HEAD_TURN    = 7;    // deg at full gaze
+const HEAD_NOD     = 4;
+const HEAD_COUNTER = .55;  // of the torso's roll, cancelled at the neck
+const FACE_LAG_TILT = 2.2; // the head arrives a beat after the chest
+const LEG_SHIFT    = .35;  // a hint of weight transfer, not a walk cycle
+
+/* Where the shared 640 canvas sits inside .grobot's box — see screens.css.
+   Kept here as well because the speech tail is aimed through it. */
+const CANVAS_X = -.1366, CANVAS_Y = -.0569, CANVAS_S = 1.0801;
+const GROBOT_AR = 520 / 610;
 
 const BLINK_GAP_MS  = [2600, 6400];
 /* 130ms rather than 105: Party's frame budget only samples a blink three or
@@ -385,6 +472,13 @@ function lifeState(){
     breath: Math.random(),          // cycles; desyncs the two rigs on a board
     amp: 0,                         // the breath grows in rather than cutting in
     gx: 0, gy: 0, lx: 0, near: 0,
+    /* live joint angles. They SPRING toward MOODS[mood].pose, so a mood change
+       is a movement and two moods landing close together blend instead of
+       fighting — the thing eight baked sprites could never do. */
+    j: { uaL:0, faL:0, haL:0, uaR:0, faR:0, haR:0, head:0, torso:0 },
+    want: REST,
+    blinking: false, eyeState: "open", restMouth: "smile",
+    viseme: null, visemeAt: 0,
     blinkAt: performance.now() + rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]),
     blinkUntil: 0, blinkAgain: false, blinkV: 1,
     searchPhase: Math.random() * 6.28,
@@ -401,6 +495,60 @@ function lifeState(){
    speeds on different machines. */
 const approach = (from, to, tau, dt) =>
   from + (to - from) * (1 - Math.exp(-dt / tau));
+
+const DEG = Math.PI / 180, RAD = 180 / Math.PI;
+
+/* Fold a joint chain into ONE transform.
+   Each joint is `translate(p) rotate(a) translate(-p)`, and a chain of those
+   composes to a plain rotation plus a translation — rotations simply add, and
+   the offsets accumulate through the rotations above them. So a hand four
+   joints deep still costs the element one `translate(...) rotate(...)`, in
+   percentages of its own box, which is the same box for every part. No pixel
+   value appears anywhere, so the whole puppet is resolution-independent for
+   free and nothing has to know the viewport. */
+function compose(chain, ang, off){
+  let th = 0, tx = 0, ty = 0;
+  for(let i = 0; i < chain.length; i++){
+    const name = chain[i];
+    const j = JOINTS[name];
+    const a = (ang[name] || 0) * DEG;
+    const o = off && off[name];
+    if(!a && !o) continue;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    /* this joint on its own: the pivot must map to itself, plus any socket
+       slide, which rides in the PARENT's frame and is therefore inherited by
+       everything further down the chain — slide a shoulder and the forearm and
+       hand come with it, which is the only reason this is safe to do */
+    let jx = j.px - (ca * j.px - sa * j.py);
+    let jy = j.py - (sa * j.px + ca * j.py);
+    if(o){ jx += o.x; jy += o.y; }
+    const c0 = Math.cos(th), s0 = Math.sin(th);
+    tx += c0 * jx - s0 * jy;
+    ty += s0 * jx + c0 * jy;
+    th += a;
+  }
+  return { th, tx, ty };
+}
+
+/* ---- THE SOCKET SLIDE ----
+   The pack's README promises the overlap tabs "prevent gaps during rotation".
+   Measured, they do not: only 17% of the upper arm is tucked behind the torso
+   at rest, 5% by a 15-degree raise and 0.2% by 66 — at which point the limb is
+   a separate blue capsule with its own closed outline lying against the body.
+   It is not a hole, which is why a connectivity test says everything is fine
+   and the render plainly is not.
+
+   So the arm is pushed back INTO its socket as it turns, along the line to the
+   body. Sliding it by this much restores the resting overlap at every angle,
+   and it is small enough to be invisible: 5.6px at the loudest pose on a
+   176px-tall rig, against an arm that has swung 66 degrees. Standard cutout
+   rigging, and it costs nothing but this function. */
+const SOCKET_MAX = 17 / 640, SOCKET_K = .32 / 640, SOCKET_BIAS = 1.6 / 640;
+const SOCKET_DY = .38;
+function socket(a, inward){
+  const s = Math.min(SOCKET_MAX, SOCKET_K * Math.abs(a) + SOCKET_BIAS);
+  return { x: s * inward, y: s * SOCKET_DY };
+}
 
 /* Breathing is NOT a sine. Air goes in quickly and comes out slowly, and the
    turn at the top is a hold, not a corner. 0..1 in, 0..1 out. */
@@ -486,30 +634,59 @@ function span(d, before){
 }
 
 function stepBlink(r, now){
-  if(now < r.blinkUntil){
-    /* Open → shut → open across one cosine. It has to START and END at 1:
-       written the other way up the eyes begin the beat already closed, which
-       renders as two hard flickers per blink instead of one blink. */
-    const u = 1 - (r.blinkUntil - now) / BLINK_MS;
-    r.blinkV = 1 - .88 * (.5 - .5 * Math.cos(2 * Math.PI * u));
-    return;
+  if(r.blinking){
+    if(now < r.blinkUntil) return;
+    r.blinking = false;
+    dressEyes(r, r.eyeState);          // back to whatever the mood wants
   }
-  r.blinkV = 1;
   if(now < r.blinkAt) return;
-  /* Half these faces already have their eyes shut or squeezed, and blinking
-     through a celebration reads as a dropped frame. */
-  if(NO_BLINK.has(r.mood) || now < r.holdUntil){
+  /* `happy` and `worried` are already drawn with the eyes closed or squeezed,
+     and blinking through a celebration reads as a dropped frame. */
+  if(r.eyeState !== "open" || now < r.holdUntil){
     r.blinkAt = now + rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]);
     return;
   }
+  r.blinking = true;
+  dressEyes(r, "blink");
   r.blinkUntil = now + BLINK_MS;
   /* `blinkAgain` is consumed here, so a double is exactly two. Rolling for it
      again on the second blink made every double a triple. */
   const paired = r.blinkAgain;
   r.blinkAgain = paired ? false : Math.random() < DOUBLE_BLINK;
-  r.blinkAt = now + (r.blinkAgain || paired
-    ? BLINK_MS + 110
-    : rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]));
+  r.blinkAt = now + BLINK_MS + (r.blinkAgain || paired
+    ? 110 : rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]));
+}
+
+/* ---- he MOUTHS the words ----
+   The pack ships five visemes and a smile, so when a line is on the paper his
+   mouth can actually run it rather than sitting in one shape while text
+   appears above his head. The mapping is deliberately crude — nobody is
+   lip-reading a robot at 176px — but the RHYTHM is what sells it, so the
+   track is built from the real characters of the real line. */
+const VISEME_MS = 85;
+const VISEME_OF = { a:"A_AH", e:"E_EE", i:"E_EE", y:"E_EE", o:"O_OH", u:"O_OH",
+  m:"M_BP", b:"M_BP", p:"M_BP", f:"FV", v:"FV", w:"O_OH" };
+function speakTrack(text){
+  const out = [];
+  for(const ch of text.toLowerCase()){
+    if(ch === " " || ch === "\u2014"){ out.push(null); continue; }   // a beat of rest
+    const v = VISEME_OF[ch];
+    if(v) out.push(v);
+    else if(out.length && out[out.length - 1]) out.push(null);
+  }
+  return out.slice(0, Math.ceil(LINE_MS / VISEME_MS));
+}
+
+function stepMouth(r, now){
+  if(!r.mouth) return;
+  let shape = r.restMouth;
+  if(r.viseme){
+    const i = Math.floor((now - r.visemeAt) / VISEME_MS);
+    if(i >= r.viseme.length) r.viseme = null;
+    else shape = r.viseme[i] || "M_BP";      // a closed mouth between sounds
+  }
+  const src = ART + MOUTH_FILE(shape);
+  if(r.mouthSrc !== src){ r.mouthSrc = src; r.mouth.src = src; }
 }
 
 const px2 = v => (Math.round(v * 100) / 100);
@@ -569,26 +746,90 @@ function lifeStep(r, now, dt, still){
     faceLag = (breathShape(r.breath - FACE_LAG_MS / period) - b) * BREATH_AMP * r.amp;
   }
 
-  /* ---- write ----
-     Under reduced motion the LEAN goes too, not just the breath. It is 1.5% of
-     his box of translation and 2.4deg of rotation about his feet, running
-     continuously as he tracks you — that is body motion by any reading, and
-     gating only the breath left it live. The gaze and the blink stay: moving
-     the eyes inside a stationary head is not vestibular, and a character who
-     never changes at all is the thing this whole loop exists to fix. */
-  const s = r.node.style;
+  /* ---- pose springs ----
+     The mood sets a TARGET for every joint and the rig travels there. Nothing
+     is keyframed, so a mood that changes mid-move blends out of wherever the
+     limbs actually are instead of cutting. */
+  const w = r.want || REST;
+  for(const k in r.j) r.j[k] = approach(r.j[k], w[k] || 0, TAU_POSE, dt);
+
+  /* ---- drive the skeleton ----
+     Under reduced motion the LEAN goes too, not just the breath: it is 1.5% of
+     his box of travel and a couple of degrees of roll, running continuously as
+     he tracks you, and that is body motion by any reading. The gaze and the
+     blink stay — moving the eyes in a still head is not vestibular, and a
+     character who never changes at all is what this loop exists to fix. */
+  const st = r.node.style;
   const lean = still ? 0 : r.lx;
-  s.setProperty("--rb-shift-x", px2(lean * LEAN_X) + "%");
-  s.setProperty("--rb-shift-y", px2(bY + (still ? 0 : r.near * NEAR_PUSH)) + "%");
-  s.setProperty("--rb-tilt", px2(bTilt + lean * TILT_X) + "deg");
-  s.setProperty("--rb-gaze-x", px2(r.gx * GAZE_FACE_X) + "%");
-  s.setProperty("--rb-gaze-y",
-    px2(r.gy * GAZE_FACE_Y + faceLag * FACE_SCALE) + "%");
-  s.setProperty("--rb-eye-x", px2(r.gx * GAZE_EYE_X) + "%");
-  s.setProperty("--rb-eye-y", px2(r.gy * GAZE_EYE_Y) + "%");
+  st.setProperty("--rb-shift-x", px2(lean * LEAN_X) + "%");
+  st.setProperty("--rb-shift-y", px2(bY + (still ? 0 : r.near * NEAR_PUSH)) + "%");
+
+  /* HIS HEAD TURNS NOW. On the sprite rig a "look" could only ever be the
+     whole body leaning, because head and torso were one picture. Here the neck
+     is a joint, so the gaze cascade finally runs the way it does in a real
+     body: eyes first, then the head, then the torso — and the head carries a
+     COUNTER of the torso's roll, so leaning does not tip his face with it. */
+  const ang = {
+    torso: r.j.torso + (still ? 0 : bTilt) + lean * TILT_X,
+    head:  r.j.head + r.gx * HEAD_TURN + r.gy * HEAD_NOD
+             - (still ? 0 : bTilt) * HEAD_COUNTER
+             + (still ? 0 : faceLag * FACE_LAG_TILT),
+    /* Keys here are JOINT names, not pose names — `compose` looks each one up
+       in JOINTS, so a pose-shaped key (uaL) silently resolves to zero and the
+       arm never moves while the head, which happened to share a name, does.
+       Raise is positive-outward on both sides and the sign flips here, so the
+       pose table stays readable and cannot drift between left and right. */
+    uarmL: -r.j.uaL, farmL: -r.j.faL,
+    uarmR:  r.j.uaR, farmR:  r.j.faR,
+    /* THE WRIST IS THE ONE JOIN THAT HOLDS — the blue cuff covers it cleanly
+       past 60 degrees — and it was hardcoded to zero, so the pack shipped hand
+       art authored to rotate and the rig left it dead. Hands counter part of
+       the forearm's bend, which is what keeps a raised arm from ending in a
+       flat plank and gives `got` an actual "yes!" instead of a T-pose. */
+    handL: -r.j.haL, handR: r.j.haR,
+    /* a hair of weight shift, so the legs are not two nailed posts */
+    legL: -lean * LEG_SHIFT, legR: -lean * LEG_SHIFT,
+  };
+  /* Only the shoulders need it; the wrist cuff covers its own joint and the
+     elbow gets its own measured slide. */
+  const off = {
+    uarmL: socket(ang.uarmL, -1),
+    uarmR: socket(ang.uarmR, +1),
+  };
+  for(let i = 0; i < r.parts.length; i++){
+    const part = r.parts[i];
+    const m = compose(CHAIN[part.j], ang, off);
+    const tf = "translate(" + px2(m.tx * 100) + "%," + px2(m.ty * 100) + "%) rotate("
+      + px2(m.th * RAD) + "deg)";
+    if(part.tf !== tf){ part.tf = tf; part.el.style.transform = tf; }
+    if(part.j === "head") r.headM = m;
+  }
+  /* The eyes travel a little further than the mouth, on top of the head chain.
+     That difference is the whole parallax: features nearer the viewer move
+     more, which is what the eye reads as rotation rather than a decal slide. */
+  st.setProperty("--rb-eye-x", px2(r.gx * GAZE_EYE_X) + "%");
+  st.setProperty("--rb-eye-y", px2(r.gy * GAZE_EYE_Y) + "%");
+
+  /* Aim the speech tail at where his mouth ACTUALLY is, through the same head
+     transform his face rides — so the paper follows him when he turns instead
+     of hanging off a per-pose constant that has to be re-authored by hand. */
+  /* ON THE BUBBLE, NOT ON .grobot. `--talk-x/--talk-y` are declared on
+     `.rb-bubble` itself as fallbacks, and a property set on the element beats
+     the same property inherited from its parent — so writing these to the rig
+     was silently doing nothing and the tail sat 11px above his mouth using the
+     stylesheet's default. It cost a full measurement of every term in that
+     geometry to find, because every number in the chain looked right. */
+  if(r.headM && r.bubble){
+    const c = Math.cos(r.headM.th), sn = Math.sin(r.headM.th);
+    const mx = r.headM.tx + c * MOUTH.x - sn * MOUTH.y;
+    const my = r.headM.ty + sn * MOUTH.x + c * MOUTH.y;
+    const bs = r.bubble.style;
+    bs.setProperty("--talk-x", px2((CANVAS_X + mx * CANVAS_S / GROBOT_AR) * 100) + "%");
+    bs.setProperty("--talk-y", px2((CANVAS_Y + my * CANVAS_S) * 100) + "%");
+  }
 
   stepBlink(r, now);
-  s.setProperty("--rb-blink", px2(r.blinkV));
+  stepMouth(r, now);
 
   /* ---- he notices you are gone, and notices you are back ---- */
   if(!r.mute && p){
@@ -650,10 +891,11 @@ if(typeof document !== "undefined"){
 function clearLife(r){
   Object.assign(r, lifeState());
   const s = r.node.style;
-  for(const k of ["--rb-shift-x", "--rb-shift-y", "--rb-tilt",
-                  "--rb-gaze-x", "--rb-gaze-y", "--rb-eye-x", "--rb-eye-y"])
-    s.setProperty(k, k === "--rb-tilt" ? "0deg" : "0%");
-  s.setProperty("--rb-blink", "1");
+  for(const k of ["--rb-shift-x", "--rb-shift-y", "--rb-eye-x", "--rb-eye-y"])
+    s.setProperty(k, "0%");
+  /* park every limb back at rest, and clear the cached transform strings so
+     the next frame genuinely rewrites them */
+  for(const part of r.parts || []){ part.tf = ""; part.el.style.transform = ""; }
 }
 
 /* ---------------- the public surface ---------------- */
@@ -738,10 +980,8 @@ export function robotNewWord(id){
   if(!r) return;
   clearTimeout(r.moodTimer); r.moodTimer = 0;
   clearTimeout(r.slamTimer); r.slamTimer = 0;
-  clearTimeout(r.swapTimer); r.swapTimer = 0;
   stopIdle(r);
   r.rig?.classList.remove("slam");
-  r.body?.classList.remove("swap");
   r.holdUntil = 0;
   r.band = null;
   /* Grow the breath back in rather than resuming mid-cycle. This is also what

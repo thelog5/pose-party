@@ -711,18 +711,32 @@ const robotBands = await page.evaluate(async () => {
   const node = document.getElementById("spRobot");
   const read = () => ({
     pose: node.dataset.pose,
-    body: node.querySelector(".rb-body").getAttribute("src"),
-    /* the face is two layers cut from one sprite — both must dress together */
-    eyes: node.querySelector(".rb-eyes").getAttribute("src"),
+    /* the puppet: every limb carries a composed joint-chain transform, and
+       the face is dressed from the pack's own eye/mouth states */
+    arm: node.querySelector('[data-j="uarmR"]').style.transform,
+    eyes: node.querySelector(".rb-eye-l").getAttribute("src"),
     mouth: node.querySelector(".rb-mouth").getAttribute("src"),
     hype: parseFloat(getComputedStyle(node).getPropertyValue("--rb-hype")) || 0,
   });
   const seen = {};
+  /* The puppet SPRINGS toward each pose, so the limbs are still at the last
+     one on the frame the charge is fed. Hold each band long enough for the
+     joints to travel — this measures the mood machine, and a sampler that
+     reads on the same tick measures nothing but the previous pose. */
+  const settle = ms => new Promise(done => {
+    const end = performance.now() + ms;
+    const step = () => { r.robotCharge("spRobot", seen._v);
+      performance.now() < end ? requestAnimationFrame(step) : done(); };
+    requestAnimationFrame(step);
+  });
   for(const [value, key] of [[0, "cold"], [.3, "watch"], [.55, "read"], [.9, "close"]]){
+    seen._v = value;
     r.robotCharge("spRobot", value);
+    await settle(600);
     seen[key] = read();
   }
   r.robotGot("spRobot");
+  await new Promise(d => setTimeout(d, 520));
   seen.got = read();
   seen.slam = node.querySelector(".rb-rig").classList.contains("slam");
   seen.said = (node.querySelector(".rb-bubble b").textContent || "").trim();
@@ -779,12 +793,27 @@ const robotBands = await page.evaluate(async () => {
      ALL of it has to be parked, not just the gaze: --rb-tilt rotates him
      about his feet, so a couple of degrees of breath swings his head
      sideways relative to a bubble anchored much lower down. */
-  for(const k of ["--rb-gaze-x", "--rb-gaze-y", "--rb-eye-x", "--rb-eye-y",
-                  "--rb-shift-x", "--rb-shift-y"])
-    node.style.setProperty(k, "0%");
-  node.style.setProperty("--rb-tilt", "0deg");
+  /* Nothing can be "parked" here: the life loop rewrites every joint AND the
+     bubble's aim on the next frame, so the old trick of zeroing the transforms
+     measured a rig that had already moved back. Map the mouth through the very
+     transform robot.js applied to it instead — exact, and independent of the
+     --talk-* variables, so this cannot pass by tautology. */
+  /* The old rig had a .rb-face box to measure against. The puppet's mouth is
+     one layer on the shared canvas, so its element rect is the whole canvas —
+     the mouth itself is at a known fraction of it (rig.json's own geometry). */
+  const mouthInk = n => {
+    const c = n.querySelector(".rb-canvas").getBoundingClientRect();
+    const el = n.querySelector(".rb-mouth");
+    /* .rp is transform-origin:0 0, so the computed matrix maps element-local
+       pixels straight through. 0.4995/0.3906 is the mouth's own centre on the
+       pack's shared canvas (smile.png ink, from rig.json's geometry). */
+    const m = new DOMMatrix(getComputedStyle(el).transform);
+    const p = m.transformPoint(new DOMPoint(c.width * 0.4995, c.height * 0.3906));
+    const w = c.width * 0.14, h = c.height * 0.07;
+    return { left: c.left + p.x - w / 2, top: c.top + p.y - h / 2, width: w, height: h };
+  };
   const bubble = bubbleNode.getBoundingClientRect();
-  const face = node.querySelector(".rb-face").getBoundingClientRect();
+  const face = mouthInk(node);
   const tailX = node.dataset.side === "left" ? 1 - .2050147493 : .2050147493;
   const origin = getComputedStyle(bubbleNode).transformOrigin
     .split(" ").map(Number.parseFloat);
@@ -812,12 +841,11 @@ ok(new Set(robotPoses).size === 5,
   `the robot has a different body at every band of the meter (${robotPoses.join(" -> ")})`);
 ok(["cold", "watch", "read", "close", "got"].every(k => {
     const m = robotBands[k];
-    const mood = /rb-eyes-(.+)\.png/.exec(m.eyes)?.[1];
-    /* eyes and mouth are the SAME cut of the SAME face: if they ever drift
-       apart he is wearing one expression's eyes over another's mouth */
-    return /rb-body-/.test(m.body) && mood && m.mouth.endsWith(`rb-mouth-${mood}.png`);
-  }),
-  "every mood dresses all three layers — body, eyes and mouth, eyes and mouth in step");
+    return /\/(open|happy|blink|worried)_left\.png$/.test(m.eyes) &&
+      /\/(smile|phoneme_[A-Z_]+)\.png$/.test(m.mouth) &&
+      /rotate\(/.test(m.arm);
+  }) && new Set(["cold","watch","read","close","got"].map(k => robotBands[k].arm)).size >= 4,
+  "every mood dresses the face AND moves the skeleton — the arm angle differs per band");
 ok(robotBands.close.hype > robotBands.watch.hype &&
    robotBands.watch.hype > robotBands.cold.hype,
   `his glow and scale climb with the meter (${robotBands.cold.hype} -> ` +
@@ -931,7 +959,7 @@ const robotIdle = await page.evaluate(async () => {
     r.robotCharge("spRobot", 0);            // stone cold the whole time
     await new Promise(done => setTimeout(done, 100));
     const key = node.dataset.pose + "/" +
-      (node.querySelector(".rb-face").getAttribute("src") || "").split("rb-face-")[1];
+      (node.querySelector(".rb-eye-l").getAttribute("src") || "").split("/").pop();
     if(seen[seen.length - 1] !== key) seen.push(key);
   }
   r.resetRobot("spRobot");
