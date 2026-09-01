@@ -1365,8 +1365,26 @@ const beforeSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 await page.$eval("#btnSkipSolo", el => el.click());
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
 ok(await page.evaluate(() => !document.querySelector(".burstwrap")) || true, "skip: no new confetti (no payoff)");
+/* The cost is DELIVERED, not announced: a glowing figure lands off-centre and
+   is dragged into the score card, and the total only drops when it arrives —
+   the exact mirror of the award paper. So the score is deliberately UNCHANGED
+   for the length of that flight, and reading it in the same breath as the
+   click reads the value before the penalty has been paid. */
+ok(await page.evaluate(() => {
+  const p = document.getElementById("spPenalty");
+  return !!p && p.classList.contains("show") &&
+    p.querySelector(".pen-val").textContent.trim() === "\u2212250";
+}), "skip: the cost lands on screen as a figure, not a toast");
+ok(parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,"")) === beforeSkip,
+  "skip: the score is held until the figure reaches the card");
+await page.waitForFunction(n => parseInt(
+  document.getElementById("soloScoreVal").textContent.replace(/[^0-9]/g,"")) !== n,
+  { timeout: 4000, polling: 40 }, beforeSkip);
 const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
+ok(await page.evaluate(() =>
+  document.getElementById("soloScoreCard").classList.contains("bump-hit")),
+  "skip: the score card recoils rather than swelling");
 /* x0, not a clamped x1: clamping made streak 0 and 1 render identically, so
    the first catch of a run — and losing a streak of one — changed nothing on
    screen and never bumped the card. */

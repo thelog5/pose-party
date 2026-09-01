@@ -250,6 +250,10 @@ const liveBursts = new Set();
    across the Results screen — and any score paint it is holding would never
    be released. */
 function settleAward(a){
+  /* clearCelebrations() iterates one set, and the penalty figure lives in it
+     alongside the award papers. Its classes and vars are the same, but it has
+     no `.sp-award` markup to reset, so it owns its own settler. */
+  if(a.classList.contains("sp-penalty")) return settlePenalty(a);
   clearTimeout(a._awardTimer);
   a._awardTimer = null;
   a.classList.remove("show", "deliver");
@@ -357,10 +361,104 @@ export function deliverPointsAward({
   }, AWARD_HOLD_MS);
 }
 
+/* ---------------- LOSING points is the same object, run backwards -------- */
+
+/* Skipping used to be a line of grey text in a toast at the bottom edge of a
+   screen that is otherwise entirely your own camera: the score in the corner
+   silently went down and nothing on screen connected the two. A penalty is
+   the exact mirror of the payoff, so it gets the payoff's grammar — a figure
+   lands, is held long enough to read, and is then DRAGGED into the score card,
+   where the total drops exactly as it arrives.
+
+   It is a bare glowing figure rather than paper on purpose. The award is a
+   physical thing you are handed; a penalty is something being taken off the
+   board, and giving it its own paper would have read as a second prize. */
+export const PENALTY_HOLD_MS   = 620;
+export const PENALTY_FLIGHT_MS = 540;
+
+/* Same anchor as the award, and for the same reason: dead centre is where the
+   player's own face is, and covering it for half a second is the one thing a
+   game played with your whole body must not do. Sharing the point also means
+   winning and losing arrive in the same place, so the two read as one meter. */
+let penaltyNode = null;
+function penaltyEl(){
+  if(penaltyNode?.isConnected) return penaltyNode;
+  penaltyNode = document.createElement("div");
+  penaltyNode.className = "sp-penalty";
+  penaltyNode.id = "spPenalty";
+  penaltyNode.setAttribute("aria-hidden", "true");
+  penaltyNode.innerHTML =
+    '<span class="pen-val"></span><span class="pen-lab">POINTS</span>';
+  document.body.appendChild(penaltyNode);
+  return penaltyNode;
+}
+
+/* Registered with liveAwards so clearCelebrations() sweeps it exactly like an
+   award in flight — a fixed-position figure left mid-throw sails across the
+   Results screen, and the score paint it is holding would never be released. */
+function settlePenalty(p){
+  clearTimeout(p._awardTimer);
+  p._awardTimer = null;
+  p.classList.remove("show", "deliver");
+  for(const v of ["--fly-x","--fly-y","--fly-s","--fly-r","--fly-ms"])
+    p.style.removeProperty(v);
+  const land = p._land;
+  p._land = null;
+  land?.();
+}
+
+export function deliverScorePenalty({ points = 0, toEl, onLand, stage } = {}){
+  const p = penaltyEl();
+  if(!points){ onLand?.(); return; }
+  anchorAward(p, stage);
+  const value = p.querySelector(".pen-val");
+  if(value) value.textContent = "\u2212" + Math.abs(points).toLocaleString("en-US");
+
+  if(liveAwards.has(p)) settlePenalty(p);
+
+  const land = () => {
+    liveAwards.delete(p);
+    toEl?.classList.remove("awaiting");
+    /* The repaint FIRST, the reaction second. Every mode's score repaint runs
+       its own ordinary `bump` on the card, and that would land on top of the
+       recoil and cancel it — this is a loss, so the card has to flinch, not
+       swell. */
+    onLand?.();
+    bumpTarget(toEl, "hit");
+  };
+
+  p.classList.remove("show", "deliver");
+  void p.offsetWidth;
+  p.classList.add("show");
+  liveAwards.add(p);
+  toEl?.classList.add("awaiting");
+  blip([330, 220], .07);
+
+  if(prefersReducedMotion()){
+    land();
+    p._land = null;
+    p._awardTimer = setTimeout(() => {
+      p._awardTimer = null;
+      p.classList.remove("show");
+      liveAwards.delete(p);
+    }, PENALTY_HOLD_MS + PENALTY_FLIGHT_MS);
+    liveAwards.add(p);
+    return;
+  }
+
+  p._land = land;
+  p._awardTimer = setTimeout(() => {
+    if(!liveAwards.has(p)) return;
+    aimAward(p, toEl, PENALTY_FLIGHT_MS);
+    p.classList.add("deliver");
+    p._awardTimer = setTimeout(() => settlePenalty(p), PENALTY_FLIGHT_MS);
+  }, PENALTY_HOLD_MS);
+}
+
 /* Point the paper at the card that is about to receive the points. The paper
    is centred with translate(-50%,-50%), so the flight is a centre-to-centre
    delta plus the scale that shrinks it into the card. */
-function aimAward(a, toEl){
+function aimAward(a, toEl, ms = AWARD_FLIGHT_MS){
   const from = a.getBoundingClientRect();
   const to = toEl?.getBoundingClientRect();
   if(!from.width || !to?.width) return;
@@ -372,16 +470,16 @@ function aimAward(a, toEl){
     Math.max(.12, Math.min(.55, (to.width * .82) / from.width)).toFixed(3));
   a.style.setProperty("--fly-r",
     (to.left + to.width / 2 < from.left + from.width / 2 ? -14 : 14) + "deg");
-  a.style.setProperty("--fly-ms", AWARD_FLIGHT_MS + "ms");
+  a.style.setProperty("--fly-ms", ms + "ms");
 }
 
 /* Every score surface in the game reacts with the same .bump keyframe —
    .sp-card for Solo, .v1-scorecard for 1v1 and both Party team cards. */
-function bumpTarget(node){
+function bumpTarget(node, kind){
   if(!node) return;
-  node.classList.remove("bump");
+  node.classList.remove("bump", "bump-hit");
   void node.offsetWidth;
-  node.classList.add("bump");
+  node.classList.add(kind === "hit" ? "bump-hit" : "bump");
 }
 
 /* The win burst is real paper: the same torn confetti the home screen uses,

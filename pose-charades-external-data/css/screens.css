@@ -509,6 +509,17 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 /* pulse when score/streak change */
 .sp-card.bump{animation:spbump .4s cubic-bezier(.2,1.6,.4,1)}
 @keyframes spbump{0%{transform:scale(1)}45%{transform:scale(1.12)}100%{transform:scale(1)}}
+/* Losing points is a HIT, not a bump: the card recoils rather than swelling,
+   and the figure inside it flashes the same red the penalty arrived in, so
+   the number you watched fly in is unmistakably the number that just came
+   off the total. */
+.sp-card.bump-hit,.v1-scorecard.bump-hit{animation:sphit .44s cubic-bezier(.2,1.5,.4,1)}
+@keyframes sphit{0%{transform:scale(1)}
+  22%{transform:scale(.9) rotate(-2.2deg)}
+  58%{transform:scale(1.04) rotate(1deg)}
+  100%{transform:scale(1) rotate(0)}}
+.sp-card.bump-hit .sp-val,.v1-scorecard.bump-hit .sp-val{animation:sphitink .44s ease-out}
+@keyframes sphitink{0%,45%{color:#e8402a}100%{color:inherit}}
 /* word-timer runs red in the final seconds */
 /* The word clock's deadline red. The RUN/MATCH clock gets its own, softer
    warning — it had none at all in any mode, so every game just stopped. The
@@ -1053,6 +1064,72 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 @keyframes awburst{0%{opacity:0;scale:.25;rotate:-18deg}18%{opacity:.85;scale:1.02}
   62%{opacity:.42;scale:1.2;rotate:22deg}100%{opacity:.22;scale:1.28;rotate:26deg}}
 @keyframes awburstout{from{opacity:.22}to{opacity:0}}
+
+/* THE PENALTY FIGURE (soloRound.js deliverScorePenalty). Skipping a word used
+   to be a grey toast at the bottom edge while the score in the corner silently
+   dropped; nothing on screen joined the two events. This is the award paper's
+   mirror and shares its whole grammar — same fixed positioning, same stage
+   anchor, same --fly-* delivery vars — so a gain and a loss arrive in the same
+   place and read as one meter.
+
+   No paper behind it, deliberately: the award is a physical thing you are
+   handed, a penalty is something taken off the board, and giving it its own
+   sheet would read as a second prize. The weight is carried by the red glow
+   instead, which is the same #e8402a every deadline in this game uses. */
+.sp-penalty{position:fixed;left:26%;top:50%;z-index:95;
+  transform:translate(-50%,-50%);pointer-events:none;opacity:0;
+  width:min(30vw,420px);container-type:inline-size;text-align:center}
+.sp-penalty::before{content:"";position:absolute;left:50%;top:50%;
+  width:150%;aspect-ratio:1;translate:-50% -50%;z-index:-1;opacity:0;
+  background:radial-gradient(circle,rgba(232,64,42,.62) 0 24%,
+    rgba(232,64,42,.30) 46%,rgba(232,64,42,.10) 64%,transparent 74%);
+  filter:blur(min(.6vw,1.06vh))}
+.sp-penalty .pen-val{display:block;
+  font-family:var(--f-lobby);font-weight:400;line-height:.94;
+  font-size:34cqw;color:#e8402a;white-space:nowrap;
+  text-shadow:0 0 .07em rgba(232,64,42,.95),0 0 .22em rgba(232,64,42,.65),
+              .022em .028em 0 rgba(60,8,0,.42)}
+.sp-penalty .pen-lab{display:block;margin-top:.14em;
+  font-family:var(--f-sign),var(--f-body);font-weight:800;
+  font-size:9.4cqw;letter-spacing:.06em;color:#e8402a;
+  text-shadow:0 0 .12em rgba(232,64,42,.7)}
+
+/* Two beats, exactly like the award: `.show` slams the figure down and LEAVES
+   it there, `.deliver` then drags that same figure into the score card and the
+   total only drops when it arrives. `.deliver` replaces the animation outright
+   so its 0% keyframe is where `penshow` came to rest. */
+.sp-penalty.show{animation:penshow .42s cubic-bezier(.16,1.4,.32,1) both}
+.sp-penalty.show::before{animation:penglow 1s ease-out both}
+.sp-penalty.show.deliver{
+  animation:pendeliver var(--fly-ms,540ms) cubic-bezier(.5,-.24,.62,1) both}
+.sp-penalty.show.deliver::before{animation:penglowout .24s ease-in both}
+@keyframes penshow{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(1.55) rotate(5deg)}
+  40%{opacity:1;transform:translate(-50%,-50%) scale(.88) rotate(-2.6deg)}
+  /* the shake is the point: a figure that lands and sits still is a readout,
+     one that rattles is something that just hit you */
+  62%{transform:translate(calc(-50% + 1.1%),-50%) scale(1.04) rotate(1.6deg)}
+  80%{transform:translate(calc(-50% - .8%),-50%) scale(.99) rotate(-.8deg)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}}
+@keyframes pendeliver{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}
+  14%{opacity:1;transform:translate(-50%,-44%) scale(1.09) rotate(3deg)}
+  100%{opacity:.05;
+    transform:translate(calc(-50% + var(--fly-x,0px)),calc(-50% + var(--fly-y,0px)))
+      scale(var(--fly-s,.24)) rotate(var(--fly-r,-14deg))}}
+@keyframes penglow{0%{opacity:0;scale:.4}16%{opacity:.95;scale:1.06}
+  60%{opacity:.5;scale:1.16}100%{opacity:.3;scale:1.2}}
+@keyframes penglowout{from{opacity:.3}to{opacity:0}}
+
+/* theme.css kills every animation under reduced motion, which would leave the
+   figure at opacity 0 — the whole point of it is that the loss is visible, so
+   show it plainly instead. deliverScorePenalty pays the score immediately on
+   that path, so nothing is waiting on a flight that never happens. */
+@media (prefers-reduced-motion: reduce){
+  .sp-penalty.show{opacity:1;animation:none}
+  .sp-penalty.show::before{opacity:.3;animation:none}
+  .sp-card.bump-hit,.v1-scorecard.bump-hit{animation:none}
+}
 
 /* theme.css kills every animation under reduced motion, which would leave the
    award paper stuck at opacity:0 — the payoff, and the points it reports,

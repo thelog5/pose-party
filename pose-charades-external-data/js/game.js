@@ -26,7 +26,7 @@ import { partyCheck } from "./partyMatch.js";
 import { captureShot, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
-         ROUND_END_PAUSE_MS, confettiFrom,
+         ROUND_END_PAUSE_MS, confettiFrom, deliverScorePenalty,
          clearCelebrations, resetSoloBoard } from "./soloRound.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
@@ -98,7 +98,11 @@ function shuffledDeck(){
 
 const setTxt=(id,v)=>{ const el=$(id); if(el) el.textContent=v; };
 
-function bump(id){ const el=$(id); if(!el) return; el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+/* Clears `bump-hit` as well as `bump`. Losing points paints the score card
+   with the recoil instead of the swell, and both rules sit at the same
+   specificity — so a stale `bump-hit` left on the element would win over
+   every ordinary bump from then on and the card would recoil on wins too. */
+function bump(id){ const el=$(id); if(!el) return; el.classList.remove("bump","bump-hit"); void el.offsetWidth; el.classList.add("bump"); }
 
 /* The practice 1v1 borrows the online split-screen board, but nothing was
    ever painting its two score cards — only the legacy header pill. That was
@@ -260,13 +264,30 @@ function onSoloResolve({won, skip}){
       secs:Math.max(.1,(SOLO.wordMs-Math.max(0,game.wordEnd-performance.now()))/1000)});
   }else{
     game.streak=0;
-    if(skip){
-      game.score=Math.max(0,game.score-SOLO.skipPenalty);
-      toast("Skipped — −"+SOLO.skipPenalty+" points");
-    }
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!skip});
   }
   updateHud();
+
+  /* The cost of a skip is DELIVERED, not announced. A toast at the bottom of
+     a screen that is otherwise your own camera got read by nobody, and the
+     score in the corner dropped with nothing on screen joining the two. The
+     figure now lands where the award lands and is dragged into the same card,
+     so the total only moves as it arrives — the exact mirror of a win.
+     The whole sequence is 1160ms, inside ROUND_END_PAUSE_MS, so it cannot
+     still be flying when the next word is dealt. */
+  if(!won && skip && SOLO.skipPenalty>0){
+    deliverScorePenalty({
+      points: SOLO.skipPenalty,
+      toEl: $("soloScoreCard"),
+      stage: $("soloStage"),
+      onLand: () => {
+        const g=state.game;
+        if(!g || g.mode!=="ai") return;
+        g.score=Math.max(0,g.score-SOLO.skipPenalty);
+        updateHud();
+      },
+    });
+  }
 
   setTimeout(()=>{
     if(gameState()!=="word-won" || !state.game) return;
@@ -330,7 +351,19 @@ function finishWord(winner, opts={}){
   }else{
     game.streak=0;
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
-    if(opts.skip) toast("Skipped — −"+PTS_SKIP+" points");
+    if(opts.skip){
+      /* Same delivery as Solo's, aimed at this mode's own score card. The
+         value is already off `game.score` by the time we get here (missWord
+         applies it), so the paint is what waits for the landing, not the
+         number — `scorePaintHeld` is the existing hold for exactly this. */
+      scorePaintHeld=true;
+      deliverScorePenalty({
+        points: PTS_SKIP,
+        toEl: $("v1YouScore")?.closest(".v1-scorecard"),
+        stage: $("matchStage"),
+        onLand: () => { scorePaintHeld=false; paintPracticeScores(); },
+      });
+    }
     else showTimesUp();
     playWordMissFeedback($("vsWordCard"),1);
     robotMiss(MATCH_ROBOT.my, opts.skip ? "skip" : "timeout");

@@ -1074,10 +1074,10 @@ function onMatchSudden({scores}={}){
   if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent="SUDDEN DEATH";
   /* The stage carries a sudden-death treatment and the screen edges pulse red
      for as long as it lasts, but the RULE CHANGE itself needs to land once,
-     loudly — this inverts the match and a toast at the bottom edge of a
-     full-screen camera is not something a player mid-pose ever reads. */
+     loudly. The banner IS that landing, and it is the only one: a toast at the
+     bottom edge of a full-screen camera is not something a player mid-pose
+     ever reads, and running both said the same sentence twice. */
   showSuddenDeath();
-  toast("SUDDEN DEATH — first player recognized wins the match!");
 }
 
 function onMatchEnd({scores, winnerId, suddenDeath=false, rematch}={}){
