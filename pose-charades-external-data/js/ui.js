@@ -191,17 +191,46 @@ function resetMatchSide(prefix, key){
 
 /* One place owns the countdown so every mode gets the same beat: writing a
    new value re-triggers the punch animation. */
+/* The count is CUT PAPER for the three numbers it actually reaches. Decoding
+   a 1254px PNG on the frame it is first shown drops the beat that has to land
+   hardest, so all three are warmed the first time a countdown runs. */
+const CD_ART = Object.freeze({ 1:"cd-1.png", 2:"cd-2.png", 3:"cd-3.png" });
+const CD_DIR = "assets/ui/figma/";
+let cdWarmed = false;
+function warmCountdownArt(){
+  if(cdWarmed || typeof Image !== "function") return;
+  cdWarmed = true;
+  for(const file of Object.values(CD_ART)) new Image().src = CD_DIR + file;
+}
+
 export function setCountdown(value){
   const cd=$("countdown");
   const num=$("countdownNum");
+  const art=$("countdownArt");
   if(!cd || !num) return false;
+  warmCountdownArt();
   const next=String(value);
-  if(num.textContent===next) return false;
-  num.textContent=next;
-  /* The punch rides the inner span. On the wrapper it also transformed the
+  /* Only 1..3 are drawn. setCountdown takes whatever seconds remain, so a
+     longer count still has to render something rather than an empty screen. */
+  const file=CD_ART[next] && art ? CD_ART[next] : null;
+
+  /* Compared against what is actually on screen rather than against the last
+     value asked for: the return value gates the tick sound, so a repeat has
+     to be silent, but a countdown re-opened on the same number it closed on
+     still has to draw itself. */
+  const already = file
+    ? cd.hasAttribute("data-art") && (art.getAttribute("src")||"").endsWith(file)
+    : !cd.hasAttribute("data-art") && num.textContent===next;
+  if(already) return false;
+
+  const beat=file ? art : num;
+  if(file){ art.src=CD_DIR+file; cd.setAttribute("data-art",""); }
+  else { num.textContent=next; cd.removeAttribute("data-art"); }
+
+  /* The punch rides the inner element. On the wrapper it also transformed the
      full-bleed ::before dim layer, sweeping a skewed grey rectangle across
      the header and camera instead of dimming the page evenly. */
-  num.classList.remove("tick"); void num.offsetWidth; num.classList.add("tick");
+  if(beat){ beat.classList.remove("tick"); void beat.offsetWidth; beat.classList.add("tick"); }
   return true;
 }
 

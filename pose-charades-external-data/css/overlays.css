@@ -17,11 +17,25 @@
   background:radial-gradient(circle at 50% 48%,transparent 38%,rgba(0,0,0,.16) 88%);
   animation:cdScrim .35s ease-out both}
 @keyframes cdScrim{from{opacity:0}to{opacity:1}}
-/* The digit lives in its own span so the punch never transforms the
-   full-bleed ::before dim layer above. */
-.cd-num{display:block;transform-origin:50% 50%}
+/* The digit lives in its own element so the punch never transforms the
+   full-bleed ::before dim layer above.
+
+   THE NUMERAL IS CUT PAPER (cd-1/2/3.png), not type. It was the one number on
+   these boards that was a font — Fredoka in --orange with a white stroke —
+   sitting over three screens made entirely of torn paper. Each glyph is on
+   its own 1254 square canvas with its navy paper shadow and confetti burst
+   already in the art, so all three register on one box and the tick beat is
+   the only thing this file has to supply.
+
+   The span is the fallback for any count with no art (setCountdown takes the
+   seconds actually remaining); `.countdown[data-art]` picks between them. */
+.cd-num,.cd-art{display:block;transform-origin:50% 50%}
+.cd-art{width:min(30vw,47vh);height:auto;
+  filter:drop-shadow(0 min(.9vw,1.6vh) min(.5vw,.9vh) rgba(21,42,110,.34))}
+.countdown[data-art] .cd-num{display:none}
+.countdown:not([data-art]) .cd-art{display:none}
 /* re-triggered by setCountdown() on every change, so 3-2-1 each get a beat */
-.cd-num.tick{animation:cdTick .52s cubic-bezier(.16,1.5,.32,1)}
+.cd-num.tick,.cd-art.tick{animation:cdTick .52s cubic-bezier(.16,1.5,.32,1)}
 @keyframes cdTick{
   0%{transform:scale(1.75) rotate(-7deg);opacity:0}
   22%{opacity:1}
@@ -54,8 +68,17 @@
     animation-duration:.46s;animation-delay:1.66s}
   .countdown{transition:font-size .4s cubic-bezier(.2,.9,.3,1)}
   body[data-intro="game"] .countdown{font-size:min(11vw,17.5vh)}
+  /* The paper glyph yields the same way the type did: it is sized in vw/vh
+     rather than em, so it needs its own transition and its own reduced size
+     while the board is still assembling. */
   .cd-num{transition:opacity .4s ease}
   body[data-intro="game"] .cd-num{opacity:.8}
+  /* The paper glyph yields with SIZE ONLY, never opacity. The type could be
+     dimmed to .8 because a solid fill just gets quieter; a photographic paper
+     texture at .8 goes translucent over the live camera and reads as a ghost
+     rather than as a smaller object. */
+  .cd-art{transition:width .4s cubic-bezier(.2,.9,.3,1)}
+  body[data-intro="game"] .cd-art{width:min(20vw,31vh)}
 }
 
 /* ================= CHASE / SUDDEN DEATH URGENCY =================

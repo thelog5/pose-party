@@ -1286,7 +1286,20 @@
   </div>
 </div>
 
-<div class="countdown hidden" id="countdown"><span class="cd-num" id="countdownNum"></span></div>
+<!-- THE 3·2·1 IS CUT PAPER, like every other number in this game. It was
+     Fredoka in --orange with a white stroke, which is the one numeral on the
+     board that was type rather than an object. `cd-1/2/3.png` are torn paper
+     glyphs on their own 1254 square canvas, each with a navy drop shadow and
+     its own confetti burst already in the art — so all three register on one
+     box and nothing here places a shard by hand.
+
+     The <span> stays as the fallback: setCountdown() is called with whatever
+     seconds remain, and only 1..3 have art. A four-second count would show a
+     silent empty screen otherwise. -->
+<div class="countdown hidden" id="countdown">
+  <img class="cd-art" id="countdownArt" alt="" aria-hidden="true">
+  <span class="cd-num" id="countdownNum"></span>
+</div>
 <!-- The toast is torn paper like everything else on these boards. It used to
      be a CSS rounded rectangle with a border, which was the one element in the
      game that looked like a web page. `cam-row.png` is the ENABLE CAMERA
