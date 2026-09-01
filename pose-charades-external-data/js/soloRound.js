@@ -493,7 +493,7 @@ export function resetSoloBoard(){
   renderStack(false);
   prepareWordFeedback(el("soloWordCard"), el("soloWordFill"), LOCK_THRESHOLD, true);
   markGuessRecognized(el("spGuessTop"), false);
-  setTxt("soloWord", "—");
+  setTxt("soloWord", "…");
   fitGameplayText(el("soloWord"));
 }
 

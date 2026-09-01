@@ -14,7 +14,7 @@ import { startGame, missWord, endGame, bindGameLifecycle } from "./game.js";
 import { wireResults, devResults } from "./results.js";
 import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty, leaveParty } from "./party.js";
-import { wireHomeAlive } from "./homeAlive.js";
+import { wireHomeAlive, pickMode } from "./homeAlive.js";
 import { wireHowToPlay, isHowToPlayOpen } from "./howToPlay.js";
 import { wireCameraGate } from "./cameraGate.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
@@ -33,7 +33,7 @@ function wireControls(){
   $("logoLobby").onclick=()=>transition("menu");
   $("btnGear").onclick=()=>transition(gameState()==="training"?"menu":"training");
   $("btnDoneTrain").onclick=()=>transition("menu");
-  $("btnFriends").onclick=()=>toast("Friends lists are coming soon — share a room link to play together!");
+  $("btnFriends").onclick=()=>toast("Friends lists are coming soon. Share a room link to play together!");
   /* Class-driven so every screen's volume control stays in sync — the header,
      Home, and one per play stage (the header is hidden during a round). */
   const toggleMute=()=>{
@@ -68,10 +68,13 @@ function wireControls(){
     toast("Left the match.");
   });
 
-  /* home (Figma v2): SOLO card -> solo, 1V1 -> lobby, PARTY -> party room */
-  $("modeAI").onclick=()=>startGame("ai");
-  $("modeVS").onclick=()=>enterLobby();
-  $("modeParty").onclick=()=>enterParty();
+  /* home (Figma v2): SOLO card -> solo, 1V1 -> lobby, PARTY -> party room.
+     pickMode() pops the pressed card off the board first and calls through
+     when it is gone — the press has to be answered before the next screen
+     exists, and for 1v1/Party the lobby then re-lands the same component. */
+  $("modeAI").onclick=()=>pickMode("ai",()=>startGame("ai"));
+  $("modeVS").onclick=()=>pickMode("vs",()=>enterLobby());
+  $("modeParty").onclick=()=>pickMode("party",()=>enterParty());
   $("btnHomeGear").onclick=()=>transition("training");
   wireHomeAlive();
   wireLobbyAlive();

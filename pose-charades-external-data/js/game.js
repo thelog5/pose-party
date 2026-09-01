@@ -160,7 +160,7 @@ function updateHud(){
 export function startGame(mode="ai"){
   state.lastMode=mode;
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
-    toast("Train the AI first — record idle plus at least one action word. Tap SETTINGS.");
+    toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
     transition("training"); return;
   }
   state.game={ mode, deck:shuffledDeck(), word:null, round:0, rounds:ROUNDS, wordEnd:0,

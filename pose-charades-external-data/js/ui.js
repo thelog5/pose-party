@@ -420,8 +420,8 @@ export function renderClasses(){
        disagrees with the list above. Refit now, and say that we did. */
     onDatasetEdited?.();
     toast(removed===1
-      ? "Clip removed — AI retrained."
-      : removed+" clips removed — AI retrained.");
+      ? "Clip removed. AI retrained."
+      : removed+" clips removed. AI retrained.");
   });
 }
 

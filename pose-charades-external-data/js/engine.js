@@ -268,7 +268,7 @@ async function acquireCamera(consent, control){
       /* A refusal is recoverable on the same card. The no-card branch is only
          for incomplete/embedded markup where there is nowhere to offer retry. */
       if(!hasCameraGate()){
-        showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally — see README.)");
+        showStatus("Camera blocked. Allow camera access for this page and refresh. (Opened as file://? Serve it locally: see README.)");
         return null;
       }
       consent = retryCameraConsent(e);

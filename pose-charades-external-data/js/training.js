@@ -100,6 +100,6 @@ function runTraining(opts={}){
   rep.innerHTML =
     'AI trained on <b>'+labels.length+'</b> words, <b>'+state.dataset.clips.length+'</b> clips, <b>'+state.model.samples.length+'</b> body-motion windows.<br><b>Hands are visual + exported only</b> so noisy finger tracking does not hurt the guesser.'+
     (acc!==null ? '<br>Quick holdout check: <b>'+acc+'%</b> of test clips guessed right.' : '<br>Record 4+ clips per word to unlock the accuracy check.')+
-    (worst.length ? '<br><span class="warn">Most confused: '+worst.map(esc).join(", ")+' — record more of these or swap them out.</span>' : '')+
+    (worst.length ? '<br><span class="warn">Most confused: '+worst.map(esc).join(", ")+'. Record more of these or swap them out.</span>' : '')+
     '<br>Watch it guess live below, then go play.';
 }

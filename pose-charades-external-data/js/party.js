@@ -201,7 +201,7 @@ function cleanLatePartyRoom(request, requestSocket, response){
 function requestTeam(team){
   if(!socket || !roster) return;
   if(myTeam() === team){
-    toast("You’re already on this team — recruit a friend!");
+    toast("You’re already on this team. Recruit a friend!");
     return;
   }
   socket.emit("party:team", { team }, res => {
@@ -301,7 +301,7 @@ function wirePartySocket(s){
   s.on("party:started", () => { blip([523, 659, 784, 1047], 0.09); });
   s.on("party:error", ({error} = {}) => {
     setLobbyStatus(error === "no-shared-words"
-      ? "No word is trained on every player’s device — train a shared word and try again."
+      ? "No word is trained on every player’s device. Train a shared word and try again."
       : partyError({error}));
   });
 
@@ -329,7 +329,7 @@ function wirePartySocket(s){
 function partyError(res){
   const e = res && res.error;
   return {
-    "no-such-room": "No party with that code — check it and try again",
+    "no-such-room": "No party with that code. Check it and try again",
     "room-full": "That party is full (6 players max)",
     "match-in-progress": "That party already started",
     "rate-limited": "Slow down a little and try again",
@@ -338,9 +338,32 @@ function partyError(res){
   }[e] || "Something went wrong (" + e + ")";
 }
 
-function partyOffline(e){
+/* Same dead end as 1v1's offlineExplain, and the same fix — see the long note
+   there. A party room is created for you on the way in too, so a create that
+   never even reached a socket left the code paper at `------` with one line
+   of grey text and nothing that would try again. */
+async function partyOffline(e, request){
   console.warn("party unavailable:", e);
-  setLobbyStatus("Can’t reach the game server right now. Check your connection and try again.");
+  const wrongHost = await partyServedWithoutServer();
+  const why = wrongHost
+    ? "This page isn’t being served by the game server, so online play can’t connect. Run the server and open http://localhost:3000."
+    : "Can’t reach the game server right now, retrying.";
+  setLobbyStatus(why);
+  if(!partyOfflineToasted){ partyOfflineToasted = true; toast(why, wrongHost ? 9000 : undefined); }
+  if(request !== undefined && !wrongHost) retryCreateLater(request);
+}
+
+/* See the long note on online.js's servedWithoutServer: `window.io` cannot
+   tell these apart because socket.io is fetched lazily, so probe the origin
+   instead. A response that is not a handshake means a host that is not a game
+   server; no response at all means one that is merely down. */
+async function partyServedWithoutServer(){
+  try{
+    const r = await fetch("/socket.io/?EIO=4&transport=polling", { cache: "no-store" });
+    return !r.ok;
+  }catch(_){
+    return false;
+  }
 }
 
 /* ---------------- roster → tiles ---------------- */
@@ -462,7 +485,7 @@ function updateGate(){
   if(!isHost()){
     setLobbyStatus(ok ? "Waiting for the host to start the party…" : null);
   }else if(!ok){
-    setLobbyStatus("Party " + roster.players.length + "/6 — need " + MIN_PER_TEAM + " per team to start");
+    setLobbyStatus("Party " + roster.players.length + "/6. Need " + MIN_PER_TEAM + " per team to start");
   }
 }
 

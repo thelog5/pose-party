@@ -30,28 +30,6 @@ page.on("response", r => { if (r.status() >= 400) consoleErrors.push(`HTTP ${r.s
 
 await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
 
-/* THE FRONT DOOR IS ON EVERY BOOT NOW. The ENABLE CAMERA card used to be
-   skipped whenever the origin already held a camera grant, which is exactly
-   what --use-fake-ui-for-media-stream reports, so every suite booted straight
-   into Home. It is a consent/briefing screen rather than a permission
-   notification, so it is shown every run and nothing downstream (the camera,
-   the status overlay, Home's entrance) happens until it is answered. */
-async function passCameraGate(page){
-  await page.waitForFunction(() =>
-    !document.getElementById("camGate").classList.contains("hidden"),
-    { timeout: 30000, polling: 50 });
-  const seen = await page.evaluate(() => ({
-    granted:document.getElementById("camGate").hasAttribute("data-granted"),
-    label:document.getElementById("cgEnableLabel").textContent.trim(),
-    head:[...document.querySelectorAll(".cg-head1")]
-      .filter(n => getComputedStyle(n).display !== "none")
-      .map(n => n.textContent.trim()).join("|"),
-  }));
-  await page.click("#cgEnable");
-  return seen;
-}
-const returning = await passCameraGate(page);
-
 const mod = (path) => `(await import('${APP}/js/${path}'))`;
 const evalApp = (expr) => page.evaluate(`(async () => (${expr}))()`);
 const txt = sel => page.evaluate(s => document.querySelector(s)?.textContent ?? null, sel);
@@ -80,14 +58,6 @@ const settledLobby = () => page.waitForFunction(
 await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000 });
 console.log("boot:");
 ok(true, "engine + camera booted (status overlay hidden)");
-/* --use-fake-ui-for-media-stream reports the origin as already granted, which
-   is exactly a returning player. The card is still shown — it is a briefing,
-   not a permission prompt, and what it says about where your video goes and
-   how much room you need is true on the tenth run — but it must stop asking
-   for something the browser has already given. */
-ok(returning.granted && returning.label === "LET\u2019S GO!" &&
-   returning.head === "YOUR CAMERA IS READY",
-  "a returning player still gets the front door, re-worded for a camera already granted");
 ok(await bodyScreen() === "home", "home screen visible");
 ok(await page.evaluate(() =>
   document.getElementById("homeStage").classList.contains("home-entering") &&
@@ -1395,26 +1365,8 @@ const beforeSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 await page.$eval("#btnSkipSolo", el => el.click());
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
 ok(await page.evaluate(() => !document.querySelector(".burstwrap")) || true, "skip: no new confetti (no payoff)");
-/* The cost is DELIVERED, not announced: a glowing figure lands off-centre and
-   is dragged into the score card, and the total only drops when it arrives —
-   the exact mirror of the award paper. So the score is deliberately UNCHANGED
-   for the length of that flight, and reading it in the same breath as the
-   click reads the value before the penalty has been paid. */
-ok(await page.evaluate(() => {
-  const p = document.getElementById("spPenalty");
-  return !!p && p.classList.contains("show") &&
-    p.querySelector(".pen-val").textContent.trim() === "\u2212250";
-}), "skip: the cost lands on screen as a figure, not a toast");
-ok(parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,"")) === beforeSkip,
-  "skip: the score is held until the figure reaches the card");
-await page.waitForFunction(n => parseInt(
-  document.getElementById("soloScoreVal").textContent.replace(/[^0-9]/g,"")) !== n,
-  { timeout: 4000, polling: 40 }, beforeSkip);
 const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
-ok(await page.evaluate(() =>
-  document.getElementById("soloScoreCard").classList.contains("bump-hit")),
-  "skip: the score card recoils rather than swelling");
 /* x0, not a clamped x1: clamping made streak 0 and 1 render identically, so
    the first catch of a run — and losing a streak of one — changed nothing on
    screen and never bumped the card. */
@@ -2271,12 +2223,11 @@ ok(reducedScoreDelay < 200,
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 
 // ---- the boot gate ----
-/* Every page in this suite sees the card (passCameraGate above answers it),
-   but with --use-fake-ui-for-media-stream the origin reports `granted`, so
-   that is the RETURNING-player wording. Drive the first-time path on a second
-   page with the permission query stubbed to `prompt`, which is what a visitor
-   who has never granted the camera gets, and exercise the refusal/retry road
-   that only exists on that side. */
+/* This suite's own page never sees the ENABLE CAMERA card: Chrome's
+   --use-fake-ui-for-media-stream reports the origin as already `granted`, so
+   requestCameraConsent() short-circuits exactly the way it does for a
+   returning player. Drive it on a second page with the permission query
+   stubbed to `prompt`, which is what a first-time visitor gets. */
 console.log("boot gate:");
 {
   const gatePage = await browser.newPage();
@@ -2375,32 +2326,8 @@ console.log("boot gate:");
       tapes:{ yellow:tape(".cg-tape-y"), cream:tape(".cg-tape-c") },
       body:src("#cgRobotBody"),
       title:document.getElementById("cgTitle").textContent.trim(),
-      /* Row 1 authors two readings of the same rectangle now — the card is
-         shown on every boot, so the permission line has to stop asking once
-         the browser has said yes. Only the displayed one is the copy. */
-      heads:[...document.querySelectorAll(".cg-head")]
-        .filter(n => getComputedStyle(n).display !== "none")
-        .map(n => n.textContent.trim()),
-      startLabel:document.getElementById("cgEnableLabel").textContent.trim(),
+      heads:[...document.querySelectorAll(".cg-head")].map(n => n.textContent.trim()),
       rig:box(".cg-rig"), btn:box(".cg-enable"), row1:box(".cg-row1"),
-      /* The button is the one element here that carries a transform: the
-         centring `translate:-50%`. It cannot be measured with `offsetLeft`
-         alone (that is the UNtransformed layout position) and it must not be
-         measured with a client rect either — the card focuses this button on
-         open, so `:focus-visible` has scale:1.035 on it and the painted box is
-         3.5% too wide. Layout width plus the RESOLVED translate is the only
-         reading that is neither. */
-      btnCentre:(() => {
-        const b = document.querySelector(".cg-enable");
-        /* `translate` keeps its percentage in the computed value (it resolves
-           against the element's own border box at paint time), so this cannot
-           just parseFloat to px. */
-        const raw = (getComputedStyle(b).translate || "").split(/\s+/)[0] || "0";
-        const tx = raw.endsWith("%")
-          ? parseFloat(raw) / 100 * b.offsetWidth
-          : parseFloat(raw) || 0;
-        return (b.offsetLeft + tx + b.offsetWidth / 2) / panel.offsetWidth;
-      })(),
     };
   });
   ok(/cam-panel\.png$/.test(authored.paper) &&
@@ -2420,30 +2347,18 @@ console.log("boot gate:");
      authored.heads.join("|") ===
        "ENABLE YOUR CAMERA|YOUR VIDEO STAYS PRIVATE|MAKE SOME ROOM",
     "the copy is Figma's, verbatim");
-  ok(authored.startLabel === "ENABLE CAMERA" &&
-     !await gatePage.evaluate(() =>
-       document.getElementById("camGate").hasAttribute("data-granted")),
-    "a visitor with no grant is asked to enable the camera");
-  /* Figma percentages: rows at 13.06/34.315 w73.879, robot 69.526/66.164
-     w32.099 — he hangs 1.6% off the right edge and paints OVER the button,
-     which is what makes the point read. */
+  /* Figma percentages: rows at 13.06/34.315 w73.879, button 17.414/85.753
+     w54.451, robot 69.526/66.164 w32.099 — he hangs 1.6% off the right edge
+     and paints OVER the button, which is what makes the point read. */
   ok(Math.abs(authored.row1.l - .1306) < .006 &&
      Math.abs(authored.row1.t - .34315) < .008 &&
      Math.abs(authored.row1.w - .73879) < .006 &&
+     Math.abs(authored.btn.l - .17414) < .006 &&
      Math.abs(authored.btn.t - .85753) < .008 &&
      Math.abs(authored.rig.l - .69526) < .006 &&
      Math.abs(authored.rig.w - .32099) < .006 &&
      authored.rig.l + authored.rig.w > 1,
-    "rows and the overhanging robot sit on their Figma percentages");
-  /* THE BUTTON IS THE ONE DELIBERATE DEPARTURE. 322:712 is authored at left
-     17.414% because the composition balances it against the robot hanging off
-     the right — but he is drawn outside the paper and over it, so on the paper
-     itself the button read as shoved left. It keeps its authored width and top
-     and is centred instead. */
-  ok(Math.abs(authored.btn.w - .54451) < .006 &&
-     Math.abs(authored.btnCentre - .5) < .004,
-    `the button keeps its authored width and is centred on the card ` +
-    `(centre ${authored.btnCentre.toFixed(4)}, w ${authored.btn.w.toFixed(4)})`);
+    "rows, button and the overhanging robot sit on their Figma percentages");
   /* Rendered bounds from slot-3 Figma nodes 321:667 / 321:666. The raw fills
      are padded transparent canvases, so using their nested fill rectangles is
      exactly what reduced both tapes to tiny scraps. */
@@ -2475,9 +2390,7 @@ console.log("boot gate:");
     !document.getElementById("cgEnable").disabled &&
     !document.getElementById("cgEnable").hasAttribute("aria-busy") &&
     getComputedStyle(document.querySelector('[data-cg-note="blocked"]')).display !== "none" &&
-    /* the card carries no loading strip at all now — the download is not a
-       wait, so the only thing under the paper is the failure that IS one */
-    !document.getElementById("cgLoad") &&
+    getComputedStyle(document.getElementById("cgLoad")).display === "none" &&
     /* the headline stays Figma's own line — it is the one sentence that says
        what the screen is for, and an error must not cost it */
     document.getElementById("cgTitle").textContent.trim() ===

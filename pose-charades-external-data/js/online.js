@@ -165,7 +165,7 @@ export function setPendingJoin(code){ pendingJoin=code; }
 
 export function enterLobby(mode="1v1"){
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
-    toast("Train the AI first — record idle plus at least one action word. Tap SETTINGS.");
+    toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
     transition("training"); return;
   }
   /* render() runs inside transition listeners. Publish the lobby variant
@@ -213,8 +213,8 @@ function wireLobby(){
   $("btnCopyLink").onclick=async()=>{
     if(!roomCode) return;
     const link=location.origin+"/#join-"+roomCode;
-    try{ await navigator.clipboard.writeText(link); toast("Invite link copied — send it to your friend!"); }
-    catch(e){ toast("Copy failed — the code is "+roomCode); }
+    try{ await navigator.clipboard.writeText(link); toast("Invite link copied! Send it to your friend."); }
+    catch(e){ toast("Copy failed. The code is "+roomCode); }
   };
   $("roomCodeText").onclick=async()=>{
     if(!roomCode) return;
@@ -225,7 +225,7 @@ function wireLobby(){
       await navigator.clipboard.writeText(roomCode);
       toast("Room code copied!");
       blip([659,880],.05);
-    }catch(e){ toast("Copy failed — the code is "+roomCode); }
+    }catch(e){ toast("Copy failed. The code is "+roomCode); }
   };
   $("btnJoinRoom").onclick=()=>{
     const code=$("joinCode").value.trim().toUpperCase();
@@ -262,7 +262,7 @@ function wireLobby(){
     /* Input stays debounced while typing; change/commit flushes the final
        Party name before another player can join against a stale roster. */
     if(lobbyMode()==="party") partyBridge.rename?.(name, true);
-    toast("Name saved — it applies to the next room you create or join.");
+    toast("Name saved. It applies to the next room you create or join.");
   };
   addEventListener("resize", ()=>{
     fitLobbyNames();
@@ -423,7 +423,7 @@ function wireSocket(s){
 
   s.on("room:error", ({error}={}) => {
     toast(error==="no-shared-words"
-      ? "You two have no words in common — train the same words first."
+      ? "You two have no words in common. Train the same words first."
       : "Room error: "+error);
   });
 
@@ -433,7 +433,7 @@ function wireSocket(s){
     else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
       roomCode=null;
       closePeer();
-      setRematchUnavailable(peerName+" left — start a new room to play again.");
+      setRematchUnavailable(peerName+" left. Start a new room to play again.");
     }
     else if(gameState()==="lobby"){ resetLobbyUi(); createRoom(); }
   });
@@ -445,7 +445,7 @@ function wireSocket(s){
     }else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
       roomCode=null;
       closePeer();
-      setRematchUnavailable("Connection lost — reconnect to play again.");
+      setRematchUnavailable("Connection lost. Reconnect to play again.");
     }
   });
 }
@@ -519,7 +519,7 @@ async function joinRoom(code){
       renderSettings(false);
       onPeerHere();
       $("btnStartMatch").disabled=true;
-      setLobbyStatus("Joined "+peerName+"’s room — waiting for them to start");
+      setLobbyStatus("Joined "+peerName+"’s room. Waiting for them to start");
       openPeer(false);
       s.emit("player:ready", {}, ()=>{});
     });
@@ -537,28 +537,83 @@ function roomAttemptActive(attempt){
 function lobbyError(res){
   const e=res && res.error;
   return {
-    "no-such-room":"No room with that code — check it and try again.",
+    "no-such-room":"No room with that code. Check it and try again.",
     "room-full":"That room already has two players.",
     "match-in-progress":"That match already started.",
     "rate-limited":"Slow down a little and try again.",
     "already-in-room":"You’re already in a room.",
     "server-full":"The server is full right now.",
-    "bad-payload":"That didn’t look right — check the code and your name.",
+    "bad-payload":"That didn’t look right. Check the code and your name.",
   }[e] || "Something went wrong ("+e+").";
 }
 
 function beginError(e){
   return {
     "not-host":"Only the host can start the match.",
-    "not-ready":"Your rival’s camera isn’t ready yet — give it a second.",
+    "not-ready":"Your rival’s camera isn’t ready yet. Give it a second.",
     "need-two":"Wait for a rival to join first!",
-    "no-shared-words":"You two have no words in common — train the same words first.",
+    "no-shared-words":"You two have no words in common. Train the same words first.",
   }[e] || "Couldn’t start ("+e+").";
 }
 
-function offlineExplain(e){
+/* A LOBBY THAT CANNOT REACH THE SERVER IS A DEAD END, and it was the only
+   failure left that way. `room:create` returning an error already toasts and
+   retries — see retryCreateLater, which exists precisely because the room is
+   made FOR you on the way in and there is no button to press again. But
+   `ensureSocket` REJECTING, which is what happens when there is no server at
+   all, landed here: one line of grey text in the corner of the lobby, no
+   toast, and nothing that would ever try again. The invite paper just sits at
+   `------`, which is exactly what "1v1 doesn't work, I can't join" looks
+   like from the sofa.
+
+   Two failures reach this, and they want opposite things said:
+
+   · The page was served by something that is not the game server — a plain
+     static host, `python -m http.server`, a file:// open, a CDN preview. The
+     game itself runs fine there, which is why Solo works and only the online
+     modes are dead, and no amount of waiting will fix it. Say where the
+     server is supposed to be.
+   · The server is simply down, restarting, or the machine dropped its
+     network. That one fixes itself, so keep trying.
+
+   Both retry: retrying costs one socket attempt every four seconds and it
+   means a lobby left open while `npm start` is still booting comes to life on
+   its own rather than needing the player to guess and walk back out. */
+async function offlineExplain(e, attempt){
   console.warn("online unavailable:", e);
-  setLobbyStatus("Can’t reach the game server right now. Check your connection — or head back and play Solo against the AI.");
+  const wrongHost = await servedWithoutServer();
+  const why = wrongHost
+    ? "This page isn’t being served by the game server, so online play can’t connect. Run the server and open http://localhost:3000."
+    : "Can’t reach the game server right now, retrying. You can head back and play Solo against the AI.";
+  setLobbyStatus(why);
+  /* ONCE PER VISIT. The status line is the running state and can say this for
+     as long as it is true, but the retry fires every four seconds and a toast
+     on every one of them is a strobe, not a message. */
+  if(!offlineToasted){ offlineToasted = true; toast(why, wrongHost ? 9000 : undefined); }
+  /* A static host will still be a static host in four seconds, so there is
+     nothing to retry into. A server that is down is exactly the case that
+     fixes itself. */
+  if(attempt !== undefined && !wrongHost) retryCreateLater(attempt);
+}
+
+/* WHICH FAILURE IS IT? `window.io` cannot answer this: socket.io is fetched
+   lazily on the first online action, so it is undefined on a perfectly good
+   page too. Nor can the script's own load error — the script 404s on a static
+   host AND fails to fetch from a server that has stopped.
+
+   What separates them is whether ANYTHING answered. A game server replies to
+   /socket.io/ with a handshake; a static host replies 404; a dead server
+   replies not at all. So a response that is not ok means the origin is up and
+   simply is not a game server, which no amount of retrying will change, and a
+   network error means nothing answered — down, or offline, and that does come
+   back. One probe, only ever on the failure path. */
+async function servedWithoutServer(){
+  try{
+    const r = await fetch("/socket.io/?EIO=4&transport=polling", { cache: "no-store" });
+    return !r.ok;
+  }catch(_){
+    return false;
+  }
 }
 
 /* ---------------- webrtc video ---------------- */
@@ -588,7 +643,7 @@ function openPeer(initiator){
       v.play().catch(()=>{});
     },
     onConnectionChange: st => {
-      if(st==="failed") toast("Video connection failed — the game still works, you just can’t see each other.");
+      if(st==="failed") toast("Video connection failed. The game still works, you just can’t see each other.");
     },
   });
 }
@@ -621,7 +676,7 @@ function clearMatchBoard(){
     stage.classList.remove("you-locked","rival-locked","chase-urgent","chase-final");
     delete stage.dataset.chaseSecond;
   }
-  $("vsWord").textContent="—";
+  $("vsWord").textContent="…";
   scorePaintHeld=false;
   stopMatchFill();
   prepareWordFeedback($("vsWordCard"),$("v1WordFill"),THRESH,true);

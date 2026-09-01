@@ -47,7 +47,7 @@ export function startRecording(){
   const label=$("classInput").value.trim().toLowerCase();
   if(!label){
     /* .focus() alone read as the button being broken */
-    toast("Type or pick a word first — that's the label this clip trains.");
+    toast("Type or pick a word first. That's the label this clip trains.");
     const input=$("classInput");
     input.focus();
     input.classList.remove("nudge"); void input.offsetWidth; input.classList.add("nudge");
@@ -83,7 +83,7 @@ export function finishRecording(){
   const left=$("recLeft"); if(left) left.textContent="";
   $("btnRecord").disabled=false;
   setArmed(false);
-  if(r.frames.length<15){ flash("bad"); toast("Too short — couldn’t see you. More light, step back!"); return; }
+  if(r.frames.length<15){ flash("bad"); toast("Too short. Couldn’t see you: more light, step back!"); return; }
   state.dataset.clips.push({label:r.label, person:r.person, ts:Date.now(), frames:r.frames});
   flash("good"); blip([660]); renderClasses();
   /* A recorded word is in the LIST but not yet in the MODEL. Deleting a clip
@@ -97,6 +97,6 @@ function markModelStale(){
   const btn=$("btnTrain");
   if(!btn) return;
   btn.classList.add("stale");
-  toast("Clip saved — press TRAIN THE AI to teach it.");
+  toast("Clip saved. Press TRAIN THE AI to teach it.");
 }
 export function clearModelStale(){ $("btnTrain")?.classList.remove("stale"); }

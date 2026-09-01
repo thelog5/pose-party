@@ -91,7 +91,7 @@ export function startPartyMatch(bridge, payload){
   scorePaintHeld = false;
   applyScores(payload.scores);
   stage().dataset.phase = "waiting";
-  setTxt("pmWord", "—");
+  setTxt("pmWord", "…");
   setTxt("pmMatchTime", fmtTime(g.matchLimitMs, { compact:true }));
   setTxt("pmWordTime", fmtTime(g.wordLimitMs));
   resetGuessPapers();
@@ -378,7 +378,7 @@ export function onPartyChase({ team, chaseEndsAt, bonus } = {}){
   const mine = team === myTeam();
   ctx.toast(mine
     ? "Your team finished! +" + bonus + " bonus"
-    : (team === "blue" ? "Blue" : "Orange") + " team finished — " +
+    : (team === "blue" ? "Blue" : "Orange") + " team finished! " +
       Math.round(PARTY_CHASE_WINDOW_MS / 1000) + "s to land yours!");
   blip(mine ? [659, 880] : [330, 262]);
 }

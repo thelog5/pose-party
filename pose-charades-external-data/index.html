@@ -131,20 +131,16 @@
 
       <img class="fh iv" id="logoHomeCraft" style="left:-0.9%;top:-4.3%;width:44.3%;z-index:3" src="assets/ui/figma/title-card.png" alt="Pose Party">
 
-      <button class="fh card" id="modeAI" style="left:72%;top:46.4%;width:28%;z-index:4" aria-label="Solo — play with the AI">
-        <img src="assets/ui/figma/card-solo.png" alt="Solo — beat your streak and outguess the AI">
+      <button class="fh card" id="modeAI" style="left:72%;top:46.4%;width:28%;z-index:4" aria-label="Solo: play with the AI">
+        <img src="assets/ui/figma/card-solo.png" alt="Solo: beat your streak and outguess the AI">
       </button>
       <button class="fh card" id="modeVS" style="left:43.5%;top:45.8%;width:27.2%;z-index:4" aria-label="1v1 Showdown">
-        <img src="assets/ui/figma/card-1v1.png" alt="1v1 — head to head real time battle">
+        <img src="assets/ui/figma/card-1v1.png" alt="1v1: head to head real time battle">
       </button>
-      <button class="fh card" id="modeParty" style="left:58.3%;top:2%;width:27.4%;z-index:4" aria-label="Party — team battle">
-        <img src="assets/ui/figma/card-party.png" alt="Party — team battle with 4-8 players">
+      <button class="fh card" id="modeParty" style="left:58.3%;top:2%;width:27.4%;z-index:4" aria-label="Party: team battle">
+        <img src="assets/ui/figma/card-party.png" alt="Party: team battle with 4-8 players">
       </button>
 
-      <!-- robot, assembled from the user's parts (arms wave, head swaps) -->
-      <img class="fh rpart arm" id="robotArmR" style="left:11%;top:57.7%;width:17.8%;z-index:5" src="assets/ui/figma/robot-arm-right.png" alt="">
-      <img class="fh rpart arm armL" id="robotArmL" style="left:-4.1%;top:66.5%;width:16.9%;z-index:5" src="assets/ui/figma/robot-arm-left.png" alt="">
-      <img class="fh rpart" id="robotBody" style="left:.6%;top:58.3%;width:22.9%;z-index:5" src="assets/ui/figma/robot-body.png" alt="">
 
       <img class="fh iv tape" id="tapeSolo"  style="left:80.1%;top:37%;width:14%;z-index:6"    src="assets/ui/figma/tape-yl-a.png" alt="">
       <img class="fh iv tape" id="tapeParty" style="left:65.1%;top:.6%;width:14.5%;z-index:6"  src="assets/ui/figma/tape-cream-a.png" alt="">
@@ -341,7 +337,7 @@
       <div class="sp-word" id="soloWordCard" style="left:29.93%;top:82.59%;width:40.14%">
         <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
         <img class="sp-word-fill" id="soloWordFill" src="assets/ui/figma/sp-pill.png" alt="">
-        <span class="sp-word-text" id="soloWord">—</span>
+        <span class="sp-word-text" id="soloWord">&hellip;</span>
       </div>
 
       <!-- Fresh REST exports from Solo nodes 225:407 and 225:386. The text,
@@ -383,12 +379,12 @@
     <div class="lobbystage" id="lobbyStage" data-mode="1v1">
       <img class="lb bg" src="assets/ui/figma/home-bg2.jpg" alt="">
 
-      <img class="lb iv2 fig-shadow-lg lobby-alpha lobby-float" id="logoLobby" style="left:-.3%;top:-.4%;width:13.8%;z-index:3" src="assets/ui/figma/lb-title.png" alt="Pose Party — home">
-      <img class="lb deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:-1%;top:-1.1%;width:5%;z-index:4" src="assets/ui/figma/lb-tape-b.png" alt="">
-      <img class="lb deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:10.2%;top:7.2%;width:4.4%;z-index:4" src="assets/ui/figma/lb-tape-c.png" alt="">
+      <img class="lb iv2 fig-shadow-lg lobby-alpha lobby-float" id="logoLobby" style="left:-.3%;top:-.4%;width:13.8%;z-index:3" src="assets/ui/figma/lb-title.png" alt="Pose Party home">
+      <img class="lb deco logo-tape fig-shadow-lg lobby-alpha lobby-tape lobby-react" id="lobbyLogoTapeA" style="left:-1%;top:-1.1%;width:5%;z-index:4" src="assets/ui/figma/lb-tape-b.png" alt="">
+      <img class="lb deco logo-tape fig-shadow-lg lobby-alpha lobby-tape lobby-react" id="lobbyLogoTapeB" style="left:10.2%;top:7.2%;width:4.4%;z-index:4" src="assets/ui/figma/lb-tape-c.png" alt="">
 
-      <img class="lb m1 lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" style="left:40.5%;top:3.3%;width:19%;z-index:3" src="assets/ui/figma/lb-1v1-card.png" alt="1v1 Lobby">
-      <img class="lb m1 deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:47%;top:.1%;width:6.7%;z-index:4" src="assets/ui/figma/lb-tape-a.png" alt="">
+      <img class="lb m1 lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" id="lobby1v1Title" style="left:40.5%;top:3.3%;width:19%;z-index:3" src="assets/ui/figma/lb-1v1-card.png" alt="1v1 Lobby">
+      <img class="lb m1 deco lobbytitle-tape fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:47%;top:.1%;width:6.7%;z-index:4" src="assets/ui/figma/lb-tape-a.png" alt="">
 
       <!-- name tag (click to edit) -->
       <div class="lb nametag fig-shadow-xs lobby-alpha lobby-float" id="lobbyNameTag">
@@ -663,7 +659,7 @@
       <div class="sp-word v1-word" id="vsWordCard" style="left:29.93%;top:82.59%;width:40.14%">
         <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
         <img class="sp-word-fill" id="v1WordFill" src="assets/ui/figma/sp-pill.png" alt="">
-        <span class="sp-word-text" id="vsWord">—</span>
+        <span class="sp-word-text" id="vsWord">&hellip;</span>
       </div>
 
 
@@ -868,7 +864,7 @@
       <div class="sp-word pm-word" id="pmWordCard" style="left:29.93%;top:82.59%;width:40.14%">
         <img class="sp-word-bg" src="assets/ui/figma/sp-word.png" alt="">
         <img class="sp-word-fill" id="pmWordFill" src="assets/ui/figma/sp-pill.png" alt="">
-        <span class="sp-word-text" id="pmWord">—</span>
+        <span class="sp-word-text" id="pmWord">&hellip;</span>
       </div>
 
       <div class="sp-flash" id="pmFlash"></div>
@@ -914,7 +910,7 @@
           </div>
         </div>
         <button class="btn orange" id="btnRecord"><span class="dot"></span><span id="recordLabel">Record clip (3·2·1)</span></button>
-        <div class="hint">Record <b>idle</b> too (stand, fidget, read) — it stops the AI guessing between words. Aim for 10–15 clips per word, full body in frame.</div>
+        <div class="hint">Record <b>idle</b> too (stand, fidget, read). It stops the AI guessing between words. Aim for 10–15 clips per word, full body in frame.</div>
         <div class="classlist" id="classList"></div>
         <button class="btn blue" id="btnTrain">Train the AI</button>
         <div class="trainreport" id="trainReport"></div>
@@ -924,7 +920,7 @@
           <button class="btn ghost" id="btnImport">Import / merge</button>
         </div>
         <input type="file" id="fileImport" accept=".json" class="hidden">
-        <button class="btn mint" id="btnDoneTrain">Done — back to play</button>
+        <button class="btn mint" id="btnDoneTrain">Done, back to play</button>
       </div>
     </div>
   </section>

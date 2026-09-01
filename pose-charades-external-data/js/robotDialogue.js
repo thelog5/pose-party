@@ -7,7 +7,7 @@
    spilling out of it. Short, punchy lines still read best during play. */
 
 export const ROBOT_DIALOGUE = Object.freeze({
-  read:    ["I SEE IT!", "OOH — HOLD ON", "SOMETHING'S THERE", "KEEP GOING!"],
+  read:    ["I SEE IT!", "OOH! HOLD ON", "SOMETHING'S THERE", "KEEP GOING!"],
   close:   ["HOLD IT!", "ALMOST!", "DON'T MOVE!", "THAT'S THE ONE!"],
   got:     ["YOU DID IT!", "NAILED IT!", "YES!! GOT IT", "THAT'S IT!"],
   streak:  ["ON FIRE!", "AGAIN?! WOW", "UNSTOPPABLE", "YOU DID IT AGAIN!"],
@@ -26,5 +26,5 @@ export const ROBOT_DIALOGUE = Object.freeze({
      failure, and a character who blames you for it is a character nobody
      wants in the room. */
   struggling: ["THAT'S ON ME…", "MY CIRCUITS ARE SLOW TODAY",
-               "BIGGER? MAYBE BIGGER", "I ALMOST HAVE IT", "HOLD THAT — LET ME LOOK"],
+               "BIGGER? MAYBE BIGGER", "I ALMOST HAVE IT", "HOLD THAT! LET ME LOOK"],
 });

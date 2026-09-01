@@ -557,7 +557,7 @@ function rollbackReadyVote(version, before, error){
   renderRematch(true);
   toast(error === "rate-limited"
     ? "Give it a beat, then try your rematch vote again."
-    : "Couldn’t update rematch readiness — try again.");
+    : "Couldn’t update rematch readiness. Try again.");
 }
 
 function toggleRematchReady(){
@@ -682,7 +682,7 @@ function paintPanel(suffix, p){
         '<img class="' + (i === 0 ? "on" : "") + '" src="' + s.url +
         '" alt="" aria-hidden="' + (i === 0 ? "false" : "true") +
         '" data-active="' + (i === 0 ? "true" : "false") + '">').join("")
-    : '<div class="rs-empty">No photos this round —<br>they’re taken the moment the AI recognises you.</div>';
+    : '<div class="rs-empty">No photos this round.<br>They’re taken the moment the AI recognises you.</div>';
 
   /* The reel plays itself. It carries no tap, swipe or key handling, so it
      is described as a plain gallery rather than an interactive control. */
@@ -709,7 +709,7 @@ function paintPanel(suffix, p){
   setAwardText("rsAward" + (A ? "SubB" : "Sub"), p.award.sub);
   const chip = n => "rsStat" + (A ? "B" + n : n);
   statChip(chip(1), fmt(p.score) + " PTS");
-  statChip(chip(2), p.avg ? p.avg.toFixed(1) + " AVG" : "— AVG");
+  statChip(chip(2), p.avg ? p.avg.toFixed(1) + " AVG" : "0.0 AVG");
   statChip(chip(3), (p.firsts || 0) + (p.firsts === 1 ? " First" : " Firsts"));
 }
 
@@ -1164,7 +1164,7 @@ export async function devResults(kind = "3v3"){
       rounds: WORDS.concat(WORDS.slice(0, 4)).map((w, i) =>
         ({ word: w, pts: i % 3 === 1 ? 0 : 560 })),
       rematch: { ready: 0, total: 1, mine: false },
-      onRematch: () => toast("Dev fixture — nothing to rematch into."),
+      onRematch: () => toast("Dev fixture: nothing to rematch into."),
     });
     await seed([me]);
     renderFocus();
@@ -1179,7 +1179,7 @@ export async function devResults(kind = "3v3"){
       mode: "1v1", size: 2, headline: "LOGAN WINS!",
       teams: { blue: 1460, orange: 1280 }, players,
       rematch: { ready: 1, total: 2, mine: true },
-      onRematch: () => toast("Dev fixture — nothing to rematch into."),
+      onRematch: () => toast("Dev fixture: nothing to rematch into."),
     });
     await seed(players);
     if(kind === "1v1-breakdown"){
@@ -1205,7 +1205,7 @@ export async function devResults(kind = "3v3"){
     rematch: kind === "breakdown"
       ? { ready: 2, total: 4, mine: false }
       : { ready: size === 2 ? 2 : 4, total: size * 2, mine: false },
-    onRematch: () => toast("Dev fixture — no room to rematch into."),
+    onRematch: () => toast("Dev fixture: no room to rematch into."),
   });
   await seed(players);
   if(kind === "breakdown"){
