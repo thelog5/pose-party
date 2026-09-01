@@ -323,10 +323,10 @@ export async function boot(){
 
   let vision;
   try{
-    setBootProgress("STARTING THE POSE ENGINE…", .12);
+    setBootProgress("STARTING THE POSE ENGINE");
     vision = await FilesetResolver.forVisionTasks(WASM_URL);
     visionRuntime = vision;
-    setBootProgress("LOADING THE BODY MODEL…", .45);
+    setBootProgress("LOADING THE BODY MODEL");
     state.landmarker = await PoseLandmarker.createFromOptions(vision,{
       baseOptions:{ modelAssetPath:POSE_MODEL_URL, delegate:"GPU" },
       runningMode:"VIDEO", numPoses:1
@@ -350,7 +350,7 @@ export async function boot(){
 
   /* Hands are a nice-to-have: the body model alone still plays the game. */
   try{
-    setBootProgress("LOADING HAND TRACKING…", .78);
+    setBootProgress("LOADING HAND TRACKING");
     state.handmarker = await HandLandmarker.createFromOptions(vision,{
       baseOptions:{ modelAssetPath:HAND_MODEL_URL, delegate:"GPU" },
       runningMode:"VIDEO", numHands:2

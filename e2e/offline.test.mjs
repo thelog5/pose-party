@@ -2420,18 +2420,30 @@ console.log("boot gate:");
      authored.heads.join("|") ===
        "ENABLE YOUR CAMERA|YOUR VIDEO STAYS PRIVATE|MAKE SOME ROOM",
     "the copy is Figma's, verbatim");
-  /* Figma percentages: rows at 13.06/34.315 w73.879, button 17.414/85.753
-     w54.451, robot 69.526/66.164 w32.099 — he hangs 1.6% off the right edge
-     and paints OVER the button, which is what makes the point read. */
+  ok(authored.startLabel === "ENABLE CAMERA" &&
+     !await gatePage.evaluate(() =>
+       document.getElementById("camGate").hasAttribute("data-granted")),
+    "a visitor with no grant is asked to enable the camera");
+  /* Figma percentages: rows at 13.06/34.315 w73.879, robot 69.526/66.164
+     w32.099 — he hangs 1.6% off the right edge and paints OVER the button,
+     which is what makes the point read. */
   ok(Math.abs(authored.row1.l - .1306) < .006 &&
      Math.abs(authored.row1.t - .34315) < .008 &&
      Math.abs(authored.row1.w - .73879) < .006 &&
-     Math.abs(authored.btn.l - .17414) < .006 &&
      Math.abs(authored.btn.t - .85753) < .008 &&
      Math.abs(authored.rig.l - .69526) < .006 &&
      Math.abs(authored.rig.w - .32099) < .006 &&
      authored.rig.l + authored.rig.w > 1,
-    "rows, button and the overhanging robot sit on their Figma percentages");
+    "rows and the overhanging robot sit on their Figma percentages");
+  /* THE BUTTON IS THE ONE DELIBERATE DEPARTURE. 322:712 is authored at left
+     17.414% because the composition balances it against the robot hanging off
+     the right — but he is drawn outside the paper and over it, so on the paper
+     itself the button read as shoved left. It keeps its authored width and top
+     and is centred instead. */
+  ok(Math.abs(authored.btn.w - .54451) < .006 &&
+     Math.abs(authored.btnCentre - .5) < .004,
+    `the button keeps its authored width and is centred on the card ` +
+    `(centre ${authored.btnCentre.toFixed(4)}, w ${authored.btn.w.toFixed(4)})`);
   /* Rendered bounds from slot-3 Figma nodes 321:667 / 321:666. The raw fills
      are padded transparent canvases, so using their nested fill rectangles is
      exactly what reduced both tapes to tiny scraps. */
@@ -2463,7 +2475,9 @@ console.log("boot gate:");
     !document.getElementById("cgEnable").disabled &&
     !document.getElementById("cgEnable").hasAttribute("aria-busy") &&
     getComputedStyle(document.querySelector('[data-cg-note="blocked"]')).display !== "none" &&
-    getComputedStyle(document.getElementById("cgLoad")).display === "none" &&
+    /* the card carries no loading strip at all now — the download is not a
+       wait, so the only thing under the paper is the failure that IS one */
+    !document.getElementById("cgLoad") &&
     /* the headline stays Figma's own line — it is the one sentence that says
        what the screen is for, and an error must not cost it */
     document.getElementById("cgTitle").textContent.trim() ===

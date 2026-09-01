@@ -151,20 +151,23 @@ function stopRig(){
   rigTimer = 0;
 }
 
-/* ---------------- the loading strip ---------------- */
+/* ---------------- boot progress ---------------- */
 
-/* `at` is 0..1. The strip is honest about the two things that actually take
-   time (the wasm runtime and the pose model) rather than being a decorative
-   sweep — a fake bar on a real wait is the one thing worse than no bar. */
+/* THE DOWNLOAD IS NOT A WAIT, so it no longer reports itself. There used to
+   be a READY WHEN YOU ARE label over a paper loading bar under the card. But
+   nothing here gates on the download: the button is live from the first
+   frame, an early click reaches getUserMedia immediately, and the models
+   finish behind the permission prompt. So the bar was a progress meter for
+   something the player never has to wait for — and it dragged the centred
+   column down and put a strip of chrome under a finished Figma composition.
+   The stage is still tracked for `data-ready`, which is the only part
+   anything else reads. */
 export function setBootProgress(label, at){
-  const lab = $("cgLoadLab");
-  const fill = $("cgLoadFill");
-  if(lab) lab.textContent = label;
-  if(fill) fill.style.width = Math.round(Math.max(0, Math.min(1, at)) * 100) + "%";
+  const g = card();
+  if(g) g.dataset.bootStage = label || "";
 }
 
 export function setBootReady(){
-  setBootProgress("READY WHEN YOU ARE", 1);
   card()?.setAttribute("data-ready", "");
 }
 
@@ -175,7 +178,7 @@ export function setBootFailed(message){
   const g = card();
   if(g){
     g.dataset.state = "broken";
-    setBootProgress(message, 1);
+    setBootProgress(message);
     /* There is no useful action left on this permission card: engine.boot()
        cancels camera acquisition before calling us. Hide the modal instead of
        releasing Home behind an inert scrim, and wake the canceled consent

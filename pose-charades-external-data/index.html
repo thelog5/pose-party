@@ -1244,20 +1244,23 @@
 
   </div>
 
-  <!-- The boot readout lives on the scrim BELOW the card: 322:717 is a
-       finished composition with no slot for it, and one note at a time is
-       picked by the card's own data-state. A permission dialog that can
-       only say the happy-path sentence is one that strands people.
+  <!-- THE ONLY THING BELOW THE CARD IS A FAILURE. There used to be a
+       "READY WHEN YOU ARE" label over a loading bar here, reporting the model
+       download. It was reporting a wait that does not block anything — the
+       button is live from the first frame and an early click reaches
+       getUserMedia immediately — so the bar was a progress meter for
+       something the player never has to wait for, sitting under a finished
+       Figma composition and pulling the whole column off centre. What is
+       left is the one line that IS actionable: why the camera did not come
+       back. 322:717 has no slot for it (its three rows butt against the
+       button with ~22 authored px between them), so it lives on the scrim,
+       unmistakably chrome rather than part of the paper.
 
        It is a SIBLING of the panel, in flow, so the column is what gets
        centred. Absolutely positioned off the panel's bottom it was invisible
        to centring, and the blocked note (three lines) made the imbalance
        worse exactly when the player most needs to read it. -->
   <div class="cg-status" role="status" aria-live="polite">
-    <div class="cg-load" id="cgLoad">
-      <span class="cg-load-lab" id="cgLoadLab">WAKING THE ROBOT&hellip;</span>
-      <span class="cg-load-track"><i class="cg-load-fill" id="cgLoadFill"></i></span>
-    </div>
     <span class="cg-note" data-cg-note="blocked">Camera access was blocked.
       Open the camera icon in your address bar, allow this page, then try
       again.</span>
