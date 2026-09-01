@@ -251,7 +251,7 @@ const PROFILE_IDS = Object.freeze({
    normal short name/value remains exactly at its Figma size. */
 const REPEATED_TEXT_SELECTOR =
   ".pm-nametag b,.pp-award span,.rs-nametag b,.rs-scorechip span,.rs-stat b," +
-  "#rsHeadline,.rb-bubble b,.fh.bubble span,.robotwait .signtext,.cg-title";
+  "#rsHeadline,.rb-bubble b,.fh.bubble span,.cg-title";
 
 let measureCanvas = null;
 let fitFrame = 0;
@@ -359,7 +359,7 @@ function fitRepeatedPaperText(node){
     return fitSingleLinePaperText(node, { safety:.9, minScale:.42 });
   /* The robot's copy is editable in robotDialogue.js and may wrap. Use the
      two-axis fitter so every edit stays inside the dedicated Figma bubble. */
-  if(node.matches(".rb-bubble b,.fh.bubble span,.robotwait .signtext"))
+  if(node.matches(".rb-bubble b,.fh.bubble span"))
     return fitWrappedTextToBox(node);
   /* The boot card's headline is authored against "CAMERA TIME!" but swaps to
      "CAMERA BLOCKED" / "NO CAMERA FOUND" when the request fails. Its box was

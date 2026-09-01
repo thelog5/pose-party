@@ -30,6 +30,28 @@ page.on("response", r => { if (r.status() >= 400) consoleErrors.push(`HTTP ${r.s
 
 await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
 
+/* THE FRONT DOOR IS ON EVERY BOOT NOW. The ENABLE CAMERA card used to be
+   skipped whenever the origin already held a camera grant, which is exactly
+   what --use-fake-ui-for-media-stream reports, so every suite booted straight
+   into Home. It is a consent/briefing screen rather than a permission
+   notification, so it is shown every run and nothing downstream (the camera,
+   the status overlay, Home's entrance) happens until it is answered. */
+async function passCameraGate(page){
+  await page.waitForFunction(() =>
+    !document.getElementById("camGate").classList.contains("hidden"),
+    { timeout: 30000, polling: 50 });
+  const seen = await page.evaluate(() => ({
+    granted:document.getElementById("camGate").hasAttribute("data-granted"),
+    label:document.getElementById("cgEnableLabel").textContent.trim(),
+    head:[...document.querySelectorAll(".cg-head1")]
+      .filter(n => getComputedStyle(n).display !== "none")
+      .map(n => n.textContent.trim()).join("|"),
+  }));
+  await page.click("#cgEnable");
+  return seen;
+}
+const returning = await passCameraGate(page);
+
 const mod = (path) => `(await import('${APP}/js/${path}'))`;
 const evalApp = (expr) => page.evaluate(`(async () => (${expr}))()`);
 const txt = sel => page.evaluate(s => document.querySelector(s)?.textContent ?? null, sel);
@@ -43,11 +65,29 @@ const readyUp = async () => {
   await page.click("#htpReady");
 };
 const bodyScreen = () => page.evaluate(() => document.body.dataset.screen);
+/* A mode press is answered before the next screen exists: the chosen card
+   pops off the board (homeAlive.js pickMode, ~420ms) and only then is the
+   move made. Clicking and reading the FSM in the same breath now reads the
+   state BEFORE the press has been acted on. */
+const leaveHome = () => page.waitForFunction(
+  () => document.body.dataset.screen !== "home", { timeout:5000, polling:20 });
+/* The lobby is dealt in over ~1.4s (screens.css, LOBBY ENTRANCE). */
+const settledLobby = () => page.waitForFunction(
+  () => !document.getElementById("lobbyStage").classList.contains("lobby-entering"),
+  { timeout:5000, polling:50 });
 
 // ---- boot ----
 await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000 });
 console.log("boot:");
 ok(true, "engine + camera booted (status overlay hidden)");
+/* --use-fake-ui-for-media-stream reports the origin as already granted, which
+   is exactly a returning player. The card is still shown — it is a briefing,
+   not a permission prompt, and what it says about where your video goes and
+   how much room you need is true on the tenth run — but it must stop asking
+   for something the browser has already given. */
+ok(returning.granted && returning.label === "LET\u2019S GO!" &&
+   returning.head === "YOUR CAMERA IS READY",
+  "a returning player still gets the front door, re-worded for a camera already granted");
 ok(await bodyScreen() === "home", "home screen visible");
 ok(await page.evaluate(() =>
   document.getElementById("homeStage").classList.contains("home-entering") &&
@@ -226,6 +266,76 @@ const waveReacted = await page.evaluate(() => {
   return ["shook","spun","popped"].some(cls => middleWave.classList.contains(cls));
 });
 ok(!waveReacted, "middle wave never gets a click-spin reaction");
+
+/* HOME'S ROBOT IS THE SAME ELEVEN-LAYER RIG (js/paperRig.js), and he has to be
+   RUNNING the moment Home is on screen. main.js wires every module long before
+   its first `render(gameState())`, and that first render is a direct call, not
+   a `transition()` — so starting him from an FSM listener, or from
+   `data-screen`, leaves him standing perfectly still on the one screen he is
+   guaranteed to be on. Nothing else on the page would look wrong. */
+const homeRig = await (async () => {
+  const read = () => page.evaluate(() => {
+    const rd = j => {
+      const m = new DOMMatrixReadOnly(getComputedStyle(
+        document.querySelector(`#homeRobot .pr-part[data-j="${j}"]`)).transform);
+      return { x:m.e, rot:Math.atan2(m.b, m.a) * 180 / Math.PI };
+    };
+    return { parts:document.querySelectorAll("#homeRobot .pr-part[data-j]").length,
+             loaded:[...document.querySelectorAll("#homeRobot .pr-part>img")]
+               .every(i => i.naturalWidth > 0),
+             eyes:rd("eyes"), waist:rd("waist"), arm:rd("uarmL") };
+  });
+  await page.mouse.move(1400, 120); await sleep(700);
+  const right = await read();
+  await page.mouse.move(40, 700); await sleep(700);
+  const left = await read();
+  return { right, left };
+})();
+ok(homeRig.right.parts === 11 && homeRig.right.loaded,
+  "home robot is Figma's eleven-layer Robot RIg, every layer loaded");
+ok(homeRig.right.eyes.x > homeRig.left.eyes.x + 1 &&
+   homeRig.right.arm.rot !== homeRig.left.arm.rot,
+  "and he is live on the boot screen — he tracks the cursor without a transition");
+ok(Math.abs(homeRig.right.eyes.x - homeRig.left.eyes.x) >
+   Math.abs(homeRig.right.waist.x - homeRig.left.waist.x) + 1,
+  "home parallax is the same ladder — the eyes out-travel the waist");
+/* A tap is answered with his body now, not a swapped-in face, and the beat
+   returns to zero on its own — so nothing can be left parked mid-pose. */
+await page.click('#homeRobot .pr-part[data-j="torso"]>img');
+await sleep(200);
+const cheerPeak = await page.evaluate(() => {
+  const m = new DOMMatrixReadOnly(getComputedStyle(
+    document.querySelector('#homeRobot .pr-part[data-j="uarmL"]')).transform);
+  return Math.atan2(m.b, m.a) * 180 / Math.PI;
+});
+await sleep(1400);
+const cheerSettled = await page.evaluate(() => {
+  const m = new DOMMatrixReadOnly(getComputedStyle(
+    document.querySelector('#homeRobot .pr-part[data-j="uarmL"]')).transform);
+  return Math.atan2(m.b, m.a) * 180 / Math.PI;
+});
+ok(cheerPeak < cheerSettled - 6,
+  `tapping him plays a cheer that falls back to rest (${cheerPeak.toFixed(1)} -> ${cheerSettled.toFixed(1)})`);
+
+/* His balloon is tethered to HIM, not nailed to the wallpaper. */
+const readHomeX = () => page.evaluate(() => {
+  const rd = j => new DOMMatrixReadOnly(getComputedStyle(
+    document.querySelector(`#homeRobot .pr-part[data-j="${j}"]`)).transform).e;
+  const b = getComputedStyle(document.getElementById("speechBubble"));
+  return { eyes:rd("eyes"),
+           bubble:parseFloat(b.translate) || 0, tilt:parseFloat(b.rotate) || 0 };
+});
+await page.mouse.move(60, 760); await sleep(900);
+const bubLeft = await readHomeX();
+await page.mouse.move(1400, 120); await sleep(900);
+const bubRight = await readHomeX();
+ok(bubRight.bubble > bubLeft.bubble + 6 && Math.abs(bubRight.tilt - bubLeft.tilt) > .8,
+  `the speech balloon drifts and swings with him (${bubLeft.bubble.toFixed(1)}px -> ${bubRight.bubble.toFixed(1)}px, ${(bubRight.tilt - bubLeft.tilt).toFixed(2)}deg)`);
+/* ...but it must never out-travel the head it belongs to, or it stops reading
+   as attached and starts reading as a second, unrelated floating object. */
+ok(Math.abs(bubRight.bubble - bubLeft.bubble) <
+   Math.abs(bubRight.eyes - bubLeft.eyes),
+  "and it trails the face rather than out-running it");
 ok(await page.evaluate(() => ["partyConfBlue","partyConfStar","partyConfRedA","partyConfRedB"]
   .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) > .95)), "original home confetti remains visible");
 ok(await page.evaluate(() => [...document.querySelectorAll(".party-hover-confetti")]
@@ -270,6 +380,20 @@ await sleep(180);
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
 await page.click("#modeAI");
+/* the press is answered on Home first: the chosen card presses in and pops
+   out towards the player, its tape lets go, everything else drops away */
+const homeExit = await page.evaluate(() => {
+  const stage = document.getElementById("homeStage");
+  const anim = sel => getComputedStyle(document.querySelector(sel)).animationName;
+  return { leaving:stage.classList.contains("home-leaving"), pick:stage.dataset.pick,
+           card:anim("#modeAI>img"), tape:anim("#tapeSolo"),
+           other:anim("#modeVS>img"), logo:anim("#logoHomeCraft") };
+});
+ok(homeExit.leaving && homeExit.pick === "ai" && homeExit.card === "homeCardPick" &&
+   homeExit.tape === "homeTapePeel" && homeExit.other === "homeCardDrop" &&
+   homeExit.logo === "homePieceOut",
+  "pressing a mode card pops that card off the board and drops the rest away");
+await leaveHome();
 ok(await fsmState() === "countdown", "SOLO card -> countdown");
 ok(await page.evaluate(() =>
   document.getElementById("soloStage").classList.contains("game-intro") &&
@@ -706,17 +830,83 @@ await page.waitForFunction(() =>
    put him in the same body — that was the whole problem with the sprite he
    replaced. Driven straight through the module so this measures the mood
    machine, not how fast a fed pose happens to charge. */
+const limbGeometry = await page.evaluate(async () => {
+  const base = location.origin + "/assets/ui/rig/";
+  const files = [
+    "upper_arm_character_right.png", "forearm_character_right.png",
+    "hand_character_right.png", "upper_arm_character_left.png",
+    "forearm_character_left.png", "hand_character_left.png",
+  ];
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 640;
+  const ctx = canvas.getContext("2d", { willReadFrequently:true });
+  const layers = {};
+  for(const file of files){
+    const img = new Image();
+    img.src = base + file;
+    await img.decode();
+    ctx.clearRect(0, 0, 640, 640);
+    ctx.drawImage(img, 0, 0);
+    const rgba = ctx.getImageData(0, 0, 640, 640).data;
+    let left=640, top=640, right=0, bottom=0;
+    for(let y=0; y<640; y++) for(let x=0; x<640; x++){
+      if(rgba[(y*640+x)*4+3] <= 8) continue;
+      left=Math.min(left,x); top=Math.min(top,y);
+      right=Math.max(right,x+1); bottom=Math.max(bottom,y+1);
+    }
+    layers[file] = { width:right-left, height:bottom-top,
+      alpha:(x,y) => rgba[(y*640+x)*4+3] };
+  }
+  const joints = [
+    ["right elbow", 216,435,"upper_arm_character_right.png","forearm_character_right.png"],
+    ["right wrist", 217,511,"forearm_character_right.png","hand_character_right.png"],
+    ["left elbow",  424,435,"upper_arm_character_left.png", "forearm_character_left.png"],
+    ["left wrist",  423,511,"forearm_character_left.png",  "hand_character_left.png"],
+  ].map(([name,x,y,a,b]) => ({ name,
+    alphaA:layers[a].alpha(x,y), alphaB:layers[b].alpha(x,y) }));
+  return { joints, boxes:Object.fromEntries(Object.entries(layers)
+    .map(([file,{width,height}]) => [file,{width,height}])) };
+});
+ok(limbGeometry.joints.every(j => j.alphaA > 240 && j.alphaB > 240),
+  `every elbow and wrist pivot overlaps opaque art (` +
+  `${limbGeometry.joints.map(j => `${j.name} ${j.alphaA}/${j.alphaB}`).join(", ")})`);
+ok(Object.entries(limbGeometry.boxes).every(([file,box]) =>
+    file.startsWith("upper_") ? box.width >= 56 && box.height >= 94 :
+    file.startsWith("forearm_") ? box.width >= 62 && box.height >= 96 :
+    box.width >= 68 && box.height >= 76),
+  "the deployed upper arms, forearms, and hands retain the expanded Figma proportions");
+
 const robotBands = await page.evaluate(async () => {
   const r = await import(location.origin + "/js/robot.js");
   const node = document.getElementById("spRobot");
-  const read = () => ({
-    pose: node.dataset.pose,
+  /* THE BAND SWEEP CANNOT BE MEASURED ON THE SOLO RIG, and for a whole
+     session it silently was not. soloRound.js feeds `robotCharge("spRobot",
+     meter.display)` from its own rAF every frame, and that rAF is registered
+     BEFORE the life loop's — so each frame runs [Solo writes the real meter]
+     -> [lifeStep reads it] -> [this probe writes its fake one], and the pose
+     the probe asked for is overwritten before anything ever reads it. Every
+     band therefore settled at idle, and the assertion below passed only on the
+     accident that breath and lean left four distinguishable transform strings.
+     It is the same trap `_posesheet.mjs` and `_robotiou.mjs` each hit and
+     documented.
+
+     `v1RobotYou` is the fix: a real local rig, same art, same driver, in the
+     DOM from boot — and on the Solo screen nothing feeds it, so the probe is
+     the only writer. Its transforms are inline styles, so they read correctly
+     even while its screen is hidden. The payoff beats stay on spRobot below:
+     robotGot sets `holdUntil`, which makes Solo's own call return early, so
+     that half of the sweep genuinely does own the rig. */
+  const bandNode = document.getElementById("v1RobotYou");
+  const read = (n = node) => ({
+    pose: n.dataset.pose,
     /* the puppet: every limb carries a composed joint-chain transform, and
-       the face is dressed from the pack's own eye/mouth states */
-    arm: node.querySelector('[data-j="uarmR"]').style.transform,
-    eyes: node.querySelector(".rb-eye-l").getAttribute("src"),
-    mouth: node.querySelector(".rb-mouth").getAttribute("src"),
-    hype: parseFloat(getComputedStyle(node).getPropertyValue("--rb-hype")) || 0,
+       the face is dressed from the exact Figma expression layers */
+    arm: n.querySelector('[data-j="uarmR"]').style.transform,
+    eyes: n.querySelector(".rb-eye-l").getAttribute("src"),
+    mouth: n.querySelector(".rb-mouth").getAttribute("src"),
+    handL: n.querySelector('[data-j="handL"]').getAttribute("src"),
+    handR: n.querySelector('[data-j="handR"]').getAttribute("src"),
+    hype: parseFloat(getComputedStyle(n).getPropertyValue("--rb-hype")) || 0,
   });
   const seen = {};
   /* The puppet SPRINGS toward each pose, so the limbs are still at the last
@@ -725,15 +915,33 @@ const robotBands = await page.evaluate(async () => {
      reads on the same tick measures nothing but the previous pose. */
   const settle = ms => new Promise(done => {
     const end = performance.now() + ms;
-    const step = () => { r.robotCharge("spRobot", seen._v);
+    const step = () => { r.robotCharge("v1RobotYou", seen._v);
       performance.now() < end ? requestAnimationFrame(step) : done(); };
     requestAnimationFrame(step);
   });
   for(const [value, key] of [[0, "cold"], [.3, "watch"], [.55, "read"], [.9, "close"]]){
     seen._v = value;
-    r.robotCharge("spRobot", value);
+    r.robotCharge("v1RobotYou", value);
     await settle(600);
-    seen[key] = read();
+    seen[key] = read(bandNode);
+  }
+  /* LEAVING A FOLD: the depth plane has to outlast the pose. `data-pose` flips
+     on the frame the mood does; the limbs need the spring's whole travel to
+     come back out. Keyed on the pose, leaving `thinking` dropped both arms
+     behind the torso while they were still crossed in front of it. Sample the
+     exit and require the plane to still be up while the forearm is mid-travel. */
+  seen._v = .3; r.robotCharge("v1RobotYou", .3); await settle(700);
+  seen._v = 0;  r.robotCharge("v1RobotYou", 0);
+  seen.exit = [];
+  for(let i = 0; i < 8; i++){
+    await new Promise(d => requestAnimationFrame(d));
+    const fa = bandNode.querySelector('.rp[data-j="farmR"]');
+    /* the INLINE transform, not the computed one: this rig's screen is hidden
+       while Solo is up, and a hidden subtree resolves `transform` to none —
+       which silently made the first version of this check unfailable. */
+    const deg = Number((/rotate\(([-\d.]+)deg\)/.exec(fa.style.transform) || [, 0])[1]);
+    seen.exit.push({ fold: bandNode.dataset.fold || "-",
+                     z: getComputedStyle(fa).zIndex, deg: +deg.toFixed(1) });
   }
   r.robotGot("spRobot");
   await new Promise(d => setTimeout(d, 520));
@@ -745,6 +953,8 @@ const robotBands = await page.evaluate(async () => {
      hardest around 95ms, well before a 320ms spot check, and that early AABB
      is the one that must retain shadow-safe air from WORD TIME. */
   const bubbleNode=node.querySelector(".rb-bubble");
+  seen.bubbleZ=Number(getComputedStyle(bubbleNode).zIndex);
+  seen.rigZ=Number(getComputedStyle(node.querySelector(".rb-rig")).zIndex);
   const wordTimerNode=document.querySelector("#soloStage .sp-wtimer");
   const obstacles=[...document.querySelectorAll(
     "#soloStage .sp-card,#soloStage .sp-word,#soloStage .sp-guess:not(.empty),"+
@@ -775,6 +985,9 @@ const robotBands = await page.evaluate(async () => {
     requestAnimationFrame(frame);
   });
   const tightest=clearances.reduce((best,next)=>next.gap<best.gap?next:best);
+  /* The bubble lasts through the celebrate -> proud handoff, so this point is
+     also a free regression probe for the authored thumb hand. */
+  seen.proud=read();
   seen.speechClearance=tightest.gap;
   seen.speechTightestAt=tightest.at;
   seen.speechSamples=clearances.length;
@@ -805,10 +1018,10 @@ const robotBands = await page.evaluate(async () => {
     const c = n.querySelector(".rb-canvas").getBoundingClientRect();
     const el = n.querySelector(".rb-mouth");
     /* .rp is transform-origin:0 0, so the computed matrix maps element-local
-       pixels straight through. 0.4995/0.3906 is the mouth's own centre on the
-       pack's shared canvas (smile.png ink, from rig.json's geometry). */
+       pixels straight through. 316.9/640,257.7/640 is the one measured Figma
+       mouth centre shared by resting expressions and speech visemes. */
     const m = new DOMMatrix(getComputedStyle(el).transform);
-    const p = m.transformPoint(new DOMPoint(c.width * 0.4995, c.height * 0.3906));
+    const p = m.transformPoint(new DOMPoint(c.width * (316.9/640), c.height * (257.7/640)));
     const w = c.width * 0.14, h = c.height * 0.07;
     return { left: c.left + p.x - w / 2, top: c.top + p.y - h / 2, width: w, height: h };
   };
@@ -841,21 +1054,58 @@ ok(new Set(robotPoses).size === 5,
   `the robot has a different body at every band of the meter (${robotPoses.join(" -> ")})`);
 ok(["cold", "watch", "read", "close", "got"].every(k => {
     const m = robotBands[k];
-    return /\/(open|happy|blink|worried)_left\.png$/.test(m.eyes) &&
-      /\/(smile|phoneme_[A-Z_]+)\.png$/.test(m.mouth) &&
+    return /\/face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_left\.png$/.test(m.eyes) &&
+      /\/(face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_mouth|phoneme_[A-Z_]+)\.png$/.test(m.mouth) &&
       /rotate\(/.test(m.arm);
   }) && new Set(["cold","watch","read","close","got"].map(k => robotBands[k].arm)).size >= 4,
   "every mood dresses the face AND moves the skeleton — the arm angle differs per band");
+/* A frame where the arm is still folded across the body but its plane has
+   already dropped is the glitch itself, so there must be none. `thinking`
+   folds farmR to about -100deg and it rests near +21, so anything still past
+   the halfway mark is unambiguously mid-travel. */
+const foldEarly = robotBands.exit.filter(f => f.deg < 0 && f.z !== "5");
+ok(foldEarly.length === 0,
+  `the depth plane outlasts the pose, so a limb never pops behind the torso ` +
+  `mid-travel (${robotBands.exit.map(f => `${f.deg}deg/z${f.z}`).join(" ")})`);
 ok(robotBands.close.hype > robotBands.watch.hype &&
    robotBands.watch.hype > robotBands.cold.hype,
   `his glow and scale climb with the meter (${robotBands.cold.hype} -> ` +
   `${robotBands.watch.hype} -> ${robotBands.close.hype})`);
 ok(robotBands.got.pose === "celebrate" && robotBands.slam,
   "recognition slams the celebrate pose in like a sticker");
+/* THE GESTURE HANDS. The pack's splayed mitten cannot make these two poses at
+   any angle, so each swaps in authored art and swaps it back out again.
+
+   WHICH HAND depends on the rig: an edge rig plays the pose mirrored, so the
+   gesturing arm is the other one. This probe runs on v1RobotYou, which is
+   data-side="right" and therefore mirrored — assert the PAIR (one gesture,
+   one plain mitten) rather than a fixed side, which is the actual promise. */
+const gesturePair = (m, gesture) => {
+  const hands = [m.handL, m.handR];
+  const gestured = hands.filter(h => new RegExp(`/${gesture}_hand_character_(left|right)\\.png$`).test(h));
+  const plain = hands.filter(h => /\/hand_character_(left|right)\.png$/.test(h));
+  return gestured.length === 1 && plain.length === 1;
+};
+ok(gesturePair(robotBands.watch, "fist"),
+  `thinking wears the fist on the gesturing hand and leaves the other a mitten ` +
+  `(${robotBands.watch.handL.split("/").pop()} + ${robotBands.watch.handR.split("/").pop()})`);
+ok(gesturePair(robotBands.read, "point"),
+  `present wears the pointing hand — the finger he calls the word out with ` +
+  `(${robotBands.read.handL.split("/").pop()} + ${robotBands.read.handR.split("/").pop()})`);
+ok(/\/hand_character_right\.png$/.test(robotBands.cold.handR) &&
+   !/(fist|point|thumbsup)_/.test(robotBands.cold.handR),
+  "and idle puts the plain hand back, so no gesture can stick");
+ok(robotBands.proud.pose === "thumbsup" &&
+   /\/face_happy_left\.png$/.test(robotBands.proud.eyes) &&
+   /\/thumbsup_hand_character_right\.png$/.test(robotBands.proud.handR) &&
+   /\/hand_character_left\.png$/.test(robotBands.proud.handL),
+  "the payoff settles into Figma's happy face and exact thumb hand");
 ok(robotBands.bubbleUp && robotBands.said.length > 0,
   `he says something on the catch ("${robotBands.said}")`);
 ok(/robot-speech-bubble\.png$/.test(robotBands.bubbleAsset),
   "gameplay robots use the dedicated Figma speech-bubble component");
+ok(robotBands.bubbleZ > robotBands.rigZ,
+  `the speech bubble always paints in front of the robot (${robotBands.bubbleZ} > ${robotBands.rigZ})`);
 /* Solo uses a closer, smaller speech paper so the complete pop route fits in
    the open pocket between WORD TIME, the robot and its guess stack. */
 const robotTailGap = Math.abs(robotBands.tailDelta.x) / robotBands.robotWidth;
@@ -874,6 +1124,9 @@ ok(Math.abs(robotBands.tailOriginDelta.x) < .002 &&
   "the bubble pop pivots at its tail instead of sweeping through the robot");
 ok(robotBands.afterReset.pose === "idle",
   "a reset puts him back to idle rather than stranding the last reaction");
+ok(!robotBands.afterReset.handL.includes("thumbsup_") &&
+   !robotBands.afterReset.handR.includes("thumbsup_"),
+  "the alternate thumb hand restores to the base articulated hands");
 
 /* Robot dialogue lives in its own editable file. Exercise every shipped line
    plus a deliberately excessive edit: the two-axis fitter must settle before
@@ -951,25 +1204,85 @@ ok(Number(robotAnchor.underPaper) < 3 && robotAnchor.inStage,
    half-second before a catch and the rest of the word he was a sticker. */
 const robotIdle = await page.evaluate(async () => {
   const r = await import(location.origin + "/js/robot.js");
+  const { notePresence } = await import(location.origin + "/js/presence.js");
+  const { ROBOT_DIALOGUE } = await import(location.origin + "/js/robotDialogue.js");
   const node = document.getElementById("spRobot");
+  /* Solo's live loop also feeds spRobot. Use a private clone for the dialogue
+     branch so the app cannot slip a second robotCharge between our synthetic
+     presence frame and the call being asserted. */
+  const semantic = node.cloneNode(true);
+  semantic.id = "semanticRobot";
+  semantic.style.visibility = "hidden";
+  node.parentElement.appendChild(semantic);
+  r.robotCharge("semanticRobot", 0);          // register the private rig
+  r.resetRobot("semanticRobot");
   r.resetRobot("spRobot");
   const seen = [];
   const started = performance.now();
-  while(performance.now() - started < 9000){
-    r.robotCharge("spRobot", 0);            // stone cold the whole time
-    await new Promise(done => setTimeout(done, 100));
-    const key = node.dataset.pose + "/" +
-      (node.querySelector(".rb-eye-l").getAttribute("src") || "").split("/").pop();
-    if(seen[seen.length - 1] !== key) seen.push(key);
+  const nativeRandom = Math.random;
+  /* Make the two idle beats deterministic: index 1 is THINKING and index 2
+     must remain the small PEEK lean. The old rotation put PRESENT there,
+     which is how an unrelated sideways arm survived into dialogue. */
+  Math.random = () => 0;
+  try{
+    while(performance.now() - started < 9000){
+      const elapsed = performance.now() - started;
+      /* Keep a visible, still player for seven seconds, then move the gesture
+         landmarks hard while the meter stays empty. At the nudge threshold
+         this selects the struggling line bank, including "I ALMOST HAVE IT".
+         That line must own THINKING instead of inheriting an idle pose. */
+      const landmarks = shift => {
+        const lm = Array.from({ length:33 }, () => null);
+        lm[0]  = { x:.5 + shift, y:.25, visibility:1 };
+        /* The whole player shifts late only to trigger the semantic
+           "struggling" line while the meter remains empty. */
+        lm[11] = { x:.65 + shift, y:.5,  visibility:1 };
+        lm[13] = { x:.65 + shift, y:.62, visibility:1 };
+        lm[15] = { x:.65 + shift, y:.74, visibility:1 };
+        lm[12] = { x:.35 + shift, y:.5,  visibility:1 };
+        lm[14] = { x:.35 + shift, y:.62, visibility:1 };
+        lm[16] = { x:.35 + shift, y:.74, visibility:1 };
+        return lm;
+      };
+      const now = performance.now();
+      if(elapsed < 7000){
+        notePresence(landmarks(0), now);
+      }else{
+        /* Supply the before/after pair atomically so the synthetic body owns
+           the energy reading even if the fake camera publishes between ticks. */
+        notePresence(landmarks(-.04), now - 100);
+        notePresence(landmarks(.04), now);
+      }
+      r.robotCharge("semanticRobot", 0);
+      r.robotCharge("spRobot", 0);          // meter stays stone cold
+      await new Promise(done => setTimeout(done, 100));
+      const key = node.dataset.pose + "/" +
+        (node.querySelector(".rb-eye-l").getAttribute("src") || "").split("/").pop();
+      if(seen[seen.length - 1] !== key) seen.push(key);
+    }
+  }finally{
+    Math.random = nativeRandom;
   }
+  const line = (semantic.querySelector(".rb-bubble b").textContent || "").trim();
+  const dialoguePose = semantic.dataset.pose;
+  const isStrugglingLine = ROBOT_DIALOGUE.struggling.includes(line);
   r.resetRobot("spRobot");
-  return { seen, distinct:[...new Set(seen)].length };
+  r.resetRobot("semanticRobot");
+  semantic.remove();
+  return { seen, distinct:[...new Set(seen)].length,
+    line, dialoguePose, isStrugglingLine };
 });
 ok(robotIdle.distinct >= 2,
   `he keeps moving with nothing fed to him (${robotIdle.distinct} looks in 9s: ` +
   `${[...new Set(robotIdle.seen)].join(", ")})`);
 ok(robotIdle.seen.some(k => k.startsWith("thinking/")),
   "the idle rotation leans on the THINKING pose — that is what he is doing");
+ok(robotIdle.seen.every(k => /^(idle|thinking|peek)\//.test(k)),
+  `idle life never throws an unrelated PRESENT or SHRUG pose ` +
+  `(${[...new Set(robotIdle.seen)].join(", ")})`);
+ok(robotIdle.isStrugglingLine && robotIdle.dialoguePose === "thinking",
+  `a struggling line owns the THINKING pose instead of random arms ` +
+  `("${robotIdle.line}" / ${robotIdle.dialoguePose})`);
 
 // the displayed percentage lies: it crawls, and it never reads 100 early
 const chargeTrace = await page.evaluate(async () => {
@@ -1082,8 +1395,26 @@ const beforeSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 await page.$eval("#btnSkipSolo", el => el.click());
 await page.waitForFunction(() => document.getElementById("scrSolo").dataset.rstate === "round_end", { timeout: 3000 });
 ok(await page.evaluate(() => !document.querySelector(".burstwrap")) || true, "skip: no new confetti (no payoff)");
+/* The cost is DELIVERED, not announced: a glowing figure lands off-centre and
+   is dragged into the score card, and the total only drops when it arrives —
+   the exact mirror of the award paper. So the score is deliberately UNCHANGED
+   for the length of that flight, and reading it in the same breath as the
+   click reads the value before the penalty has been paid. */
+ok(await page.evaluate(() => {
+  const p = document.getElementById("spPenalty");
+  return !!p && p.classList.contains("show") &&
+    p.querySelector(".pen-val").textContent.trim() === "\u2212250";
+}), "skip: the cost lands on screen as a figure, not a toast");
+ok(parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,"")) === beforeSkip,
+  "skip: the score is held until the figure reaches the card");
+await page.waitForFunction(n => parseInt(
+  document.getElementById("soloScoreVal").textContent.replace(/[^0-9]/g,"")) !== n,
+  { timeout: 4000, polling: 40 }, beforeSkip);
 const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
+ok(await page.evaluate(() =>
+  document.getElementById("soloScoreCard").classList.contains("bump-hit")),
+  "skip: the score card recoils rather than swelling");
 /* x0, not a clamped x1: clamping made streak 0 and 1 render identically, so
    the first catch of a run — and losing a streak of one — changed nothing on
    screen and never bumped the card. */
@@ -1363,27 +1694,93 @@ ok(await fsmState() === "menu", "done -> home");
 // ---- 1v1 lobby (static host: server unreachable, graceful message) ----
 console.log("1v1 lobby (no server):");
 await page.click("#modeVS");
+await leaveHome();
 ok(await fsmState() === "lobby", "1v1 card opens lobby");
 ok(await bodyScreen() === "lobby", "lobby screen shown");
-const lobbyRobotSign = await page.evaluate(() => {
-  const paper=document.getElementById("robotWaveHigh");
-  const line=document.querySelector("#lobbyRobotWait .signtext");
+/* The lobby re-lands the component that just left Home: its 1V1 title paper
+   arrives on the mirror of that pop, its tape slaps down after it, every
+   other paper is thrown in on its own path, and the camera compositions drop
+   on one shared distance so their stacked layers stay glued. */
+const lobbyIn = await page.evaluate(() => {
+  const stage = document.getElementById("lobbyStage");
+  const anim = sel => getComputedStyle(document.querySelector(sel)).animationName;
+  const delay = sel => getComputedStyle(document.querySelector(sel)).animationDelay;
+  const path = sel => {
+    const cs = getComputedStyle(document.querySelector(sel));
+    return ["--lb-in-x","--lb-in-y","--lb-in-r"].map(v => cs.getPropertyValue(v).trim()).join(" ");
+  };
+  return { entering:stage.classList.contains("lobby-entering"),
+           card:anim("#lobby1v1Title"), tape:anim(".m1.lobbytitle-tape"),
+           panel:anim(".lobby-you-layer"), invite:anim(".invite"),
+           robot:anim("#lobbyRobotWait"),
+           inviteDelay:delay(".invite"), logoDelay:delay("#logoLobby"),
+           invitePath:path(".invite"), startPath:path(".startbtn") };
+});
+ok(lobbyIn.entering && lobbyIn.card === "homeCardPickIn" &&
+   lobbyIn.tape === "homeTapeSlap" && lobbyIn.panel === "lobbyStackIn" &&
+   lobbyIn.invite === "lobbyPaperIn" && lobbyIn.robot === "lobbyPaperIn",
+  "the 1v1 lobby is dealt in, led by the mode paper Home just handed over");
+ok(lobbyIn.logoDelay === "0.3s" && lobbyIn.inviteDelay === "0.5s",
+  "its pieces keep their own beats (an id inside :is() would flatten them)");
+/* Each paper is thrown in from the edge it lives against — a shared path
+   reads as one fade with an offset, which is what this replaced. */
+ok(lobbyIn.invitePath === "-36% 50% -8deg" && lobbyIn.startPath === "42% 46% 9deg",
+  "and its own path in, from the corner of the board it belongs to");
+/* Everything below measures a settled board: a paper still landing owns its
+   own translate, so it cannot be lifted by a hover and its client rect is
+   inflated by the scale it is still carrying. */
+await settledLobby();
+/* The waiting robot is Figma's eleven-layer `Robot RIg` (353:752) driven by
+   js/paperRig.js, not a sprite. Two things are worth holding: that every
+   authored layer is actually on the board, and that the parallax LADDER is
+   real — the eyes must out-travel the hips, because equal gains everywhere is
+   exactly the sticker-being-dragged look the rig replaced. */
+const readRig = () => page.evaluate(() => {
+  const shift = j => {
+    const el = document.querySelector(`#lobbyRobotWait .pr-part[data-j="${j}"]`);
+    const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    return { x:m.e, rot:Math.atan2(m.b, m.a) * 180 / Math.PI };
+  };
+  const parts = [...document.querySelectorAll("#lobbyRobotWait .pr-part[data-j]")];
   return {
-    text:line.textContent.trim(),
-    asset:[paper.naturalWidth,paper.naturalHeight],
-    fits:line.scrollWidth <= line.clientWidth + .75 &&
-      line.scrollHeight <= line.clientHeight + .75,
+    joints: parts.map(p => p.dataset.j).join(","),
+    loaded: parts.every(p => p.querySelector("img").naturalWidth > 0),
+    /* the waist only ever inherits the hips, so it IS the bottom of the ladder */
+    eyes: shift("eyes"), hip: shift("waist"),
+    arm: shift("uarmL"), hand: shift("handL"),
   };
 });
-ok(lobbyRobotSign.text === "STRIKE A POSE!" && lobbyRobotSign.fits &&
-   lobbyRobotSign.asset[0] === 1714 && lobbyRobotSign.asset[1] === 1136,
-  "1v1 waiting robot uses the refreshed Figma art and fitted STRIKE A POSE! sign");
+await page.mouse.move(1380, 120);
+await sleep(700);
+const rigRight = await readRig();
+await page.mouse.move(60, 700);
+await sleep(700);
+const rigLeft = await readRig();
+ok(rigRight.joints === "legR,uarmL,uarmR,legL,waist,head,torso,eyes,mouth,handL,handR" &&
+   rigRight.loaded,
+  "1v1 waiting robot is Figma's eleven-layer Robot RIg, every layer loaded");
+ok(rigRight.arm.rot < rigLeft.arm.rot - 8 && rigRight.eyes.x > rigLeft.eyes.x + 1,
+  "he reaches for the cursor: the waving arm swings up-right and back down-left");
+ok(Math.abs(rigRight.eyes.x - rigLeft.eyes.x) >
+   Math.abs(rigRight.hip.x - rigLeft.hip.x) + 1,
+  "and the parallax is a ladder — the eyes out-travel the waist");
 if(process.env.LOBBY_SCREENSHOT)
   await page.screenshot({path:process.env.LOBBY_SCREENSHOT,fullPage:true});
+/* This suite serves the app from a plain static host, which is exactly the
+   "the page is not being served by the game server" case — so that is the
+   line the lobby must show, and it is the more useful of the two: waiting
+   cannot fix a static host, and the message has to say where the server is.
+   Accept either wording, but require it to name the server and, for the
+   wrong-host case, to say what to open. */
 await page.waitForFunction(
-  () => /Can’t reach the game server/.test(document.getElementById("lobbyStatus").textContent),
+  () => /(isn’t being served by the game server|Can’t reach the game server)/
+    .test(document.getElementById("lobbyStatus").textContent),
   { timeout: 20000 }
 );
+const noServerLine = (await txt("#lobbyStatus")) || "";
+ok(/localhost:3000/.test(noServerLine),
+  `a lobby with no server behind it says where the server is ` +
+  `("${noServerLine.slice(0, 90)}")`);
 ok(true, "graceful no-server message shown");
 ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "START disabled without a rival");
 await page.setViewport({ width:1024,height:768 });
@@ -1463,9 +1860,42 @@ await sleep(100);
 // ---- party lobby (shared stage, party mode; no server on a static host) ----
 console.log("party lobby:");
 await page.click("#btnExitLobby");
+/* Walking out is the mirror of the press that opened the room: the mode
+   paper pops back off the board and the room drops away under it, before the
+   move is made. */
+const lobbyExit = await page.evaluate(() => {
+  const stage = document.getElementById("lobbyStage");
+  const anim = sel => getComputedStyle(document.querySelector(sel)).animationName;
+  return { leaving:stage.classList.contains("lobby-leaving"),
+           card:anim("#lobby1v1Title"), tape:anim(".m1.lobbytitle-tape"),
+           invite:anim(".invite"), panel:anim(".lobby-you-layer") };
+});
+ok(lobbyExit.leaving && lobbyExit.card === "homeCardPick" &&
+   lobbyExit.tape === "homeTapePeel" && lobbyExit.invite === "homePieceOut" &&
+   lobbyExit.panel === "lobbyStackOut",
+  "leaving pops the mode paper back out and drops the room away under it");
+await page.waitForFunction(() => document.body.dataset.screen === "home",
+  { timeout:5000, polling:20 });
 ok(await fsmState() === "menu", "exit lobby -> home");
+ok(await page.evaluate(() =>
+  !document.getElementById("lobbyStage").classList.contains("lobby-leaving")),
+  "and the exit is cleared, so the room is never left parked at opacity 0");
 await page.click("#modeParty");
+await leaveHome();
 ok(await fsmState() === "party", "PARTY card enters the party state");
+const partyLobbyIn = await page.evaluate(() => {
+  const anim = sel => getComputedStyle(document.querySelector(sel)).animationName;
+  return { entering:document.getElementById("lobbyStage")
+             .classList.contains("lobby-entering"),
+           card:anim("#partyLobbyTitle"), tape:anim(".mp.lobbytitle-tape"),
+           team:anim(".party-team-layer"), join:anim("#btnJoinBlue"),
+           vs:anim(".party-vs") };
+});
+ok(partyLobbyIn.entering && partyLobbyIn.card === "homeCardPickIn" &&
+   partyLobbyIn.tape === "homeTapeSlap" && partyLobbyIn.team === "lobbyStackIn" &&
+   partyLobbyIn.join === "lobbyPaperIn" && partyLobbyIn.vs === "homeTapeSlap",
+  "the party lobby is dealt in the same way, led by its own mode paper");
+await settledLobby();
 ok(await bodyScreen() === "lobby", "party shares the lobby stage");
 ok(await page.evaluate(() => !document.querySelector(".party-rain,.party-title-confetti,.party-asset-burst")), "party lobby contains no confetti");
 ok(await page.evaluate(() => document.getElementById("lobbyStage").dataset.mode) === "party", "stage flipped to party mode");
@@ -1493,11 +1923,14 @@ ok(await page.evaluate(() => !document.querySelector(".party-rain,.party-title-c
   "title, teams, VS, and controls remain confetti-free on hover");
 ok(await page.evaluate(() => document.getElementById("btnStartMatch").disabled), "party START gated");
 await page.waitForFunction(
-  () => /Can’t reach the game server/.test(document.getElementById("lobbyStatus").textContent),
+  () => /(isn’t being served by the game server|Can’t reach the game server)/
+    .test(document.getElementById("lobbyStatus").textContent),
   { timeout: 20000 }
 );
 ok(true, "graceful no-server message in party mode");
 await page.click("#btnExitLobby");
+await page.waitForFunction(() => document.body.dataset.screen === "home",
+  { timeout:5000, polling:20 });
 ok(await fsmState() === "menu", "back to home");
 
 // ---- results visual contract (2v2 has different Figma rectangles) ----
@@ -1838,11 +2271,12 @@ ok(reducedScoreDelay < 200,
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 
 // ---- the boot gate ----
-/* This suite's own page never sees the ENABLE CAMERA card: Chrome's
-   --use-fake-ui-for-media-stream reports the origin as already `granted`, so
-   requestCameraConsent() short-circuits exactly the way it does for a
-   returning player. Drive it on a second page with the permission query
-   stubbed to `prompt`, which is what a first-time visitor gets. */
+/* Every page in this suite sees the card (passCameraGate above answers it),
+   but with --use-fake-ui-for-media-stream the origin reports `granted`, so
+   that is the RETURNING-player wording. Drive the first-time path on a second
+   page with the permission query stubbed to `prompt`, which is what a visitor
+   who has never granted the camera gets, and exercise the refusal/retry road
+   that only exists on that side. */
 console.log("boot gate:");
 {
   const gatePage = await browser.newPage();
@@ -1893,7 +2327,7 @@ console.log("boot gate:");
     "the boot hold is on while the card is up");
   const held = await gatePage.evaluate(() => {
     const pieces = ["logoHomeCraft","modeAI","modeVS","modeParty","tapeSolo",
-                    "robotBody","speechBubble"];
+                    "homeRobot","speechBubble"];
     return {
       hidden:pieces.every(id =>
         Number(getComputedStyle(document.getElementById(id)).opacity) === 0),
@@ -1941,8 +2375,32 @@ console.log("boot gate:");
       tapes:{ yellow:tape(".cg-tape-y"), cream:tape(".cg-tape-c") },
       body:src("#cgRobotBody"),
       title:document.getElementById("cgTitle").textContent.trim(),
-      heads:[...document.querySelectorAll(".cg-head")].map(n => n.textContent.trim()),
+      /* Row 1 authors two readings of the same rectangle now — the card is
+         shown on every boot, so the permission line has to stop asking once
+         the browser has said yes. Only the displayed one is the copy. */
+      heads:[...document.querySelectorAll(".cg-head")]
+        .filter(n => getComputedStyle(n).display !== "none")
+        .map(n => n.textContent.trim()),
+      startLabel:document.getElementById("cgEnableLabel").textContent.trim(),
       rig:box(".cg-rig"), btn:box(".cg-enable"), row1:box(".cg-row1"),
+      /* The button is the one element here that carries a transform: the
+         centring `translate:-50%`. It cannot be measured with `offsetLeft`
+         alone (that is the UNtransformed layout position) and it must not be
+         measured with a client rect either — the card focuses this button on
+         open, so `:focus-visible` has scale:1.035 on it and the painted box is
+         3.5% too wide. Layout width plus the RESOLVED translate is the only
+         reading that is neither. */
+      btnCentre:(() => {
+        const b = document.querySelector(".cg-enable");
+        /* `translate` keeps its percentage in the computed value (it resolves
+           against the element's own border box at paint time), so this cannot
+           just parseFloat to px. */
+        const raw = (getComputedStyle(b).translate || "").split(/\s+/)[0] || "0";
+        const tx = raw.endsWith("%")
+          ? parseFloat(raw) / 100 * b.offsetWidth
+          : parseFloat(raw) || 0;
+        return (b.offsetLeft + tx + b.offsetWidth / 2) / panel.offsetWidth;
+      })(),
     };
   });
   ok(/cam-panel\.png$/.test(authored.paper) &&
@@ -1962,18 +2420,30 @@ console.log("boot gate:");
      authored.heads.join("|") ===
        "ENABLE YOUR CAMERA|YOUR VIDEO STAYS PRIVATE|MAKE SOME ROOM",
     "the copy is Figma's, verbatim");
-  /* Figma percentages: rows at 13.06/34.315 w73.879, button 17.414/85.753
-     w54.451, robot 69.526/66.164 w32.099 — he hangs 1.6% off the right edge
-     and paints OVER the button, which is what makes the point read. */
+  ok(authored.startLabel === "ENABLE CAMERA" &&
+     !await gatePage.evaluate(() =>
+       document.getElementById("camGate").hasAttribute("data-granted")),
+    "a visitor with no grant is asked to enable the camera");
+  /* Figma percentages: rows at 13.06/34.315 w73.879, robot 69.526/66.164
+     w32.099 — he hangs 1.6% off the right edge and paints OVER the button,
+     which is what makes the point read. */
   ok(Math.abs(authored.row1.l - .1306) < .006 &&
      Math.abs(authored.row1.t - .34315) < .008 &&
      Math.abs(authored.row1.w - .73879) < .006 &&
-     Math.abs(authored.btn.l - .17414) < .006 &&
      Math.abs(authored.btn.t - .85753) < .008 &&
      Math.abs(authored.rig.l - .69526) < .006 &&
      Math.abs(authored.rig.w - .32099) < .006 &&
      authored.rig.l + authored.rig.w > 1,
-    "rows, button and the overhanging robot sit on their Figma percentages");
+    "rows and the overhanging robot sit on their Figma percentages");
+  /* THE BUTTON IS THE ONE DELIBERATE DEPARTURE. 322:712 is authored at left
+     17.414% because the composition balances it against the robot hanging off
+     the right — but he is drawn outside the paper and over it, so on the paper
+     itself the button read as shoved left. It keeps its authored width and top
+     and is centred instead. */
+  ok(Math.abs(authored.btn.w - .54451) < .006 &&
+     Math.abs(authored.btnCentre - .5) < .004,
+    `the button keeps its authored width and is centred on the card ` +
+    `(centre ${authored.btnCentre.toFixed(4)}, w ${authored.btn.w.toFixed(4)})`);
   /* Rendered bounds from slot-3 Figma nodes 321:667 / 321:666. The raw fills
      are padded transparent canvases, so using their nested fill rectangles is
      exactly what reduced both tapes to tiny scraps. */
@@ -2005,7 +2475,9 @@ console.log("boot gate:");
     !document.getElementById("cgEnable").disabled &&
     !document.getElementById("cgEnable").hasAttribute("aria-busy") &&
     getComputedStyle(document.querySelector('[data-cg-note="blocked"]')).display !== "none" &&
-    getComputedStyle(document.getElementById("cgLoad")).display === "none" &&
+    /* the card carries no loading strip at all now — the download is not a
+       wait, so the only thing under the paper is the failure that IS one */
+    !document.getElementById("cgLoad") &&
     /* the headline stays Figma's own line — it is the one sentence that says
        what the screen is for, and an error must not cost it */
     document.getElementById("cgTitle").textContent.trim() ===
@@ -2039,7 +2511,7 @@ console.log("boot gate:");
     !document.getElementById("homeStage").classList.contains("home-entering"),
     { timeout:6000, polling:50 });
   ok(await gatePage.evaluate(() =>
-    ["logoHomeCraft","modeAI","tapeSolo","robotBody","speechBubble"].every(id =>
+    ["logoHomeCraft","modeAI","tapeSolo","homeRobot","speechBubble"].every(id =>
       Number(getComputedStyle(document.getElementById(id)).opacity) === 1)),
     "every held paper is fully on screen once the entrance finishes");
   await gatePage.waitForFunction(() =>

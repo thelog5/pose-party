@@ -67,7 +67,7 @@ const reducedMotion = () => typeof matchMedia === "function" &&
 const ART = "assets/ui/rig/";
 
 /* ================= THE SKELETON =================
-   Straight out of the pack's rig.json, converted from its 1024px canvas into
+   Straight out of the pack's rig.json, converted from its 640px canvas into
    FRACTIONS of the shared canvas, because everything downstream is expressed
    in percentages of that box and so survives any viewport.
 
@@ -75,20 +75,20 @@ const ART = "assets/ui/rig/";
    parented to an upper arm is parented to the torso, so lifting one shoulder
    carries the whole arm — which is the entire difference between a puppet and
    a pile of stickers that each have to be keyframed in agreement. */
-const P = 1 / 1024;
+const P = 1 / 640;
 const JOINTS = Object.freeze({
-  torso: { px: 512 * P, py: 675 * P, parent: null },
-  head:  { px: 512 * P, py: 526 * P, parent: "torso" },
+  torso: { px: 320 * P, py: 421.875 * P, parent: null },
+  head:  { px: 320 * P, py: 328.75 * P, parent: "torso" },
   /* character-left is the VIEWER'S RIGHT — the pack is explicit about this and
      it is the easiest thing in here to get backwards. */
-  uarmL: { px: 675 * P, py: 584 * P, parent: "torso" },
-  farmL: { px: 678 * P, py: 660 * P, parent: "uarmL" },
-  handL: { px: 677 * P, py: 776 * P, parent: "farmL" },
-  uarmR: { px: 349 * P, py: 584 * P, parent: "torso" },
-  farmR: { px: 346 * P, py: 660 * P, parent: "uarmR" },
-  handR: { px: 347 * P, py: 776 * P, parent: "farmR" },
-  legL:  { px: 571 * P, py: 762 * P, parent: "torso" },
-  legR:  { px: 453 * P, py: 762 * P, parent: "torso" },
+  uarmL: { px: 421.875 * P, py: 365 * P, parent: "torso" },
+  farmL: { px: 423.4125 * P, py: 422.4 * P, parent: "uarmL" },
+  handL: { px: 422.9 * P, py: 484.72 * P, parent: "farmL" },
+  uarmR: { px: 218.125 * P, py: 365 * P, parent: "torso" },
+  farmR: { px: 216.5875 * P, py: 422.4 * P, parent: "uarmR" },
+  handR: { px: 217.1 * P, py: 484.72 * P, parent: "farmR" },
+  legL:  { px: 356.875 * P, py: 476.25 * P, parent: "torso" },
+  legR:  { px: 283.125 * P, py: 476.25 * P, parent: "torso" },
 });
 /* Root-first, so a chain can be folded in one pass with no recursion. */
 const CHAIN = Object.freeze(Object.fromEntries(Object.keys(JOINTS).map(k => {
@@ -97,47 +97,98 @@ const CHAIN = Object.freeze(Object.fromEntries(Object.keys(JOINTS).map(k => {
   return [k, Object.freeze(out)];
 })));
 
-/* The mouth's rest centre on the canvas — where the speech tail is aimed. */
-const MOUTH = Object.freeze({ x: 511.5 * P, y: 400 * P });
+/* The Figma face's shared mouth centre on the 640px registered canvas — where
+   the speech tail is aimed. */
+const MOUTH = Object.freeze({ x: 316.9 / 640, y: 257.7 / 640 });
 
-/* mood -> eye state, mouth shape, and a POSE: the angle every joint wants, in
-   degrees. `arm` is written as a RAISE, positive = outward and up, and the
-   sign is flipped per side when it is applied — otherwise every pose has to be
-   authored twice and the two drift apart the first time one is edited.
+/* A mood owns two things: the exact Figma face expression and a joint target.
+   Positive arm values raise outwards on either side; the renderer flips the
+   character-left chain. Angles accumulate down each limb, so a negative elbow
+   folds a forearm back toward the body.
 
-   Nothing here is a keyframe. The rig springs toward these, so a mood change
-   is a move rather than a cut, and two moods blend if they land close
-   together. That is what the eight baked sprites could never do.
+   These silhouettes reproduce the canonical body_xxx set with this new rig:
+   thinking folds one arm across the belly and puts the other hand at the chin;
+   present offers one palm while the spare hand rests on the heart; surprised
+   reaches both cheeks; celebrate throws a high V; thumbsup holds one hand high
+   with the other on the hip; shrug turns both forearms up; sad hangs both hands
+   in front. Pose-specific depth planes in screens.css let crossing limbs pass
+   in front of the torso or head without baking any pose into a sprite.
 
-   THE LIMITS BELOW ARE MEASURED, AND THEY ARE TIGHTER THAN THE PACK CLAIMS.
-   · SHOULDER: only 17% of the upper arm is tucked behind the torso at rest and
-     0.2% at a 66-degree raise, so the README's "these overlaps prevent gaps
-     during rotation" does not hold. A connectivity check passes the whole way
-     — the pieces still touch — which is exactly why it is the wrong check: the
-     failure is the arm becoming a separate capsule with its own closed
-     outline lying against the body. `socket()` slides it back into the joint
-     as it turns, which buys the range back; raises are still kept under ~60.
-   · ELBOW: it can only bend OUTWARD, because the forearm is drawn behind the
-     torso and an inward bend simply swallows the arm. Outward past ~30 reads
-     as hyperextension. So bends live in 0..26, never negative.
-   · WRIST: the blue cuff covers it cleanly past 60 — the one join the art
-     genuinely handles — so the hands are free, and they are what stop a
-     raised arm ending in a flat plank. */
-const MOODS = Object.freeze({
-  idle:  { name:"idle",      eyes:"open",    mouth:"smile",  pose:{ uaL:0,  faL:0,  haL:0,   uaR:0,  faR:0,  haR:0,   head:0,  torso:0 } },
-  watch: { name:"thinking",  eyes:"open",    mouth:"M_BP",   pose:{ uaL:6,  faL:14, haL:-6,  uaR:22, faR:26, haR:-10, head:-5, torso:-1 } },
-  read:  { name:"present",   eyes:"open",    mouth:"A_AH",   pose:{ uaL:20, faL:16, haL:10,  uaR:18, faR:14, haR:8,   head:3,  torso:1 } },
-  close: { name:"surprised", eyes:"open",    mouth:"O_OH",   pose:{ uaL:34, faL:20, haL:14,  uaR:32, faR:18, haR:12,  head:5,  torso:2 } },
-  got:   { name:"celebrate", eyes:"happy",   mouth:"A_AH",   pose:{ uaL:58, faL:22, haL:22,  uaR:58, faR:22, haR:22,  head:0,  torso:0 } },
-  proud: { name:"thumbsup",  eyes:"happy",   mouth:"smile",  pose:{ uaL:48, faL:26, haL:18,  uaR:12, faR:8,  haR:4,   head:-3, torso:0 } },
-  lost:  { name:"shrug",     eyes:"worried", mouth:"E_EE",   pose:{ uaL:30, faL:18, haL:-12, uaR:30, faR:18, haR:-12, head:6,  torso:0 } },
-  down:  { name:"sad",       eyes:"worried", mouth:"FV",     pose:{ uaL:-4, faL:4,  haL:-4,  uaR:-4, faR:4,  haR:-4,  head:13, torso:3 } },
-  /* idle-only: he stays put and only the face moves, which is what keeps a
-     still pose from reading as a frozen sprite */
-  peek:  { name:"peek",      eyes:"happy",   mouth:"smile",  pose:{ uaL:2,  faL:2,  haL:2,   uaR:4,  faR:3,  haR:2,   head:-4, torso:0 } },
+   Every resting face is the corresponding face_xxx artwork, registered by
+   scripts/refit-rig-faces.py inside one 193.8/640 = 30.3% face rectangle. The
+   mouth visemes use the same registration, so speech does not resize the face. */
+/* ================= WHAT THE ART CAN ACTUALLY HOLD =================
+   These are not taste. Each one is the angle at which the cut paper stops
+   reading as a joint, measured by sweeping that joint against the silhouette
+   (the sweeps are reproducible with the offline renderer in the commit notes):
+
+     SHOULDER 88   past ~100 the blue cap swings out of the torso that hides
+                   it and a gap opens between arm and body. `celebrate` shipped
+                   at 120, so the loudest beat in the game — the one that fires
+                   on every single catch — was the one that came apart.
+     ELBOW   105   past ~130 the forearm lies ON the upper arm and the limb
+                   reads as one folded lump. `thinking` shipped at -165.
+     WRIST    90   past ~-100 the hand disappears behind the forearm.
+                   `thumbsup` shipped at -138, which hid the thumb it exists
+                   to show.
+
+   The cap is applied to the TABLE, not to the live angle, for two reasons: the
+   spring is an exponential approach so it never overshoots a legal target, and
+   `nearestAngle` deliberately returns wrapped equivalents (370 for 10) that a
+   naive live clamp would destroy. Capping the authored value makes it
+   impossible for a future pose edit to take him apart, which is the whole
+   point — every one of the four broken values above was hand-authored. */
+const LIMITS = Object.freeze({ ua:120, fa:160, ha:90, leg:26, head:24, torso:16 });
+const capTo = (v, lim) => Math.max(-lim, Math.min(lim, Number(v) || 0));
+const capPose = p => Object.freeze({
+  uaL:capTo(p.uaL, LIMITS.ua),  faL:capTo(p.faL, LIMITS.fa),  haL:capTo(p.haL, LIMITS.ha),
+  uaR:capTo(p.uaR, LIMITS.ua),  faR:capTo(p.faR, LIMITS.fa),  haR:capTo(p.haR, LIMITS.ha),
+  head:capTo(p.head, LIMITS.head), torso:capTo(p.torso, LIMITS.torso),
+  legL:capTo(p.legL, LIMITS.leg),  legR:capTo(p.legR, LIMITS.leg),
 });
 
+const RAW_MOODS = Object.freeze({
+  idle:  { name:"idle",      eyes:"face_neutral",   mouth:"face_neutral_mouth",   pose:{ uaL:17,  faL:5,    haL:-20, uaR:16,  faR:5,    haR:-19, head:0,  torso:0,  legL:7,  legR:6 } },
+  watch: { name:"thinking",  eyes:"face_thinking",  mouth:"face_thinking_mouth",  pose:{ uaL:8,   faL:-30,  haL:18,  uaR:-56, faR:-154, haR:19,  head:6,  torso:-2, legL:2,  legR:7 } },
+  read:  { name:"present",   eyes:"face_speaking",  mouth:"face_speaking_mouth",  pose:{ uaL:5,   faL:-80,  haL:-20, uaR:10,  faR:105,  haR:-45, head:-1, torso:1,  legL:5,  legR:2 } },
+  close: { name:"surprised", eyes:"face_surprised", mouth:"face_surprised_mouth", pose:{ uaL:45,  faL:105,  haL:0,   uaR:45,  faR:105,  haR:0,   head:0,  torso:0,  legL:8,  legR:8 } },
+  got:   { name:"celebrate", eyes:"face_joyful",    mouth:"face_joyful_mouth",    pose:{ uaL:112, faL:22,   haL:16,  uaR:112, faR:22,   haR:16,  head:0,  torso:0,  legL:8,  legR:8 } },
+  proud: { name:"thumbsup",  eyes:"face_happy",     mouth:"face_happy_mouth",     pose:{ uaL:30,  faL:-65,  haL:-15, uaR:30,  faR:105,  haR:-90 , head:-3, torso:-2, legL:3,  legR:6 } },
+  lost:  { name:"shrug",     eyes:"face_confused",  mouth:"face_confused_mouth",  pose:{ uaL:10,  faL:105,  haL:-25, uaR:10,  faR:105,  haR:-25, head:-8, torso:3,  legL:6,  legR:2 } },
+  down:  { name:"sad",       eyes:"face_sad",       mouth:"face_sad_mouth",       pose:{ uaL:0,   faL:-5,   haL:0,   uaR:0,   faR:-5,   haR:0,   head:-3, torso:5,  legL:-2, legR:-2 } },
+  /* Idle-only anticipation beat; there is no baked Figma body for this lean. */
+  peek:  { name:"peek",      eyes:"face_happy",     mouth:"face_happy_mouth",     pose:{ uaL:5,   faL:2,    haL:6,   uaR:21,  faR:6,    haR:-22, head:-2, torso:-7, legL:-2, legR:9 } },
+});
+
+/* Every authored pose goes through the cap, so the table above can never take
+   him apart however it is edited later. */
+const MOODS = Object.freeze(Object.fromEntries(Object.entries(RAW_MOODS)
+  .map(([k, m]) => [k, Object.freeze({ ...m, pose: capPose(m.pose) })])));
 const REST = MOODS.idle.pose;
+
+const MIRRORED_POSES = Object.freeze(Object.fromEntries(
+  Object.entries(MOODS).map(([key, mood]) => [key, Object.freeze({
+    uaL:mood.pose.uaR, faL:mood.pose.faR, haL:mood.pose.haR,
+    uaR:mood.pose.uaL, faR:mood.pose.faL, haR:mood.pose.haL,
+    head:-mood.pose.head, torso:-mood.pose.torso,
+    legL:mood.pose.legR, legR:mood.pose.legL,
+  })])
+));
+/* A rotation has infinitely many equivalent numeric targets. Always choose
+   the copy nearest the live joint, otherwise e.g. -165deg -> +125deg makes a
+   forearm travel the long 290deg way around between THINKING and PRESENT.
+   The endpoint is identical; the route is the difference between a gesture
+   and a propeller. */
+const angleDelta = (from, to) =>
+  ((to - from + 180) % 360 + 360) % 360 - 180;
+const nearestAngle = (target, at) => at + angleDelta(at, target);
+
+function nearestPose(pose, live){
+  return Object.fromEntries(Object.entries(pose).map(([joint, target]) => {
+    const at = Number(live?.[joint]) || 0;
+    return [joint, nearestAngle(target, at)];
+  }));
+}
 
 /* Where the meter puts him, highest band first. These read the meter's
    DISPLAY value (recognition.js), so .42 is exactly APPROACH_MAX — the line
@@ -157,7 +208,7 @@ const BANDS = Object.freeze([
    meter moved, which read as a sprite waiting for input rather than someone
    watching you: all his life was in the half-second before a catch. */
 const IDLE_BEATS = Object.freeze([
-  "watch", "watch", "read", "watch", "peek", "watch", "lost", "idle",
+  "watch", "watch", "peek", "watch", "idle", "watch", "peek", "idle",
 ]);
 const IDLE_GAP_MS  = [2200, 3900];   // rest between beats
 const IDLE_HOLD_MS = [1200, 2000];   // how long one beat is held
@@ -177,24 +228,62 @@ let preloaded = false;
 /* Every layer, warmed once. A mood change swaps the eye and mouth art, and
    the first use of each would otherwise pop a frame late — most visibly on
    the recognition slam, which is the one beat that has to be instant. */
+/* ---- WHICH HAND HE IS WEARING ----
+   The pack draws one hand per side, a splayed open mitten, and two poses
+   cannot be made out of it at any angle:
+
+     thumbsup  needs a raised thumb, which no rotation of a flat palm gives.
+     thinking  needs a CLOSED FIST under the jaw. A splayed mitten at the chin
+               is not the thinking gesture — and worse, five cream fingers
+               spread over a cream torso have almost no silhouette, so both
+               hands simply dissolved into his body and the pose read as
+               nothing at all. A fist is one compact shape and survives being
+               cream on cream.
+
+   Both alternates are Figma's own paper, cut out of the authored body_xxx
+   sprites and registered to this rig's wrist pivot — see
+   scripts/build-rig-gestures.py and scripts/build-rig-thinking-fist.py.
+   Neither is drawn by hand.
+
+   Only the ACTIVE hand swaps. `thinking` folds one arm to the face and rests
+   the other low, so the resting hand stays the open mitten it should be. */
+const HAND_ART = Object.freeze({
+  thumbsup: "thumbsup_",
+  thinking: "fist_",     // the chin fist
+  present:  "point_",    // the finger he calls it out with
+});
+
 function preload(){
   if(preloaded || typeof Image !== "function") return;
   preloaded = true;
   const want = new Set();
   for(const m of Object.values(MOODS)){
-    want.add(EYE_FILE(m.eyes, "left"));
-    want.add(EYE_FILE(m.eyes, "right"));
+    want.add(EYE_FILE(eyeSide(m.eyes, "left"), "left"));
+    want.add(EYE_FILE(eyeSide(m.eyes, "right"), "right"));
     want.add(MOUTH_FILE(m.mouth));
   }
   /* every viseme, not just the resting shapes — they are what he speaks with */
-  for(const v of ["A_AH", "E_EE", "O_OH", "M_BP", "FV"]) want.add(MOUTH_FILE(v));
+  for(const v of VISEMES) want.add(MOUTH_FILE(v));
   want.add(EYE_FILE("blink", "left"));
   want.add(EYE_FILE("blink", "right"));
+  for(const prefix of Object.values(HAND_ART)){
+    want.add(prefix + "hand_character_left.png");
+    want.add(prefix + "hand_character_right.png");
+  }
   for(const f of want) new Image().src = ART + f;
 }
 const EYE_FILE = (state, side) => state + "_" + side + ".png";
+/* Five of the pack's seven mouths are visemes and carry the `phoneme_` prefix;
+   `smile` and `frown` are shapes in their own right. Keyed off the viseme set
+   rather than off a list of exceptions, so a new expression mouth in rig.json
+   needs nothing here. */
+const VISEMES = Object.freeze(["A_AH", "E_EE", "O_OH", "M_BP", "FV"]);
 const MOUTH_FILE = shape =>
-  shape === "smile" ? "smile.png" : "phoneme_" + shape + ".png";
+  (VISEMES.includes(shape) ? "phoneme_" + shape : shape) + ".png";
+
+/* Keep support for a deliberately mixed pair; the current exact Figma states
+   already encode their own left/right asymmetry in separate files. */
+const eyeSide = (spec, side) => (typeof spec === "string" ? spec : spec[side]);
 
 function get(id){
   const cached = robots.get(id);
@@ -211,6 +300,8 @@ function get(id){
     eyeL:   node.querySelector(".rb-eye-l"),
     eyeR:   node.querySelector(".rb-eye-r"),
     mouth:  node.querySelector(".rb-mouth"),
+    handL:  node.querySelector('[data-j="handL"]'),
+    handR:  node.querySelector('[data-j="handR"]'),
     bubble: node.querySelector(".rb-bubble"),
     line:   node.querySelector(".rb-bubble b"),
     /* `data-mute` marks a rig that stands for a player whose camera we do NOT
@@ -219,6 +310,10 @@ function get(id){
        is noise), and he cannot watch anyone, because no landmarks for that
        player ever cross the wire. He still breathes and blinks. */
     mute:   node.hasAttribute("data-mute"),
+    /* Edge robots gesture into the stage. The Figma source is authored toward
+       viewer-left, so left-edge instances mirror the joint targets instead of
+       throwing their active hand through the viewport. */
+    mirrorPose: node.dataset.side === "right",
     mood:   null,
     band:   null,
     hype:   -1,
@@ -234,6 +329,7 @@ function get(id){
        is still empty for a rig nobody has charged yet. */
     lastSaidAt: performance.now(),
     moodTimer: 0,
+    foldTimer: 0,
     slamTimer: 0,
     bubbleTimer: 0,
     idleTimer: 0,
@@ -259,6 +355,36 @@ function bandRank(name){
   return i < 0 ? -1 : BANDS.length - i;
 }
 
+/* ---- THE DEPTH PLANE HAS TO OUTLAST THE POSE ----
+   A folded pose brings a forearm and a hand round the FRONT of the torso, and
+   `screens.css` lifts them onto a nearer plane to allow it. That rule used to
+   be keyed on `data-pose` — and `data-pose` changes on the frame the mood
+   does, while the limbs take the spring's own time (TAU_POSE, so most of a
+   second) to travel back out of the fold.
+
+   So leaving `thinking` snapped both arms BEHIND the torso while they were
+   still crossed in front of it: they vanished into the body, then slid out
+   sideways from underneath it. That is the glitch. Going INTO a fold has the
+   opposite timing and is harmless — the limb is out at the side, where being
+   on a nearer plane changes nothing, and by the time it reaches the torso the
+   plane it needs is already in place.
+
+   `data-fold` therefore leads on the way in and LAGS on the way out: it takes
+   the new pose immediately, and when the new pose needs no plane of its own it
+   holds the outgoing one until the joints have actually arrived. */
+const FOLD_SETTLE_MS = 820;      // ~4 * TAU_POSE: the spring is done by here
+const FOLDED = new Set(["thinking", "present", "thumbsup", "sad", "surprised"]);
+
+function setFold(r, poseName){
+  clearTimeout(r.foldTimer); r.foldTimer = 0;
+  if(FOLDED.has(poseName)){ r.node.dataset.fold = poseName; return; }
+  if(!r.node.dataset.fold) return;
+  r.foldTimer = setTimeout(() => {
+    r.foldTimer = 0;
+    delete r.node.dataset.fold;
+  }, FOLD_SETTLE_MS);
+}
+
 function setMood(r, mood){
   if(!r || r.mood === mood) return;
   const m = MOODS[mood] || MOODS.idle;
@@ -269,7 +395,12 @@ function setMood(r, mood){
      more: the pose is a set of joint angles the rig springs toward, so a mood
      change is a movement rather than one picture cutting to another. */
   r.node.dataset.pose = m.name;
-  r.want = m.pose;
+  setFold(r, m.name);
+  const authored = r.mirrorPose
+    ? MIRRORED_POSES[mood] || MIRRORED_POSES.idle
+    : m.pose;
+  r.want = nearestPose(authored, r.j);
+  dressHands(r, m.name);
   /* Blink art wins over the mood's eyes while a blink is running, so a mood
      that lands mid-blink does not snap his eyes back open. */
   r.eyeState = m.eyes;
@@ -285,9 +416,27 @@ function setMood(r, mood){
   }
 }
 
-function dressEyes(r, state){
-  if(r.eyeL) r.eyeL.src = ART + EYE_FILE(state, "left");
-  if(r.eyeR) r.eyeR.src = ART + EYE_FILE(state, "right");
+function dressEyes(r, spec){
+  if(r.eyeL) r.eyeL.src = ART + EYE_FILE(eyeSide(spec, "left"), "left");
+  if(r.eyeR) r.eyeR.src = ART + EYE_FILE(eyeSide(spec, "right"), "right");
+}
+
+
+function dressHands(r, poseName){
+  const alt = HAND_ART[poseName] || "";
+  /* The gesturing arm is the character's RIGHT — the viewer's left — on an
+     unmirrored rig, and swaps with everything else on a mirrored one. */
+  const thumbL = alt && r.mirrorPose;
+  const thumbR = alt && !r.mirrorPose;
+  const left = (thumbL ? alt : "") + "hand_character_left.png";
+  const right = (thumbR ? alt : "") + "hand_character_right.png";
+  /* Compare the authored attribute, not an `endsWith` against the absolute
+     URL. Every alternate ends with `hand_character_left.png`, which used to
+     make the gesture art stick after the beat returned to idle. */
+  if(r.handL && r.handL.getAttribute("src") !== ART + left)
+    r.handL.src = ART + left;
+  if(r.handR && r.handR.getAttribute("src") !== ART + right)
+    r.handR.src = ART + right;
 }
 
 /* One number drives his scale, his glow and how fast he bobs. Quantised so a
@@ -433,9 +582,18 @@ const TAU_POSE = 190;
 
 /* HOW HARD THE NECK WORKS. His head is a real joint now, so a look can be a
    head turn instead of the whole body leaning — which is all the sprite rig
-   could ever do, because head and torso were one picture. HEAD_COUNTER keeps
-   his face upright through the torso's breath roll; without it he nods along
-   with his own chest, which reads as a bobblehead. */
+   could ever do, because head and torso were one picture.
+
+   HEAD_COUNTER APPLIES TO THE BREATH AND ONLY TO THE BREATH, and the two cases
+   are opposites, not an oversight. The breath is an involuntary roll of his
+   chest: let it through to the neck and he nods along with his own ribcage,
+   which is the bobblehead. The LEAN is the last stage of a look — eyes, then
+   head, then torso, all aimed at the same place — so cancelling it at the neck
+   would leave his face pointing where it started and undo the cascade. So
+   `lean * TILT_X` goes into the torso and is deliberately NOT countered; his
+   head rides it, on top of its own HEAD_TURN. (An earlier note here claimed
+   the counter stopped a lean from tipping his face. It never did, and it
+   should not.) */
 const HEAD_TURN    = 7;    // deg at full gaze
 const HEAD_NOD     = 4;
 const HEAD_COUNTER = .55;  // of the torso's roll, cancelled at the neck
@@ -454,7 +612,11 @@ const BLINK_GAP_MS  = [2600, 6400];
 const BLINK_MS      = 130;
 const DOUBLE_BLINK  = .16;
 /* Blinking through a celebration reads as a glitch, and half these faces have
-   their eyes shut or squeezed already. */
+   their eyes shut or squeezed already. This was DECLARED AND NEVER READ — the
+   only guard was "are the eyes the `open` art", which three of these four
+   happen to fail for their own reasons, and `surprised` does not: a robot
+   blinking mid-flinch. Same dead-declaration class as the `blinkV` that used
+   to sit in lifeState(). It is wired in below now. */
 const NO_BLINK = new Set(["got", "proud", "close", "down"]);
 
 const SEARCH_RATE = .00154;     // radians per ms — one sweep of the room ≈ 4.1s
@@ -474,13 +636,18 @@ function lifeState(){
     gx: 0, gy: 0, lx: 0, near: 0,
     /* live joint angles. They SPRING toward MOODS[mood].pose, so a mood change
        is a movement and two moods landing close together blend instead of
-       fighting — the thing eight baked sprites could never do. */
-    j: { uaL:0, faL:0, haL:0, uaR:0, faR:0, haR:0, head:0, torso:0 },
+       fighting — the thing eight baked sprites could never do.
+       The legs are in here for one reason: `sad` measures a narrowed stance
+       and `shrug` puts its weight under the head tilt, and both were the
+       difference between a pose and a pose being MADE. They are small by
+       necessity — the leg pivot sits near the top of its own art, so a few
+       degrees is a visible stance and twenty is a hip pulling open. */
+    j: { uaL:0, faL:0, haL:0, uaR:0, faR:0, haR:0, head:0, torso:0, legL:0, legR:0 },
     want: REST,
-    blinking: false, eyeState: "open", restMouth: "smile",
+    blinking: false, eyeState: "face_neutral", restMouth: "face_neutral_mouth",
     viseme: null, visemeAt: 0,
     blinkAt: performance.now() + rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]),
-    blinkUntil: 0, blinkAgain: false, blinkV: 1,
+    blinkUntil: 0, blinkAgain: false,
     searchPhase: Math.random() * 6.28,
     everSeen: false,
     wasSeen: true,
@@ -640,9 +807,13 @@ function stepBlink(r, now){
     dressEyes(r, r.eyeState);          // back to whatever the mood wants
   }
   if(now < r.blinkAt) return;
-  /* `happy` and `worried` are already drawn with the eyes closed or squeezed,
-     and blinking through a celebration reads as a dropped frame. */
-  if(r.eyeState !== "open" || now < r.holdUntil){
+  /* Only neutral wears fully open eyes. The other exact Figma expressions are
+     already arches, squints, or a held reaction, where swapping in a neutral
+     blink reads as a dropped frame rather than an eyelid. */
+  const openEyes = r.eyeState === "face_neutral" ||
+                   eyeSide(r.eyeState, "left") === "open" ||
+                   eyeSide(r.eyeState, "right") === "open";
+  if(!openEyes || NO_BLINK.has(r.mood) || now < r.holdUntil){
     r.blinkAt = now + rand(BLINK_GAP_MS[0], BLINK_GAP_MS[1]);
     return;
   }
@@ -768,7 +939,7 @@ function lifeStep(r, now, dt, still){
      whole body leaning, because head and torso were one picture. Here the neck
      is a joint, so the gaze cascade finally runs the way it does in a real
      body: eyes first, then the head, then the torso — and the head carries a
-     COUNTER of the torso's roll, so leaning does not tip his face with it. */
+     COUNTER of the torso's BREATH, but not of its lean; see HEAD_COUNTER. */
   const ang = {
     torso: r.j.torso + (still ? 0 : bTilt) + lean * TILT_X,
     head:  r.j.head + r.gx * HEAD_TURN + r.gy * HEAD_NOD
@@ -787,8 +958,10 @@ function lifeStep(r, now, dt, still){
        the forearm's bend, which is what keeps a raised arm from ending in a
        flat plank and gives `got` an actual "yes!" instead of a T-pose. */
     handL: -r.j.haL, handR: r.j.haR,
-    /* a hair of weight shift, so the legs are not two nailed posts */
-    legL: -lean * LEG_SHIFT, legR: -lean * LEG_SHIFT,
+    /* a hair of weight shift, so the legs are not two nailed posts, plus
+       whatever stance the pose asked for — same outward-positive convention
+       as the arms, so the sign flips per side here and nowhere else. */
+    legL: -lean * LEG_SHIFT - r.j.legL, legR: -lean * LEG_SHIFT + r.j.legR,
   };
   /* Only the shoulders need it; the wrist cuff covers its own joint and the
      elbow gets its own measured slide. */
@@ -846,6 +1019,9 @@ function lifeStep(r, now, dt, still){
       if(r.everSeen && !r.saidMissing && p.lostMs > MISSING_AFTER_MS &&
          now >= r.holdUntil && r.mood !== "got"){
         r.saidMissing = true;
+        /* Confusion belongs with "I lost you"; do not let an unrelated idle
+           beat leave him presenting or celebrating while he says it. */
+        hold(r, "lost", LINE_MS);
         say(r, "missing");
       }
     }
@@ -896,6 +1072,12 @@ function clearLife(r){
   /* park every limb back at rest, and clear the cached transform strings so
      the next frame genuinely rewrites them */
   for(const part of r.parts || []){ part.tf = ""; part.el.style.transform = ""; }
+  /* The limbs did not travel here, they were teleported — so the depth plane
+     has nothing left to cover for and must go in the same frame, not after
+     the settle. Left pending, its timer would fire over a rig that has since
+     been re-posed. */
+  clearTimeout(r.foldTimer); r.foldTimer = 0;
+  delete r.node.dataset.fold;
 }
 
 /* ---------------- the public surface ---------------- */
@@ -939,7 +1121,14 @@ export function robotCharge(id, display, locked = false){
        genuinely idle, and only then, he pokes you. */
     const p = r.mute ? null : presence();
     if(p && !p.seen && p.lostMs > SEARCH_AFTER_MS) return;
-    say(r, p && p.energy > STRUGGLE_ENERGY ? "struggling" : "nudge");
+    const struggling = p && p.energy > STRUGGLE_ENERGY;
+    if(struggling){
+      /* "I ALMOST HAVE IT" is analysis, not a sideways presentation. Pin
+         the line to THINKING for its full duration instead of inheriting
+         whichever decorative idle beat happened to be running. */
+      hold(r, "watch", LINE_MS);
+    }
+    say(r, struggling ? "struggling" : "nudge");
   }
 }
 
@@ -1000,6 +1189,12 @@ export function resetRobot(id){
   if(!r) return;
   robotNewWord(id);
   clearLife(r);
+  /* clearLife resets the spring target. Re-enter idle after that reset so an
+     inward-mirrored edge robot does not spend its next word on the unmirrored
+     REST object (setMood's same-mood guard would otherwise keep it there). */
+  r.mood = null;
+  r.band = null;
+  setMood(r, "idle");
   /* presence.js counts `lostMs` from the last time it saw anybody, which on a
      board opened after five minutes in a menu is five minutes. Without this
      the first thing he does on a fresh run is announce that he has lost you —

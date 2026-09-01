@@ -87,6 +87,8 @@ function resetPartyUi(){
 
 const PARTY_RETRY_MS = 4000;
 let partyRetryTimer = 0;
+/* reset on leaveParty — see partyOffline */
+let partyOfflineToasted = false;
 function retryCreateLater(request){
   clearTimeout(partyRetryTimer);
   partyRetryTimer = setTimeout(() => {
@@ -134,7 +136,7 @@ async function createParty(){
   }catch(e){
     finishPartyRequest(request);
     cleanedPartyRequests.delete(request);
-    if(partyRequestActive(request)) partyOffline(e);
+    if(partyRequestActive(request)) partyOffline(e, request);
   }
 }
 
@@ -241,6 +243,7 @@ function renameParty(name, immediate=false){
 }
 
 export function leaveParty(){
+  partyOfflineToasted = false;
   const request = pendingPartyRequest;
   if(socket && socket.connected){
     socket.emit("room:leave", {}, () => {});

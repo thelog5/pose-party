@@ -18,7 +18,7 @@ const ok = (cond, msg) => { console.log((cond ? "  ok  " : "  FAIL") + " " + msg
 const server = spawn("node", ["index.js"], {
   cwd: SERVER_DIR,
   env: { ...process.env, PORT: String(PORT), PRECOUNT_MS: "1200",
-         TUTORIAL_TIMEOUT_MS: "12000", BETWEEN_ROUNDS_MS: "900",
+         TUTORIAL_GRACE_MS: "6000", BETWEEN_ROUNDS_MS: "900",
          RATE_CREATE: "40", RATE_JOIN: "80" },
   stdio: "pipe",
 });
@@ -36,6 +36,32 @@ const browser = await puppeteer.launch({
 
 const TAGS = ["A", "B", "C", "D"];
 const errors = Object.fromEntries(TAGS.map(t => [t, []]));
+/* THE FRONT DOOR IS ON EVERY BOOT NOW. The ENABLE CAMERA card used to be
+   skipped whenever the origin already held a camera grant, which is exactly
+   what --use-fake-ui-for-media-stream reports, so every suite booted straight
+   into Home. It is a consent/briefing screen rather than a permission
+   notification, so it is shown every run and nothing downstream (the camera,
+   the status overlay, Home's entrance) happens until it is answered. */
+async function passCameraGate(page){
+  await page.waitForFunction(() =>
+    !document.getElementById("camGate").classList.contains("hidden"),
+    { timeout: 30000, polling: 50 });
+  await page.click("#cgEnable");
+}
+
+/* HOW TO PLAY IS A GRACE, NOT A BARRIER. The server starts the match when the
+   grace runs out whether or not anybody pressed anything, and the card counts
+   that down on its own button and then fires READY itself. So a click here has
+   to tolerate the card having already closed on its own — otherwise the suite
+   is really asserting that four headless clients can each find a button inside
+   six seconds, which is a race, not a behaviour. */
+const readyUp = async page => {
+  const open = await page.evaluate(() =>
+    !document.getElementById("howToPlay").classList.contains("hidden"));
+  if(open) await page.click("#htpReady");
+  return open;
+};
+
 async function player(tag, name){
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
@@ -46,6 +72,7 @@ async function player(tag, name){
   page.on("response", r => { if (r.status() >= 400) errors[tag].push("HTTP " + r.status() + " " + r.url()); });
   await page.evaluateOnNewDocument(n => localStorage.setItem("poseCharadesName", n), name);
   await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
+  await passCameraGate(page);
   await page.waitForFunction(() => document.getElementById("status").style.display === "none",
     { timeout: 60000, polling: 400 });
   page.tag = tag;
@@ -133,7 +160,7 @@ try {
   ok(htpParty.labels.join("|") ===
     "SEE THE WORD AND ACT IT OUT|GET AI TO GUESS YOUR ACTION FIRST|BONUS POINTS IF YOUR ENTIRE TEAM GETS IT",
     `Party's three columns show Party-specific copy (${htpParty.labels.join(" / ")})`);
-  await A.click("#htpReady");
+  await readyUp(A);
   ok(await ev(A, `document.getElementById("howToPlay").classList.contains("hidden")`),
     "I'M READY acknowledges and dismisses the local Party card");
   await sleep(250);
@@ -142,12 +169,12 @@ try {
     return !state.game?.roundId &&
       !document.getElementById("howToPlay").classList.contains("hidden") &&
       document.getElementById("countdown").classList.contains("hidden");
-  })()`), "one Party acknowledgement cannot start beneath another player's instructions");
-  await Promise.all([B, C, D].map(p => p.click("#htpReady")));
+  })()`), "inside the grace, one Party acknowledgement cannot start beneath another player's instructions");
+  await Promise.all([B, C, D].map(readyUp));
   await Promise.all([A, B, C, D].map(p => p.waitForFunction(() =>
     !document.getElementById("countdown").classList.contains("hidden"),
     {timeout:3000,polling:25})));
-  ok(true, "all four acknowledgements release the same future Party countdown");
+  ok(true, "all four ready releases the same future Party countdown at once");
 
   const partyBubble = await ev(A, `(async () => {
     const robot=document.getElementById("pmRobotMine");
@@ -578,7 +605,7 @@ try {
   await Promise.all([A, B, C, D].map(p => p.waitForFunction(() =>
     !document.getElementById("howToPlay").classList.contains("hidden"),
     {timeout:3000,polling:25})));
-  await Promise.all([A, B, C, D].map(p => p.click("#htpReady")));
+  await Promise.all([A, B, C, D].map(readyUp));
 
   /* Let the short restarted match end naturally, then prove a results-phase
      leaver disappears from the survivor papers and reduces the tally. The

@@ -167,7 +167,30 @@
       <img class="fh iv conf party-hover-confetti" id="partyHoverLeftBottom" style="left:56%;top:39%;width:3.2%;z-index:7" src="assets/ui/figma/conf-blue-a.png" alt="">
       <img class="fh iv conf party-hover-confetti" id="partyHoverRightBottom" style="left:84.8%;top:39%;width:3.2%;z-index:7" src="assets/ui/figma/conf-red-b.png" alt="">
 
-      <img class="fh rpart" id="robotHead" data-mood="happy" style="left:-2%;top:37.5%;width:26.8%;z-index:8" src="assets/ui/figma/robot-head-happy.png" alt="Robot">
+      <!-- THE ROBOT (js/paperRig.js). Figma "Robot RIg" 353:752 — the same
+           eleven cut-outs the 1v1 lobby uses. He watches the cursor and
+           reaches for it. He stood here as four sprites (two arms, a body,
+           and a head with two baked faces) waving on a symmetric CSS sine,
+           which is the universal signature of a cheap mascot. He is placed
+           so his HEAD lands exactly where the old head's ink landed, because
+           that is what the speech bubble's tail is aimed at. z-index 8 is the
+           old head's layer: the one confetti star that overlaps him has to
+           stay behind his face, as it always did. -->
+      <div class="fh homerobot" id="homeRobot" data-rig="home" data-rig-room=".55" data-rig-bubble="#speechBubble" style="left:1.25%;top:39.26%;width:28.2%;z-index:8">
+        <div class="pr-canvas">
+          <div class="pr-part" data-j="legR"><img class="home-alpha" src="assets/ui/robotrig/right-leg.png" alt=""></div>
+          <div class="pr-part" data-j="uarmL"><img class="home-alpha" src="assets/ui/robotrig/left-arm.png" alt=""></div>
+          <div class="pr-part" data-j="uarmR"><img class="home-alpha" src="assets/ui/robotrig/right-arm.png" alt=""></div>
+          <div class="pr-part" data-j="legL"><img class="home-alpha" src="assets/ui/robotrig/left-leg.png" alt=""></div>
+          <div class="pr-part" data-j="waist"><img class="home-alpha" src="assets/ui/robotrig/waist.png" alt=""></div>
+          <div class="pr-part" data-j="head"><img class="home-alpha" src="assets/ui/robotrig/head-blank.png" alt="Robot"></div>
+          <div class="pr-part" data-j="torso"><img class="home-alpha" src="assets/ui/robotrig/torso.png" alt=""></div>
+          <div class="pr-part" data-j="eyes"><img src="assets/ui/robotrig/eyes.png" alt=""></div>
+          <div class="pr-part" data-j="mouth"><img src="assets/ui/robotrig/mouth.png" alt=""></div>
+          <div class="pr-part" data-j="handL"><img class="home-alpha" src="assets/ui/robotrig/left-hand.png" alt=""></div>
+          <div class="pr-part" data-j="handR"><img class="home-alpha" src="assets/ui/robotrig/right-hand.png" alt=""></div>
+        </div>
+      </div>
 
       <img class="fh iv boat" id="homeBoat" style="left:65.5%;bottom:-2.9%;width:14.4%;z-index:8" src="assets/ui/figma/conf-boat.png" alt="">
 
@@ -266,14 +289,14 @@
            style="left:70%;top:25.1%;width:12.2%">
         <div class="rb-rig">
           <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
-               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
-               canvas precisely so there is not a single offset to hand-place:
+               pack (assets/ui/rig/rig.json) registers every active layer on
+               one canvas so there is not a single offset to hand-place:
                registration is a property of the art, not of this markup.
-               Order is the pack's own back-to-front list — legs, upper arms,
-               HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
-               forearms so the blue wrist cuff hides the wrist tab, exactly as
-               the upper arms sit behind the torso to hide the elbow caps. Get
-               this order wrong and the joins show the moment a limb turns. -->
+               The default order is the pack's back-to-front list — legs,
+               upper arms, hands, forearms, torso, head, eyes, mouth. Hands sit
+               behind the blue wrist cuffs and upper arms behind the torso so
+               the joint overlaps stay hidden. Pose selectors in screens.css
+               lift only the folded limbs that cross the torso or bezel. -->
           <div class="rb-canvas" role="img" aria-label="Robot">
             <img class="rp" data-j="legR"   src="assets/ui/rig/leg_character_right.png" alt="">
             <img class="rp" data-j="legL"   src="assets/ui/rig/leg_character_left.png" alt="">
@@ -285,9 +308,9 @@
             <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
             <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
             <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
-            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
-            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
-            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/face_neutral_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/face_neutral_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/face_neutral_mouth.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -394,13 +417,27 @@
         <img src="assets/ui/figma/lb-name-chip.png" alt=""><span id="lobbyOppName">RIVAL</span>
       </div>
 
-      <!-- waiting robot lives inside the opponent frame until someone joins -->
-      <div class="lb m1 robotwait lobby-alpha lobby-rival-layer lobby-react" id="lobbyRobotWait" style="left:56.5%;top:18.4%;width:39.7%;z-index:5">
-        <img id="robotWaveHigh" src="assets/ui/figma/lb-robot-high.png" alt="">
-        <img id="robotWaveLow" class="ghosted" src="assets/ui/figma/lb-robot-low.png" alt="">
-        <span class="signtext">STRIKE A POSE!</span>
+      <!-- Waiting robot: lives inside the opponent frame until someone joins.
+           Figma "Robot RIg" 353:752 — eleven cut-out layers, not a sprite, so
+           js/paperRig.js can point him at the player's cursor. Draw order is
+           Figma's own (legs and arms behind the torso, hands in front), and
+           every rect lives in css/screens.css beside the pivots' square. -->
+      <div class="lb m1 robotwait lobby-rival-layer lobby-react" id="lobbyRobotWait" data-rig="lobby" style="left:64.17%;top:20.72%;width:20.2%;z-index:5">
+        <div class="pr-canvas">
+          <div class="pr-part" data-j="legR"><img class="lobby-alpha" src="assets/ui/robotrig/right-leg.png" alt=""></div>
+          <div class="pr-part" data-j="uarmL"><img class="lobby-alpha" src="assets/ui/robotrig/left-arm.png" alt=""></div>
+          <div class="pr-part" data-j="uarmR"><img class="lobby-alpha" src="assets/ui/robotrig/right-arm.png" alt=""></div>
+          <div class="pr-part" data-j="legL"><img class="lobby-alpha" src="assets/ui/robotrig/left-leg.png" alt=""></div>
+          <div class="pr-part" data-j="waist"><img class="lobby-alpha" src="assets/ui/robotrig/waist.png" alt=""></div>
+          <div class="pr-part" data-j="head"><img class="lobby-alpha" src="assets/ui/robotrig/head-blank.png" alt="Robot"></div>
+          <div class="pr-part" data-j="torso"><img class="lobby-alpha" src="assets/ui/robotrig/torso.png" alt=""></div>
+          <div class="pr-part" data-j="eyes"><img src="assets/ui/robotrig/eyes.png" alt=""></div>
+          <div class="pr-part" data-j="mouth"><img src="assets/ui/robotrig/mouth.png" alt=""></div>
+          <div class="pr-part" data-j="handL"><img class="lobby-alpha" src="assets/ui/robotrig/left-hand.png" alt=""></div>
+          <div class="pr-part" data-j="handR"><img class="lobby-alpha" src="assets/ui/robotrig/right-hand.png" alt=""></div>
+        </div>
       </div>
-      <div class="lb m1 waitbig lobby-rival-layer" id="lobbyWaitBig" style="left:55.3%;top:60.4%;width:49.6%;z-index:5">
+      <div class="lb m1 waitbig lobby-rival-layer" id="lobbyWaitBig" style="left:55.3%;top:64%;width:49.6%;z-index:5">
         WAITING FOR FRIEND<i id="dotsBig">···</i></div>
 
       <!-- vs badge pops when the opponent arrives -->
@@ -410,7 +447,7 @@
            panels; video sandwiches between the offwhite inner paper and
            the three-window overlay. Tiles fill from party.js. ===== -->
       <img class="lb mp lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" id="partyLobbyTitle" style="left:35.1%;top:4.2%;width:24.9%;z-index:3" src="assets/ui/figma/lb-party-card.png" alt="Party Lobby">
-      <img class="lb mp deco fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:44.7%;top:.1%;width:6.4%;z-index:4" src="assets/ui/figma/lb-tape-party.png" alt="">
+      <img class="lb mp deco lobbytitle-tape fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:44.7%;top:.1%;width:6.4%;z-index:4" src="assets/ui/figma/lb-tape-party.png" alt="">
 
       <img class="lb mp fig-shadow-card party-panel-art party-team-layer party-blue-layer party-blue-hit lobby-alpha" style="left:2.1%;top:16.7%;width:43.9%;z-index:2" src="assets/ui/figma/pt-panel-blue.png" alt="">
       <span class="lb mp pt-teamname party-team-layer party-blue-layer" style="left:2.1%;top:17.7%;width:43.9%;z-index:5">BLUE TEAM</span>
@@ -542,8 +579,8 @@
            style="left:-1.8%;top:50.3%;width:9.7%">
         <div class="rb-rig">
           <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
-               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
-               canvas precisely so there is not a single offset to hand-place:
+               pack (assets/ui/rig/rig.json) registers every active layer on
+               one canvas so there is not a single offset to hand-place:
                registration is a property of the art, not of this markup.
                Order is the pack's own back-to-front list — legs, upper arms,
                HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
@@ -561,9 +598,9 @@
             <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
             <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
             <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
-            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
-            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
-            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/face_neutral_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/face_neutral_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/face_neutral_mouth.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -574,8 +611,8 @@
            data-mute style="left:92.1%;top:51.6%;width:9.7%">
         <div class="rb-rig">
           <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
-               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
-               canvas precisely so there is not a single offset to hand-place:
+               pack (assets/ui/rig/rig.json) registers every active layer on
+               one canvas so there is not a single offset to hand-place:
                registration is a property of the art, not of this markup.
                Order is the pack's own back-to-front list — legs, upper arms,
                HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
@@ -593,9 +630,9 @@
             <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
             <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
             <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
-            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
-            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
-            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/face_neutral_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/face_neutral_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/face_neutral_mouth.png" alt="">
           </div>
         </div>
       </div>
@@ -747,8 +784,8 @@
            style="left:-.8%;top:58.7%;width:7.9%">
         <div class="rb-rig">
           <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
-               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
-               canvas precisely so there is not a single offset to hand-place:
+               pack (assets/ui/rig/rig.json) registers every active layer on
+               one canvas so there is not a single offset to hand-place:
                registration is a property of the art, not of this markup.
                Order is the pack's own back-to-front list — legs, upper arms,
                HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
@@ -766,9 +803,9 @@
             <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
             <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
             <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
-            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
-            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
-            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/face_neutral_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/face_neutral_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/face_neutral_mouth.png" alt="">
           </div>
         </div>
         <div class="rb-bubble" aria-hidden="true">
@@ -779,8 +816,8 @@
            data-mute style="left:92.9%;top:59.4%;width:7.9%">
         <div class="rb-rig">
           <!-- ONE 640x640 canvas per layer, every one drawn at inset:0. The
-               pack (assets/ui/rig/rig.json) authors all 24 parts on a shared
-               canvas precisely so there is not a single offset to hand-place:
+               pack (assets/ui/rig/rig.json) registers every active layer on
+               one canvas so there is not a single offset to hand-place:
                registration is a property of the art, not of this markup.
                Order is the pack's own back-to-front list — legs, upper arms,
                HANDS, forearms, torso, head, eyes, mouth. Hands sit behind the
@@ -798,9 +835,9 @@
             <img class="rp" data-j="farmL"  src="assets/ui/rig/forearm_character_left.png" alt="">
             <img class="rp" data-j="torso"  src="assets/ui/rig/torso.png" alt="">
             <img class="rp" data-j="head"   src="assets/ui/rig/head.png" alt="">
-            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/open_left.png" alt="">
-            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/open_right.png" alt="">
-            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/smile.png" alt="">
+            <img class="rp rb-eye-l" data-j="head" src="assets/ui/rig/face_neutral_left.png" alt="">
+            <img class="rp rb-eye-r" data-j="head" src="assets/ui/rig/face_neutral_right.png" alt="">
+            <img class="rp rb-mouth" data-j="head" src="assets/ui/rig/face_neutral_mouth.png" alt="">
           </div>
         </div>
       </div>

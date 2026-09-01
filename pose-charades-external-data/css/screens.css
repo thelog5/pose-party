@@ -144,6 +144,55 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
   .homestage.home-entering :is(#tapeParty,#tapeVS,#tapeSolo){opacity:1!important}
 }
 
+/* ---------- leaving: the card you pressed comes off the board ----------
+   The entrance deals three cards onto a desk, so picking one has to be that
+   same gesture in reverse — and for the ~0.4s before the next screen exists
+   it is the ONLY answer the player gets that their press registered.
+
+   The chosen card presses IN first and then pops out towards the viewer: the
+   anticipation is what makes the pop read as a pop rather than a zoom. Its
+   tape lets go a beat ahead of it, because a taped-down card cannot leave
+   until the tape has. Everything else — the two cards not chosen, the logo,
+   the robot, his bubble, the boat, the confetti — drops away underneath,
+   quieter and faster, so the pick stays the loudest thing on screen.
+
+   `.home-leaving` is transient, exactly like `.home-entering`: it is cleared
+   by playHomeEntrance() on the way back in, so Home is never found parked at
+   the end of an exit with everything at opacity 0. */
+.homestage.home-leaving{pointer-events:none}
+.homestage.home-leaving .fh.card>img{
+  transform-origin:50% -10%;                    /* the unchosen ones swing off their tape */
+  animation:homeCardDrop .34s cubic-bezier(.55,0,.85,.4) both}
+.homestage.home-leaving
+  :is(#logoHomeCraft,#homeRobot,.fh.bubble,#homeBoat,.pp-corner,.fh.iv.conf,
+      #tapeParty,#tapeVS,#tapeSolo,#tapeTitleA,#tapeTitleB){
+  animation:homePieceOut .3s ease-in both}
+/* the chosen pair. No transform-origin: this one scales about its own centre,
+   towards the player, not about the tape it is hanging from. */
+.homestage.home-leaving[data-pick="ai"]    #modeAI.card>img,
+.homestage.home-leaving[data-pick="vs"]    #modeVS.card>img,
+.homestage.home-leaving[data-pick="party"] #modeParty.card>img{
+  transform-origin:50% 50%;
+  animation:homeCardPick .44s cubic-bezier(.36,0,.24,1) .07s both}
+.homestage.home-leaving[data-pick="ai"]    #tapeSolo,
+.homestage.home-leaving[data-pick="vs"]    #tapeVS,
+.homestage.home-leaving[data-pick="party"] #tapeParty{
+  animation:homeTapePeel .3s cubic-bezier(.3,0,.4,1) both}
+@keyframes homeCardPick{
+  0%  {opacity:1;translate:0 0;rotate:0deg;scale:1}
+  24% {opacity:1;translate:0 2.4%;rotate:-2.2deg;scale:.92}
+  100%{opacity:0;translate:0 -7%;rotate:2.4deg;scale:1.42}}
+@keyframes homeCardDrop{
+  0%  {opacity:1;translate:0 0;rotate:0deg;scale:1}
+  100%{opacity:0;translate:0 7%;rotate:-5deg;scale:.92}}
+@keyframes homeTapePeel{
+  0%  {opacity:1;transform:none}
+  35% {opacity:1;transform:scale(1.18) rotate(-9deg)}
+  100%{opacity:0;transform:translateY(-38%) scale(.6) rotate(22deg)}}
+@keyframes homePieceOut{
+  0%  {opacity:1;translate:0 0;scale:1}
+  100%{opacity:0;translate:0 2.6%;scale:.97}}
+
 /* ---------- the boot hold ----------
    `body[data-boot]` is written in the markup and cleared the same frame Home
    is released (cameraGate.js hands over, homeAlive.js takes it). Home is HELD,
@@ -153,7 +202,7 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
    visibly still arriving reads as one that is loading — which is the truth,
    because MediaPipe's wasm and both model files are downloading behind it. */
 body[data-boot] .homestage
-  :is(#logoHomeCraft,.fh.card,.fh.iv.tape,.fh.iv.conf,#homeBoat,.rpart,.fh.bubble,
+  :is(#logoHomeCraft,.fh.card,.fh.iv.tape,.fh.iv.conf,#homeBoat,#homeRobot,.fh.bubble,
       .pp-corner){
   opacity:0;translate:0 2.4%;pointer-events:none}
 
@@ -166,10 +215,10 @@ body[data-boot] .homestage
    entrance outranks `cardfloat`, and hands them back afterwards.
    The confetti is deliberately NOT in here: spinConfetti() throws it in the
    same beat, and `ivspin` is the better arrival for a paper scrap. */
-.homestage.home-arriving :is(#logoHomeCraft,.rpart,.fh.bubble,#homeBoat,.pp-corner){
+.homestage.home-arriving :is(#logoHomeCraft,#homeRobot,.fh.bubble,#homeBoat,.pp-corner){
   animation:homePieceIn .62s cubic-bezier(.16,1.38,.32,1) both}
 .homestage.home-arriving #logoHomeCraft{animation-delay:.02s}
-.homestage.home-arriving .rpart{animation-delay:.2s}
+.homestage.home-arriving #homeRobot{animation-delay:.2s}
 .homestage.home-arriving #homeBoat{animation-delay:.34s}
 .homestage.home-arriving .fh.bubble{animation-delay:.46s}
 .homestage.home-arriving .pp-corner{animation-delay:1.1s}
@@ -179,7 +228,7 @@ body[data-boot] .homestage
   100%{opacity:1;translate:0 0;scale:1}}
 @media (prefers-reduced-motion:reduce){
   .homestage.home-arriving
-    :is(#logoHomeCraft,.rpart,.fh.bubble,#homeBoat,.pp-corner){
+    :is(#logoHomeCraft,#homeRobot,.fh.bubble,#homeBoat,.pp-corner){
     animation:none;opacity:1}
 }
 .fh.card:hover{rotate:-3.2deg;translate:0 7px}
@@ -193,30 +242,15 @@ body[data-boot] .homestage
 .homestage:has(#logoHomeCraft:hover) #tapeTitleA{transform:rotate(7deg)}
 .homestage:has(#logoHomeCraft:hover) #tapeTitleB{transform:rotate(-6deg)}
 
-/* ---------- robot: always alive, parts move as one body ---------- */
-/* Arms are pointer-transparent (they animate constantly; taps land on the
-   body/head). Small synchronized amplitudes keep every part inside the
-   silhouette so nothing pops out from behind the body. */
-.rpart{cursor:pointer;transition:filter .16s ease,scale .16s cubic-bezier(.2,1.4,.35,1)}
-.rpart:hover{filter:brightness(1.06) drop-shadow(0 min(.3vw,.53vh) min(.25vw,.44vh) rgba(0,0,0,.28));
-  scale:1.03}
-.rpart:active{scale:.98;filter:brightness(.98)}
-#robotArmR,#robotArmL{pointer-events:none}
-#robotArmR{animation:armwaveR 2.4s ease-in-out infinite;transform-origin:22% 88%}
-#robotArmL{animation:armwaveL 2.4s ease-in-out infinite;transform-origin:78% 12%}
-#robotBody{animation:bodysway 2.4s ease-in-out infinite;transform-origin:50% 96%}
-#robotHead{animation:headbob 2.4s ease-in-out infinite;transform-origin:50% 88%}
-@keyframes armwaveR{0%,100%{transform:rotate(0)}50%{transform:rotate(-6deg) translateY(-3px)}}
-@keyframes armwaveL{0%,100%{transform:rotate(0)}50%{transform:rotate(3.5deg) translateY(-1px)}}
-@keyframes bodysway{0%,100%{transform:rotate(0)}50%{transform:rotate(-1deg)}}
-@keyframes headbob{0%,100%{transform:rotate(0)}50%{transform:rotate(-1.1deg) translateY(-1px)}}
-/* tapping the robot: bigger wave + surprised boing, still in sync */
-.homestage.excited #robotArmR{animation:armwaveRBig .6s ease-in-out infinite;transform-origin:22% 88%}
-.homestage.excited #robotArmL{animation:armwaveLBig .6s ease-in-out infinite;transform-origin:78% 12%}
-@keyframes armwaveRBig{0%,100%{transform:rotate(1deg)}50%{transform:rotate(-9deg) translateY(-5px)}}
-@keyframes armwaveLBig{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(6deg) translateY(-3px)}}
-#robotHead.boing{animation:headboing .5s cubic-bezier(.2,1.7,.4,1)}
-@keyframes headboing{0%{transform:scale(.92) rotate(-3deg)}55%{transform:scale(1.08) rotate(2.5deg)}100%{transform:none}}
+/* ---------- the robot: a jointed puppet, not four sprites ----------
+   The art rect (see THE PAPER ROBOT RIG below for what that means) sized and
+   hung so his HEAD lands exactly on the old head sprite's ink — the speech
+   bubble's tail is aimed at that head and was never going to be re-authored.
+   The idle wave, the lean, the breath and the tap reaction all live in
+   js/paperRig.js now; the four @keyframes that used to be here were a
+   symmetric CSS sine on each sprite, which is the one thing a jointed rig
+   exists not to look like. */
+.homerobot{pointer-events:none;container-type:inline-size;aspect-ratio:1087/1309}
 
 /* ---------- speech bubble ----------
    Figma 302:637 supplies the blank 302:638 paper. The current composition's
@@ -532,10 +566,14 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    Transforms are split across elements so none of them can clobber another —
    `animation-fill-mode:both` beats a plain declaration, and stacking two
    owners on one element was the whole reason the old robot could not move:
-     .grobot      `scale` from the meter, plus the BREATH/LEAN/RECOIL that
-                  js/robot.js writes into --rb-shift-* / --rb-tilt every
-                  frame. The count-in entrance is an animation on this element
-                  and outranks all of it for its ~1s, then hands back.
+     .grobot      `scale` from the meter, plus the BREATH and LEAN that
+                  js/robot.js writes into --rb-shift-x/y every frame. The
+                  count-in entrance is an animation on this element and
+                  outranks all of it for its ~1s, then hands back. There is
+                  deliberately no `--rb-tilt`: the roll it used to carry moved
+                  into the TORSO joint, where the head can counter it at the
+                  neck, and a rig-wide rotate cannot be countered by anything.
+                  Declaring it here anyway left a var nothing ever wrote.
      .rb-rig      the recognition SLAM, and nothing else.
      .rp          EVERY puppet part: js/robot.js composes that part's whole
                   joint chain (torso -> upper arm -> forearm -> hand, or
@@ -559,7 +597,6 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   /* percentages resolve against his own box, so every one of these is
      resolution-independent without a single px anywhere */
   translate:var(--rb-shift-x,0%) var(--rb-shift-y,0%);
-  rotate:var(--rb-tilt,0deg);
   transform-origin:50% 94%;   /* his feet: a lean pivots there, not at his waist */
   transition:scale .3s cubic-bezier(.2,1.5,.4,1)}
 /* The warmth behind him climbs with the meter, so "you are getting through"
@@ -575,20 +612,67 @@ body[data-screen="solo"] .camdock .brackets{display:none}
      is paint work for nothing, on a board that can have two rigs up at once */
   background:radial-gradient(circle,rgba(255,228,145,.6) 0 22%,
     rgba(255,203,66,.3) 44%,transparent 70%)}
-/* THE PUPPET PAINTS OVER HIS OWN SPEECH PAPER (z 3 against the bubble's 2).
-   The Solo bubble's side gap was tuned against the old bust, whose head sat
-   lower and narrower in the same box; this head is 81% of his width, so the
-   opaque cream paper landed across his face — including one eye — during the
-   recognition slam, which is the loudest beat in the game. Rather than push
-   the paper further out (where it collides with WORD TIME), let him stand in
-   front of it: a tail disappearing behind his head still reads as speech, a
-   robot with his face covered does not. */
+/* THE PAPER IS IN FRONT OF HIM NOW (bubble z 4 against the rig's 3), AND IT
+   CLEARS HIS FACE — the two have to be solved together.
+
+   He used to stand in front of his own bubble, because the side gap had been
+   tuned against the old bust and the opaque cream paper landed across this
+   head — one eye included. Standing him in front fixed the face and broke the
+   thing the paper is FOR: measured on the 640 canvas, his head spans 15%–84.3%
+   of his box and the copy region starts 66.6% across, so the first sixth of
+   every line was behind his head, and during the recognition slam (rig scales
+   1.42x) it was nearly a fifth — of the loudest line in the game.
+
+   So the ORDER changed and the gap did not. The gap was a red herring, and
+   proving that took measuring the paper vertically: its balloon body bottoms
+   out 20.8% down his box (22.1% for Solo's smaller paper) while his eye ink
+   starts at 25.9%, so at rest the paper passes clean ABOVE his face and only
+   the tail crosses him. Pushing it sideways to 46% did clear his head — and
+   cost the tail its connection to his mouth, tripped the E2E windows in Solo
+   and Party, and put the Solo paper 3.6px from WORD TIME. None of that bought
+   anything the z-index had not already fixed.
+
+   THE SLAM DOES NOT NEED AN EXCEPTION EITHER, and it cost a wrong fix to
+   establish that. A QA pass reported the paper lying across his eye for the
+   first 35-85ms of every recognition, with per-frame overlap figures — so the
+   slam got its own wider gap and a 200ms ease to carry it there. Both were
+   wrong, because the measurement was: it took the eye ELEMENT's rect, and
+   every layer in this rig IS the whole 640 canvas, so it was really measuring
+   canvas-against-paper, which of course intersects. Frozen through the WAAPI
+   timeline at the exact reported instants and screenshotted, his face is
+   clear at 35ms, 52ms and every frame after; a sweep of the gap from 28% to
+   54% finds zero eye-ink overlap at any of them across the full 1500ms.
+
+   What the wider gap DID do was throw the tail half his width from his mouth
+   and 37px below it, pointing at empty body, for the whole 1.45s celebration
+   — a real regression bought to fix an imaginary one. One gap, no exception,
+   no transition. When a probe and a screenshot disagree, believe the
+   screenshot. */
 .grobot .rb-rig{position:absolute;inset:0;transform-origin:50% 92%;z-index:3}
+/* THE SLAM MUST NOT SCALE HIM OFF THE SCREEN.
+   1v1 and Party tuck their rigs THROUGH the outer edge so they never stand
+   over a player's body, which leaves his ink starting within ~3px of x=0. A
+   1.42x slam about the box centre then moves that ink edge OUTWARD by 42% of
+   the distance from the centre to it — measured, 25px in 1v1 and 20px in
+   Party — and the loudest beat in the game rendered with half his head, one
+   eye and an entire arm sliced off by the viewport.
+
+   The fix is not to move him inboard (he would cover the player again) or to
+   shrink the slam (it is the payoff). It is to scale about his own INK EDGE:
+   his silhouette spans 15.1%-84.9% of his box, so pinning the origin there
+   makes that edge the FIXED POINT of the scale. It cannot travel outward at
+   any scale — the guarantee holds for whatever the keyframe does, not just
+   for 1.42 — and he grows inward, out of the edge he is tucked into, which is
+   the direction with room. Solo is deliberately excluded: its rig sits at 70%
+   with nothing to clip against, and the centred slam is what that composition
+   was tuned with. */
+:is(.matchstage,.pmstage) .grobot[data-side="right"] .rb-rig{transform-origin:15.1% 92%}
+:is(.matchstage,.pmstage) .grobot[data-side="left"]  .rb-rig{transform-origin:84.9% 92%}
 
 /* ---- THE PUPPET (assets/ui/rig/) ----
-   Ten body parts, four eye states, six mouth shapes; every one authored on the
-   SAME 640x640 canvas so all of them are drawn at inset:0 and registration is
-   a property of the art rather than of twenty-six numbers in this file.
+   Ten body parts, two gesture-hand alternatives and the registered face
+   states all use the SAME 640x640 canvas. Every active layer is drawn at
+   inset:0, so registration belongs to the art rather than to CSS offsets.
 
    .rb-canvas is that square, sized and offset so the robot's INK lands exactly
    where the old single-sprite robot's ink landed — his ink is 92.58% of the
@@ -606,27 +690,80 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    any size with not a pixel value anywhere. */
 .grobot .rp{position:absolute;inset:0;width:100%;height:100%;
   transform-origin:0 0;will-change:transform}
-/* One shadow for the whole assembly, not one per limb — thirteen stacked
-   drop-shadows darken every overlap into a seam and cost thirteen filter
-   passes a frame on a board that can have two rigs up. */
-.grobot .rb-canvas{filter:drop-shadow(0 min(.3vw,.53vh) min(.34vw,.6vh) rgba(0,0,0,.34))}
-/* The face is 27.8% of the body, which is 66% of the head screen's width —
-   NOT a fill. Nothing here is stretched (the sprites were cropped and resized
-   at a constant ratio), but the face art is a 1.74 rectangle sitting in a 1.41
-   screen, so filling the screen's width pushes the eyes almost edge to edge
-   and the whole face reads as stretched wide. Two thirds keeps the features
-   clustered in the middle of the screen, which is what reads as cute. */
+/* Default puppet depth, back to front. The crossing poses selectively lift a
+   forearm or hand without changing its transform owner, so the spring can
+   travel continuously into and out of folded silhouettes. */
+.grobot .rp:is([data-j="legL"],[data-j="legR"]){z-index:0}
+.grobot .rp:is([data-j="uarmL"],[data-j="uarmR"]){z-index:1}
+.grobot .rp:is([data-j="handL"],[data-j="handR"]){z-index:2}
+.grobot .rp:is([data-j="farmL"],[data-j="farmR"]){z-index:3}
+.grobot .rp[data-j="torso"]{z-index:4}
+.grobot .rp[data-j="head"]{z-index:6}
+.grobot .rp:is(.rb-eye-l,.rb-eye-r,.rb-mouth){z-index:9}
 
-/* THE FACE. The pack ships the eyes as two SEPARATE layers with four states
-   each (open / happy / blink / worried) and the mouth as six shapes — a smile
-   plus five visemes. Both are parented to the head, so they inherit its whole
-   chain from js/robot.js and need no geometry here at all.
+/* In-front-of-torso plane: belly fold, heart hand, hip hand and the hanging
+   sad forearms. The head stays above this plane.
+
+   KEYED ON `data-fold`, NEVER ON `data-pose`. The pose attribute changes on
+   the frame the mood does; the limbs need the spring's whole travel to get
+   back out of a fold. Keyed on the pose, leaving `thinking` dropped both arms
+   BEHIND the torso while they were still crossed in front of it — they
+   disappeared into the body and then slid out from under it. js/robot.js
+   leads `data-fold` on the way in and lags it on the way out, so the plane is
+   always in place for where the limbs actually ARE. */
+/* thinking brings BOTH forearms forward: the chin arm folds up the FRONT of
+   the body, so its forearm has to cross the torso, and its elbow sits inside
+   the torso silhouette where the torso hides the joint. */
+.grobot[data-side="left"][data-fold="thinking"] .rp:is([data-j="handL"],[data-j="farmL"],[data-j="farmR"]),
+.grobot[data-side="right"][data-fold="thinking"] .rp:is([data-j="handR"],[data-j="farmR"],[data-j="farmL"]),
+.grobot[data-side="left"][data-fold="present"]  .rp:is([data-j="handL"],[data-j="farmL"]),
+.grobot[data-side="right"][data-fold="present"] .rp:is([data-j="handR"],[data-j="farmR"]),
+.grobot[data-side="left"][data-fold="thumbsup"]  .rp:is([data-j="handL"],[data-j="farmL"]),
+.grobot[data-side="right"][data-fold="thumbsup"] .rp:is([data-j="handR"],[data-j="farmR"]),
+.grobot[data-fold="sad"]      .rp:is([data-j="handL"],[data-j="handR"],[data-j="farmL"],[data-j="farmR"]){z-index:5}
+/* Chin and cheek hands cross the bezel; facial ink remains the top plane. */
+.grobot[data-side="left"][data-fold="thinking"] .rp[data-j="handR"],
+.grobot[data-side="right"][data-fold="thinking"] .rp[data-j="handL"],
+.grobot[data-fold="surprised"] .rp:is([data-j="handL"],[data-j="handR"],[data-j="farmL"],[data-j="farmR"]){z-index:7}
+/* ---- THE PAPER SHADOW, PER PIECE ----
+   One drop-shadow on the whole canvas draws the puppet's OUTLINE and nothing
+   else, which is fine for a sticker and wrong for eleven pieces of cut paper.
+   It is why the folded poses read as flat ink printed on the torso: a fist at
+   the chin is cream over cream over cream — hand, torso and head bezel all
+   the same paper — and with only a silhouette shadow there is nothing at all
+   to separate them.
+
+   Figma does not draw them that way. Zoom body_thinking (286:611) and there
+   is a distinct shadow under the fist where it crosses the head, and another
+   under the crossing forearm. The rig section 353:752 authors it as a real
+   per-layer DROP_SHADOW: y 12, blur 4, black 35% on its 1309 canvas — TIGHT
+   and offset, which is why the usual worry about stacking them does not
+   apply. That worry is about a soft halo bleeding sideways out of every edge;
+   this is a third of a percent wide and lands almost entirely under the piece
+   above it.
+
+   The two lengths are Figma's, carried across the two boxes: `.grobot` is
+   already an inline-size container and the art canvas is 1.267x its width, so
+   12/1309 of the canvas is 1.16cqw here and 4/1309 is 0.39cqw. */
+.grobot .rp{filter:drop-shadow(0 1.16cqw .39cqw rgba(0,0,0,.35))}
+/* The face is INSIDE the head's screen. A shadow here falls on the blue panel
+   the eyes are drawn on, which no cut-paper reading supports and which at
+   gameplay size only reads as the eyes looking smudged. */
+.grobot .rp:is(.rb-eye-l,.rb-eye-r,.rb-mouth){filter:none}
+/* All face_xxx art is registered inside one 193.8/640 = 30.3%-wide face
+   rectangle. The percentage lives in the generated art, not in CSS, so eyes,
+   blinks, resting mouths and speech visemes cannot drift to different scales. */
+
+/* THE FACE. Each exact Figma expression is split into a left eye, right eye
+   and mouth layer; the refitted pack art supplies the neutral blink and five
+   speech visemes. All three active layers are parented to the head, so they
+   inherit its whole chain from js/robot.js and need no geometry here at all.
 
    Only the extra eye-look rides on top: the eyes travel a little further than
    the mouth does, and that difference is the parallax that reads as a head
    turning rather than a decal sliding across a screen. The blink is ART now,
-   not a scaleY — swapping open_* for blink_* is what the pack is built for,
-   and a drawn closed eyelid beats a squashed open one every time. */
+   not a scaleY — neutral swaps to `blink_*`, and a drawn closed eyelid beats
+   a squashed open one every time. */
 .grobot .rb-eye-l,.grobot .rb-eye-r{
   translate:var(--rb-eye-x,0%) var(--rb-eye-y,0%)}
 
@@ -657,26 +794,46 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    1356x880 and the measured tail tip is x=20.50%, y=96.59%. The paper flips
    for a robot on the opposite side; the sibling <b> never does.
 
-   `--talk-gap-x` is a small amount of deliberate air between the visible tail
-   and his head. Twenty-eight percent of the rig is roughly 39px in desktop
-   1v1 and 32px in Party: close enough to read as speech while keeping the
-   opaque paper edge clear of his antenna. The previous 78% displaced the tail
-   by 89–109px and made it look unrelated to the robot even though the vertical
-   aim was correct. */
-.grobot .rb-bubble{--talk-x:50.5%;--talk-y:30.6%;--talk-gap-x:28%;
+   `--talk-gap-x` is the air between the visible tail and his face. It has been
+   wrong in both directions: at 78% the tail was displaced 89–109px and read as
+   unrelated to him; at 46% and again at 48% it tripped the E2E windows in both
+   Solo and Party and left the slam's tail pointing at his knee.
+
+   28% is the authored value and it is the right one, because the collision it
+   was twice widened to solve does not exist — see the note by `.rb-rig`. The
+   paper clears his face on the VERTICAL, at rest and through the slam, so the
+   horizontal budget belongs entirely to keeping the tail on his cheek. 28% is
+   also where the E2E windows for Solo (.26–.36) and Party (.26–.30) overlap.
+   About 39px in desktop 1v1 and 32px in Party. ONE value, no per-beat
+   exception — which is why there is no `@property` here either: nothing about
+   this number animates, and registering it only to transition it was scaffold
+   for a fix that turned out to be the regression.
+
+   The two FALLBACKS are the real rest state, not decoration: robot.js writes
+   `--talk-x` (measures 47.8–50.1% across the bands) and `--talk-y` (37.8%) on
+   every frame, but not before its first one. The old 30.6% put anything
+   reading this pre-first-frame 5.9% of his height off. */
+.grobot .rb-bubble{--talk-x:49.7%;--talk-y:37.8%;--talk-gap-x:28%;
   position:absolute;bottom:calc(97.70% - var(--talk-y));width:122%;
-  aspect-ratio:1356/880;z-index:2;opacity:0;pointer-events:none;
+  aspect-ratio:1356/880;z-index:4;opacity:0;pointer-events:none;
   container-type:inline-size;
   /* NO transition on the anchor. It eased because the anchor used to jump
      between per-pose constants; robot.js now recomputes it every frame from
      the head's live transform, so an ease is not smoothing anything — it is a
      200ms lag that leaves the tail pointing at where his mouth was, measurably
      11px above where it is. Continuous input, no easing. */}
-/* The slam belongs to .rb-rig, not to the speech paper. Keeping the paper on
-   its normal mouth anchor prevents the Solo catch line from climbing through
-   the WORD TIME card while the body celebrates. */
+/* The slam scales the body, not the speech paper. Solo keeps the normal live
+   mouth anchor because WORD TIME sits directly above it. The two multiplayer
+   edge rigs have open board above them, so their catch paper lifts by 50% of
+   robot height: 23% follows the head's mechanical rise and the remaining 27%
+   keeps the opaque balloon clear of both eyes throughout the 1.42x overshoot.
+   The tail still points toward the head, and z-index 4 keeps the complete paper
+   in front of the z-index 3 rig at every animation frame. */
 .grobot:has(.rb-rig.slam) .rb-bubble{
   bottom:calc(97.70% - var(--talk-y))}
+:is(.matchstage,.pmstage) .grobot:has(.rb-rig.slam) .rb-bubble{
+  bottom:calc(97.70% - var(--talk-y) + 50%);
+  transition:bottom .26s cubic-bezier(.16,1.5,.32,1)}
 /* Aiming the tail is solved from the exported pixels, not eyeballed.
    `--talk-x/y` is the face target for that pose. At 122% bubble width, the
    20.50% tail is 25.01% of the robot's width from the paper's left edge; once
@@ -698,9 +855,12 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   left:calc(var(--talk-x) - 25.01% + var(--talk-gap-x));
   transform-origin:20.5015% 96.5909%}
 /* Solo's timer occupies the upper-left edge of the generic speech-paper
-   route. A slightly smaller paper and a closer (still visibly separated)
-   tail put the entire rbSay animation into the open pocket between the timer,
-   robot and guess stack. 108% × 20.5015% = a 22.142% near-tail inset. */
+   route. A slightly smaller paper puts the entire rbSay animation into the
+   open pocket between the timer, robot and guess stack. 108% × 20.5015% = a
+   22.142% near-tail inset. The gap matches the generic route because the
+   clearance it buys is symmetric — Solo's rig is the mirrored one. It is
+   restated rather than inherited only because this rule already exists for
+   the width; there is no per-beat override for it to have to outrank. */
 #spRobot .rb-bubble{--talk-gap-x:28%;width:108%}
 #spRobot.grobot[data-side="left"] .rb-bubble{
   right:calc(77.858% - var(--talk-x) + var(--talk-gap-x))}
@@ -957,18 +1117,81 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .namechip span{position:absolute;inset:8% 4% 20%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(2.25vw,4vh),100px);letter-spacing:.01em;text-shadow:min(.139vw,.247vh) min(.139vw,.247vh) 0 rgba(0,0,0,.5);text-transform:uppercase;overflow:hidden;white-space:nowrap}
 .oppchip{display:none}
 
-/* robot + waiting: hidden once someone joins */
-.robotwait{pointer-events:auto;cursor:pointer;container-type:inline-size}
-.robotwait img{position:absolute;left:0;top:0;transition:opacity .28s ease}
-.robotwait img:first-child{position:relative}
-.robotwait img.ghosted{opacity:0}
-.robotwait .signtext{position:absolute;left:55.15%;top:53.11%;width:31.69%;height:20.09%;
-  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
-  overflow:hidden;overflow-wrap:anywhere;text-align:center;
-  color:#17356f;font-family:var(--f-lobby);font-weight:400;font-size:6.575cqw;
-  line-height:1;letter-spacing:.01em;text-shadow:.38cqw .38cqw 0 rgba(255,255,255,.9)}
+/* ============ THE PAPER ROBOT RIG — shared by Home and the lobby ============
+   Figma "Robot RIg" SECTION 353:752, driven by js/paperRig.js. Eleven
+   separately-exported cut-outs; this pack is NOT on one shared canvas the way
+   assets/ui/rig/ is, so each layer's rect has to be written down, and here is
+   where.
+
+   Two boxes, and the difference between them is the whole trick. The RIG ROOT
+   (`.robotwait` in the lobby, `#homeRobot` on Home) is the ART RECT — Figma's
+   own 1087x1309 union of the eleven layers, and the only thing a screen has to
+   position. `.pr-canvas` inside it is the SQUARE that rect is centred in
+   (side 1309, so 120.4232% of the rect's width, hung 10.2116% off its left
+   edge). Every rect and pivot below is a fraction of that square, and
+   paperRig.js works in the same units — because a rotation composed in a
+   non-square normalised space is a shear, and a sheared puppet comes apart.
+
+   Each `.pr-part` IS the whole square, carrying the transform paperRig.js
+   composes for that joint (origin 0 0, so the composed translate+rotate is
+   exactly the chain's product); the `<img>` inside it is that layer's Figma
+   rect. Draw order is Figma's, and it is load-bearing: arms and legs sit
+   BEHIND the torso so the rotating shoulder and hip caps stay hidden, and the
+   hands sit in FRONT of everything so a reach reads as a reach.
+
+   The DROP_SHADOW is per LAYER, as Figma authors it (y 12, blur 4, 35% black
+   over the 1309 square = 1.104cqw / .368cqw against the root's width) — one
+   shadow on the whole silhouette instead would flatten eleven pieces of cut
+   paper into one sticker, which is the look this rig exists to escape. Every
+   root therefore needs `container-type:inline-size`. */
+.pr-canvas{position:absolute;left:-10.2116%;top:0;width:120.4232%;aspect-ratio:1}
+.pr-part{position:absolute;inset:0;transform-origin:0 0;pointer-events:none}
+.pr-part>img{position:absolute;display:block;pointer-events:auto;cursor:pointer;
+  filter:drop-shadow(0 1.104cqw .368cqw rgba(0,0,0,.35))}
+/* Figma rects, as fractions of the square. */
+.pr-part[data-j="head"] >img{left:13.2162%;top:0;      width:66.3865%;height:53.0940%}
+.pr-part[data-j="eyes"] >img{left:13.2162%;top:.0764%; width:65.6990%;height:52.5592%}
+.pr-part[data-j="mouth"]>img{left:14.2857%;top:1.2223%;width:64.2475%;height:51.4133%}
+.pr-part[data-j="torso"]>img{left:25.8213%;top:49.1215%;width:40.1069%;height:26.7379%}
+.pr-part[data-j="waist"]>img{left:30.9396%;top:69.3659%;width:29.1826%;height:11.6883%}
+.pr-part[data-j="uarmL"]>img{left:54.0107%;top:45.2254%;width:28.1131%;height:18.7166%}
+.pr-part[data-j="handL"]>img{left:74.7899%;top:37.8916%;width:16.7303%;height:16.7303%}
+.pr-part[data-j="uarmR"]>img{left:8.4798%; top:52.6356%;width:33.9190%;height:22.6127%}
+.pr-part[data-j="handR"]>img{left:10.2368%;top:71.6578%;width:18.4110%;height:16.8067%}
+/* Both legs are placed by Figma's own relativeTransform rather than by a
+   rotation: the left one has a NEGATIVE determinant — it is mirrored, not
+   turned — and re-deriving that as an angle puts the boot on the wrong foot.
+   `transform-origin:0 0` is what makes the matrix agree with the rect. */
+.pr-part[data-j="legL"] >img{left:47.9195%;top:69.3659%;width:23.9114%;height:28.2659%;
+  transform-origin:0 0;transform:matrix(-.9944621,.1050962,.1050962,.9944621,0,0)}
+.pr-part[data-j="legR"] >img{left:43.6211%;top:73.6277%;width:20.3972%;height:24.0642%;
+  transform-origin:0 0;transform:matrix(.9953252,-.0965799,.0965799,.9953252,0,0)}
+.pr-part[data-j="legR"] {z-index:0}
+.pr-part[data-j="uarmL"]{z-index:1}
+.pr-part[data-j="uarmR"]{z-index:2}
+.pr-part[data-j="legL"] {z-index:3}
+.pr-part[data-j="waist"]{z-index:4}
+.pr-part[data-j="head"] {z-index:5}
+.pr-part[data-j="torso"]{z-index:6}
+.pr-part[data-j="eyes"] {z-index:7}
+.pr-part[data-j="mouth"]{z-index:8}
+.pr-part[data-j="handL"]{z-index:9}
+.pr-part[data-j="handR"]{z-index:10}
+/* He is a CHARACTER, not eleven controls, so hovering any one layer has to
+   light the whole of him — hence `:has()` on the root rather than a hover on
+   the part. alphaHit.js keeps this honest: a layer whose transparent pixel is
+   under the pointer is `pointer-events:none`, so it cannot match `:hover`.
+   The shadow is restated because `filter` replaces, never adds. */
+[data-rig] .pr-part>img{transition:filter .16s ease}
+[data-rig]:has(.pr-part>img:hover) .pr-part>img{
+  filter:drop-shadow(0 1.104cqw .368cqw rgba(0,0,0,.35)) brightness(1.07)}
+[data-rig]:has(.pr-part>img:active) .pr-part>img{
+  filter:drop-shadow(0 .74cqw .3cqw rgba(0,0,0,.4)) brightness(.98)}
+/* The waiting robot's own box: the art rect, centred on the opponent panel.
+   Hidden once someone joins. */
+.robotwait{pointer-events:none;container-type:inline-size;aspect-ratio:1087/1309}
 .waitbig{color:#FBF6EC;font-family:var(--f-lobby);font-weight:400;font-size:clamp(26px,min(3.47vw,6.17vh),160px);line-height:1.36;letter-spacing:.01em;text-align:left;text-shadow:min(.347vw,.617vh) min(.347vw,.617vh) 0 rgba(0,0,0,.5);pointer-events:none}
-.waitbig i,.signtext i,.waitline i{font-style:normal}
+.waitbig i,.waitline i{font-style:normal}
 .lobbystage.joined .robotwait,.lobbystage.joined .waitbig{display:none}
 .lobbystage.joined .oppchip{display:block}
 .vsbadge{display:none;pointer-events:none;filter:drop-shadow(0 6px 10px rgba(23,53,111,.35))}
@@ -1033,6 +1256,161 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .waitline{color:#124c9d;font-family:var(--f-sign);font-weight:700;font-size:clamp(14px,min(1.67vw,2.97vh),78px);line-height:.75;letter-spacing:.04em;text-align:center;text-shadow:min(.069vw,.123vh) min(.069vw,.123vh) min(.069vw,.123vh) rgba(0,0,0,.25)}
 .waitline.compact{font-size:clamp(11px,min(1vw,1.78vh),48px);line-height:1.02;
   letter-spacing:.02em;overflow-wrap:anywhere;top:auto!important;bottom:1.5%}
+
+/* ============ LOBBY ENTRANCE — the room is dealt the way Home leaves ======
+   Pressing 1V1 or PARTY pops that card off Home's board (`.home-leaving`),
+   and the lobby it opens re-lands the SAME kind of component — its 1V1 /
+   PARTY LOBBY title paper — with the mirror of that pop, then slaps its tape
+   down after it, exactly as Home's own three cards do. `homeCardPickIn` runs
+   `homeCardPick` backwards (in from big and over-close, undershooting past
+   rest before settling) and `homeTapeSlap` is Home's tape beat, reused
+   unchanged: it is the same gesture, so it is the same keyframes.
+
+   Everything else is thrown onto the desk the same way the mode cards are on
+   Home: `lobbyPaperIn` is `homeCardEnter`'s shape, and like it, each piece
+   carries its OWN path in `--lb-in-x/y/r` — thrown in from the edge it lives
+   against, so the room assembles outwards instead of every paper rising off
+   the same spot. A shared path would read as one fade with an offset.
+
+   ONE group cannot travel: the camera compositions (`.lobby-you-layer`,
+   `.lobby-rival-layer`, `.party-team-layer`). Each is a stack of separately
+   positioned layers — panel, feed, torn frame, name chip — held together only
+   by none of them having a transform of its own, and a percentage translate
+   applied to boxes of different heights moves them by different numbers of
+   pixels, so the stack comes apart in flight. `lobbyStackIn` drops them on a
+   single `--lb-in-drop` in VIEWPORT units, identical for every layer, so the
+   composition still lands with weight and still lands as one object. Same
+   reason their hover lift is a shared `--lb-lift` and never a percentage.
+   The pieces that SIT on a composition rather than belong to it — the waiting
+   robot, his WAITING FOR FRIEND line, the two JOIN THIS TEAM buttons — are
+   pulled back out by id and given their own beat once their panel has landed.
+
+   Fill is `backwards`, NOT `both` — this is the one place it matters. The
+   count-in can afford `both` because nothing is clickable during a 3·2·1,
+   but the lobby is live the instant it is on screen and a filled-forwards
+   entrance out-ranks every plain declaration under it: the hover lift, the
+   press, `[disabled]` — all dead until the class comes off, and dead for the
+   pieces that finished a second ago too. `backwards` still holds each piece
+   at its 0% state through its own delay (which is the whole point of the
+   stagger) and hands it back the moment its beat lands, because every one of
+   these ends at the element's natural resting state. `.lobby-entering` is
+   still transient (lobbyAlive.js clears it on a timer and on the way out) so
+   nothing is left mid-flight if the room is left during the entrance. */
+.lobbystage{--lb-in-drop:min(3.1vw,5.5vh)}
+.lobbystage.lobby-entering .lobbytitle{
+  animation:homeCardPickIn .62s cubic-bezier(.16,1.38,.32,1) .06s backwards}
+.lobbystage.lobby-entering .lobbytitle-tape{
+  animation:homeTapeSlap .6s cubic-bezier(.16,1.5,.32,1) .5s backwards}
+.lobbystage.lobby-entering
+  :is(.lobby-you-layer,.lobby-rival-layer,.party-team-layer){
+  animation:lobbyStackIn .58s cubic-bezier(.16,1.38,.32,1) backwards}
+.lobbystage.lobby-entering :is(.lobby-rival-layer,.party-orange-layer){
+  animation-delay:.18s}
+/* Class selectors only, deliberately: `:is()` takes the specificity of its
+   most specific argument, so a single id in this list would rate the whole
+   group rule at (1,3,0) — above every per-piece rule under it. The shorthand
+   resets delay to 0s and the vars to their fallbacks, so the beats would
+   silently collapse into one and every paper would arrive on the same path,
+   with nothing in the CSS looking wrong. `.iv2` is the lobby logo;
+   `.nametag` is the name tag. */
+.lobbystage.lobby-entering :is(.iv2,.nametag,.lobby-exit,
+  .invite,.settings,.startbtn,.waitline){
+  animation:lobbyPaperIn .66s cubic-bezier(.16,1.38,.32,1) backwards}
+.lobbystage.lobby-entering #logoLobby{
+  --lb-in-x:-44%;--lb-in-y:-34%;--lb-in-r:-9deg;animation-delay:.30s}
+.lobbystage.lobby-entering #lobbyNameTag{
+  --lb-in-x:14%;--lb-in-y:-70%;--lb-in-r:7deg;animation-delay:.38s}
+.lobbystage.lobby-entering .lobby-exit{
+  --lb-in-x:50%;--lb-in-y:-38%;--lb-in-r:10deg;animation-delay:.44s}
+.lobbystage.lobby-entering .invite{
+  --lb-in-x:-36%;--lb-in-y:50%;--lb-in-r:-8deg;animation-delay:.50s}
+.lobbystage.lobby-entering .settings{
+  --lb-in-x:0%;--lb-in-y:62%;--lb-in-r:5deg;animation-delay:.58s}
+.lobbystage.lobby-entering .startbtn{
+  --lb-in-x:42%;--lb-in-y:46%;--lb-in-r:9deg;animation-delay:.66s}
+.lobbystage.lobby-entering .waitline{
+  --lb-in-x:0%;--lb-in-y:46%;--lb-in-r:0deg;animation-delay:.74s}
+/* the pieces that stand ON a composition, once it has landed under them */
+.lobbystage.lobby-entering :is(#lobbyRobotWait,#lobbyWaitBig,
+  #btnJoinBlue,#btnJoinOrange){
+  animation:lobbyPaperIn .6s cubic-bezier(.16,1.38,.32,1) backwards}
+/* The rig's box is the robot alone — less than half the width of the sprite
+   that used to hold a sign beside him — so his path in is written as a bigger
+   fraction of a smaller box to keep the DISTANCE he travels the same. A paper
+   thrown from the same corner has to arrive from the same distance away, or
+   the beat reads as a shorter throw than its neighbours. */
+.lobbystage.lobby-entering #lobbyRobotWait{
+  --lb-in-x:52%;--lb-in-y:19%;--lb-in-r:8deg;animation-delay:.56s}
+.lobbystage.lobby-entering #lobbyWaitBig{
+  --lb-in-x:0%;--lb-in-y:34%;--lb-in-r:-3deg;animation-delay:.66s}
+.lobbystage.lobby-entering #btnJoinBlue{
+  --lb-in-x:-18%;--lb-in-y:38%;--lb-in-r:-7deg;animation-delay:.50s}
+.lobbystage.lobby-entering #btnJoinOrange{
+  --lb-in-x:18%;--lb-in-y:38%;--lb-in-r:7deg;animation-delay:.60s}
+/* START waits for a second player, so it must not FLY IN looking available:
+   an entrance interpolating towards opacity 1 out-ranks
+   `.startbtn[disabled]{opacity:.72}` for as long as it runs. It travels to
+   its dimmed value instead — and reverts to whichever the CSS says once the
+   beat lands, so a rival arriving mid-entrance still lights it up. */
+.lobbystage.lobby-entering .startbtn[disabled]{animation-name:lobbyPaperInDim}
+.lobbystage.lobby-entering .logo-tape,
+.lobbystage.lobby-entering .party-vs{
+  animation:homeTapeSlap .56s cubic-bezier(.16,1.5,.32,1) backwards}
+.lobbystage.lobby-entering #lobbyLogoTapeA{animation-delay:.70s}
+.lobbystage.lobby-entering #lobbyLogoTapeB{animation-delay:.78s}
+.lobbystage.lobby-entering .party-vs{animation-delay:.86s}
+@keyframes homeCardPickIn{
+  0%  {opacity:0;translate:0 -7%;rotate:2.4deg;scale:1.42}
+  56% {opacity:1;translate:0 1.6%;rotate:-1.8deg;scale:.955}
+  78% {translate:0 -.6%;rotate:.8deg;scale:1.025}
+  100%{opacity:1;translate:0 0;rotate:0deg;scale:1}}
+/* homeCardEnter's shape, with the path left to the caller. The fallbacks are
+   a plain drop so a piece that forgets its vars still arrives sensibly. */
+@keyframes lobbyPaperIn{
+  0%  {opacity:0;translate:var(--lb-in-x,0%) var(--lb-in-y,-40%);
+       rotate:var(--lb-in-r,-6deg);scale:.8}
+  64% {opacity:1;translate:0 1.5%;rotate:-1.4deg;scale:1.04}
+  84% {translate:0 -.7%;rotate:.7deg;scale:.99}
+  100%{opacity:1;translate:0 0;rotate:0deg;scale:1}}
+@keyframes lobbyPaperInDim{
+  0%  {opacity:0;translate:var(--lb-in-x,0%) var(--lb-in-y,-40%);
+       rotate:var(--lb-in-r,-6deg);scale:.8}
+  64% {opacity:.72;translate:0 1.5%;rotate:-1.4deg;scale:1.04}
+  84% {opacity:.72;translate:0 -.7%;rotate:.7deg;scale:.99}
+  100%{opacity:.72;translate:0 0;rotate:0deg;scale:1}}
+@keyframes lobbyStackIn{
+  0%  {opacity:0;translate:0 var(--lb-in-drop)}
+  64% {opacity:1;translate:0 calc(var(--lb-in-drop) * -.13)}
+  100%{opacity:1;translate:0 0}}
+
+/* ---------- leaving: the mode paper goes back out the way it came in -------
+   The exit button is the mirror of pressing 1V1 / PARTY on Home, so it is
+   Home's own exit: `homeCardPick` takes the mode paper off the board towards
+   the player, `homeTapePeel` releases its tape a beat ahead of it, and every
+   other paper drops away underneath. The camera compositions get their own
+   fall for the same reason they get their own arrival — a percentage
+   translate would pull their layers apart on the way out too.
+   `both` here, unlike the entrance: these end at opacity 0 and MUST hold
+   there until the screen is actually swapped. lobbyAlive.js clears the
+   class. */
+.lobbystage.lobby-leaving{pointer-events:none}
+.lobbystage.lobby-leaving .lobbytitle{
+  animation:homeCardPick .44s cubic-bezier(.36,0,.24,1) .07s both}
+.lobbystage.lobby-leaving .lobbytitle-tape{
+  animation:homeTapePeel .3s cubic-bezier(.3,0,.4,1) both}
+.lobbystage.lobby-leaving :is(.iv2,.nametag,.lobby-exit,.invite,.settings,
+  .startbtn,.waitline,.logo-tape,.party-vs){
+  animation:homePieceOut .3s ease-in both}
+/* The robot, his waiting line and the two JOIN buttons are given their own
+   arrival because they STAND on a composition — but they leave with it. A
+   composition breaking up into its pieces on the way out is the one reading
+   the whole stack treatment exists to prevent. */
+.lobbystage.lobby-leaving
+  :is(.lobby-you-layer,.lobby-rival-layer,.party-team-layer){
+  animation:lobbyStackOut .32s ease-in both}
+@keyframes lobbyStackOut{
+  0%  {opacity:1;translate:0 0}
+  100%{opacity:0;translate:0 calc(var(--lb-in-drop) * .42)}}
 
 /* ---------- lobby mode gating (one stage, two centers) ---------- */
 .lobbystage[data-mode="party"] .m1{display:none!important}

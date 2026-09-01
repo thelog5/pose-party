@@ -19,7 +19,7 @@ const ok = (cond, msg) => { console.log((cond ? "  ok  " : "  FAIL") + " " + msg
 const server = spawn("node", ["index.js"], {
   cwd: SERVER_DIR,
   env: { ...process.env, PORT: String(PORT), PRECOUNT_MS: "1500",
-         TUTORIAL_TIMEOUT_MS: "12000", BETWEEN_ROUNDS_MS: "900",
+         TUTORIAL_GRACE_MS: "6000", BETWEEN_ROUNDS_MS: "900",
          RATE_CREATE: "30", RATE_JOIN: "60" },
   stdio: "pipe",
 });
@@ -35,6 +35,32 @@ const browser = await puppeteer.launch({
 });
 
 const errors = { A: [], B: [] };
+/* THE FRONT DOOR IS ON EVERY BOOT NOW. The ENABLE CAMERA card used to be
+   skipped whenever the origin already held a camera grant, which is exactly
+   what --use-fake-ui-for-media-stream reports, so every suite booted straight
+   into Home. It is a consent/briefing screen rather than a permission
+   notification, so it is shown every run and nothing downstream (the camera,
+   the status overlay, Home's entrance) happens until it is answered. */
+async function passCameraGate(page){
+  await page.waitForFunction(() =>
+    !document.getElementById("camGate").classList.contains("hidden"),
+    { timeout: 30000, polling: 50 });
+  await page.click("#cgEnable");
+}
+
+/* HOW TO PLAY IS A GRACE, NOT A BARRIER. The server starts the match when the
+   grace runs out whether or not anybody pressed anything, and the card counts
+   that down on its own button and then fires READY itself. So a click here has
+   to tolerate the card having already closed on its own — otherwise the suite
+   is really asserting that four headless clients can each find a button inside
+   six seconds, which is a race, not a behaviour. */
+const readyUp = async page => {
+  const open = await page.evaluate(() =>
+    !document.getElementById("howToPlay").classList.contains("hidden"));
+  if(open) await page.click("#htpReady");
+  return open;
+};
+
 async function player(tag){
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
@@ -43,6 +69,7 @@ async function player(tag){
   page.on("response", r => { if (r.status() >= 400) errors[tag].push("HTTP " + r.status() + " " + r.url()); });
   page.on("pageerror", e => errors[tag].push("PAGEERROR: " + e.message));
   await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
+  await passCameraGate(page);
   await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000, polling: 400 });
   return page;
 }
@@ -174,7 +201,13 @@ try {
   ok(htp1v1.labels.join("|") ===
     "SEE THE WORD AND ACT IT OUT|GET AI TO GUESS YOUR ACTION FIRST|5 SECONDS TO ACT IF YOUR OPPONENT GETS IT FIRST",
     `1v1's three columns show 1v1-specific copy (${htp1v1.labels.join(" / ")})`);
-  await act(A, () => A.click("#htpReady"));
+  /* The one control on the card also has to say WHEN, or a player watching a
+     silent screen has no way to tell a grace from a hang. */
+  const graceCount = await A.evaluate(() =>
+    document.getElementById("htpCount").textContent.trim());
+  ok(/^[1-6]$/.test(graceCount),
+    `the READY button counts the grace down so nobody wonders why (${graceCount})`);
+  await act(A, () => readyUp(A));
   ok(await A.evaluate(() => document.getElementById("howToPlay").classList.contains("hidden")),
     "I'M READY acknowledges and dismisses the local 1v1 card");
   await sleep(250);
@@ -183,12 +216,12 @@ try {
     return document.body.dataset.state === "countdown" && !state.game?.roundId &&
       !document.getElementById("howToPlay").classList.contains("hidden") &&
       document.getElementById("countdown").classList.contains("hidden");
-  }), "one ready player cannot start underneath the other player's instructions");
-  await act(B, () => B.click("#htpReady"));
+  }), "inside the grace, one ready player cannot start underneath the other's instructions");
+  await act(B, () => readyUp(B));
   await Promise.all([A, B].map(p => p.waitForFunction(() =>
     !document.getElementById("countdown").classList.contains("hidden"),
     {timeout:3000,polling:25})));
-  ok(true, "the second acknowledgement releases one future countdown on both clients");
+  ok(true, "both ready releases one future countdown immediately, without waiting out the grace");
 
   await waitState(A, "playing"); await waitState(B, "playing");
   ok(await A.evaluate(() => document.body.dataset.screen) === "match", "match screen shown");

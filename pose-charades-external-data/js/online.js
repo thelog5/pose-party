@@ -41,6 +41,7 @@ import {
   showResults,
 } from "./results.js";
 import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
+import { leaveLobby } from "./lobbyAlive.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
@@ -70,6 +71,8 @@ let lastGuessConfidence = -1;
 let roomAttemptVersion = 0;
 let statusFitFrame = 0;
 let retryTimer = 0;
+/* reset whenever the player walks into a lobby — see offlineExplain */
+let offlineToasted = false;
 
 const serverNow = () => Date.now() + clockOffset;
 const perfFromServer = tServer => performance.now() + (tServer - serverNow());
@@ -242,7 +245,9 @@ function wireLobby(){
       if(res && res.error) setLobbyStatus(beginError(res.error));
     });
   };
-  $("btnExitLobby").onclick=()=>transition("menu");   // fsm listener handles leaveRoom
+  /* The mode paper pops back off the board first, mirroring the press that
+     opened this room; the fsm listener still handles leaveRoom. */
+  $("btnExitLobby").onclick=()=>leaveLobby(()=>transition("menu"));
   $("joinCode").addEventListener("input", e=>{ e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""); });
   $("lobbyName").addEventListener("input", e=>{
     const v=e.target.value.slice(0,NAME_MAX);
@@ -482,7 +487,7 @@ async function createRoom(){
       setLobbyStatus(null); // back to waiting-with-dots
       s.emit("player:ready", {}, ()=>{});
     });
-  }catch(e){ if(roomAttemptActive(attempt)) offlineExplain(e); }
+  }catch(e){ if(roomAttemptActive(attempt)) offlineExplain(e, attempt); }
 }
 
 async function joinRoom(code){
@@ -518,6 +523,9 @@ async function joinRoom(code){
       openPeer(false);
       s.emit("player:ready", {}, ()=>{});
     });
+  /* No attempt id, so no retry: retryCreateLater CREATES a room, and silently
+     turning a failed join into a new room of your own is the one outcome a
+     player pressing JOIN cannot want. The JOIN button is still right there. */
   }catch(e){ if(roomAttemptActive(attempt)) offlineExplain(e); }
 }
 
@@ -1074,6 +1082,9 @@ function endOnline(scores, why, outcome={}){
 export function leaveRoom(){
   roomAttemptVersion++;
   clearTimeout(retryTimer);
+  /* A fresh visit gets to hear it again — this is per-lobby, not per-session,
+     because walking back in is exactly when a player is asking why. */
+  offlineToasted = false;
   /* Also send during a pending create/join. Socket.IO preserves ordering, so
      create → leave reaches the server even before the create ack sets code. */
   if(socket && socket.connected) socket.emit("room:leave", {}, ()=>{});

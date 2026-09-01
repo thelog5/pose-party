@@ -1,13 +1,15 @@
-/* Makes the v2 home screen feel alive. The robot idles in a constant wave
-   (CSS); this module owns the stateful behaviors — the robot's mood, the
-   speech-bubble phrase bank, click "shakes", and alpha-aware pointer
-   routing so transparent paper art never blocks the pieces beneath it. */
+/* Makes the v2 home screen feel alive. The robot is a jointed puppet that
+   watches the player's cursor (js/paperRig.js); this module owns the stateful
+   behaviors around him — the speech-bubble phrase bank, click "shakes", and
+   alpha-aware pointer routing so transparent paper art never blocks the
+   pieces beneath it. */
 
 import { $ } from "./dom.js";
 import { blip } from "./audio.js";
 import { wireAlphaHitAreas } from "./alphaHit.js";
 import { onTransition } from "./fsm.js";
 import { fitWrappedTextToBox } from "./textFit.js";
+import { wirePaperRigs, startRig, stopRig, cheerRig } from "./paperRig.js";
 
 /* Keep the project's authored dialogue bank. Figma's visible Home overlay
    (302:635) supplies the first line; the remaining entries are the existing
@@ -55,26 +57,14 @@ function cyclePhrase(){
   blip([392, 523], 0.07);
 }
 
-/* Faces cycle on head taps and STAY — no auto-revert. Add more moods here
-   as head components land in Figma. */
-const FACES = ["happy", "surprised"];
-let faceIx = 0;
-
-function cycleFace(){
-  faceIx = (faceIx + 1) % FACES.length;
-  const head = $("robotHead");
-  head.src = "assets/ui/figma/robot-head-" + FACES[faceIx] + ".png";
-  head.dataset.mood = FACES[faceIx];
-  head.classList.remove("boing"); void head.offsetWidth; head.classList.add("boing");
-}
-
-/* Any robot tap hypes the wave for a beat (face is left alone). */
-let hypeTimer = null;
+/* A TAP IS ANSWERED WITH HIS BODY, not with a different picture of his face.
+   He used to swap `robot-head-happy` for `robot-head-surprised` and hold it —
+   the rig pack Figma authors (353:752) ships exactly one face, and a mood was
+   always better read as a pose anyway. `cheerRig` plays a rise-and-fall that
+   cannot be caught half-played, so there is nothing to revert. */
 function hypeWave(){
-  $("homeStage").classList.add("excited");
+  cheerRig("home");
   blip([659, 880], 0.08);
-  clearTimeout(hypeTimer);
-  hypeTimer = setTimeout(() => $("homeStage").classList.remove("excited"), 1400);
 }
 
 /* Tap reactions vary: sometimes a shake, sometimes a spin, sometimes a pop. */
@@ -100,12 +90,72 @@ function playHomeEntrance(){
   const stage = $("homeStage");
   if(!stage) return;
   stage.classList.remove("home-entering");
+  /* An exit that is still on the stage would out-rank everything below it —
+     `both` fill holds each piece at opacity 0 — so arriving always cancels
+     leaving. This is the only place Home is un-left. */
+  clearHomeExit();
   void stage.offsetWidth;
   stage.classList.add("home-entering");
   clearTimeout(entranceTimer);
   lastEntranceAt = performance.now();
   /* must outlast the last tape (1.26s delay + .66s slap) or it snaps */
   entranceTimer = setTimeout(() => stage.classList.remove("home-entering"), 2100);
+}
+
+/* The pieces with no entrance of their own — logo, robot, bubble, boat. */
+function playHomeArrival(){
+  const stage = $("homeStage");
+  if(!stage) return;
+  stage.classList.add("home-arriving");
+  clearTimeout(arrivalTimer);
+  arrivalTimer = setTimeout(() => stage.classList.remove("home-arriving"), 1800);
+}
+
+/* ---------- picking a mode ----------
+   The card is pulled off the board before the next screen is asked for, so
+   the press has an answer during the gap where nothing has been built yet.
+   Long enough to read the pop, short enough that it is never a wait: the
+   chosen card's own beat runs .07s–.51s and this cuts it at .42s, by which
+   point it is at ~10% opacity and 1.4x — the tail nobody sees. */
+const MODE_EXIT_MS = 420;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+let leaving = false;
+
+function clearHomeExit(){
+  const stage = $("homeStage");
+  if(!stage) return;
+  stage.classList.remove("home-leaving");
+  delete stage.dataset.pick;
+}
+
+/* `go` is the navigation itself (startGame / enterLobby / enterParty). */
+export function pickMode(pick, go){
+  const stage = $("homeStage");
+  /* A second press cannot re-deal a board that is already leaving, and it
+     must not fire `go` twice — enterLobby() creates a room on the way in. */
+  if(leaving) return;
+  if(!stage || reducedMotion.matches){ go(); return; }
+  leaving = true;
+  stage.dataset.pick = pick;
+  stage.classList.remove("home-entering", "home-arriving");
+  void stage.offsetWidth;
+  stage.classList.add("home-leaving");
+  blip([523, 698], 0.07);
+  setTimeout(() => {
+    leaving = false;
+    go();
+    /* Every normal path has left Home by now. The ones that have not are the
+       refusals — an untrained model routes to Training (a different screen,
+       so nothing to undo), but a rejected transition leaves the player right
+       here, and a Home parked at the end of its own exit is a dead page.
+       Deal it back in rather than snapping it back. */
+    if(document.body.dataset.screen === "home"){
+      playHomeEntrance();
+      playHomeArrival();
+    }else{
+      clearHomeExit();
+    }
+  }, MODE_EXIT_MS);
 }
 
 function revealHome(){
@@ -130,9 +180,7 @@ function claimBootRelease(e){
   playHomeEntrance();
   /* .home-arriving carries the logo/robot/bubble/boat in; the cards and
      tapes already have their own beats inside .home-entering. */
-  stage.classList.add("home-arriving");
-  clearTimeout(arrivalTimer);
-  arrivalTimer = setTimeout(() => stage.classList.remove("home-arriving"), 1800);
+  playHomeArrival();
   delete document.body.dataset.boot;
   spinConfetti();
 }
@@ -169,8 +217,10 @@ export function wireHomeAlive(){
   if("ResizeObserver" in globalThis)
     new ResizeObserver(fitHomePhrase).observe($("speechBubble"));
   $("speechBubble").onclick = cyclePhrase;
-  $("robotHead").onclick = () => { cycleFace(); hypeWave(); cyclePhrase(); };
-  $("robotBody").onclick = () => { hypeWave(); cyclePhrase(); };
+  /* One listener on the rig root: eleven layers are one character, and the
+     click bubbles up from whichever of them the pointer actually hit. */
+  $("homeRobot").onclick = () => { hypeWave(); cyclePhrase(); };
+  wirePaperRigs();
   /* Tape is visual hardware, not a separate control. During the entrance it
      travels on a different path from its card and can temporarily sit over
      the card's centre; letting it take pointer events makes a deliberate
@@ -190,13 +240,24 @@ export function wireHomeAlive(){
        routing could otherwise leave an inline pointer-events:none behind
        after returning from another screen, making PARTY/1V1 look clickable
        while swallowing the click. */
-    ".iv:not(.tape), #robotBody, #robotHead, .fh.bubble",
+    ".iv:not(.tape), .home-alpha, .fh.bubble",
   );
   /* menu -> menu is a legal transition, so clicking the brand re-fired the
      whole 2.1s entrance and the three mode cards vanished mid-click. Only
      replay it when Home is actually being ARRIVED at. */
   onTransition((to, from)=>{
     if(to==="menu" && from!=="menu") requestAnimationFrame(revealHome);
+    /* The rig is only ever fed while Home is the screen — a puppet swapping
+       transforms into a stage nobody is looking at is the waste the gameplay
+       rig's IDLE_STALE_MS exists to stop. */
+    if(to==="menu") startRig("home"); else stopRig("home");
   });
+  /* AND START HIM HERE, unconditionally. Home is the boot screen, but main.js
+     wires every module (line ~79) long before its first `render(gameState())`
+     (line ~150) — and that first render is a direct call, not a `transition()`,
+     so no listener ever hears about it. Reading `data-screen` here is no better:
+     nothing has written it yet. Both of those looked right and left the robot
+     standing perfectly still on the one screen he is guaranteed to be on. */
+  startRig("home");
   spinConfettiWhenHomeIsReady();
 }
