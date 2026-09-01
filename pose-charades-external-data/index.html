@@ -1167,9 +1167,14 @@
             style="left:.946%;top:6.085%;width:96.786%;height:20.174%;font-size:8.512cqw;line-height:12.611cqw">BONUS POINTS IF YOUR ENTIRE TEAM GETS IT</span>
     </div>
 
+    <!-- In 1v1 and Party the card is a GRACE, not a barrier: the server
+         starts the match a few seconds from now whether or not anybody
+         presses this. `#htpCount` counts that down on the button itself, so
+         the one control on the screen also answers "why has it not started"
+         before anyone has to ask. Solo has no clock and never shows it. -->
     <button class="htp-ready pbtn" id="htpReady">
       <img src="assets/ui/figma/htp-ready.png" alt="">
-      <span>I&rsquo;M READY</span>
+      <span>I&rsquo;M READY<i class="htp-count" id="htpCount"></i></span>
     </button>
   </div>
 </div>

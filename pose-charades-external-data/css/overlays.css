@@ -321,6 +321,18 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 .htp-ready span{position:absolute;left:0;top:49.5%;width:100%;translate:0 -50%;
   text-align:center;font-size:16.77cqw;line-height:1;color:#fff;
   text-shadow:1.1cqw 1.1cqw 0 rgba(0,0,0,.3)}
+/* THE GRACE COUNTDOWN, on the button itself. In 1v1 and Party the match
+   starts a few seconds from now whether or not this is pressed, so the one
+   control on the card also has to say when — a screen that gives no reason it
+   has not started is the exact thing this replaced. It is empty (and takes no
+   space) in Solo, which has no clock to report. */
+.htp-count{font-style:normal;display:none;margin-left:.42em;opacity:.86;
+  font-variant-numeric:tabular-nums}
+.htp-count:not(:empty){display:inline}
+@media (prefers-reduced-motion:no-preference){
+  .htp-count.beat{animation:htpCountBeat .5s cubic-bezier(.2,1.5,.35,1)}
+}
+@keyframes htpCountBeat{0%{scale:1.34;opacity:1}60%{scale:.97}100%{scale:1}}
 .htp-ready:hover,.htp-ready:focus-visible{
   translate:0 calc(-1 * min(.34vw,.6vh));scale:1.035;filter:brightness(1.06)}
 .htp-ready:active{scale:.975;filter:brightness(.97)}

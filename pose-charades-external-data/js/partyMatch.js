@@ -113,12 +113,21 @@ export function startPartyMatch(bridge, payload){
         ctx.toast?.("Couldn’t ready the party (" + res.error + ")");
     });
   };
-  showHowToPlay({ mode:"party", ready:acknowledge, back:acknowledge });
+  /* All six readying releases the room at once; otherwise the server's grace
+     does, and `tutorialStartsAt` is that moment. Six people looking at a card
+     that never says why nothing is happening is the same bug as two, only
+     louder — so the button counts it down. */
+  const startsAt = Number(payload.tutorialStartsAt);
+  showHowToPlay({ mode:"party", ready:acknowledge, back:acknowledge,
+    startsAt: startsAt ? ctx.perfFromServer(startsAt) : 0 });
 }
 
 export function startPartyCountdown({tutorialId, startAt, matchEndsAt}={}){
   const g = state.game;
   if(!g || g.mode !== "party" || g.tutorialId !== tutorialId) return;
+  /* The grace releases the room whether or not this client answered, so the
+     3-2-1 can arrive with the card still up on a tab that was slow. */
+  hideHowToPlay();
   g.matchEndsAt = ctx.perfFromServer(matchEndsAt);
   g.matchLimitMs = Math.max(0, Number(matchEndsAt) - Number(startAt)) ||
     g.matchLimitMs;

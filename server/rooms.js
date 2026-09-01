@@ -172,19 +172,23 @@ export function createRoomStore({ config, emit }){
     room.firstClaim = null;
     room.tutorialId = crypto.randomBytes(8).toString("hex");
     room.tutorialReady = new Set();
-    room.tutorialTimeoutAt = Date.now() + config.tutorialTimeoutMs;
+    room.tutorialStartsAt = Date.now() + config.tutorialGraceMs;
     for(const p of room.players)
       emit(p.id, "match:prepare", {
         tutorialId: room.tutorialId,
-        tutorialTimeoutAt: room.tutorialTimeoutAt,
+        tutorialStartsAt: room.tutorialStartsAt,
         matchMs: room.settings.matchMs,
         players: scoresPayload(room),
       });
-    /* The normal path is every client acknowledging the tutorial. This is a
-       safety release only: a crashed/backgrounded tab cannot hold the other
-       player forever, and the full synchronized count-in still follows. */
+    /* THE GRACE IS THE NORMAL PATH, not a safety net. Everyone gets a few
+       seconds with HOW TO PLAY and then the match starts regardless — a room
+       held indefinitely on a card that never says why is the worst thing this
+       screen can do. Both players readying early still releases immediately
+       (matchTutorialReady), and the full synchronized 3-2-1 follows either
+       way. `tutorialStartsAt` goes out with the payload so each client can
+       count it down on its own button. */
     room.timer = setTimeout(() => releaseMatchCountdown(room),
-      config.tutorialTimeoutMs);
+      config.tutorialGraceMs);
   }
 
   function releaseMatchCountdown(room){
@@ -647,17 +651,20 @@ export function createRoomStore({ config, emit }){
     for(const p of room.players) p.score = 0;
     room.tutorialId = crypto.randomBytes(8).toString("hex");
     room.tutorialReady = new Set();
-    room.tutorialTimeoutAt = Date.now() + config.tutorialTimeoutMs;
+    room.tutorialStartsAt = Date.now() + config.tutorialGraceMs;
     for(const p of room.players)
       emit(p.id, "party:match", {
         tutorialId: room.tutorialId,
-        tutorialTimeoutAt: room.tutorialTimeoutAt,
+        tutorialStartsAt: room.tutorialStartsAt,
         matchMs: room.settings.matchMs,
         wordMs: room.settings.wordMs,
         roster: partyRoster(room), scores: partyScores(room),
       });
+    /* Same grace as 1v1, and the same reason — six people on a card that
+       never explains why nothing is happening is worse the more people are
+       looking at it. All six readying early still releases on the spot. */
     room.timer = setTimeout(() => releasePartyCountdown(room),
-      config.tutorialTimeoutMs);
+      config.tutorialGraceMs);
   }
 
   function releasePartyCountdown(room){

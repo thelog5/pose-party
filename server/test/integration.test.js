@@ -21,7 +21,10 @@ const ENV = {
   ROUNDS: "3",
   WORD_MS: "1200",
   PRECOUNT_MS: "250",
-  TUTORIAL_TIMEOUT_MS: "1000",
+  /* HOW TO PLAY is a grace, not a barrier: long enough here that the
+     deliberate one-acknowledgement-at-a-time assertions below still see the
+     room held, short enough that the grace-only release is quick to prove. */
+  TUTORIAL_GRACE_MS: "1500",
   BETWEEN_ROUNDS_MS: "150",
   RATE_JOIN: "50",
   RATE_CREATE: "10",
@@ -104,15 +107,15 @@ try {
   ok(r.ok === true, "host begins the match");
   const [prepA, prepB] = await Promise.all([aPrepare, bPrepare]);
   ok(prepA.tutorialId === prepB.tutorialId &&
-    prepA.tutorialTimeoutAt > Date.now(),
-    "both clients receive the same bounded tutorial barrier");
+    prepA.tutorialStartsAt > Date.now(),
+    "both clients are told the same tutorial token and the same start deadline");
 
   let earlyRound = false;
   const earlyRoundProbe = () => { earlyRound = true; };
   A.on("round:start", earlyRoundProbe);
   await sleep(350); // longer than PRECOUNT_MS: the old flow had dealt by now
   A.off("round:start", earlyRoundProbe);
-  ok(!earlyRound, "no round is dealt while HOW TO PLAY is awaiting acknowledgements");
+  ok(!earlyRound, "no round is dealt during the HOW TO PLAY grace");
 
   const aStart = once(A, "match:start"), bStart = once(B, "match:start");
   const staleTutorial = await emit(A, "match:tutorial-ready",
@@ -245,10 +248,19 @@ try {
     await Promise.all([rematchPrepareA, rematchPrepareB]);
   const rematchStartA = once(A, "match:start");
   const rematchStartB = once(B, "match:start");
-  await emit(A, "match:tutorial-ready", { tutorialId:rematchPrepA.tutorialId });
-  await emit(B, "match:tutorial-ready", { tutorialId:rematchPrepB.tutorialId });
+  /* NOBODY ACKNOWLEDGES THIS ONE. The grace is the primary path: a room whose
+     players are still reading — or whose tab is backgrounded, or who simply
+     never find the button — must start anyway, because a game that silently
+     refuses to begin and never says why is the worst outcome this screen has.
+     Waiting the grace out here is the assertion. */
+  const graceFrom = Date.now();
   const [rematchPayloadA, rematchPayloadB] =
     await Promise.all([rematchStartA, rematchStartB]);
+  const graceWaited = Date.now() - graceFrom;
+  ok(graceWaited >= 900 && graceWaited < 4000,
+    `the grace starts the match with no acknowledgement at all (${graceWaited}ms)`);
+  ok(rematchPrepA.tutorialStartsAt === rematchPrepB.tutorialStartsAt,
+    "and both clients were told the same deadline, so their buttons agree");
   ok(r.started === true &&
     rematchPayloadA.players.every(p => p.score === 0) &&
     rematchPayloadB.players.every(p => p.score === 0),
@@ -470,8 +482,8 @@ try {
   ok(r.ok === true, "host started a 2v2 party match");
   const pm = await matchAll[0];
   await Promise.all(matchAll);
-  ok(!!pm.tutorialId && pm.tutorialTimeoutAt > Date.now(),
-    "party:match opens a bounded tutorial barrier before timing begins");
+  ok(!!pm.tutorialId && pm.tutorialStartsAt > Date.now(),
+    "party:match publishes a tutorial token and the grace's start deadline");
   const byId = Object.fromEntries(pm.roster.players.map(p => [p.id, p]));
   const teamOfSocket = s => byId[s.id].team;
   const blueSockets = M.filter(s => teamOfSocket(s) === "blue");
@@ -483,20 +495,21 @@ try {
   M[0].on("party:round", earlyPartyProbe);
   await sleep(350);
   M[0].off("party:round", earlyPartyProbe);
-  ok(!earlyPartyRound, "Party deals no word before all current players accept HOW TO PLAY");
+  ok(!earlyPartyRound, "Party deals no word during the HOW TO PLAY grace");
 
   const partyCountdowns = M.map(s => once(s, "party:countdown"));
   for(let i = 0; i < M.length - 1; i++){
     r = await emit(M[i], "party:tutorial-ready", { tutorialId:pm.tutorialId });
     ok(r.ok === true && !r.started,
-      `Party acknowledgement ${i + 1}/4 keeps the barrier closed`);
+      `Party acknowledgement ${i + 1}/4 does not release the room on its own`);
   }
   const dupPartyReady = await emit(M[0], "party:tutorial-ready",
     { tutorialId:pm.tutorialId });
   ok(dupPartyReady.ready === 3 && !dupPartyReady.started,
     "duplicate Party acknowledgement is idempotent");
   r = await emit(M[3], "party:tutorial-ready", { tutorialId:pm.tutorialId });
-  ok(r.started === true, "the final Party acknowledgement releases everyone together");
+  ok(r.started === true,
+    "everybody ready releases immediately, without waiting out the grace");
   const partyCountdown = await partyCountdowns[0];
   await Promise.all(partyCountdowns);
   ok(partyCountdown.matchEndsAt > partyCountdown.startAt &&

@@ -17,11 +17,21 @@ export const config = {
   matchMs: int(process.env.MATCH_MS, 120000),
   wordMs: int(process.env.WORD_MS, 20000),
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
-  /* Multiplayer waits here for every current client to dismiss HOW TO PLAY.
-     A bounded fallback keeps an abandoned/backgrounded tab from deadlocking
-     the whole room; once the barrier releases, preCountMs still supplies the
-     complete shared 3-2-1 before the first word is dealt. */
-  tutorialTimeoutMs: int(process.env.TUTORIAL_TIMEOUT_MS, 15000),
+  /* HOW TO PLAY IS A GRACE, NOT A BARRIER. Multiplayer used to hold the match
+     until every current client had dismissed the card, with a 15s fallback
+     for a crashed tab. In practice that meant a room of six sat on a screen
+     that gave no reason it was not starting, for as long as the slowest
+     person took to find the button — and the one thing a player must never
+     have to wonder is why the game has not begun.
+     So this is now the PRIMARY path: everybody gets a few seconds to read
+     three short lines, and then the match starts whether or not they pressed
+     anything. Readying up early still releases immediately (see
+     matchTutorialReady / partyTutorialReady), so the card never costs time to
+     anyone who has read it before. `preCountMs` still supplies the complete
+     shared 3-2-1 after the release, so nobody is dropped straight into a
+     live word. */
+  tutorialGraceMs: int(process.env.TUTORIAL_GRACE_MS,
+    int(process.env.TUTORIAL_TIMEOUT_MS, 6000)),
   betweenRoundsMs: int(process.env.BETWEEN_ROUNDS_MS, 1800),
   /* A claim is scored from its synchronized recognition timestamp, not its
      arrival time. This short grace only lets an in-flight claim arrive; it

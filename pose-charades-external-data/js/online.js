@@ -688,7 +688,7 @@ function clearMatchBoard(){
   clearSeatAward(v1Seat(true));
 }
 
-function onMatchPrepare({tutorialId, matchMs, players}={}){
+function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
   if(typeof tutorialId!=="string" || !tutorialId) return;
   const myId=socket.id;
   const rec=(players||[]).find(p=>p.id!==myId);
@@ -723,9 +723,12 @@ function onMatchPrepare({tutorialId, matchMs, players}={}){
   applyScores(players);
 
   /* The board may assemble behind the modal, but neither the 3-2-1 nor a
-     word is live until every current player has acknowledged this exact
-     tutorialId. Esc counts as an acknowledgement too: it dismisses the same
-     modal decision and must not strand the peer at the barrier. */
+     word is live until the server releases the room. BOTH players readying
+     releases it at once; otherwise the server's grace does, and
+     `tutorialStartsAt` is that moment — handed to the card so it can count it
+     down on its own button rather than leaving anyone to wonder. Esc counts
+     as an acknowledgement too: it dismisses the same decision and must not
+     strand the peer. */
   clearInterval(countdownTimer);
   $("countdown").classList.add("hidden");
   const acknowledge=()=>{
@@ -735,7 +738,8 @@ function onMatchPrepare({tutorialId, matchMs, players}={}){
         toast("Couldn’t ready the match ("+res.error+")");
     });
   };
-  showHowToPlay({ mode:"1v1", ready:acknowledge, back:acknowledge });
+  showHowToPlay({ mode:"1v1", ready:acknowledge, back:acknowledge,
+    startsAt: Number(tutorialStartsAt) ? perfFromServer(Number(tutorialStartsAt)) : 0 });
 
   state.onlineClaim = () => {
     const g=state.game;
@@ -774,6 +778,11 @@ function onMatchPrepare({tutorialId, matchMs, players}={}){
 function onMatchStart({tutorialId, startAt, matchEndsAt, players}={}){
   const game=state.game;
   if(!game || game.mode!=="online" || game.tutorialId!==tutorialId) return;
+  /* The grace releases the room whether or not this client answered, so the
+     3-2-1 can arrive with the card still up on a tab that was slow, paused or
+     mid-decode. Counting in behind it would deal the first word underneath a
+     modal. */
+  hideHowToPlay();
   game.matchEndsAt=perfFromServer(matchEndsAt);
   game.matchLimitMs=Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
     game.matchLimitMs;

@@ -14,13 +14,18 @@
    Solo. Esc still backs out, the same way it leaves every other stage.
 
    1v1 and Party keep the server authoritative without starting underneath
-   the card. The server first sends a tutorial token; I'M READY (or Esc)
-   acknowledges that exact token, and only after every current player has
-   acknowledged does it publish one shared future countdown timestamp. A
-   bounded server fallback handles crashed/backgrounded tabs, followed by the
-   complete synchronized 3·2·1, so no client-only pause can desynchronize the
-   room. main.js's Esc-to-leave self-suppresses while this card is open; a
-   second Esc, after the acknowledgement closes it, leaves like normal.
+   the card, but the card is a GRACE, not a barrier. The server sends a
+   tutorial token and the timestamp at which it will start the match anyway;
+   I'M READY (or Esc) acknowledges that exact token, and if EVERY current
+   player acknowledges it releases on the spot. Otherwise it releases when the
+   grace runs out. `startsAt` drives a live count on the button, so the one
+   control on the screen answers "why has it not started yet" before anybody
+   has to ask — which is the whole reason the old every-player barrier had to
+   go: a room of six sat on a silent card for as long as the slowest person
+   took to find the button. The complete synchronized 3·2·1 follows the
+   release either way, so no client-only pause can desynchronize the room.
+   main.js's Esc-to-leave self-suppresses while this card is open; a second
+   Esc, after the acknowledgement closes it, leaves like normal.
 
    The card answers to the keyboard as well as the mouse — Enter/Space on the
    focused button natively, Esc to back out — and focus is trapped inside it
@@ -32,6 +37,7 @@ import { blip } from "./audio.js";
 let onReady = null;
 let onBack = null;
 let restoreFocus = null;
+let graceTimer = 0;
 
 const panel = () => $("htpPanel");
 /* I'M READY is the only paper on the card now — the BACK paper is gone, so
@@ -43,7 +49,10 @@ export function isHowToPlayOpen(){
   return !$("howToPlay")?.classList.contains("hidden");
 }
 
-export function showHowToPlay({ ready, back, mode = "ai" } = {}){
+/* `startsAt` is a performance.now()-domain deadline (the callers convert the
+   server stamp), and it is the moment the match starts with or without this
+   button. Solo passes nothing and the count never appears. */
+export function showHowToPlay({ ready, back, mode = "ai", startsAt = 0 } = {}){
   const card = $("howToPlay");
   if(!card){ ready?.(); return; }
   onReady = ready || null;
@@ -51,6 +60,7 @@ export function showHowToPlay({ ready, back, mode = "ai" } = {}){
   restoreFocus = document.activeElement;
   card.dataset.mode = mode;
   card.classList.remove("hidden");
+  startGraceCount(startsAt);
   /* replay the drop every time — a state selector alone would only animate
      the first open, the same trap the results papers hit */
   const p = panel();
@@ -59,9 +69,45 @@ export function showHowToPlay({ ready, back, mode = "ai" } = {}){
   requestAnimationFrame(() => $("htpReady")?.focus({ preventScroll:true }));
 }
 
+/* Ticks the count on the button down to the release. At zero it fires the
+   READY path itself rather than waiting to be told: the server releases on
+   the same deadline, so acknowledging here means the client is never sitting
+   on a card the room has already left — and the acknowledgement is idempotent
+   on both sides, so the two crossing costs nothing. */
+function startGraceCount(startsAt){
+  clearInterval(graceTimer);
+  graceTimer = 0;
+  const pip = $("htpCount");
+  if(pip) pip.textContent = "";
+  if(!(startsAt > 0)) return;
+
+  const paint = () => {
+    if(!isHowToPlayOpen()){ clearInterval(graceTimer); graceTimer = 0; return; }
+    const left = Math.max(0, Math.ceil((startsAt - performance.now()) / 1000));
+    if(left <= 0){
+      clearInterval(graceTimer);
+      graceTimer = 0;
+      /* Same path as the click, so nothing downstream has to know the
+         difference between a player who pressed and a player who read. */
+      fire("ready");
+      return;
+    }
+    if(pip && pip.textContent !== String(left)){
+      pip.textContent = String(left);
+      pip.classList.remove("beat"); void pip.offsetWidth; pip.classList.add("beat");
+    }
+  };
+  paint();
+  graceTimer = setInterval(paint, 120);
+}
+
 export function hideHowToPlay(){
   const card = $("howToPlay");
   if(!card || card.classList.contains("hidden")) return;
+  clearInterval(graceTimer);
+  graceTimer = 0;
+  const pip = $("htpCount");
+  if(pip){ pip.textContent = ""; pip.classList.remove("beat"); }
   card.classList.add("hidden");
   onReady = null;
   onBack = null;
