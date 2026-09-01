@@ -530,23 +530,40 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    the skip penalty, SUDDEN DEATH, copy-failed fallbacks) was invisible.
    Paper-craft to match the rest: a cream card with a torn-ink border, pinned
    above the bottom edge where it never covers the word or the score. */
+/* TORN PAPER, not a rounded rectangle. Every other surface in this game is a
+   piece of cut paper taped to a board; the toast was a bordered box with a
+   box-shadow, which is the only element that ever read as a web page. The
+   backing is `cam-row.png` — the ENABLE CAMERA screen's own info-row paper —
+   stretched with object-fit:fill, which is how every re-used paper in this
+   project is fitted (its authored aspect is a source ratio, never a promise).
+   The shadow is a `drop-shadow` FILTER on the image, never a box-shadow: a
+   box-shadow round torn paper in a transparent bounding box draws a rectangle
+   in mid-air. */
+/* THE CAP IS NARROWER THAN THE OLD BOX ON PURPOSE. A toast wide enough to
+   hold a whole sentence on one line is ~12:1, and at that aspect the torn
+   edge is stretched to a couple of pixels and the paper reads as a plain
+   rectangle again — the exact thing this replaced. Wrapping to two lines
+   keeps it near the source paper's own proportions, and a sentence somebody
+   is meant to read in a hurry wants two short lines anyway. */
 .toast{position:fixed;left:50%;bottom:4.5vh;z-index:97;
-  display:none;max-width:min(46rem,86vw);
-  padding:.7em 1.15em;
-  translate:-50% 0;
+  display:none;width:max-content;max-width:min(32rem,58vw);
+  translate:-50% 0;pointer-events:none}
+.toast-paper{position:absolute;inset:0;width:100%;height:100%;
+  object-fit:fill;
+  filter:drop-shadow(0 min(.5vw,.9vh) min(.35vw,.62vh) rgba(9,22,62,.34))}
+.toast-text{position:relative;display:block;
+  padding:1.05em 1.7em;
   font-family:var(--f-sign),var(--f-body);font-weight:800;
   font-size:clamp(13px,min(1.32vw,2.35vh),24px);line-height:1.25;
   letter-spacing:.01em;text-align:center;text-wrap:balance;
-  color:#17356f;background:#f4ece0;
-  border:min(.21vw,.37vh) solid #17356f;border-radius:var(--r-md);
-  box-shadow:0 min(.42vw,.75vh) 0 rgba(23,53,111,.28),
-             0 min(.9vw,1.6vh) min(1.1vw,2vh) rgba(9,22,62,.24);
-  pointer-events:none}
-.toast.show{display:block;animation:toastIn .26s cubic-bezier(.2,1.5,.35,1)}
+  color:#17356f;text-shadow:0 .06em 0 rgba(244,236,224,.55)}
+/* A slip of paper lands with a bit of skew — the old entrance was a straight
+   vertical pop, which is a notification, not something tossed onto a desk. */
+.toast.show{display:block;animation:toastIn .3s cubic-bezier(.2,1.5,.35,1)}
 @keyframes toastIn{
-  from{opacity:0;translate:-50% 42%;scale:.94}
-  60%{opacity:1;translate:-50% -6%;scale:1.02}
-  to{opacity:1;translate:-50% 0;scale:1}}
+  from{opacity:0;translate:-50% 46%;scale:.9;rotate:-2.4deg}
+  60%{opacity:1;translate:-50% -7%;scale:1.03;rotate:.9deg}
+  to{opacity:1;translate:-50% 0;scale:1;rotate:0deg}}
 @media (prefers-reduced-motion: reduce){
   .toast.show{animation:none}
 }

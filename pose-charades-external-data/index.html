@@ -1275,7 +1275,15 @@
 </div>
 
 <div class="countdown hidden" id="countdown"><span class="cd-num" id="countdownNum"></span></div>
-<div class="toast" id="toast" role="status"></div>
+<!-- The toast is torn paper like everything else on these boards. It used to
+     be a CSS rounded rectangle with a border, which was the one element in the
+     game that looked like a web page. `cam-row.png` is the ENABLE CAMERA
+     screen's own info-row paper (1200x382), stretched with object-fit:fill —
+     the same treatment every re-used paper in this project gets. -->
+<div class="toast" id="toast" role="status">
+  <img class="toast-paper" src="assets/ui/figma/cam-row.png" alt="">
+  <span class="toast-text" id="toastText"></span>
+</div>
 
 <script type="module" src="js/main.js"></script>
 </body>

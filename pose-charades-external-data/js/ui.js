@@ -40,15 +40,23 @@ export function flash(kind){
   flash._t=setTimeout(()=>f.className="flash",700);
 }
 
-export function toast(msg){
+/* `ms` exists for the handful of messages that are INSTRUCTIONS rather than
+   notifications. 2.6s is right for "Room code copied!"; it is not enough to
+   read a sentence that ends in a URL you are meant to type, and the one time
+   a player most needs to read carefully is when they are stuck. */
+const TOAST_MS = 2600;
+export function toast(msg, ms = TOAST_MS){
   const t=$("toast");
-  t.textContent=msg;
+  /* The paper is a sibling <img> inside the toast, so the copy goes on the
+     text span — writing it to the container would blow the backing away. */
+  const line=$("toastText")||t;
+  line.textContent=msg;
   /* restart the entrance even when a second message lands inside the window */
   t.classList.remove("show");
   void t.offsetWidth;
   t.classList.add("show");
   clearTimeout(toast._t);
-  toast._t=setTimeout(()=>t.classList.remove("show"),2600);
+  toast._t=setTimeout(()=>t.classList.remove("show"), ms);
 }
 
 export const fmtTime = (ms, { compact=false }={}) => {
