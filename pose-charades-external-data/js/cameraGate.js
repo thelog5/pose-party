@@ -26,11 +26,21 @@
      words in a match. He is muted (`data-mute`) — the panel copy is the
      voice here, and a speech paper would collide with the button.
 
-   Permission is sticky per origin, so a player who has already said yes never
-   sees this again: `navigator.permissions.query({name:"camera"})` short-
-   circuits the whole thing and boot runs exactly as it did before. Where that
-   query is unsupported (Firefox, Safari) the card is shown — asking twice is
-   cheap, silently ambushing someone with a permission prompt is not. */
+   IT IS SHOWN ON EVERY BOOT, not only the first one. This is not a permission
+   notification, it is the game's front door: it says what Pose Party does with
+   your camera, where your video goes, and how much room you need to stand in.
+   All three of those are worth reading again on the tenth run, and none of
+   them stop being true once the browser has granted the permission. Skipping
+   the card for a returning player dropped them straight into a Home screen
+   with a live camera already running and no statement anywhere about it.
+
+   What the grant DOES change is the one line that would be a lie: the card
+   asks `navigator.permissions.query({name:"camera"})` and, when the answer is
+   `granted`, sets `data-granted` — row 1 becomes YOUR CAMERA IS READY and the
+   button becomes LET'S GO instead of ENABLE CAMERA. Asking someone to enable
+   something they enabled months ago reads as a screen that is not listening.
+   Where the query is unsupported (Firefox, Safari) the asking copy is used:
+   over-explaining is cheap, claiming a permission you do not have is not. */
 
 import { $ } from "./dom.js";
 import { blip } from "./audio.js";
@@ -61,12 +71,21 @@ const BEAT_GAP_MS  = [1500, 2700];   // back on `point`, waiting
 const BEAT_HOLD_MS = [800, 1400];    // how long one alternate is held
 
 let resolveConsent = null;
+/* Whether the browser already holds a camera grant for this origin. It is the
+   only thing on the card that the grant changes, so it is the only thing kept
+   here; every place that restores the default button label reads it. */
+let cameraGranted = false;
 let rigTimer = 0;
 let beatIx = -1;
 let restoreFocus = null;
 let spritesWarmed = false;
 
 const card = () => $("camGate");
+/* The single action on this card is "start the game". When the permission is
+   still outstanding that action happens to include asking for it, which is
+   what the button should say; when it is already held, saying ENABLE CAMERA
+   asks for something the player has already given. */
+const startLabel = () => cameraGranted ? "LET\u2019S GO!" : "ENABLE CAMERA";
 export const isCameraGateOpen = () => {
   const gate = card();
   return !!gate && !gate.classList.contains("hidden");
@@ -169,7 +188,7 @@ export function setBootFailed(message){
       button.removeAttribute("aria-busy");
     }
     const label = $("cgEnableLabel");
-    if(label) label.textContent = "ENABLE CAMERA";
+    if(label) label.textContent = startLabel();
   }
   stopRig();
   const finishConsent = resolveConsent;
@@ -193,7 +212,11 @@ async function alreadyGranted(){
 }
 
 export async function requestCameraConsent(){
-  if(await alreadyGranted()) return true;
+  /* The grant no longer short-circuits the card, it only re-words it. The
+     three things this screen says are true on every run, and a returning
+     player who is dropped straight into Home has a camera switched on with
+     nothing on screen that ever said so. */
+  cameraGranted = await alreadyGranted();
   open();
   return new Promise(resolve => { resolveConsent = resolve; });
 }
@@ -206,6 +229,11 @@ export function retryCameraConsent(err){
   if(g){
     g.dataset.state = err?.name === "NotAllowedError" ? "blocked" : "failed";
     g.removeAttribute("data-pending");
+    /* Whatever permissions.query said a moment ago, the camera did not come
+       back — so the card must stop claiming it is ready and go back to the
+       asking copy. */
+    cameraGranted = false;
+    g.removeAttribute("data-granted");
     /* The headline stays Figma's own line. The failure goes in the note strip
        under the button, which is the only copy on this card that is not
        authored — swapping the title would throw away the one sentence that
@@ -228,6 +256,9 @@ function open(){
   if(!g || isCameraGateOpen()) return;
   restoreFocus = document.activeElement;
   document.body.dataset.boot = "gate";
+  g.toggleAttribute("data-granted", cameraGranted);
+  const startText = $("cgEnableLabel");
+  if(startText) startText.textContent = startLabel();
   g.classList.remove("hidden");
   /* Replay the drop on every open — a state selector alone only animates the
      first one, which is the trap every other paper on this project has hit. */
@@ -254,13 +285,14 @@ export function closeCameraGate(){
     g.removeAttribute("data-state");
     g.removeAttribute("data-pending");
     g.removeAttribute("data-ready");
+    g.removeAttribute("data-granted");
     const button = $("cgEnable");
     if(button){
       button.disabled = false;
       button.removeAttribute("aria-busy");
     }
     const label = $("cgEnableLabel");
-    if(label) label.textContent = "ENABLE CAMERA";
+    if(label) label.textContent = startLabel();
     if(restoreFocus?.isConnected) restoreFocus.focus?.({ preventScroll:true });
     restoreFocus = null;
   }
@@ -298,8 +330,11 @@ function consent(){
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
   }
+  /* "ASKING" is only true when there is something to ask for. With the grant
+     already held the click starts the camera outright, so the busy copy has to
+     say that instead of describing a prompt that will never appear. */
   const label = $("cgEnableLabel");
-  if(label) label.textContent = "ASKING…";
+  if(label) label.textContent = cameraGranted ? "STARTING\u2026" : "ASKING\u2026";
   blip([523, 784], .06);
   fn(true);
 }

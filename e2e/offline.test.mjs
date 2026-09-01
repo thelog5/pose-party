@@ -30,6 +30,28 @@ page.on("response", r => { if (r.status() >= 400) consoleErrors.push(`HTTP ${r.s
 
 await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
 
+/* THE FRONT DOOR IS ON EVERY BOOT NOW. The ENABLE CAMERA card used to be
+   skipped whenever the origin already held a camera grant, which is exactly
+   what --use-fake-ui-for-media-stream reports, so every suite booted straight
+   into Home. It is a consent/briefing screen rather than a permission
+   notification, so it is shown every run and nothing downstream (the camera,
+   the status overlay, Home's entrance) happens until it is answered. */
+async function passCameraGate(page){
+  await page.waitForFunction(() =>
+    !document.getElementById("camGate").classList.contains("hidden"),
+    { timeout: 30000, polling: 50 });
+  const seen = await page.evaluate(() => ({
+    granted:document.getElementById("camGate").hasAttribute("data-granted"),
+    label:document.getElementById("cgEnableLabel").textContent.trim(),
+    head:[...document.querySelectorAll(".cg-head1")]
+      .filter(n => getComputedStyle(n).display !== "none")
+      .map(n => n.textContent.trim()).join("|"),
+  }));
+  await page.click("#cgEnable");
+  return seen;
+}
+const returning = await passCameraGate(page);
+
 const mod = (path) => `(await import('${APP}/js/${path}'))`;
 const evalApp = (expr) => page.evaluate(`(async () => (${expr}))()`);
 const txt = sel => page.evaluate(s => document.querySelector(s)?.textContent ?? null, sel);
@@ -58,6 +80,14 @@ const settledLobby = () => page.waitForFunction(
 await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000 });
 console.log("boot:");
 ok(true, "engine + camera booted (status overlay hidden)");
+/* --use-fake-ui-for-media-stream reports the origin as already granted, which
+   is exactly a returning player. The card is still shown — it is a briefing,
+   not a permission prompt, and what it says about where your video goes and
+   how much room you need is true on the tenth run — but it must stop asking
+   for something the browser has already given. */
+ok(returning.granted && returning.label === "LET\u2019S GO!" &&
+   returning.head === "YOUR CAMERA IS READY",
+  "a returning player still gets the front door, re-worded for a camera already granted");
 ok(await bodyScreen() === "home", "home screen visible");
 ok(await page.evaluate(() =>
   document.getElementById("homeStage").classList.contains("home-entering") &&
@@ -2241,11 +2271,12 @@ ok(reducedScoreDelay < 200,
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 
 // ---- the boot gate ----
-/* This suite's own page never sees the ENABLE CAMERA card: Chrome's
-   --use-fake-ui-for-media-stream reports the origin as already `granted`, so
-   requestCameraConsent() short-circuits exactly the way it does for a
-   returning player. Drive it on a second page with the permission query
-   stubbed to `prompt`, which is what a first-time visitor gets. */
+/* Every page in this suite sees the card (passCameraGate above answers it),
+   but with --use-fake-ui-for-media-stream the origin reports `granted`, so
+   that is the RETURNING-player wording. Drive the first-time path on a second
+   page with the permission query stubbed to `prompt`, which is what a visitor
+   who has never granted the camera gets, and exercise the refusal/retry road
+   that only exists on that side. */
 console.log("boot gate:");
 {
   const gatePage = await browser.newPage();
@@ -2344,8 +2375,32 @@ console.log("boot gate:");
       tapes:{ yellow:tape(".cg-tape-y"), cream:tape(".cg-tape-c") },
       body:src("#cgRobotBody"),
       title:document.getElementById("cgTitle").textContent.trim(),
-      heads:[...document.querySelectorAll(".cg-head")].map(n => n.textContent.trim()),
+      /* Row 1 authors two readings of the same rectangle now — the card is
+         shown on every boot, so the permission line has to stop asking once
+         the browser has said yes. Only the displayed one is the copy. */
+      heads:[...document.querySelectorAll(".cg-head")]
+        .filter(n => getComputedStyle(n).display !== "none")
+        .map(n => n.textContent.trim()),
+      startLabel:document.getElementById("cgEnableLabel").textContent.trim(),
       rig:box(".cg-rig"), btn:box(".cg-enable"), row1:box(".cg-row1"),
+      /* The button is the one element here that carries a transform: the
+         centring `translate:-50%`. It cannot be measured with `offsetLeft`
+         alone (that is the UNtransformed layout position) and it must not be
+         measured with a client rect either — the card focuses this button on
+         open, so `:focus-visible` has scale:1.035 on it and the painted box is
+         3.5% too wide. Layout width plus the RESOLVED translate is the only
+         reading that is neither. */
+      btnCentre:(() => {
+        const b = document.querySelector(".cg-enable");
+        /* `translate` keeps its percentage in the computed value (it resolves
+           against the element's own border box at paint time), so this cannot
+           just parseFloat to px. */
+        const raw = (getComputedStyle(b).translate || "").split(/\s+/)[0] || "0";
+        const tx = raw.endsWith("%")
+          ? parseFloat(raw) / 100 * b.offsetWidth
+          : parseFloat(raw) || 0;
+        return (b.offsetLeft + tx + b.offsetWidth / 2) / panel.offsetWidth;
+      })(),
     };
   });
   ok(/cam-panel\.png$/.test(authored.paper) &&

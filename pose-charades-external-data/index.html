@@ -1207,9 +1207,18 @@
 
     <img class="cg-row cg-row1" src="assets/ui/figma/cam-row.png" alt="">
     <img class="cg-icon cg-icon-cam" src="assets/ui/figma/cam-icon-camera.png" alt="">
-    <span class="cg-head cg-head1">ENABLE YOUR CAMERA</span>
-    <span class="cg-sub cg-sub1">Pose Party needs camera access to recognize
-      your movements.</span>
+    <!-- This screen is shown on EVERY boot, not only the first one, so row 1
+         has two readings: a permission the game still needs, and one it
+         already holds. `data-granted` on .cg picks between them (overlays.css)
+         and cameraGate.js swaps the button label to match — a card that says
+         ENABLE CAMERA over a camera that is already enabled asks the player
+         for something they have already given. -->
+    <span class="cg-head cg-head1" data-cg-when="ask">ENABLE YOUR CAMERA</span>
+    <span class="cg-sub cg-sub1" data-cg-when="ask">Pose Party needs camera
+      access to recognize your movements.</span>
+    <span class="cg-head cg-head1" data-cg-when="ready">YOUR CAMERA IS READY</span>
+    <span class="cg-sub cg-sub1" data-cg-when="ready">Pose Party uses it to
+      recognize your movements.</span>
 
     <img class="cg-row cg-row2" src="assets/ui/figma/cam-row.png" alt="">
     <img class="cg-icon cg-icon-hi5" src="assets/ui/figma/cam-icon-highfive.png" alt="">

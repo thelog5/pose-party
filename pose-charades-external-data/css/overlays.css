@@ -419,6 +419,13 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
   line-height:2.599cqw;letter-spacing:.0325cqw;text-wrap:pretty;
   text-shadow:.325cqw .325cqw 0 rgba(255,255,255,.65)}
 .cg-sub1{left:36.452%;top:41.5%;width:46.589%;height:8%;font-size:3.249cqw}
+/* Row 1 has two readings because the card is shown on every boot, not only
+   the first: this is a consent/briefing screen, and the permission line is the
+   only part of it that goes stale once the browser has said yes. Both spans
+   sit in the same authored rectangle and exactly one is displayed. */
+[data-cg-when]{display:none}
+.cg:not([data-granted]) [data-cg-when="ask"],
+.cg[data-granted] [data-cg-when="ready"]{display:grid}
 .cg-sub2{left:35.802%;top:57.8%;width:49.123%;height:8%;font-size:3.054cqw}
 .cg-sub3{left:35.802%;top:74.4%;width:40.481%;height:8%;font-size:3.249cqw}
 
