@@ -256,6 +256,7 @@ export function leaveParty(){
   clearTimeout(partyRetryTimer);
   for(const [, entry] of peers) entry.peer.close();
   peers.clear();
+  clearPeerFailures();
   resetPartyUi();
   setLobbyStatus(null);
 }
@@ -277,7 +278,7 @@ function wirePartySocket(s){
   s.on("party:signal", ({from, data} = {}) => { peers.get(from)?.peer.handleSignal(data); });
   s.on("party:left", ({id} = {}) => {
     const entry = peers.get(id);
-    if(entry){ entry.peer.close(); peers.delete(id); }
+    if(entry){ entry.peer.close(); peers.delete(id); failedPeers.delete(id); }
     /* the roster event repaints the lobby; a match in progress has to be told
        separately, or the departed player's tile stays frozen and silent */
     if(["countdown", "playing", "word-won"].includes(gameState()))
@@ -490,6 +491,43 @@ function updateGate(){
 }
 
 /* ---------------- webrtc mesh ---------------- */
+
+/* A DEAD LINK HAS TO SAY SO. 1v1 has said it since it shipped
+   (`onConnectionChange` in online.js), and Party is the mode where the
+   silence costs most: this is a full mesh, so a player whose network cannot
+   hole-punch loses ALL FIVE of their links at once and sits in front of five
+   black tiles with nothing on screen accounting for it.
+   The count is the diagnosis, which is why it is worth coalescing rather
+   than firing per link. One name is that one pair's problem. Two or more is
+   YOUR connection, and telling somebody to look at their own wifi is only
+   useful if you are confident enough to say it. Both lines lead with the
+   fact that the match is unaffected, because it is: the server scores every
+   player whether or not their video ever arrives. */
+const failedPeers = new Map();      // id -> name, as at the time it failed
+let failToastTimer = null;
+
+function clearPeerFailures(){
+  failedPeers.clear();
+  clearTimeout(failToastTimer);
+  failToastTimer = null;
+}
+
+function notePeerFailure(id, name){
+  if(failedPeers.has(id)) return;
+  failedPeers.set(id, name);
+  /* Five links die within a few hundred ms of each other, so wait to find
+     out whether this is one bad pair or one bad connection. */
+  clearTimeout(failToastTimer);
+  failToastTimer = setTimeout(() => {
+    const names = [...failedPeers.values()];
+    if(!names.length) return;
+    toast(names.length === 1
+      ? `Can’t see ${names[0]}. You can both still play and score.`
+      : `Your video isn’t getting through to ${names.length} players. Everyone can still play and score.`,
+      5200);
+  }, 400);
+}
+
 /* One link per pair; the lexically smaller socket id makes the offer, so
    both sides agree who initiates without negotiating. */
 function syncPeers(){
@@ -510,6 +548,12 @@ function syncPeers(){
         scaleResolutionDownBy: 1.25,
       },
       sendSignal: data => socket && socket.emit("party:signal", { to: p.id, data }),
+      onConnectionChange: st => {
+        if(st === "failed") notePeerFailure(p.id, p.name || "a player");
+      },
+      /* Route diagnostics only: which candidate types won, or that none did.
+         A six-player mesh is where the failure rate actually shows up. */
+      onIceReport: r => { if(socket) socket.emit("net:report", { mode:"party", ...r }); },
       onRemoteStream: stream => {
         entry.stream = stream;
         attachPartyStream(p.id, stream);
@@ -524,6 +568,8 @@ function syncPeers(){
     peers.set(p.id, entry);
   }
   for(const [id, entry] of peers){
-    if(!others.find(p => p.id === id)){ entry.peer.close(); peers.delete(id); }
+    if(!others.find(p => p.id === id)){
+      entry.peer.close(); peers.delete(id); failedPeers.delete(id);
+    }
   }
 }
