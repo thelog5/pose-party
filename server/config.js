@@ -2,6 +2,7 @@
    game logic. Copy .env.example and `source` it, or set vars inline. */
 
 const int = (v, d) => Number.isFinite(+v) ? +v : d;
+const bool = (v, d) => (v == null || v === "") ? d : /^(1|true|yes|on)$/i.test(String(v).trim());
 
 export const config = {
   port: int(process.env.PORT, 3000),
@@ -50,6 +51,27 @@ export const config = {
      which is why both E2E suites already had to override it. */
   rateCreate: int(process.env.RATE_CREATE, 30),
   rateJoin: int(process.env.RATE_JOIN, 60),
+
+  /* BEHIND A PLATFORM PROXY, EVERY PLAYER SHARES ONE IP. Render, Railway and
+     Fly all terminate TLS in front of this process, so `req.ip` and
+     `socket.handshake.address` become the proxy's address for everybody. Both
+     rate buckets are keyed by IP, so the whole player base would then share a
+     single bucket of `rateCreate` rooms per minute — and walking into a lobby
+     CREATES a room. The symptom is the one already documented above: the
+     invite paper stuck at `------` for everyone at once.
+     The forwarded header is only trusted when this is on, because a client
+     can write whatever it likes into `X-Forwarded-For`. Trusting it on a
+     directly-exposed server would hand every abuser an unlimited supply of
+     fresh rate-limit keys. Off locally, on in production. */
+  trustProxy: bool(process.env.TRUST_PROXY, false),
+
+  /* Static cache lifetime for `assets/`, in seconds. The art is the bulk of
+     the payload (about 30 MB over 275 files) and it is stable between
+     deploys, so it is worth caching hard. Markup, JS and CSS are deliberately
+     NOT covered by this: they are not content-hashed, so a long cache there
+     would leave players running a stale build after a deploy with no way to
+     know. See the static handler in index.js. */
+  staticMaxAge: int(process.env.STATIC_MAX_AGE, 30 * 24 * 60 * 60),
 
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),

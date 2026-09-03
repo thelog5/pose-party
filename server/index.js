@@ -24,6 +24,11 @@ const GAME_DIR = path.join(__dirname, "..", "pose-charades-external-data");
 
 const app = express();
 
+/* Behind Render/Railway/Fly this makes `req.ip` the real client rather than
+   the platform proxy. Off by default: an untrusted `X-Forwarded-For` is a
+   free supply of rate-limit keys. See config.trustProxy. */
+if(config.trustProxy) app.set("trust proxy", 1);
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -51,7 +56,30 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(GAME_DIR, { index: "index.html" }));
+/* Liveness for the platform's health check, and a cheap way to see from
+   outside whether this is a game server at all — the client's own
+   `servedWithoutServer()` probe answers the same question from /socket.io/. */
+app.get("/healthz", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ ok: true, rooms: store._rooms.size, uptimeSec: Math.round(process.uptime()) });
+});
+
+/* CACHE THE ART HARD, NEVER THE CODE. `assets/` is ~30 MB across 275 files
+   and barely changes; served with the Express default (`max-age=0`) every
+   one of them revalidates on every visit. Markup, JS and CSS are NOT
+   content-hashed here, so caching those the same way would strand players on
+   a stale build after a deploy. They keep must-revalidate instead, which is
+   a few KB of conditional requests. */
+app.use(express.static(GAME_DIR, {
+  index: "index.html",
+  setHeaders: (res, filePath) => {
+    const rel = path.relative(GAME_DIR, filePath);
+    const isArt = rel.split(path.sep)[0] === "assets";
+    res.set("Cache-Control", isArt
+      ? `public, max-age=${config.staticMaxAge}`
+      : "no-cache");
+  },
+}));
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
@@ -85,8 +113,22 @@ io.engine.on("connection_error", err => {
   log(`handshake FAILED from ${err.req?.socket?.remoteAddress || "?"}: ${err.message} (code ${err.code})`);
 });
 
+/* THE RATE BUCKETS ARE KEYED BY THIS, so it has to be the player and not the
+   platform proxy in front of them. `X-Forwarded-For` is client-writable, so
+   it is only read when the operator has said there IS a proxy. */
+function clientIp(socket){
+  if(config.trustProxy){
+    const fwd = socket.handshake.headers["x-forwarded-for"];
+    if(typeof fwd === "string"){
+      const first = fwd.split(",")[0].trim();
+      if(first) return first;
+    }
+  }
+  return socket.handshake.address || "unknown";
+}
+
 io.on("connection", socket => {
-  const ip = socket.handshake.address || "unknown";
+  const ip = clientIp(socket);
   const ack = cb => (typeof cb === "function" ? cb : () => {});
   log(`connect ${socket.id.slice(0,6)} from ${ip} (origin: ${socket.handshake.headers.origin || "?"})`);
 
@@ -276,7 +318,20 @@ io.on("connection", socket => {
   });
 });
 
+/* THE TWO SETTINGS THAT ARE SILENTLY WRONG IN PRODUCTION. Neither breaks a
+   local run, and neither announces itself when it breaks a deployed one:
+   an untrusted proxy collapses every player onto one rate-limit key, and a
+   localhost CORS list only bites the cross-origin case. Say so at boot. */
+function warnIfMisconfigured(){
+  if(process.env.NODE_ENV !== "production") return;
+  if(!config.trustProxy)
+    console.warn("WARNING: TRUST_PROXY is off. Behind a platform proxy every player shares one rate-limit bucket.");
+  if(config.corsOrigins.every(o => /localhost|127\.0\.0\.1/.test(o)))
+    console.warn("WARNING: CORS_ORIGINS still only lists localhost. Set it to your real origin.");
+}
+
 httpServer.listen(config.port, () => {
+  warnIfMisconfigured();
   console.log(`Pose Charades server running.`);
   console.log(`  On this computer:   http://localhost:${config.port}`);
   for(const addrs of Object.values(os.networkInterfaces()))
