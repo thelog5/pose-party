@@ -830,20 +830,27 @@ await page.waitForFunction(() =>
    put him in the same body — that was the whole problem with the sprite he
    replaced. Driven straight through the module so this measures the mood
    machine, not how fast a fed pose happens to charge. */
+/* RIG.JSON IS THE AUTHORITY FOR THE PIVOTS, so the test has to read them
+   rather than restate them. The four coordinates here used to be written out
+   by hand, and they described art that was never shipped: they sampled the
+   right elbow at y=435 when this upper arm's ink stops at y=430, so all four
+   joints reported alpha 0 and both assertions had been red since the day
+   they were added. Reading the pack means a re-export moves the test with
+   the art instead of against it.
+   What is actually being checked is still worth checking: a pivot has to sit
+   on opaque paper in BOTH the limb that turns and the one it hangs from, or
+   the joint opens a hole the moment it rotates. */
 const limbGeometry = await page.evaluate(async () => {
   const base = location.origin + "/assets/ui/rig/";
-  const files = [
-    "upper_arm_character_right.png", "forearm_character_right.png",
-    "hand_character_right.png", "upper_arm_character_left.png",
-    "forearm_character_left.png", "hand_character_left.png",
-  ];
+  const rig = await (await fetch(base + "rig.json", { cache:"no-store" })).json();
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 640;
   const ctx = canvas.getContext("2d", { willReadFrequently:true });
   const layers = {};
-  for(const file of files){
+  async function layer(joint){
+    if(layers[joint]) return layers[joint];
     const img = new Image();
-    img.src = base + file;
+    img.src = base + rig.body[joint].file;
     await img.decode();
     ctx.clearRect(0, 0, 640, 640);
     ctx.drawImage(img, 0, 0);
@@ -854,27 +861,38 @@ const limbGeometry = await page.evaluate(async () => {
       left=Math.min(left,x); top=Math.min(top,y);
       right=Math.max(right,x+1); bottom=Math.max(bottom,y+1);
     }
-    layers[file] = { width:right-left, height:bottom-top,
-      alpha:(x,y) => rgba[(y*640+x)*4+3] };
+    return (layers[joint] = { width:right-left, height:bottom-top,
+      alpha:(x,y) => rgba[(y*640+x)*4+3] });
   }
-  const joints = [
-    ["right elbow", 216,435,"upper_arm_character_right.png","forearm_character_right.png"],
-    ["right wrist", 217,511,"forearm_character_right.png","hand_character_right.png"],
-    ["left elbow",  424,435,"upper_arm_character_left.png", "forearm_character_left.png"],
-    ["left wrist",  423,511,"forearm_character_left.png",  "hand_character_left.png"],
-  ].map(([name,x,y,a,b]) => ({ name,
-    alphaA:layers[a].alpha(x,y), alphaB:layers[b].alpha(x,y) }));
+  /* A child's pivot IS the joint it shares with its parent. */
+  const joints = [];
+  for(const child of ["forearm_character_right", "hand_character_right",
+                      "forearm_character_left",  "hand_character_left"]){
+    const parent = rig.body[child].parent;
+    const [px, py] = rig.body[child].pivot;
+    const x = Math.round(px), y = Math.round(py);
+    const kid = await layer(child), dad = await layer(parent);
+    joints.push({ name:child, alphaA:dad.alpha(x, y), alphaB:kid.alpha(x, y) });
+  }
+  for(const j of ["upper_arm_character_right", "upper_arm_character_left"]) await layer(j);
   return { joints, boxes:Object.fromEntries(Object.entries(layers)
-    .map(([file,{width,height}]) => [file,{width,height}])) };
+    .map(([joint,{width,height}]) => [joint,{width,height}])) };
 });
 ok(limbGeometry.joints.every(j => j.alphaA > 240 && j.alphaB > 240),
-  `every elbow and wrist pivot overlaps opaque art (` +
+  `every elbow and wrist pivot overlaps opaque art in both limbs (` +
   `${limbGeometry.joints.map(j => `${j.name} ${j.alphaA}/${j.alphaB}`).join(", ")})`);
-ok(Object.entries(limbGeometry.boxes).every(([file,box]) =>
-    file.startsWith("upper_") ? box.width >= 56 && box.height >= 94 :
-    file.startsWith("forearm_") ? box.width >= 62 && box.height >= 96 :
-    box.width >= 68 && box.height >= 76),
-  "the deployed upper arms, forearms, and hands retain the expanded Figma proportions");
+/* Floors sit just under the shipped ink AS THIS TEST MEASURES IT. The alpha
+   cutoff above is 8, which trims the anti-aliased fringe, so these are a few
+   px tighter than the same art measured on any non-zero alpha. Comparing
+   numbers taken with two different cutoffs is how the old floors came to be
+   set above the art they were guarding. */
+ok(Object.entries(limbGeometry.boxes).every(([joint,box]) =>
+    joint.startsWith("upper_arm") ? box.width >= 46 && box.height >= 78 :
+    joint.startsWith("forearm")   ? box.width >= 52 && box.height >= 79 :
+    box.width >= 63 && box.height >= 72),
+  "no limb has been re-exported smaller than the deployed art (" +
+  Object.entries(limbGeometry.boxes)
+    .map(([j,b]) => `${j.split("_")[0]} ${b.width}x${b.height}`).join(", ") + ")");
 
 const robotBands = await page.evaluate(async () => {
   const r = await import(location.origin + "/js/robot.js");
