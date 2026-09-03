@@ -22,14 +22,67 @@ function applyVideoEncoding(sender, limits){
   }
 }
 
+/* WHICH ROUTE DID THIS LINK ACTUALLY TAKE? Without an answer, the question
+   "how many of my players cannot connect, and would TURN be worth paying
+   for" can only be settled with an industry average applied to a player base
+   nobody has observed. The candidate types are the whole answer:
+
+     host   both peers on the same network; no traversal needed
+     srflx  hole-punched through NAT using STUN. The common success case.
+     prflx  peer-reflexive; learned from an inbound packet
+     relay  a TURN server carried it. Impossible here, since none is
+            configured, which is exactly why `failed` is the number to watch.
+
+   So a `failed` report is a link that would have needed TURN. Count those
+   against the total and the decision makes itself. */
+async function selectedPairTypes(pc){
+  try{
+    const stats = await pc.getStats();
+    let pair = null;
+    /* The transport names the winner outright where it is available. */
+    for(const s of stats.values())
+      if(s.type === "transport" && s.selectedCandidatePairId)
+        pair = stats.get(s.selectedCandidatePairId) || pair;
+    if(!pair)
+      for(const s of stats.values())
+        if(s.type === "candidate-pair" && s.state === "succeeded" && s.nominated !== false)
+          pair = s;
+    if(!pair) return null;
+    return {
+      local: stats.get(pair.localCandidateId)?.candidateType || "?",
+      remote: stats.get(pair.remoteCandidateId)?.candidateType || "?",
+    };
+  }catch(_error){
+    return null;   // a browser without full stats support tells us nothing
+  }
+}
+
 export function createPeer({
   initiator, stream, sendSignal, onRemoteStream, onConnectionChange,
-  videoEncoding,
+  onIceReport, videoEncoding,
 }){
   const pc = new RTCPeerConnection(ICE);
   const pendingCandidates = [];
   const videoSenders = [];
   let closed = false;
+  const startedAt = Date.now();
+  /* One report of each outcome. A link that connects and later drops is a
+     different phenomenon from one that never connects, and both are worth
+     seeing, but neither is worth repeating. */
+  const reported = new Set();
+
+  async function reportIce(result){
+    if(!onIceReport || reported.has(result)) return;
+    reported.add(result);
+    const types = result === "connected" ? await selectedPairTypes(pc) : null;
+    if(closed && result === "connected") return;
+    onIceReport({
+      result,
+      local: types?.local || "",
+      remote: types?.remote || "",
+      ms: Date.now() - startedAt,
+    });
+  }
 
   for(const track of stream.getTracks()){
     const sender = pc.addTrack(track, stream);
@@ -48,7 +101,9 @@ export function createPeer({
   pc.onconnectionstatechange = () => {
     if(pc.connectionState === "connected"){
       for(const sender of videoSenders) applyVideoEncoding(sender, videoEncoding);
+      reportIce("connected");
     }
+    if(pc.connectionState === "failed") reportIce("failed");
     if(onConnectionChange) onConnectionChange(pc.connectionState);
   };
 

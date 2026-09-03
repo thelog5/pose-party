@@ -645,6 +645,9 @@ function openPeer(initiator){
     onConnectionChange: st => {
       if(st==="failed") toast("Video connection failed. The game still works, you just can’t see each other.");
     },
+    /* Route diagnostics only: which candidate types won, or that none did.
+       No addresses, and nothing about the media itself. */
+    onIceReport: r => { if(socket) socket.emit("net:report", { mode:"1v1", ...r }); },
   });
 }
 

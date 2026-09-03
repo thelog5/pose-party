@@ -98,11 +98,14 @@ const joinLimit   = createLimiter({ tokens: config.rateJoin,   perMs: 60000 }); 
 const claimLimit  = createLimiter({ tokens: 30,  perMs: 60000 });   // per socket
 const signalLimit = createLimiter({ tokens: 200, perMs: 60000 });   // per socket
 const guessLimit  = createLimiter({ tokens: 360, perMs: 60000 });   // per socket
+/* A six-player mesh is five links per client, and each reports at most one
+   success and one failure. 60 is far above that and far below a flood. */
+const netLimit    = createLimiter({ tokens: 60,  perMs: 60000 });   // per socket
 
 setInterval(() => {
   store.sweep();
   createLimit.sweep(); joinLimit.sweep(); claimLimit.sweep();
-  signalLimit.sweep(); guessLimit.sweep();
+  signalLimit.sweep(); guessLimit.sweep(); netLimit.sweep();
 }, 60000).unref();
 
 /* Support log: connection + room events only — never landmarks or video
@@ -126,6 +129,8 @@ function clientIp(socket){
   }
   return socket.handshake.address || "unknown";
 }
+
+const TYPES = new Set(["host", "srflx", "prflx", "relay"]);
 
 io.on("connection", socket => {
   const ip = clientIp(socket);
@@ -310,6 +315,25 @@ io.on("connection", socket => {
 
   /* Clock sync: client measures RTT around this ack. */
   socket.on("time:sync", (payload, cb) => ack(cb)({ serverNow: Date.now() }));
+
+  /* HOW MANY LINKS ACTUALLY CONNECT. No TURN server is configured, so every
+     `failed` here is a pair that STUN could not hole-punch and that a relay
+     would have rescued. Counting these against the successes is the only
+     honest way to decide whether TURN is worth buying, instead of applying
+     an industry average to a player base nobody has measured.
+     This records a route, not a person: candidate TYPES only, never an
+     address, and nothing whatever about the media. */
+  socket.on("net:report", payload => {
+    if(!netLimit.allow(socket.id)) return;
+    if(!isPlainObject(payload)) return;
+    const mode = payload.mode === "party" ? "party" : "1v1";
+    const result = payload.result === "failed" ? "failed" : "connected";
+    const type = v => (TYPES.has(v) ? v : "?");
+    const pair = result === "connected"
+      ? `${type(payload.local)}/${type(payload.remote)}` : "none";
+    const ms = Number.isFinite(+payload.ms) ? Math.round(+payload.ms) : -1;
+    log(`net ${mode} ${result} ${pair} ${ms}ms`);
+  });
 
   socket.on("room:leave", (payload, cb) => { store.leave(socket.id); ack(cb)({ ok: true }); });
   socket.on("disconnect", reason => {
