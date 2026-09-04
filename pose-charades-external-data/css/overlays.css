@@ -283,10 +283,21 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 
 /* col 3 (1v1 only): the mini word-timer card, same paper/aspect-from-rect
    convention as the live .sp-wtimer, just this instance's own Figma rect
-   (257x117.21, not the live HUD card's 252px/2.250) and the matching cqw
-   type — this component scales identically wherever it's placed. */
-.htp-timer{position:absolute;container-type:inline-size}
-.htp-timer img{display:block;width:100%;aspect-ratio:257/117.21;object-fit:fill;
+   (not the live HUD card's 252px/2.250) and the matching cqw type — this
+   component scales identically wherever it's placed.
+
+   THE BOX IS THE FRAME; THE PAPER IS THE CARD INSIDE IT. Figma wraps this one
+   in a `Word Timer` FRAME (310:591, 257x117.2) that is wider than the paper it
+   holds — `robot-guess-card-tertiary-cream` (310:592) is 201.4x114.2, inset
+   3.11%/2.56% into it. The frame is the right box for the two text layers,
+   which ARE positioned against it, and the wrong one for the paper: stretched
+   to the frame the card came out 28% too wide and at 2.19 instead of its
+   authored 1.76, the one asset on any of these three cards not drawn at the
+   size Figma draws it. Every other paper here happens to sit in a rectangle of
+   its own, which is why this was the only one that could go wrong. */
+.htp-timer{position:absolute;container-type:inline-size;aspect-ratio:257/117.21}
+.htp-timer img{position:absolute;left:3.113%;top:2.560%;
+  width:78.366%;height:97.440%;object-fit:fill;
   filter:drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(0,0,0,.3))}
 .htp-timer span{position:absolute;left:18.527%;width:57.245%;text-align:center;
   color:#17356f;line-height:23.41cqw;text-shadow:1.19cqw 1.19cqw 0 rgba(255,255,255,.9)}
