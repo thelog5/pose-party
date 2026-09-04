@@ -17,7 +17,7 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { createPeer } from "./webrtc.js";
-import { partyBridge, enterLobby, ensureSocket, myName, setLobbyStatus,
+import { partyBridge, enterLobby, ensureSocket, iceServers, myName, setLobbyStatus,
          lobbySettings, renderLobbySettings, setLobbyCode,
          serverNow, perfFromServer } from "./online.js";
 import { setRematchState, syncResultsRoster } from "./results.js";
@@ -551,6 +551,7 @@ function syncPeers(){
     entry.peer = createPeer({
       initiator: myId < p.id,
       stream: state.mediaStream,
+      iceServers: iceServers(),
       /* One Party client can encode this camera for five peers. A modest
          sender cap protects the local pose loop while staying sharp enough
          for both the half-screen feed and portrait tiles. */

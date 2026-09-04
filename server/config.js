@@ -73,6 +73,40 @@ export const config = {
      know. See the static handler in index.js. */
   staticMaxAge: int(process.env.STATIC_MAX_AGE, 30 * 24 * 60 * 60),
 
+  /* TURN. A RELAY IS NOT AN SFU, AND THE DIFFERENCE IS THE WHOLE DESIGN.
+     WebRTC media is DTLS-SRTP encrypted end to end and the keys are derived
+     between the two browsers, so a TURN server forwards packets it holds no
+     key for and cannot open. An SFU terminates the encryption and can see
+     the video, which is why this game will never have one.
+     What TURN buys is REACH, and nothing else: it does not reduce a client's
+     upload one bit, because a mesh allocates one relay per link. It rescues
+     the pairs that STUN cannot hole-punch — symmetric NAT, carrier-grade NAT
+     on mobile, corporate and campus firewalls, UDP blocked outright.
+     Unset by default, in which case the client is STUN-only exactly as
+     before. `net:report` in index.js is how you find out whether you need
+     this: every `failed` it logs is a pair a relay would have rescued.
+
+     Two standard credential schemes, no provider-specific code:
+       TURN_SECRET   the TURN REST API (coturn `use-auth-secret`, and the
+                     several managed providers that implement it). The server
+                     signs a short-lived username here and the password never
+                     exists in the client for longer than TURN_TTL_SEC.
+       TURN_USERNAME + TURN_PASSWORD  a fixed pair, for providers that only
+                     issue those. Weaker: it is handed to every client as-is,
+                     so prefer the secret where the provider supports it. */
+  turnUrls: (process.env.TURN_URLS || "").split(",").map(s => s.trim()).filter(Boolean),
+  turnSecret: process.env.TURN_SECRET || "",
+  turnUsername: process.env.TURN_USERNAME || "",
+  turnPassword: process.env.TURN_PASSWORD || "",
+  turnTtlSec: int(process.env.TURN_TTL_SEC, 12 * 60 * 60),
+
+  /* The STUN server the client falls back on, and still tries first even
+     when TURN is configured — ICE only reaches for the relay if the cheap
+     routes fail, which is what keeps the relay bill to the links that
+     actually need it. */
+  stunUrls: (process.env.STUN_URLS || "stun:stun.l.google.com:19302")
+    .split(",").map(s => s.trim()).filter(Boolean),
+
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),
   maxRooms: int(process.env.MAX_ROOMS, 500),

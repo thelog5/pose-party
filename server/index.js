@@ -10,6 +10,7 @@ import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
 import http from "http";
+import crypto from "crypto";
 import express from "express";
 import helmet from "helmet";
 import { Server } from "socket.io";
@@ -131,6 +132,29 @@ function clientIp(socket){
 }
 
 const TYPES = new Set(["host", "srflx", "prflx", "relay"]);
+
+/* THE CLIENT NEVER HOLDS A LASTING TURN CREDENTIAL. With TURN_SECRET the
+   username is an expiry stamp and the password is its HMAC, so what a
+   browser receives is worthless after turnTtlSec and a leaked page source
+   costs nothing. This is the TURN REST API, which coturn implements as
+   `use-auth-secret`.
+   An open relay is found by scanners within days and used as a free proxy,
+   so a deployment that sets TURN_URLS without either credential scheme gets
+   no TURN at all rather than an unauthenticated one. */
+function iceServers(){
+  const list = [{ urls: config.stunUrls }];
+  if(!config.turnUrls.length) return list;
+  if(config.turnSecret){
+    const username = `${Math.floor(Date.now() / 1000) + config.turnTtlSec}`;
+    const credential = crypto.createHmac("sha1", config.turnSecret)
+      .update(username).digest("base64");
+    list.push({ urls: config.turnUrls, username, credential });
+  }else if(config.turnUsername && config.turnPassword){
+    list.push({ urls: config.turnUrls,
+      username: config.turnUsername, credential: config.turnPassword });
+  }
+  return list;
+}
 
 io.on("connection", socket => {
   const ip = clientIp(socket);
@@ -335,6 +359,14 @@ io.on("connection", socket => {
     log(`net ${mode} ${result} ${pair} ${ms}ms`);
   });
 
+  /* Asked for once per lobby visit, before the first peer is built. Costs a
+     fresh signature each time, which is the point: see iceServers(). */
+  socket.on("ice:servers", (payload, cb) => {
+    cb = ack(cb);
+    if(!netLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    cb({ iceServers: iceServers() });
+  });
+
   socket.on("room:leave", (payload, cb) => { store.leave(socket.id); ack(cb)({ ok: true }); });
   socket.on("disconnect", reason => {
     log(`disconnect ${socket.id.slice(0,6)} (${reason})`);
@@ -352,6 +384,8 @@ function warnIfMisconfigured(){
     console.warn("WARNING: TRUST_PROXY is off. Behind a platform proxy every player shares one rate-limit bucket.");
   if(config.corsOrigins.every(o => /localhost|127\.0\.0\.1/.test(o)))
     console.warn("WARNING: CORS_ORIGINS still only lists localhost. Set it to your real origin.");
+  if(config.turnUrls.length && !config.turnSecret && !(config.turnUsername && config.turnPassword))
+    console.warn("WARNING: TURN_URLS is set but no credentials are. TURN is disabled rather than left open.");
 }
 
 httpServer.listen(config.port, () => {

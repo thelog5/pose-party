@@ -368,9 +368,32 @@ async function ensureSocket(){
     setTimeout(()=>reject(new Error("server connection timed out")), 8000);
   });
   await syncClock();
+  _ice = await fetchIceServers(socket);
   wireSocket(socket);
   return socket;
 }
+
+/* THE ICE LIST COMES FROM THE SERVER, so switching a TURN relay on is a
+   deployment decision and never a code change. With TURN_SECRET set the
+   credential in it is signed and short-lived, which is why it is fetched per
+   connection rather than baked in anywhere.
+   It must never be able to hold up a lobby: a server that does not answer
+   this (an older build, a hiccup) leaves the list null and webrtc.js falls
+   back to the STUN-only default, which is exactly the behaviour that shipped
+   before any of this existed. */
+let _ice = null;
+
+function fetchIceServers(s){
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = v => { if(!settled){ settled = true; resolve(v); } };
+    setTimeout(() => finish(null), 2500);
+    try{ s.emit("ice:servers", {}, res => finish(res?.iceServers || null)); }
+    catch(_error){ finish(null); }
+  });
+}
+
+export function iceServers(){ return _ice; }
 
 function syncClock(){
   return new Promise(resolve => {
@@ -633,6 +656,7 @@ function openPeer(initiator){
   peer=createPeer({
     initiator,
     stream: state.mediaStream,
+    iceServers: iceServers(),
     sendSignal: data => socket && socket.emit("rtc:signal", { data }),
     onRemoteStream: stream => {
       const v=$("videoRemote");

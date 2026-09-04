@@ -1,8 +1,17 @@
 /* Thin RTCPeerConnection wrapper for the 1v1 video link.
    Signaling blobs are opaque {sdp}/{candidate} objects relayed by the
-   server; video itself flows peer-to-peer and never touches it. */
+   server; the video itself flows peer-to-peer.
 
-const ICE = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+   The server supplies the ICE servers (`ice:servers`, fetched once per lobby
+   visit by online.js) so that a TURN relay can be turned on by configuration
+   without a code change. Where no TURN is configured this is the same
+   STUN-only list it has always been, and even where one is, ICE reaches for
+   the relay only after the direct routes fail.
+   A TURN relay carries DTLS-SRTP packets it holds no key for, so it cannot
+   see the video. That is the line between a relay and an SFU, and it is why
+   this can exist here at all. */
+
+const ICE_FALLBACK = [{ urls: "stun:stun.l.google.com:19302" }];
 
 function applyVideoEncoding(sender, limits){
   if(!sender || !limits) return;
@@ -59,9 +68,11 @@ async function selectedPairTypes(pc){
 
 export function createPeer({
   initiator, stream, sendSignal, onRemoteStream, onConnectionChange,
-  onIceReport, videoEncoding,
+  onIceReport, videoEncoding, iceServers,
 }){
-  const pc = new RTCPeerConnection(ICE);
+  const pc = new RTCPeerConnection({
+    iceServers: iceServers?.length ? iceServers : ICE_FALLBACK,
+  });
   const pendingCandidates = [];
   const videoSenders = [];
   let closed = false;

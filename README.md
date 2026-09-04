@@ -35,6 +35,11 @@ npm run offline
 ## Privacy
 
 Video is WebRTC peer-to-peer (a full mesh in Party) and never recorded.
+If a TURN relay is configured (off by default, see `server/.env.example`),
+links that cannot connect directly are carried by it. WebRTC media is
+DTLS-SRTP encrypted between the two browsers, so a relay forwards packets it
+holds no key for and cannot see the video. That is the difference between a
+relay and an SFU, and it is why this project will never have an SFU.
 Pose/face landmarks and training data never leave the browser — including the
 head tracking that places the 1v1 crown and the Party "GOT IT" sticker, which
 only ever runs on your own camera. During 1v1 and Party the server relays the
