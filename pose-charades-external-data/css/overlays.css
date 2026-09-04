@@ -387,8 +387,21 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    bottom edge. The stack carries the width (and therefore the container, so
    every cqw under it still measures against the card) and .cg's grid centres
    the pair. */
+/* THE BOX IS CENTRED; THE PAPER IS NOT, AND THE PAPER IS WHAT THE EYE
+   READS. 322:717's panel rectangle runs from the title card hanging off the
+   top (.6849%) to the foot of the cream sheet (~99.2%), but the sheet itself
+   only begins at 16.301% — so a perfectly centred BOX leaves the sheet's own
+   centre at 56.5% of the screen, with 21.9% of scrim above it and 8.9%
+   below. Measured at all four target viewports, and it is why the card read
+   as sitting low with LET'S GO nearly on the bottom edge.
+   The offset is a constant fraction of the panel, not a viewport figure,
+   because the sheet's place inside the composition is fixed by the art: the
+   correction comes out at 7.8% of panel height at 16:9, 16:10 and FHD and
+   7.8% at 5:4. 84vh rather than 88vh buys the room to make it without
+   jamming the title card against the top edge. */
 .cg-stack{display:flex;flex-direction:column;align-items:center;
-  container-type:inline-size;width:min(66vw,88vh,1539px)}
+  container-type:inline-size;width:min(66vw,84vh,1539px);
+  translate:0 -7.8%}
 
 .cg-panel{position:relative;container-type:inline-size;overflow:visible;
   width:100%;aspect-ratio:1539/1460;
