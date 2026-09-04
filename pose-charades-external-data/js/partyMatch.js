@@ -32,7 +32,7 @@ import {
 } from "./gameplayFeedback.js";
 import { captureShot, showResults, setRematchState } from "./results.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
-         setSeatAwardPoints, seatAwardIsUp,
+         setSeatAwardPoints, seatAwardIsUp, swapSeatAwards,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
 import { createChargeMeter, resetChargeMeter, advanceCharge,
          chargePercent } from "./recognition.js";
@@ -157,8 +157,8 @@ function runCountdown(startAt){
 
 /* ---------------- seating ----------------
    Featured seat per team, then the centre tiles in roster order. The local
-   player is pulled to the front of their own team so they are always the
-   featured one. */
+   player is pulled to the front of their own team so they start every word
+   featured on their own side. */
 function layoutSeats(){
   const roster = ctx.roster;
   seats = new Map();
@@ -171,6 +171,13 @@ function layoutSeats(){
     members.forEach((p, i) => { if(i < 3) seats.set(team + i, p.id); });
   }
   foeFeaturedId = perTeam[myTeam() === "blue" ? "orange" : "blue"][0]?.id || null;
+  /* The seating a word STARTS from, so repeated handovers inside a match
+     cannot permanently shuffle who sits in which tile. */
+  baseOrder = { blue: perTeam.blue.map(p => p.id).slice(0, 3),
+                orange: perTeam.orange.map(p => p.id).slice(0, 3) };
+  spectating = false;
+  clearTimeout(spectateTimer);
+  spectateTimer = 0;
 
   const biggest = Math.max(perTeam.blue.length, perTeam.orange.length);
   stage().dataset.size = biggest >= 3 ? "3" : "2";
@@ -181,14 +188,196 @@ function layoutSeats(){
     const pid = seats.get(key);
     el.classList.toggle("vacant", !pid && el.classList.contains("pm-tile"));
     el.classList.remove("got", "gone", "first");
-    el.classList.toggle("mine", pid === ctx.myId);
-    const tag = el.querySelector(".pm-nametag b");
-    const player = pid && ctx.roster.players.find(p => p.id === pid);
-    if(tag) tag.textContent = player ? disp(player.name) : "";
+    setSeatOwner(el, pid);
     resetSeatCrown(el);
     clearSeatAward(el);
     if(pid) mountSeatVideo(el, pid);
   }
+}
+
+/* Whose seat this is, in the two places it shows: the `mine` hook every rule
+   and probe keys off, and the chip.
+
+   YOUR OWN CHIP SAYS "YOU". Six live feeds of six people in unfamiliar crops
+   is a genuinely hard thing to read at a glance, and your own name is no help
+   at all — you know your name, what you are hunting for is which of these is
+   the mirror. The chip is also bigger and a different colour on your seat
+   (see `.mine .pm-nametag` in screens.css), because it is the one label on
+   the board that answers a question rather than labelling a stranger. It
+   follows you into a tile when the featured half is handed over. */
+function setSeatOwner(el, pid){
+  el.classList.toggle("mine", pid === ctx.myId);
+  const tag = el.querySelector(".pm-nametag b");
+  if(!tag) return;
+  if(!pid){ tag.textContent = ""; return; }
+  if(pid === ctx.myId){ tag.textContent = "YOU"; return; }
+  const player = ctx.roster?.players.find(p => p.id === pid);
+  tag.textContent = player ? disp(player.name) : "";
+}
+
+/* ---------------- spectating ----------------
+   ONCE YOU ARE IN, THE BIG HALF IS WASTED ON YOU. You have already been
+   recognized; you stop posing and watch a half-screen of yourself standing
+   still, while the team-mate whose word is still running is a portrait tile
+   the size of a postcard. So the featured seat is handed to a team-mate who
+   has NOT got it yet, and you take the tile they were in — the same six feeds,
+   re-ranked by who still has something to do.
+
+   It is a straight EXCHANGE of two seats rather than a re-layout: everything
+   that describes a player (the chip, `mine`/`got`/`gone`, the stamped award
+   paper, the video) moves with them, and everything that describes the seat
+   (its Figma rectangle, its team colour, its border art) stays put. Only the
+   local team is ever re-ranked; the opposing half is the rival's own business
+   and `foeFeaturedId` drives a guess paper that must not change mid-word.
+
+   The handover waits SPECTATE_DELAY_MS so your own GOT IT lands on the big
+   screen and is read there before the view moves on. */
+const SPECTATE_DELAY_MS = 1100;
+let spectating = false;
+let spectateTimer = 0;
+let baseOrder = { blue: [], orange: [] };
+
+/* the team-mate most worth watching: still here, still hunting the word */
+function spectateTarget(){
+  const team = myTeam();
+  for(const key of [team + "0", team + "1", team + "2"]){
+    const id = seats.get(key);
+    if(!id || id === ctx.myId) continue;
+    const el = seatEl(key);
+    if(!el || el.classList.contains("got") || el.classList.contains("gone")) continue;
+    return key;
+  }
+  return null;
+}
+
+function handOverFeaturedSeat(){
+  const team = myTeam();
+  const featured = team + "0";
+  const showingMe = seats.get(featured) === ctx.myId;
+  /* Nothing to do if the big seat is already showing somebody who is still
+     going — which is the case every time a spectated team-mate gets it and
+     the next one is promoted in their place. */
+  if(!showingMe){
+    const cur = seatEl(featured);
+    if(!cur?.classList.contains("got") && !cur?.classList.contains("gone")) return;
+  }
+  const target = spectateTarget();
+  if(!target || target === featured){
+    /* nobody left worth watching — a half-screen of your own frozen pose
+       still beats a half-screen of somebody else's */
+    if(!showingMe) restoreMyFeaturedSeat();
+    return;
+  }
+  swapSeats(featured, target);
+  spectating = seats.get(featured) !== ctx.myId;
+}
+
+/* The local player has to be IN before the half is worth handing over, and
+   the word has to still be the word it was scheduled against. */
+function scheduleSpectate(roundId, delayMs){
+  clearTimeout(spectateTimer);
+  spectateTimer = 0;
+  const run = () => {
+    spectateTimer = 0;
+    const g = state.game;
+    if(!g || g.mode !== "party" || g.roundId !== roundId) return;
+    if(g.myPlace === null) return;          // not in yet: keep your own feed
+    handOverFeaturedSeat();
+  };
+  if(delayMs > 0) spectateTimer = setTimeout(run, delayMs);
+  else run();
+}
+
+/* Put me back on my own half, mid-word, when there is suddenly nobody left
+   worth watching. One swap: the rest of the team stays where the player has
+   been looking at them. */
+function restoreMyFeaturedSeat(){
+  clearTimeout(spectateTimer);
+  spectateTimer = 0;
+  if(!spectating) return;
+  spectating = false;
+  const featured = myTeam() + "0";
+  const mineKey = seatOf(ctx.myId);
+  if(mineKey && mineKey !== featured) swapSeats(featured, mineKey);
+}
+
+/* THE AUTHORED ORDER IS RESTORED IN FULL AT THE TOP OF EVERY WORD, not just
+   my own seat. Two handovers inside one word leave the team rotated — I take
+   the first watched player's tile, they take the second's — and undoing only
+   my half of that would leave team-mates swapping tiles between words for the
+   rest of the match. `onPartyRound` has already cleared `got`, the crowns and
+   every award by the time this runs, so a full reorder here is only moving
+   video and chips. */
+function restoreTeamOrder(){
+  clearTimeout(spectateTimer);
+  spectateTimer = 0;
+  spectating = false;
+  const team = myTeam();
+  const want = baseOrder[team] || [];
+  want.forEach((id, i) => {
+    const key = team + i;
+    const at = seatOf(id);
+    if(at && at !== key) swapSeats(key, at);
+  });
+}
+
+/* Exchange two seats' occupants. Seat elements are never rebuilt, so this
+   moves the tenant, not the furniture. */
+function swapSeats(keyA, keyB){
+  const a = seatEl(keyA), b = seatEl(keyB);
+  if(!a || !b || a === b) return;
+  const idA = seats.get(keyA), idB = seats.get(keyB);
+  seats.set(keyA, idB);
+  seats.set(keyB, idA);
+  for(const cls of ["got", "gone"]){
+    const av = a.classList.contains(cls), bv = b.classList.contains(cls);
+    a.classList.toggle(cls, bv);
+    b.classList.toggle(cls, av);
+  }
+  /* The crown is re-derived rather than swapped: `.first` is a class on the
+     seat AND a tracked inline position measured against the box it was in, so
+     carrying that position into a differently shaped seat puts the crown in
+     mid-air. Re-crowning drops it back on the CSS head-band fallback, which
+     is what every remote player wears anyway. */
+  const firstId = a.classList.contains("first") ? idA
+    : b.classList.contains("first") ? idB : null;
+  for(const el of [a, b]){ el.classList.remove("first"); resetSeatCrown(el); }
+  if(firstId) crownSeat(seatOf(firstId));
+  swapSeatAwards(a, b);
+  setSeatOwner(a, idB);
+  setSeatOwner(b, idA);
+  setSeatVideo(a, idB);
+  setSeatVideo(b, idA);
+  a.classList.toggle("vacant", !idB && a.classList.contains("pm-tile"));
+  b.classList.toggle("vacant", !idA && b.classList.contains("pm-tile"));
+  /* the swapped-in feed arrives at a new size — let it read as a move */
+  for(const el of [a, b]){
+    el.classList.remove("reseated");
+    void el.offsetWidth;
+    el.classList.add("reseated");
+  }
+}
+
+/* Like mountSeatVideo, but it also EMPTIES the seat of whatever was there.
+   mountSeatVideo only ever added: the local camera dock moving into a tile
+   would sit on top of that tile's old remote <video>, which keeps painting. */
+function setSeatVideo(el, pid){
+  const slot = el?.querySelector(".slot");
+  if(!slot) return;
+  const dock = $("cameraDock");
+  if(pid === ctx.myId){
+    for(const v of [...slot.querySelectorAll("video")])
+      if(!dock || !dock.contains(v)) { v.pause?.(); v.srcObject = null; v.remove(); }
+    mountCamera(slot);
+    return;
+  }
+  /* park the dock rather than orphaning it inside a seat somebody else owns */
+  if(dock && slot.contains(dock)) document.body.appendChild(dock);
+  if(!pid){
+    for(const v of [...slot.querySelectorAll("video")]){ v.pause?.(); v.srcObject = null; v.remove(); }
+    return;
+  }
+  mountSeatVideo(el, pid);
 }
 
 /* The crown is the FIRST-place mark, not a "you were recognised" sticker —
@@ -245,6 +434,12 @@ export function markPartyPlayerGone(pid){
   /* foeFeaturedId is otherwise only assigned in layoutSeats(), which runs once
      at match start — so losing the featured opponent killed the rival guess
      paper for the rest of the match. Promote the next one still seated. */
+  /* Spectating someone who has just walked out is the one case where the big
+     half is worth LESS than your own feed. Re-pick, or take it back. */
+  if(spectating){
+    if(spectateTarget()) handOverFeaturedSeat();
+    else restoreMyFeaturedSeat();
+  }
   if(pid === foeFeaturedId){
     const foeTeam = myTeam() === "blue" ? "orange" : "blue";
     foeFeaturedId = [...seats]
@@ -305,9 +500,13 @@ export function onPartyRound(payload){
        the end of that word — but a round that ends while one is still in the
        air must not carry it into this one. */
     clearSeatAward(el);
-    el.classList.remove("got", "first");
+    el.classList.remove("got", "first", "reseated");
     resetSeatCrown(el);
   }
+  /* Every word starts from the authored seating with you featured on your own
+     side: spectating is a thing you have EARNED by already being in, and it
+     cannot outlast the word you earned it in. */
+  restoreTeamOrder();
   applyScores(payload.scores);
   const card = $("pmWordCard");
   prepareWordFeedback(card, $("pmWordFill"), CLAIM_THRESH, true);
@@ -340,6 +539,11 @@ export function onPartyGot({ id, place } = {}){
   stampSeatAward(el, {
     title: "GOT IT " + (ORDINALS[place] || "") + "!", points: earned,
   });
+  /* Hand the big half to somebody still working — mine on the beat after my
+     own payoff lands, everyone else's the moment the seat they are watching
+     is no longer worth watching. Keyed to the round so a word that resolves
+     inside the delay never re-seats the board under the next one. */
+  scheduleSpectate(g?.roundId, id === ctx.myId ? SPECTATE_DELAY_MS : 0);
   if(id === ctx.myId){
     if(g) g.myPlace = place;
     const card = $("pmWordCard");
@@ -706,6 +910,8 @@ function endPartyMatch(payload){
   const g = state.game;
   if(g) clearInterval(g.timer);
   clearInterval(ctx?.countdownTimer);
+  clearTimeout(spectateTimer);
+  spectateTimer = 0;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   $("countdown")?.classList.add("hidden");
 

@@ -40,12 +40,23 @@ export const SEAT_AWARD_FLIGHT_MS = 560;  // ...then carried into the card
    runs to 57% and orange2 starts at 50% — so a paper pinned that low covers
    the name chip of the tile beneath. .66 keeps the Figma reading (low in the
    portrait, not floating over the face) and clears every neighbour.
-   The half-screen seats put it on the OUTER side, the one band of each half
-   that the timers, score cards, guess papers and word card all leave empty. */
+
+   THE HALF-SCREEN SEATS OBEY THE SAME READING, and that is a correction. They
+   used to sit at .34 of the seat's height, which on a full-height half is
+   34% of the stage — head height, and a party half is a PORTRAIT crop of a
+   landscape camera, so a player standing back to pose has their face at
+   roughly 12-30% of the stage and their body down the middle. The paper
+   therefore landed square on the one thing you watch while holding a pose. It
+   is now low in the frame like the tiles', in the band each half genuinely
+   leaves empty: measured at 1440x810 the blue paper spans x 12.3-27.4% of the
+   stage and y 55-67.8%, which clears the robot (ends 7.1%), the centre tiles
+   (start 31.9%), the WORD TIME tape (starts y 70.9%) and the guess papers
+   (start y 73.3%). Orange is the exact mirror. 1v1's halves are a different
+   crop and keep their own figures. */
 const PLACEMENT = [
   [".pm-tile",              .50, .66, .86],
-  [".pm-side.blue",         .32, .34, .30],
-  [".pm-side.orange",       .68, .34, .30],
+  [".pm-side.blue",         .394, .614, .30],
+  [".pm-side.orange",       .606, .614, .30],
   [".v1-video-side.you",    .32, .34, .34],
   [".v1-video-side.rival",  .68, .34, .34],
 ];
@@ -222,6 +233,29 @@ function aim(node, toEl){
   node.style.setProperty("--fly-r",
     (to.left + to.width / 2 < from.left + from.width / 2 ? -14 : 14) + "deg");
   node.style.setProperty("--fly-ms", SEAT_AWARD_FLIGHT_MS + "ms");
+}
+
+/* THE PAPER BELONGS TO THE PLAYER, NOT TO THE SEAT. Party hands the featured
+   half over to a team-mate who is still performing once you are in, which
+   exchanges two players between two seat elements mid-word — and a paper
+   cached on the seat they left would stay on the board over somebody else,
+   carrying somebody else's number into their team card. So the two seats
+   trade papers along with everything else, and each one is re-placed against
+   the box it now belongs to. There is no flight here on purpose: this is the
+   same object being re-hung, not a payoff being delivered. */
+export function swapSeatAwards(a, b){
+  if(!a || !b || a === b) return;
+  const nodeA = a._seatAward, nodeB = b._seatAward;
+  a._seatAward = nodeB;
+  b._seatAward = nodeA;
+  for(const [node, seat] of [[nodeA, b], [nodeB, a]]){
+    if(!node) continue;
+    node._seat = seat;
+    node.dataset.seat = seat.dataset.seat ||
+      (seat.classList.contains("rival") ? "rival" : "you");
+    if(node.classList.contains("show") && !node.classList.contains("deliver"))
+      place(node);
+  }
 }
 
 /* One seat — between words, and for a seat nobody is sitting in. */

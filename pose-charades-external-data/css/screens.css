@@ -1939,15 +1939,63 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-tile.orange .pm-nametag img,.pm-side.orange .pm-nametag img{
   filter:hue-rotate(158deg) saturate(1.5) brightness(1.12)}
 
+/* YOUR OWN CHIP IS THE ONE LABEL ON THIS BOARD THAT ANSWERS A QUESTION.
+   The other five say who a stranger is; yours says which of six unfamiliar
+   crops is the mirror, and that is the thing a player actually hunts for on
+   a six-way split. So it reads YOU (partyMatch.js writes the word), it is
+   about a third bigger, and it leaves the two team colours entirely: the
+   chip paper is warmed to the boards' yellow and the type goes navy, which
+   is the highest-contrast pairing in this palette and is already how every
+   yellow paper in the game is set. Team colour is carried by the seat's own
+   border and the score card either way, so nothing is lost by taking it off
+   this one chip — and there is only ever ONE yellow chip on the board.
+   Font-size is `cqw`, so the size follows the width above.
+
+   THE CHAIN IS SOLVED, NOT GUESSED. `hue-rotate` is a matrix approximation,
+   not a rotation in any perceptual space, so 188deg off the chip's #0044d5
+   lands on #e66a00 — orange, i.e. the OTHER TEAM'S colour, which is the exact
+   confusion this chip exists to remove. Going through grey and sepia gives a
+   hue that does not depend on the source at all; these five terms were fitted
+   against #f5c542, the yellow the tapes and the how-to-play squares already
+   use, and reproduce it to 3/255. Re-solve, do not nudge, if the chip art is
+   ever re-exported. */
+.pm-tile.mine .pm-nametag img,.pm-side.mine .pm-nametag img{
+  filter:grayscale(1) brightness(2.9) sepia(1) saturate(3.25)
+    hue-rotate(-12deg) brightness(.95)}
+.pm-tile.mine .pm-nametag b,.pm-side.mine .pm-nametag b{
+  color:#17356f;letter-spacing:.03em;
+  text-shadow:1.4cqw 1.4cqw 0 rgba(255,255,255,.55)}
+
 /* tile seating: blue tags hug the outer edge, orange mirror them; the score
    sign takes the opposite corner so name and total read as one strip */
 .pm-tile .pm-nametag{top:3.4%;width:35%}
+/* 42, not more: the crown's UNTRACKED fallback is centred at 35-65% of the
+   tile and draws over the chip (z-index 6 vs 3). A team-mate's 35% chip
+   already runs 4pp into it and always has; 42% is a fifth wider without
+   turning that into a collision, and on a tile the yellow is doing the
+   identifying anyway. The featured half has no such neighbour — its crown
+   fallback is only 13% wide — so it takes the full third. */
+.pm-tile.mine .pm-nametag{width:42%}
 .pm-tile.blue .pm-nametag{left:4%}
 .pm-tile.orange .pm-nametag{right:4%}
 /* the featured players get the frame-level Figma positions */
 .pm-side .pm-nametag{top:13.33%;width:15.75%}
+.pm-side.mine .pm-nametag{width:21%}
 .pm-side.blue .pm-nametag{left:2.35%}
 .pm-side.orange .pm-nametag{right:3.05%}
+
+/* THE HANDOVER IS A MOVE, NOT A CUT. Once you are in, the featured half goes
+   to a team-mate still hunting the word and you take their tile — see
+   partyMatch.js. Two feeds changing size in one frame reads as a glitch, so
+   each seat that was re-tenanted plays a short settle on its new box. The
+   seats themselves never move: it is the tenant that changed. */
+.pm-tile.reseated,.pm-side.reseated{animation:pmReseat .42s cubic-bezier(.2,1.3,.35,1)}
+@keyframes pmReseat{
+  0%  {opacity:.35;scale:.965}
+  62% {opacity:1;scale:1.012}
+  100%{opacity:1;scale:1}}
+@media (prefers-reduced-motion:reduce){
+  .pm-tile.reseated,.pm-side.reseated{animation:none}}
 
 /* ---- the seat award: the GOT IT paper, stamped on whoever earned it ----
    This slot used to hold a standing score sign — a green box in every seat

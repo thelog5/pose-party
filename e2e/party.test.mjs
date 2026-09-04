@@ -104,12 +104,24 @@ try {
      every stamped award paper by design (clearCelebrations) — so the throw
      this suite asserts sometimes never got to start. That is the match ENDING,
      not the payoff being broken, and it is not what the assertion is about.
-     Six more seconds puts the observed round clear of the whistle. */
+
+     30 rather than 16 for the same class of reason, one level up: the MATCH
+     clock has to outlast this suite's own assertions, not just the round.
+     Between the countdown and `recognize(C)` there are three dozen page
+     round-trips across four headless Chromes, and on a loaded machine that
+     block ran ~14 seconds — so the whistle blew before the chase the next
+     assertion waits for could open, and the failure looked like "the chase
+     never happened" rather than "the match was over". Timed against the
+     wall clock this block is the constraint; the round it observes is not.
+     The two results waits below are sized off this number. */
   await A.evaluate(async () => {
     const {lobbySettings, partyBridge}=await import("/js/online.js");
     const settings=lobbySettings();
-    settings.matchSecs=16;
-    settings.wordSecs=5;
+    settings.matchSecs=30;
+    /* 9, not 5: between A's recognition and C's this suite runs a dozen
+       page round-trips, and on a loaded machine that block outlasted a
+       five-second word — the word rolled over and blue never completed. */
+    settings.wordSecs=9;
     partyBridge.settings(settings);
   });
 
@@ -246,11 +258,15 @@ try {
   ok(seatInfo.seats.filter(s => s.hidden).map(s => s.seat).sort().join() === "blue2,orange2",
     "the bottom centre cards are the ones dropped");
   const mine = seatInfo.seats.find(s => s.mine);
-  ok(mine && mine.seat === "blue0" && mine.name === "ALICE",
-    `the local player is featured on their own side (${mine?.seat} = ${mine?.name})`);
+  /* YOUR OWN CHIP SAYS "YOU", NOT YOUR NAME. On a six-way split the only
+     thing a player hunts for is which of these unfamiliar crops is the
+     mirror, and their own name answers a question nobody asked. Everyone
+     else's chip still carries the name they set in the lobby. */
+  ok(mine && mine.seat === "blue0" && mine.name === "YOU",
+    `the local player is featured on their own side and labelled YOU (${mine?.seat} = ${mine?.name})`);
   ok(shown.every(s => s.name && s.name !== ""), "every visible seat carries a name tag");
   const names = shown.map(s => s.name).sort().join();
-  ok(names === "ALICE,BOB,CARA,DAN", `lobby names carried into the match (${names})`);
+  ok(names === "BOB,CARA,DAN,YOU", `lobby names carried into the match for everyone else (${names})`);
   const visualContract = await ev(A, `(() => {
     const src = sel => document.querySelector(sel)?.getAttribute('src') || '';
     const stage = document.getElementById('pmStage').getBoundingClientRect();
@@ -412,12 +428,18 @@ try {
   ok(teams.A === "blue" && teams.C === "blue" && teams.B === "orange" && teams.D === "orange",
     `auto-balance seated A/C blue and B/D orange (${JSON.stringify(teams)})`);
 
+  /* Read the word ON EVERY TICK rather than capturing it at setup. Captured,
+     a word that rolled over between two calls left this injecting a stale
+     label forever — the client simply never claimed and the next wait timed
+     out eight seconds later with nothing on screen to say why. It also read
+     `state.game.word` eagerly, which throws outright once a match has ended. */
   const recognize = p => p.evaluate(`(async () => {
     const { partyCheck } = await import('${APP}/js/partyMatch.js');
     const { state } = await import('${APP}/js/state.js');
-    const w = state.game.word;
     clearInterval(window.__rec);
     window.__rec = setInterval(() => {
+      const w = state.game?.word;
+      if(!w) return;
       state.smooth[w] = .95;
       partyCheck(w, .95);
     }, 70);
@@ -575,7 +597,7 @@ try {
   console.log("party results + same-room rematch:");
   await Promise.all([A, B, C, D].map(p =>
     p.waitForFunction(() => document.body.dataset.screen === "results",
-      { timeout: 18000, polling: 150 })));
+      { timeout: 45000, polling: 150 })));
   ok(true, "all four players reached results without leaving the party room");
   ok((await txt(A, "#rsRematchLabel")).includes("0/4"),
     `results starts with the authoritative ready tally (${await txt(A, "#rsRematchLabel")})`);
@@ -610,10 +632,10 @@ try {
   /* Let the short restarted match end naturally, then prove a results-phase
      leaver disappears from the survivor papers and reduces the tally. The
      authoritative deadline lets an in-flight word/chase finish, so allow the
-     16s match plus count-in and its full 5s chase on slower CI machines. */
+     30s match plus count-in and its full 5s chase on slower CI machines. */
   await Promise.all([A, B, C, D].map(p =>
     p.waitForFunction(() => document.body.dataset.screen === "results",
-      { timeout: 26000, polling: 150 })));
+      { timeout: 50000, polling: 150 })));
   await D.click("#rsExit");
   await D.waitForFunction(() => document.body.dataset.screen === "home",
     { timeout: 6000, polling: 100 });
