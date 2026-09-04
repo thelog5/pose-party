@@ -141,8 +141,50 @@ const TYPES = new Set(["host", "srflx", "prflx", "relay"]);
    An open relay is found by scanners within days and used as a free proxy,
    so a deployment that sets TURN_URLS without either credential scheme gets
    no TURN at all rather than an unauthenticated one. */
-function iceServers(){
+/* CLOUDFLARE MINTS ITS OWN, so this is the one provider-specific path. The
+   answer is CACHED rather than fetched per client: minting inside the lobby
+   path would put a third-party API call, and its failure modes, between a
+   player and the room they are walking into. The credential is short-lived
+   either way, and it is refreshed at 75% of its life so nobody is ever
+   handed one that expires mid-match.
+   A mint that fails serves STUN only. A relay is worth having; a lobby that
+   will not open because someone else's API is down is not. */
+let cfCache = { servers: null, expiresAt: 0 };
+
+async function cloudflareIceServers(){
+  const now = Date.now();
+  if(cfCache.servers && now < cfCache.expiresAt) return cfCache.servers;
+  const ttl = config.turnTtlSec;
+  try{
+    const r = await fetch(
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${config.cfTurnKeyId}/credentials/generate-ice-servers`,
+      { method: "POST",
+        headers: { Authorization: `Bearer ${config.cfTurnApiToken}`,
+                   "Content-Type": "application/json" },
+        body: JSON.stringify({ ttl }),
+        signal: AbortSignal.timeout(4000) });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const body = await r.json();
+    /* the endpoint has shipped iceServers as both an object and an array */
+    const servers = Array.isArray(body.iceServers) ? body.iceServers
+                  : body.iceServers ? [body.iceServers] : [];
+    if(!servers.length) throw new Error("no iceServers in response");
+    cfCache = { servers, expiresAt: now + ttl * 750 };
+    log(`TURN: minted Cloudflare credentials, ttl ${ttl}s`);
+    return servers;
+  }catch(e){
+    log(`TURN: Cloudflare mint failed (${e.message}); serving STUN only`);
+    return null;
+  }
+}
+
+async function iceServers(){
   const list = [{ urls: config.stunUrls }];
+  if(config.cfTurnKeyId && config.cfTurnApiToken){
+    const cf = await cloudflareIceServers();
+    if(cf) list.push(...cf);
+    return list;
+  }
   if(!config.turnUrls.length) return list;
   if(config.turnSecret){
     const username = `${Math.floor(Date.now() / 1000) + config.turnTtlSec}`;
@@ -361,10 +403,10 @@ io.on("connection", socket => {
 
   /* Asked for once per lobby visit, before the first peer is built. Costs a
      fresh signature each time, which is the point: see iceServers(). */
-  socket.on("ice:servers", (payload, cb) => {
+  socket.on("ice:servers", async (payload, cb) => {
     cb = ack(cb);
     if(!netLimit.allow(socket.id)) return cb({ error: "rate-limited" });
-    cb({ iceServers: iceServers() });
+    cb({ iceServers: await iceServers() });
   });
 
   socket.on("room:leave", (payload, cb) => { store.leave(socket.id); ack(cb)({ ok: true }); });
@@ -384,7 +426,8 @@ function warnIfMisconfigured(){
     console.warn("WARNING: TRUST_PROXY is off. Behind a platform proxy every player shares one rate-limit bucket.");
   if(config.corsOrigins.every(o => /localhost|127\.0\.0\.1/.test(o)))
     console.warn("WARNING: CORS_ORIGINS still only lists localhost. Set it to your real origin.");
-  if(config.turnUrls.length && !config.turnSecret && !(config.turnUsername && config.turnPassword))
+  if(config.turnUrls.length && !config.cfTurnKeyId
+     && !config.turnSecret && !(config.turnUsername && config.turnPassword))
     console.warn("WARNING: TURN_URLS is set but no credentials are. TURN is disabled rather than left open.");
 }
 

@@ -94,6 +94,13 @@ export const config = {
        TURN_USERNAME + TURN_PASSWORD  a fixed pair, for providers that only
                      issue those. Weaker: it is handed to every client as-is,
                      so prefer the secret where the provider supports it. */
+  /* Cloudflare does NOT implement the shared-secret scheme below. It mints
+     credentials from its own API, so it needs a key id and an API token
+     rather than TURN_URLS: the endpoint returns the urls too. Setting both
+     of these selects it; nothing else is provider-specific. */
+  cfTurnKeyId: process.env.TURN_CF_KEY_ID || "",
+  cfTurnApiToken: process.env.TURN_CF_API_TOKEN || "",
+
   turnUrls: (process.env.TURN_URLS || "").split(",").map(s => s.trim()).filter(Boolean),
   turnSecret: process.env.TURN_SECRET || "",
   turnUsername: process.env.TURN_USERNAME || "",
