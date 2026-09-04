@@ -113,6 +113,18 @@ setInterval(() => {
    (none are ever sent), and no full payload dumps. */
 const log = (...a) => console.log(new Date().toISOString().slice(11,19), ...a);
 
+/* A GAME SERVER MUST NOT DIE OF ONE ODD PACKET. Node ends the process on an
+   unhandled promise rejection, and socket handlers are per-message — some of
+   them async now — so a single malformed payload reaching an uncaught throw
+   would take down every match in progress, not just that request. Room state
+   lives in memory, so that is not one dropped request, it is everybody.
+   `uncaughtException` is deliberately NOT caught: a process in a genuinely
+   unknown state should restart under the platform rather than keep scoring
+   matches, and rooms are short-lived by design. */
+process.on("unhandledRejection", err => {
+  log(`unhandled rejection: ${err?.stack || err}`);
+});
+
 io.engine.on("connection_error", err => {
   log(`handshake FAILED from ${err.req?.socket?.remoteAddress || "?"}: ${err.message} (code ${err.code})`);
 });
