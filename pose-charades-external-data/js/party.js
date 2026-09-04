@@ -5,7 +5,7 @@
    teams, may switch while the target team has room (JOIN THIS TEAM), and
    the host can start once both teams have at least two players. Video is
    a WebRTC mesh — one peer link per pair — with every feed sandwiched
-   between the panel's offwhite paper and its three-window overlay.
+   between the panel's offwhite paper and its 2x2 window overlay.
 
    Starting hands the same mesh straight to partyMatch.js, which owns the
    in-game screen; the peer links are never renegotiated. */
@@ -78,8 +78,8 @@ export function wireParty(){
 function resetPartyUi(){
   roster = null;
   for(const ids of Object.values(TILES)) for(const id of ids) renderEmptyTile($(id));
-  $("btnJoinBlue").disabled = false;
-  $("btnJoinOrange").disabled = false;
+  setJoinState("blue", false);
+  setJoinState("orange", false);
   $("btnStartMatch").disabled = true;
 }
 
@@ -442,7 +442,6 @@ function renderTiles(){
     const members = teamOf(team);
     TILES[team].forEach((tileId, ix) => {
       const tile = $(tileId);
-      tile.classList.toggle("wide", ix === 0);
       tile.dataset.team = team;
       const member = members[ix];
       if(!member){ renderEmptyTile(tile); return; }
@@ -470,10 +469,23 @@ function renderTiles(){
       }
       setTileName(tile, displayName(member));
     });
-    /* the JOIN card occupies the third tile only while there's room */
-    const joinBtn = team === "blue" ? $("btnJoinBlue") : $("btnJoinOrange");
-    joinBtn.disabled = members.length >= TEAM_CAP;
+    setJoinState(team, members.length >= TEAM_CAP);
   }
+}
+
+/* The JOIN paper owns the 2x2's fourth cell, so a full team is something it
+   has to SAY rather than something it can step out of the way for. Teams cap
+   at three, and a player looking at three occupied cells and a dead button
+   deserves the sentence, not an inference. */
+function setJoinState(team, full){
+  const btn = team === "blue" ? $("btnJoinBlue") : $("btnJoinOrange");
+  if(!btn) return;
+  btn.disabled = full;
+  const label = btn.querySelector("[data-join-label]");
+  if(label) label.textContent = full ? "TEAM IS FULL" : "JOIN THIS TEAM";
+  btn.setAttribute("aria-label", full
+    ? "The " + team + " team is full"
+    : "Join the " + team + " team");
 }
 
 function updateGate(){

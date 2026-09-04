@@ -439,34 +439,47 @@
       <!-- vs badge pops when the opponent arrives -->
       <img class="lb m1 vsbadge" id="lobbyVs" style="left:45.6%;top:36%;width:8.8%;z-index:7" src="assets/ui/figma/lb-vs.png" alt="VS">
 
-      <!-- ===== PARTY MODE center (Figma frame 137:332): two 3-tile team
-           panels; video sandwiches between the offwhite inner paper and
-           the three-window overlay. Tiles fill from party.js. ===== -->
+      <!-- ===== PARTY MODE center (Figma frame 137:332): two team panels.
+           Figma re-authored both as a 2x2 (`party blue` 134:320 /
+           `party orange` 134:321): the three player cells read TL -> TR ->
+           BL and the JOIN paper owns the bottom-right cell of its own,
+           instead of the old wide-tile-over-two-halves triangle where JOIN
+           had to sit ON the third tile and vanish once the team filled.
+
+           Video sandwiches between the panel and `pt-frame-2x2.png`
+           (`paper-frame-2x2-transparent`, imageRef fbaa3f15…): four
+           transparent windows in one torn cream sheet, laid OVER the tiles
+           exactly as the three-window overlay it replaces was. Each tile is
+           its window plus ~10 component px of bleed on every side, so the
+           feed tucks under the torn edge with no seam. The JOIN paper keeps
+           its own authored rectangle and sits ABOVE the frame — it is a
+           coloured paper laid on the grid, with its own shadow, not a
+           window in it. Tiles fill from party.js. ===== -->
       <img class="lb mp lobbytitle fig-shadow-sm lobby-alpha lobby-float lobby-react" id="partyLobbyTitle" style="left:35.1%;top:4.2%;width:24.9%;z-index:3" src="assets/ui/figma/lb-party-card.png" alt="Party Lobby">
       <img class="lb mp deco lobbytitle-tape fig-shadow-lg lobby-alpha lobby-tape lobby-react" style="left:44.7%;top:.1%;width:6.4%;z-index:4" src="assets/ui/figma/lb-tape-party.png" alt="">
 
       <img class="lb mp fig-shadow-card party-panel-art party-team-layer party-blue-layer party-blue-hit lobby-alpha" style="left:2.1%;top:16.7%;width:43.9%;z-index:2" src="assets/ui/figma/pt-panel-blue.png" alt="">
       <span class="lb mp pt-teamname party-team-layer party-blue-layer" style="left:2.1%;top:17.7%;width:43.9%;z-index:5">BLUE TEAM</span>
-      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB0" style="left:4.1%;top:25.8%;width:39.9%;height:22.4%;z-index:3"></div>
-      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB1" style="left:4.1%;top:49.4%;width:19.5%;height:21.2%;z-index:3"></div>
-      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB2" style="left:24.2%;top:49.4%;width:19.9%;height:21.2%;z-index:3"></div>
-      <img class="lb mp passthru party-team-layer party-blue-layer" style="left:3.3%;top:23.9%;width:41.8%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
-      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-blue-layer party-blue-hit" id="btnJoinBlue" style="left:24.2%;top:49.4%;width:19.9%;z-index:6" aria-label="Join the blue team">
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB0" style="left:4.07%;top:26.33%;width:19.75%;height:22.42%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB1" style="left:24.32%;top:26.33%;width:19.57%;height:22.42%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-blue-layer party-blue-hit" id="ptB2" style="left:4.07%;top:49.08%;width:19.75%;height:22.20%;z-index:3"></div>
+      <img class="lb mp passthru party-team-layer party-blue-layer" style="left:1.46%;top:22.84%;width:48.97%;height:54.71%;z-index:4" src="assets/ui/figma/pt-frame-2x2.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-blue-layer party-blue-hit" id="btnJoinBlue" style="left:24.32%;top:49.08%;width:19.57%;height:22.20%;z-index:6" aria-label="Join the blue team">
         <img class="pt-join-art" src="assets/ui/figma/pt-join-blue.png" alt="">
         <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
-        <span>JOIN THIS TEAM</span>
+        <span data-join-label>JOIN THIS TEAM</span>
       </button>
 
       <img class="lb mp fig-shadow-card party-panel-art party-team-layer party-orange-layer party-orange-hit lobby-alpha" style="left:53.8%;top:16.7%;width:44.1%;z-index:2" src="assets/ui/figma/pt-panel-orange.png" alt="">
       <span class="lb mp pt-teamname party-team-layer party-orange-layer" style="left:53.8%;top:17.7%;width:44.1%;z-index:5">ORANGE TEAM</span>
-      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO0" style="left:55.9%;top:25.9%;width:40.1%;height:22.5%;z-index:3"></div>
-      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO1" style="left:55.9%;top:49.5%;width:19.6%;height:21.3%;z-index:3"></div>
-      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO2" style="left:75.9%;top:49.5%;width:20.0%;height:21.3%;z-index:3"></div>
-      <img class="lb mp passthru party-team-layer party-orange-layer" style="left:55.0%;top:24.0%;width:41.9%;z-index:4" src="assets/ui/figma/pt-overlay.png" alt="">
-      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-orange-layer party-orange-hit" id="btnJoinOrange" style="left:75.9%;top:49.5%;width:20.0%;z-index:6" aria-label="Join the orange team">
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO0" style="left:55.78%;top:26.37%;width:19.84%;height:22.52%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO1" style="left:76.12%;top:26.37%;width:19.65%;height:22.52%;z-index:3"></div>
+      <div class="lb mp pt-tile party-team-layer party-orange-layer party-orange-hit" id="ptO2" style="left:55.78%;top:49.23%;width:19.84%;height:22.30%;z-index:3"></div>
+      <img class="lb mp passthru party-team-layer party-orange-layer" style="left:53.16%;top:22.87%;width:49.20%;height:54.96%;z-index:4" src="assets/ui/figma/pt-frame-2x2.png" alt="">
+      <button class="lb mp pt-join pbtn lobby-alpha party-team-layer party-orange-layer party-orange-hit" id="btnJoinOrange" style="left:76.12%;top:49.23%;width:19.65%;height:22.30%;z-index:6" aria-label="Join the orange team">
         <img class="pt-join-art" src="assets/ui/figma/pt-join-orange.png" alt="">
         <img class="pt-join-icon" src="assets/ui/figma/pt-join-icon.png" alt="">
-        <span>JOIN THIS TEAM</span>
+        <span data-join-label>JOIN THIS TEAM</span>
       </button>
 
       <img class="lb mp fig-shadow-sm party-vs lobby-alpha" style="left:43.6%;top:37.7%;width:12.3%;z-index:6" src="assets/ui/figma/pt-vs.png" alt="VS">
