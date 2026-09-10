@@ -1065,8 +1065,13 @@
 </div>
 
 <!-- overlays -->
-<!-- dev shortcut: opens either results layout without playing a match -->
-<button class="devbtn" id="btnDevResults" data-kind="breakdown">DEV: RESULTS 3V3</button>
+<!-- dev shortcuts. Stacked in one column so adding a third never lands on
+     top of the last one. Training is reachable in play only through Home's
+     gear, which is three screens away from a match. -->
+<div class="devbar">
+  <button class="devbtn" id="btnDevTrain">DEV: TRAINING</button>
+  <button class="devbtn" id="btnDevResults" data-kind="breakdown">DEV: RESULTS 3V3</button>
+</div>
 
 <!-- Figma "TIMES UP" (245:907). One shared overlay: solo, 1v1 and party all
      run out of time the same way, so they all get the same paper. -->

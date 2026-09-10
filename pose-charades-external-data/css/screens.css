@@ -2697,9 +2697,12 @@ body[data-screen="results"] .rs-save:active:not(:disabled){
   .rs-award,.rs-award:hover{rotate:-5.89592deg!important}
 }
 
-/* dev shortcut — deliberately plain so it never reads as game UI */
-.devbtn{position:fixed;right:10px;bottom:10px;z-index:200;
-  font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72vw,13px);
+/* dev shortcuts — deliberately plain so they never read as game UI. The BAR
+   carries the fixed position; each button is a flow item inside it, so a new
+   one stacks instead of landing on the one before it. */
+.devbar{position:fixed;right:10px;bottom:10px;z-index:200;
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.devbtn{font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72vw,13px);
   letter-spacing:.06em;color:#fff;background:rgba(9,22,62,.72);
   border:1px solid rgba(255,255,255,.35);border-radius:var(--r-xs);
   padding:.5em .8em;cursor:pointer}

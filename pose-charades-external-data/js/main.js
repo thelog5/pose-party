@@ -99,6 +99,11 @@ function wireControls(){
   $("rsHome").onclick=leaveResults;
   $("rsExit").onclick=leaveResults;
 
+  /* dev: jump straight to the training panel from wherever you are. Every
+     FSM state already allows `training`, and this is the same call Home's
+     gear makes — it just saves walking back to Home to reach it. */
+  $("btnDevTrain").onclick=()=>{ if(gameState()!=="training") transition("training"); };
+
   /* dev: jump straight to either results layout without playing a match */
   const resultsDev=$("btnDevResults");
   resultsDev.onclick=()=>{
