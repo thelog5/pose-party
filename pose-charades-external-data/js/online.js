@@ -193,6 +193,14 @@ export function enterLobby(mode="1v1"){
 }
 
 function resetLobbyUi(){
+  /* THE OPPONENT PANEL IS THE RIVAL'S VIDEO, so putting the lobby back to
+     "waiting for a friend" has to include taking that video down. Without
+     this, a rival who leaves the room leaves their last decoded frame frozen
+     in the panel the waiting robot lives in: `.joined` came off, the robot
+     came back, and the departed player's face stayed sitting behind him until
+     someone else's stream replaced it. `leaveRoom()` always closed the peer;
+     the `peer:left` path reached only this function and never did. */
+  closePeer();
   roomCode=null; isHost=false; peerReady=false;
   settings={ ...DEFAULT_SETTINGS };
   renderCode("");
