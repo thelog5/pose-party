@@ -919,11 +919,23 @@
         <div class="row2">
           <div class="field"><label for="personInput">Who’s performing</label><input type="text" id="personInput" placeholder="your name"></div>
           <div class="field"><label for="clipLen">Clip length</label>
-            <select id="clipLen"><option value="3">3 seconds</option><option value="4" selected>4 seconds</option><option value="6">6 seconds</option><option value="8">8 seconds</option></select>
+            <!-- 6s is the default because 4s measurably costs accuracy. The
+                 classifier reads a rolling 2-second window, so a 4-second clip
+                 shows a repeating gesture barely twice and yields four training
+                 windows against eight. Training on 4-second clips scored 81.4%
+                 against 88.7% for full-length ones on the same deck. -->
+            <select id="clipLen"><option value="3">3 seconds</option><option value="4">4 seconds</option><option value="6" selected>6 seconds</option><option value="8">8 seconds</option></select>
           </div>
         </div>
         <button class="btn orange" id="btnRecord"><span class="dot"></span><span id="recordLabel">Record clip (3·2·1)</span></button>
-        <div class="hint">Record <b>idle</b> too (stand, fidget, read). It stops the AI guessing between words. Aim for 10–15 clips per word, full body in frame.</div>
+        <!-- "10-15 clips per word" was wrong, and measurably so. On the shipped
+             deck accuracy went 85.4% -> 88.1% -> 88.7% for one, two and three
+             clips per word and then stopped: a fourth take of the same
+             performance at the same distance buys almost nothing. What the model
+             has never seen is VARIETY, so that is what the hint asks for now.
+             Left and right are deliberately not on the list, because
+             classifier.js already trains every clip mirrored. -->
+        <div class="hint">Record <b>idle</b> too (stand, fidget, read). It stops the AI guessing between words. Aim for 4 to 6 clips per word and make each one different: change your distance, your angle and your speed. Keep your whole body in frame, feet included.</div>
         <div class="classlist" id="classList"></div>
         <button class="btn blue" id="btnTrain">Train the AI</button>
         <div class="trainreport" id="trainReport"></div>

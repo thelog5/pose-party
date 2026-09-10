@@ -6,6 +6,7 @@ import { state } from "./state.js";
 import { flash, toast, renderClasses, setCountdown } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, onTransition } from "./fsm.js";
+import { JOINTS } from "./constants.js";
 
 let countIn = null;
 let ticker = null;
@@ -76,6 +77,45 @@ export function startRecording(){
   },800);
 }
 
+/* ── FRAMING ───────────────────────────────────────────────────────────────
+   Frames are hip-centred and scaled by the torso (shoulder-mid to hip-mid), so
+   an ankle's y IS its depth below the hips measured in torso lengths. On a
+   standing adult that is about 1.5. Anything much under it means the ankles
+   are not in the picture and MediaPipe is extrapolating them: the numbers keep
+   arriving, they just describe legs it cannot see.
+
+   This was worth checking because it had already happened to the whole shipped
+   deck. Thirty of its thirty-four clips sit between 0.99 and 1.39, so the
+   classifier was being taught, over and over, from invented legs — and `squat`,
+   whose entire signal is where the knees are relative to the hips, could never
+   be learned from any of them.
+
+   It WARNS and still saves. The clip is the player's, a short recording is
+   cheap to redo, and refusing to keep work someone just performed is worse
+   than telling them what is wrong with it. */
+const ANKLES = [JOINTS.indexOf(27), JOINTS.indexOf(28)].filter(i => i >= 0);
+const FULL_BODY_ANKLE_DEPTH = 1.30;
+
+function ankleDepth(frames){
+  if(!ANKLES.length) return null;
+  const depths = [];
+  for(const f of frames){
+    let sum = 0, n = 0;
+    for(const i of ANKLES){
+      const p = f[i];
+      if(!p) continue;
+      sum += p[1]; n++;
+    }
+    if(n) depths.push(sum / n);
+  }
+  if(!depths.length) return null;
+  /* median, not mean: one frame where the tracker lost the feet entirely
+     should not decide whether a whole clip gets flagged */
+  depths.sort((a, b) => a - b);
+  const mid = depths.length >> 1;
+  return depths.length % 2 ? depths[mid] : (depths[mid - 1] + depths[mid]) / 2;
+}
+
 export function finishRecording(){
   const r=state.recording; state.recording=null;
   if(ticker){ clearInterval(ticker); ticker=null; }
@@ -86,17 +126,24 @@ export function finishRecording(){
   if(r.frames.length<15){ flash("bad"); toast("Too short. Couldn’t see you: more light, step back!"); return; }
   state.dataset.clips.push({label:r.label, person:r.person, ts:Date.now(), frames:r.frames});
   flash("good"); blip([660]); renderClasses();
+  const depth = ankleDepth(r.frames);
+  const cropped = depth !== null && depth < FULL_BODY_ANKLE_DEPTH;
   /* A recorded word is in the LIST but not yet in the MODEL. Deleting a clip
      retrains immediately, so leaving a record un-marked made the two paths
      disagree about whether the AI had caught up. */
-  markModelStale();
+  markModelStale(cropped
+    /* One toast, not two: the framing is the more useful sentence, and a
+       second toast would only replace the first before it could be read. */
+    ? "Clip saved, but your legs were out of shot. Step back so your feet are in the picture, then record it again."
+    : "Clip saved. Press TRAIN THE AI to teach it.");
+  if(cropped) flash("bad");
 }
 
 /* the TRAIN button is the thing that closes the gap, so it is what pulses */
-function markModelStale(){
+function markModelStale(message){
   const btn=$("btnTrain");
   if(!btn) return;
   btn.classList.add("stale");
-  toast("Clip saved. Press TRAIN THE AI to teach it.");
+  toast(message, 4200);
 }
 export function clearModelStale(){ $("btnTrain")?.classList.remove("stale"); }
