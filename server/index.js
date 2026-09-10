@@ -222,6 +222,115 @@ const TYPES = new Set(["host", "srflx", "prflx", "relay"]);
    handed one that expires mid-match.
    A mint that fails serves STUN only. A relay is worth having; a lobby that
    will not open because someone else's API is down is not. */
+/* THE SPEND CAP ------------------------------------------------------------
+   Cloudflare bills TURN egress at $0.05/GB once the 1000 GB allowance is
+   gone. Nothing in a TURN key stops itself, so this reads our own usage back
+   out of Cloudflare's analytics API (`callsTurnUsageAdaptiveGroups`;
+   egressBytes is the billed direction, ingress is free) and stops serving
+   relay credentials before the allowance runs out.
+
+   IT FAILS CLOSED. Every path that leaves us unsure how much has been spent
+   serves STUN only: no analytics credentials, a query that has never
+   succeeded, a reading gone stale. Being wrong in the safe direction costs
+   some players a relay for a few minutes; being wrong in the other direction
+   costs money nobody agreed to spend.
+
+   It is a CAP, not a kill switch. The poll keeps running while the relay is
+   off, so a new billing month turns it back on with no restart. */
+const GB = 1024 ** 3;
+
+const budget = {
+  bytes: 0,        // last known billed egress inside the window
+  readAt: 0,       // when that reading arrived; 0 means we have never had one
+  blocked: null,   // last reason we refused, so the log fires on change only
+};
+
+const budgetEnforced = () =>
+  !!(config.cfTurnKeyId && config.cfTurnApiToken && config.cfTurnBudgetGb > 0);
+
+/* Cloudflare's own billing boundary, unless the operator pinned a date. */
+function budgetWindowStart(){
+  if(config.cfBudgetSince) return config.cfBudgetSince;
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+
+const USAGE_QUERY = `query($accountId:String!,$from:Date!,$to:Date!){
+  viewer{accounts(filter:{accountTag:$accountId}){
+    callsTurnUsageAdaptiveGroups(limit:1,filter:{date_geq:$from,date_leq:$to}){
+      sum{egressBytes}
+    }}}}`;
+
+async function readTurnUsage(){
+  const today = new Date().toISOString().slice(0, 10);
+  const r = await fetch(config.cfAnalyticsUrl, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${config.cfAnalyticsToken}`,
+               "Content-Type": "application/json" },
+    body: JSON.stringify({ query: USAGE_QUERY, variables: {
+      accountId: config.cfAccountId, from: budgetWindowStart(), to: today } }),
+    signal: AbortSignal.timeout(8000),
+  });
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const body = await r.json();
+  /* GraphQL reports failure in the body with HTTP 200, so this is the real
+     error path, not the one above. */
+  if(body.errors?.length) throw new Error(body.errors[0]?.message || "graphql error");
+  const groups = body.data?.viewer?.accounts?.[0]?.callsTurnUsageAdaptiveGroups;
+  if(!Array.isArray(groups)) throw new Error("no usage in response");
+  /* An account that has never relayed a byte returns no rows. That is a
+     real, successful reading of zero, not a missing one. */
+  return groups.reduce((n, g) => n + (+g?.sum?.egressBytes || 0), 0);
+}
+
+async function pollTurnBudget(){
+  if(!budgetEnforced() || !config.cfAccountId || !config.cfAnalyticsToken) return;
+  try{
+    const bytes = await readTurnUsage();
+    const wasOver = budget.readAt && budget.bytes >= config.cfTurnBudgetGb * GB;
+    budget.bytes = bytes;
+    budget.readAt = Date.now();
+    const gb = bytes / GB;
+    const isOver = gb >= config.cfTurnBudgetGb;
+    if(isOver && !wasOver)
+      log(`TURN: BUDGET REACHED, relay OFF (${gb.toFixed(2)} of ${config.cfTurnBudgetGb} GB since ${budgetWindowStart()})`);
+    else if(!isOver && wasOver)
+      log(`TURN: budget window reset, relay back ON (${gb.toFixed(2)} GB)`);
+  }catch(e){
+    log(`TURN: usage check failed (${e.message})`);
+  }
+}
+
+/* One line per state change, never per client: this is asked on every lobby
+   visit and a log entry each time would bury everything else. */
+function refuse(reason){
+  if(budget.blocked !== reason){
+    budget.blocked = reason;
+    log(`TURN: relay withheld, serving STUN only (${reason})`);
+  }
+  return false;
+}
+
+function relayAllowed(){
+  if(!budgetEnforced()){
+    budget.blocked = null;
+    return true;                       // cap lifted on purpose
+  }
+  if(!config.cfAccountId || !config.cfAnalyticsToken)
+    return refuse("TURN_CF_BUDGET_GB is set but TURN_CF_ACCOUNT_ID / TURN_CF_ANALYTICS_TOKEN are not, so spend cannot be measured");
+  if(!budget.readAt)
+    return refuse("no usage reading yet");
+  if(Date.now() - budget.readAt > config.cfBudgetStaleMs)
+    return refuse(`usage reading is stale (older than ${Math.round(config.cfBudgetStaleMs / 1000)}s)`);
+  if(budget.bytes >= config.cfTurnBudgetGb * GB)
+    return refuse(`${(budget.bytes / GB).toFixed(2)} of ${config.cfTurnBudgetGb} GB used since ${budgetWindowStart()}`);
+  if(budget.blocked !== null){
+    budget.blocked = null;
+    log(`TURN: relay available (${(budget.bytes / GB).toFixed(2)} of ${config.cfTurnBudgetGb} GB used)`);
+  }
+  return true;
+}
+
 let cfCache = { servers: null, expiresAt: 0 };
 
 async function cloudflareIceServers(){
@@ -254,6 +363,7 @@ async function cloudflareIceServers(){
 async function iceServers(){
   const list = [{ urls: config.stunUrls }];
   if(config.cfTurnKeyId && config.cfTurnApiToken){
+    if(!relayAllowed()) return list;
     const cf = await cloudflareIceServers();
     if(cf) list.push(...cf);
     return list;
@@ -455,9 +565,9 @@ io.on("connection", socket => {
   /* Clock sync: client measures RTT around this ack. */
   socket.on("time:sync", (payload, cb) => ack(cb)({ serverNow: Date.now() }));
 
-  /* HOW MANY LINKS ACTUALLY CONNECT. No TURN server is configured, so every
-     `failed` here is a pair that STUN could not hole-punch and that a relay
-     would have rescued. Counting these against the successes is the only
+  /* HOW MANY LINKS ACTUALLY CONNECT. With no TURN configured every `failed`
+     here is a pair that STUN could not hole-punch and that a relay would have
+     rescued; with TURN on, a `relay` pair is one it did. Counting these against the successes is the only
      honest way to decide whether TURN is worth buying, instead of applying
      an industry average to a player base nobody has measured.
      This records a route, not a person: candidate TYPES only, never an
@@ -504,8 +614,24 @@ function warnIfMisconfigured(){
     console.warn("WARNING: TURN_URLS is set but no credentials are. TURN is disabled rather than left open.");
 }
 
+/* The first reading has to arrive before anybody asks for a relay, so this
+   runs at boot rather than one interval later. `unref` keeps a stopped server
+   from being held open by a timer nobody is waiting on. */
+function startTurnBudgetWatch(){
+  if(!budgetEnforced()) return;
+  if(!config.cfAccountId || !config.cfAnalyticsToken){
+    console.warn("WARNING: TURN spend cap is ON but TURN_CF_ACCOUNT_ID / TURN_CF_ANALYTICS_TOKEN are unset.");
+    console.warn("         Relay stays OFF until they are set. TURN_CF_BUDGET_GB=0 lifts the cap and accepts the charges.");
+    return;
+  }
+  pollTurnBudget();
+  setInterval(pollTurnBudget, config.cfBudgetPollMs).unref();
+  log(`TURN: spend cap ${config.cfTurnBudgetGb} GB, counted from ${budgetWindowStart()}, checked every ${Math.round(config.cfBudgetPollMs / 1000)}s`);
+}
+
 httpServer.listen(config.port, () => {
   warnIfMisconfigured();
+  startTurnBudgetWatch();
   console.log(`Pose Charades server running.`);
   console.log(`  On this computer:   http://localhost:${config.port}`);
   for(const addrs of Object.values(os.networkInterfaces()))

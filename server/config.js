@@ -2,6 +2,8 @@
    game logic. Copy .env.example and `source` it, or set vars inline. */
 
 const int = (v, d) => Number.isFinite(+v) ? +v : d;
+/* Same coercion, but the value is genuinely fractional (GB budgets). */
+const num = (v, d) => Number.isFinite(+v) && String(v).trim() !== "" ? +v : d;
 const bool = (v, d) => (v == null || v === "") ? d : /^(1|true|yes|on)$/i.test(String(v).trim());
 
 export const config = {
@@ -100,6 +102,36 @@ export const config = {
      of these selects it; nothing else is provider-specific. */
   cfTurnKeyId: process.env.TURN_CF_KEY_ID || "",
   cfTurnApiToken: process.env.TURN_CF_API_TOKEN || "",
+
+  /* THE SPEND CAP. Cloudflare bills TURN egress at $0.05/GB once the 1000 GB
+     allowance is gone, and a TURN key has no stop of its own: it relays until
+     somebody notices the invoice. So the server reads its OWN usage back out
+     of Cloudflare's analytics API and stops handing out relay credentials
+     before the allowance runs out.
+
+     IT FAILS CLOSED, which is the entire point. No analytics credentials, a
+     query that has never succeeded, or a reading that has gone stale all
+     serve STUN only. A relay is worth having; a bill nobody authorised is
+     not. Set TURN_CF_BUDGET_GB=0 to lift the cap and accept the charges.
+
+     900 rather than 1000 is deliberate headroom: the analytics feed lags
+     real traffic by minutes, and the free allowance is shared with the
+     Realtime SFU, so the last 100 GB pays for the lag. */
+  cfTurnBudgetGb: num(process.env.TURN_CF_BUDGET_GB, 900),
+  cfAccountId: process.env.TURN_CF_ACCOUNT_ID || "",
+  cfAnalyticsToken: process.env.TURN_CF_ANALYTICS_TOKEN || "",
+  /* Counted from this YYYY-MM-DD. Unset means the start of the current UTC
+     month, which is how Cloudflare bills everything else. Pin a fixed date
+     here to treat the 1000 GB as a once-ever allowance instead. */
+  cfBudgetSince: (process.env.TURN_CF_BUDGET_SINCE || "").trim(),
+  /* Overridable so the cap can be driven against a mock in tests. There is
+     no reason to set this in production. */
+  cfAnalyticsUrl: process.env.TURN_CF_ANALYTICS_URL
+    || "https://api.cloudflare.com/client/v4/graphql",
+  cfBudgetPollMs: int(process.env.TURN_CF_BUDGET_POLL_MS, 5 * 60 * 1000),
+  /* A reading older than this is not evidence of anything, so the relay goes
+     off until a fresh one arrives. */
+  cfBudgetStaleMs: int(process.env.TURN_CF_BUDGET_STALE_MS, 30 * 60 * 1000),
 
   turnUrls: (process.env.TURN_URLS || "").split(",").map(s => s.trim()).filter(Boolean),
   turnSecret: process.env.TURN_SECRET || "",
