@@ -641,3 +641,53 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 @media (prefers-reduced-motion: reduce){
   .toast.show{animation:none}
 }
+
+/* ================= MOVE BACK (framing warning) =================
+   Figma's blank red warning cutout (317:651, 1283x715) with live type, the
+   same treatment SUDDEN DEATH and the 3·2·1 get. Type is `cqw` against the
+   card, so it reproduces at any viewport.
+
+   z-index 87 puts it UNDER sudden death (88), the tutorial (90) and the boot
+   gate (92), and over the edge pulse. It is the least urgent of the full
+   screen messages: the others announce something that just happened to the
+   match, this one is advice about the room, and it must never be the thing
+   covering a rule change. `pointer-events:none` throughout, because it is a
+   hint and nothing on this screen should become unclickable because of it. */
+.moveback{position:fixed;inset:0;z-index:87;display:grid;place-items:center;
+  pointer-events:none}
+.moveback.hidden{display:none}
+.mvb-card{position:relative;container-type:inline-size;
+  width:min(44vw,74vh,660px);
+  filter:drop-shadow(0 min(.7vw,1.24vh) min(.5vw,.89vh) rgba(0,0,0,.42));
+  animation:mvbIn .42s cubic-bezier(.16,1.5,.32,1) both}
+/* aspect from the Figma RECTANGLE (1283/715), never the PNG's own 1680x936 */
+.mvb-card img{display:block;width:100%;aspect-ratio:1.7944;object-fit:fill}
+.mvb-card span{position:absolute;left:6%;width:88%;text-align:center;
+  translate:0 -50%;font-family:var(--f-lobby);font-weight:400;line-height:1.05;
+  color:#fff8ec}
+/* nowrap, and sized to fit inside it: at 15.5cqw "MOVE BACK!" was wider than
+   the paper's text box and broke onto a second line that landed straight on
+   top of the sub. The headline of a warning is the one string that must never
+   reflow. */
+.mvb-title{top:41%;font-size:13cqw;white-space:nowrap;
+  text-shadow:.9cqw .9cqw 0 rgba(122,20,8,.55)}
+/* the sub wraps to two balanced lines on purpose: one line at this width would
+   have to drop to about 4cqw and stop reading as part of the same object */
+.mvb-sub{top:72%;font-size:5.4cqw;letter-spacing:.02em;
+  text-shadow:.5cqw .5cqw 0 rgba(122,20,8,.5)}
+@keyframes mvbIn{
+  0%{opacity:0;transform:scale(1.5) rotate(-5deg)}
+  60%{opacity:1;transform:scale(.97) rotate(1.4deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}}
+/* A held warning has to keep saying itself without ever slamming again — a
+   repeating slam on a persistent state reads as a bug. */
+@media (prefers-reduced-motion:no-preference){
+  .moveback:not(.hidden) .mvb-card{animation:mvbIn .42s cubic-bezier(.16,1.5,.32,1) both,
+    mvbBreathe 1.5s 0.42s ease-in-out infinite}
+}
+@keyframes mvbBreathe{
+  0%,100%{scale:1}
+  50%{scale:1.035}}
+@media (prefers-reduced-motion:reduce){
+  .mvb-card{animation:none;opacity:1}
+}

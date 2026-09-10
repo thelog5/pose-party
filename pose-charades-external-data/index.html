@@ -1321,6 +1321,23 @@
   </div>
 </div>
 
+<!-- MOVE BACK. The paper is Figma's own blank red warning cutout
+     (`warning-red-paper-cutout-blank-v3`, 317:651, imageRef 4583925b…, drawn
+     at 1283x715 = aspect 1.794) with live type on it, the same way SUDDEN
+     DEATH and the 3·2·1 put live type on authored paper. The wording is the
+     ENABLE CAMERA screen's own line (322:703, "Step back until your full body
+     is visible"), so a player meets the same sentence twice rather than two
+     different explanations of one problem.
+     role="status" and aria-live="polite": this is advice, not an alert, and it
+     must never interrupt whatever a screen reader is already saying. -->
+<div class="moveback hidden" id="moveBack" role="status" aria-live="polite">
+  <div class="mvb-card">
+    <img src="assets/ui/figma/warn-paper-red.png" alt="">
+    <span class="mvb-title">MOVE BACK!</span>
+    <span class="mvb-sub">SO WE CAN SEE YOUR WHOLE BODY</span>
+  </div>
+</div>
+
 <!-- THE 3·2·1 IS CUT PAPER, like every other number in this game. It was
      Fredoka in --orange with a white stroke, which is the one numeral on the
      board that was type rather than an object. `cd-1/2/3.png` are torn paper

@@ -2570,6 +2570,72 @@ console.log("boot gate:");
   await gatePage.close();
 }
 
+/* ---- MOVE BACK ----
+   Driven off presence(), so it is exercised by feeding notePresence synthetic
+   landmark sets rather than by trying to stand too close to a fake camera. The
+   point of the assertions is the JUDGEMENT, not the paper: that a small room
+   with the hips low but in shot stays quiet, that a genuine crop speaks, and
+   that it stops on its own instead of pinning itself over a match somebody
+   cannot fix. */
+console.log("move back:");
+{
+  const framing = await page.evaluate(async () => {
+    const { notePresence, presence, resetPresence } =
+      await import("/js/presence.js");
+    const body = ({ noseY, shY, hipY, span }) => {
+      const lm = Array.from({ length: 33 }, () => ({ x:.5, y:.5, z:0, visibility:1 }));
+      lm[0]  = { x:.5, y:noseY, z:0, visibility:1 };
+      lm[7]  = { x:.5 - span*.18, y:noseY, z:0, visibility:1 };
+      lm[8]  = { x:.5 + span*.18, y:noseY, z:0, visibility:1 };
+      lm[11] = { x:.5 - span/2, y:shY, z:0, visibility:1 };
+      lm[12] = { x:.5 + span/2, y:shY, z:0, visibility:1 };
+      lm[23] = { x:.5 - span*.35, y:hipY, z:0, visibility:1 };
+      lm[24] = { x:.5 + span*.35, y:hipY, z:0, visibility:1 };
+      return lm;
+    };
+    const read = cfg => { resetPresence();
+      let t = 0;
+      for(let i = 0; i < 6; i++){ t += 33; notePresence(body(cfg), t); }
+      return presence().cropped;
+    };
+    return {
+      roomy:     read({ noseY:.12, shY:.28, hipY:.62,  span:.30 }),
+      smallRoom: read({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
+      onEdge:    read({ noseY:.05, shY:.22, hipY:1.00, span:.34 }),
+      tooClose:  read({ noseY:.05, shY:.24, hipY:1.15, span:.40 }),
+      headOff:   read({ noseY:-.10, shY:.20, hipY:.90, span:.40 }),
+      farAway:   read({ noseY:.30, shY:.38, hipY:1.10, span:.13 }),
+    };
+  });
+  ok(framing.tooClose && framing.headOff,
+    "a body cropped at the hips or the head is flagged");
+  ok(!framing.roomy && !framing.onEdge,
+    "hips ON the bottom edge are still in shot and stay quiet");
+  ok(!framing.smallRoom,
+    "a small room with the hips low but visible is never told to move back");
+  ok(!framing.farAway,
+    "a far-away hip misread cannot fire it (the shoulder-span gate)");
+
+  const card = await page.evaluate(() => {
+    const el = document.getElementById("moveBack");
+    const img = el.querySelector("img");
+    const title = el.querySelector(".mvb-title");
+    return { exists: !!el, hidden: el.classList.contains("hidden"),
+      art: img.getAttribute("src"), pe: getComputedStyle(el).pointerEvents,
+      z: getComputedStyle(el).zIndex,
+      nowrap: getComputedStyle(title).whiteSpace,
+      title: title.textContent };
+  });
+  ok(card.exists && card.hidden, "the card starts down");
+  ok(card.art === "assets/ui/figma/warn-paper-red.png",
+    "it is Figma's own warning paper (317:651), not a CSS box");
+  ok(card.pe === "none", "it never eats a click");
+  ok(Number(card.z) < 88,
+    `it sits under sudden death and the tutorial (z ${card.z})`);
+  ok(card.nowrap === "nowrap" && card.title === "MOVE BACK!",
+    "the headline cannot reflow onto the sub");
+}
+
 // ---- console errors ----
 console.log("hygiene:");
 const realErrors = consoleErrors.filter(e =>

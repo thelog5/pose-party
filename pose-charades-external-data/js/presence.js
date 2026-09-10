@@ -141,9 +141,47 @@ let mX = 0, mY = 0, mSpan = 0;
 /* The published object is reused every frame and returned by reference: this
    runs per video frame in three modes and a fresh literal per read is exactly
    the kind of garbage a 30 Hz loop does not need. Read it, don't retain it. */
+/* ── FRAMING ──────────────────────────────────────────────────────────────
+   "Too close" is not a distance, it is a CROP. The only question worth asking
+   is whether enough of the player is in the picture for a pose to be readable
+   at all, and the answer is: their head and their hips both have to be in it.
+   Knees and ankles are NOT required. That is deliberate — plenty of people
+   play in a room where their feet will never be in shot, and a warning they
+   cannot act on is worse than no warning.
+
+   Measured on the RAW landmark coordinates rather than on `visibility`,
+   because MediaPipe extrapolates a landmark that has left the frame and marks
+   it low-visibility for exactly that reason: gating on visibility would
+   suppress the one signal we are looking for. An off-frame landmark reports a
+   coordinate outside 0..1, and that is what this reads.
+
+   The margin is generous on purpose. Hips at y = 1.0 are on the bottom edge
+   and still technically visible, so nothing fires until they are a clear 3%
+   past it. */
+const CROP_MARGIN = .03;
+/* Below this shoulder span the player is far enough away that a hip reading
+   past the bottom edge is a tracker guess, not a person standing too close.
+   SHOULDER_REF (.30) is normal playing distance, so this is well short of it
+   and cannot fire on somebody across the room. */
+const CROP_MIN_SPAN = .20;
+
 const out = {
   x: 0, y: 0, scale: 0, energy: 0, seen: false, lostMs: 0, t: 0,
+  /* raw, this-frame: head or hips outside the picture. Deliberately NOT
+     debounced here — how long to wait before saying something, and how long to
+     keep saying it, are presentation decisions and only the consumer knows
+     them. Same reasoning as `seen`/`lostMs` above. */
+  cropped: false,
 };
+
+/* Head above the top edge, or hips below the bottom one. */
+function croppedNow(lm){
+  if(mSpan < CROP_MIN_SPAN) return false;
+  const nose = lm[0], hipL = lm[23], hipR = lm[24];
+  if(Number.isFinite(nose?.y) && nose.y < -CROP_MARGIN) return true;
+  if(!Number.isFinite(hipL?.y) || !Number.isFinite(hipR?.y)) return false;
+  return (hipL.y + hipR.y) / 2 > 1 + CROP_MARGIN;
+}
 
 /* ── FRAME-RATE INDEPENDENCE ──────────────────────────────────────────────
    The one thing that must not be a fixed per-frame constant. `p += (target-p)
@@ -239,6 +277,7 @@ export function notePresence(lm, now){
     out.seen = false;
     out.lostMs = Math.max(0, t - (havePos ? lastGoodT : firstT));
     out.energy = pEnergy;
+    out.cropped = false;      // nobody in shot is not the same as badly framed
     out.t = t;
     return;
   }
@@ -278,6 +317,7 @@ export function notePresence(lm, now){
   out.energy = pEnergy;
   out.seen = true;
   out.lostMs = 0;
+  out.cropped = croppedNow(lm);
   out.t = t;
 }
 
@@ -292,6 +332,7 @@ export function presence(){ return out; }
 /* Screen changes: the next body in front of the lens is a different framing,
    often a different person. Nothing in here is worth carrying across one. */
 export function resetPresence(){
+  out.cropped = false;
   px = py = pScale = pEnergy = 0;
   havePos = false;
   following = false;

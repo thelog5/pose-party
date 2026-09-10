@@ -12,11 +12,11 @@ import { normalize } from "./pose.js";
 import { createLandmarkFilter, filterLandmarks } from "./smooth.js";
 import { drawSkeleton } from "./draw.js";
 import { features, classify } from "./classifier.js";
-import { showStatus, renderGuesses } from "./ui.js";
+import { showStatus, renderGuesses, updateMoveBack } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
 import { setModelOutput } from "./soloRound.js";
-import { notePresence } from "./presence.js";
+import { notePresence, presence } from "./presence.js";
 import { requestCameraConsent, retryCameraConsent, closeCameraGate,
          hasCameraGate, setBootProgress, setBootReady,
          setBootFailed } from "./cameraGate.js";
@@ -453,6 +453,10 @@ function loop(){
      the landmarks before anything else can consume them: presence.js needs the
      empty frames too, or its "how long since we saw you" clock never runs. */
   notePresence(lm, now);
+  /* Straight after, on the same reading, and unconditionally — a frame with no
+     body has to reach it too, or a warning stays on screen after the player
+     walks out of shot. */
+  updateMoveBack(presence(), now);
   if(lm){
     if(faceEvery && now-lastFaceSeenT>350) positionLocalCrownFromPose(lm);
     drawSkeleton(lm, handRes, ctx, overlay);
