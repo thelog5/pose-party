@@ -1,0 +1,42 @@
+# Render blueprint for Pose Party.
+#
+# ONE INSTANCE, ALWAYS. Rooms live in memory (a Map in server/rooms.js), so a
+# second instance means the room A created is "not found" for B. Never raise
+# numInstances and never turn on autoscaling.
+#
+# The Node process serves the game files AND the socket, because the client
+# calls window.io() with no URL and so must reach the socket on its own
+# origin. Do not move the frontend to a static site.
+services:
+  - type: web
+    name: pose-party
+    runtime: node
+    plan: starter          # free also works, but sleeps after 15 min idle
+    numInstances: 1
+    buildCommand: cd server && npm ci
+    startCommand: cd server && npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Render terminates TLS in front of this process. Without this every
+      # player looks like the platform proxy and they all share ONE bucket
+      # of RATE_CREATE rooms per minute.
+      - key: TRUST_PROXY
+        value: "1"
+      # Set to the real https origin once Render assigns it.
+      - key: CORS_ORIGINS
+        sync: false
+      # The private-beta lock. Unset it to open the game to everyone.
+      - key: ACCESS_CODE
+        sync: false
+      # TURN. All four are needed: the last two arm the spend cap, and
+      # without them the relay stays off by design.
+      - key: TURN_CF_KEY_ID
+        sync: false
+      - key: TURN_CF_API_TOKEN
+        sync: false
+      - key: TURN_CF_ACCOUNT_ID
+        sync: false
+      - key: TURN_CF_ANALYTICS_TOKEN
+        sync: false
