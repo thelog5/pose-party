@@ -772,6 +772,9 @@ function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
     const g=state.game;
     if(!g || g.mode!=="online" || g.claimed || !g.roundId || !socket) return;
     g.claimed=true;
+    /* The local stamp, taken here rather than off any packet: this is the
+       actual instant the AI recognized this player, with no network in it. */
+    g.claimedAt=performance.now();
     const recognizedAt=Math.round(serverNow());
     socket.emit("round:claim", { roundId:g.roundId, recognizedAt }, res=>{
       if(res?.error==="already-claimed") g.claimed=true;
@@ -856,6 +859,12 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   game.chaseSecond=null;
   game.wordStart=performance.now();
   game.wordEnd=perfFromServer(endsAt);
+  /* Cleared per word. These two are the only source the results screen's AVG
+     and FASTEST chips and the METRONOME award have — onRoundResult reads them
+     when it pushes the word's result. Online 1v1 never recorded a time at all,
+     so every 1v1 results screen read "0.0 AVG" for both players. */
+  game.claimedAt=0;
+  game.rivalClaimedAt=0;
   if(state.smooth) state.smooth[game.word]=0;
   if($("v1WordTimerLabel")) $("v1WordTimerLabel").textContent=suddenDeath?"SUDDEN DEATH":"WORD TIME";
   clearMatchBoard();
@@ -968,6 +977,11 @@ function onRoundChase({firstId, firstPoints, chaseEndsAt, scores}={}){
   applyScores(scores);
   game.firstId=firstId;
   game.firstPoints=firstPoints|0;
+  /* The chase opens the instant the first player locks, so this packet IS
+     their recognition time — one network hop late, which is the best the
+     rival's clock is ever going to be. Only taken for the rival; the local
+     player already has an exact figure from `onlineClaim`. */
+  if(!mine && !game.rivalClaimedAt) game.rivalClaimedAt=performance.now();
   game.roundPhase="chase";
   game.wordEnd=perfFromServer(chaseEndsAt);
   game.claimed=mine;
@@ -1025,26 +1039,41 @@ function onRoundResult({
       markGuessRecognized($(prefix+"GuessTop"),true);
     }
   }
+  /* Seconds from the word being dealt to the AI recognising that player. Null
+     whenever we genuinely do not know — the results chips read 0.0 rather than
+     inventing a figure. `rivalSecs` falls back to the resolving packet because
+     the server ends the word the moment a chase succeeds, so its arrival IS
+     the rival's catch to within one hop. */
+  const since = at => at ? Math.max(.1, (at-game.wordStart)/1000) : null;
+  const mySecs = since(game.claimedAt);
+  const rivalSecs = since(game.rivalClaimedAt || (caught&&iWasFirst ? performance.now() : 0));
+
   /* Every branch below only STAMPS. The word is banked once, at the bottom —
      one payoff per word, no matter how many players got it. */
   let bankAfterStamp=null;
   if(iWasFirst){
-    game.results.push({word, ok:true, pts:firstPoints, rivalPts:chaserPoints, first:true});
+    /* `rivalChaser` is the rival's CLUTCH: they were the one caught up during
+       the five-second chase. Recorded as a fact here rather than re-derived
+       from the shape of the other fields at results time. */
+    game.results.push({word, ok:true, pts:firstPoints, rivalPts:chaserPoints, first:true,
+      secs:mySecs, rivalSecs:caught?rivalSecs:null, rivalChaser:caught});
     if(caught) showMatchAward("rival", chaserPoints);
     blip(caught?[523,659]:[523,659,784]);
   }else if(iWasChaser && caught){
-    game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true});
+    game.results.push({word, ok:true, pts:chaserPoints, rivalPts:firstPoints, chaser:true,
+      secs:mySecs, rivalSecs});
     /* the local stamp lands on the far side of the hitstop */
     bankAfterStamp=fn=>playLocalMatchLock(chaserPoints,fn);
   }else if(winnerId){
-    game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints});
+    game.results.push({word, ok:false, rival:true, pts:0, rivalPts:firstPoints,
+      secs:null, rivalSecs});
     /* The rival's award paper already says exactly this, in the paper-craft
        language the rest of the game speaks — the old square burst card was
        the last piece of the pre-Figma HUD still showing during a match. */
     showMatchAward("rival", firstPoints);
     blip([330,247]);
   }else{
-    game.results.push({word, ok:false, timeout:true});
+    game.results.push({word, ok:false, timeout:true, secs:null, rivalSecs:null});
     showTimesUp();
   }
   const localSucceeded=iWasFirst || (caught&&iWasChaser);
@@ -1136,6 +1165,8 @@ function endOnline(scores, why, outcome={}){
   if(!sameRoom) closePeer();
 
   const mineTimes=g.results.filter(r=>r.ok && Number.isFinite(r.secs)).map(r=>r.secs);
+  const rivalTimes=g.results.filter(r=>Number.isFinite(r.rivalSecs)).map(r=>r.rivalSecs);
+  const mean=list=>list.length?list.reduce((a,b)=>a+b,0)/list.length:null;
   const title = why==="finished"
     ? (outcome.winnerId===socket?.id || (!outcome.winnerId && g.score>g.rivalScore)
         ? myName().toUpperCase()+" WINS!"
@@ -1150,11 +1181,16 @@ function endOnline(scores, why, outcome={}){
       { id:"me", name:myName(), team:"blue", mine:true, score:g.score,
         firsts:g.results.filter(r=>r.ok).length,
         fastest:mineTimes.length?Math.min(...mineTimes):null,
-        avg:mineTimes.length?mineTimes.reduce((a,b)=>a+b,0)/mineTimes.length:null,
-        clutch:g.results.filter(r=>r.ok && r.chase).length, ready:false },
+        avg:mean(mineTimes),
+        /* `chaser` is the key onRoundResult writes. `chase` was never on any
+           result object, so CLUTCH read 0 for the whole life of online 1v1. */
+        clutch:g.results.filter(r=>r.ok && r.chaser).length, ready:false },
       { id:"rival", name:peerName, team:"orange", mine:false, score:g.rivalScore,
         firsts:g.results.filter(r=>r.rival).length,
-        fastest:null, avg:null, clutch:0, ready:false, stream:rivalStream },
+        fastest:rivalTimes.length?Math.min(...rivalTimes):null,
+        avg:mean(rivalTimes),
+        clutch:g.results.filter(r=>r.rivalChaser).length,
+        ready:false, stream:rivalStream },
     ],
     rematch: sameRoom
       ? { ready:outcome.rematch?.ready || 0,
