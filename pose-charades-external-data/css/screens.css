@@ -2702,6 +2702,20 @@ body[data-screen="results"] .rs-save:active:not(:disabled){
    one stacks instead of landing on the one before it. */
 .devbar{position:fixed;right:10px;bottom:10px;z-index:200;
   display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+/* DEV CHROME MUST NOT SIT ON A REAL CONTROL. The bar's own corner is where
+   START MATCH lives in both lobbies, and stacking a second button made it tall
+   enough to cover that button's centre at smaller windows — a click on START
+   then opened Training and quietly took the host out of the room, which is a
+   miserable thing to hit while a friend is waiting. No corner is free on every
+   screen (bottom-right is START, top-right is the header gear), so rather than
+   move it somewhere else that collides, it simply stands down wherever a real
+   game is being set up or played. Home, Training and Results keep it, which is
+   everywhere it is actually used from. */
+body[data-state="lobby"] .devbar,
+body[data-state="party"] .devbar,
+body[data-state="countdown"] .devbar,
+body[data-state="playing"] .devbar,
+body[data-state="word-won"] .devbar{display:none}
 .devbtn{font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72vw,13px);
   letter-spacing:.06em;color:#fff;background:rgba(9,22,62,.72);
   border:1px solid rgba(255,255,255,.35);border-radius:var(--r-xs);

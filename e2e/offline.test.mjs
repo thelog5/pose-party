@@ -2636,6 +2636,28 @@ console.log("move back:");
     "the headline cannot reflow onto the sub");
 }
 
+/* ---- dev chrome ---- */
+{
+  /* The rule keys on body[data-state], so read it there rather than driving
+     the FSM: `transition("lobby")` from whatever state this suite happens to
+     be in is often illegal, and a console error is a suite failure. */
+  const devbar = await page.evaluate(() => {
+    const bar = document.querySelector(".devbar");
+    const was = document.body.dataset.state;
+    const seen = {};
+    for(const st of ["lobby", "party", "playing", "menu", "training"]){
+      document.body.dataset.state = st;
+      seen[st] = getComputedStyle(bar).display;
+    }
+    document.body.dataset.state = was;
+    return seen;
+  });
+  ok(devbar.lobby === "none" && devbar.party === "none" && devbar.playing === "none",
+    "the dev bar stands down wherever a real game is set up or played");
+  ok(devbar.menu !== "none" && devbar.training !== "none",
+    "and is still there on Home and Training, where it is used from");
+}
+
 // ---- console errors ----
 console.log("hygiene:");
 const realErrors = consoleErrors.filter(e =>
