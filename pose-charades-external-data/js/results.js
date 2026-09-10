@@ -974,58 +974,92 @@ function paintPanelFrame(panel){
 function syncPhotoStripTarget(){
   const save = $("rsSaveStrip");
   if(!save) return;
+  const label = save.querySelector("b");
   if(is1v1()){
-    const local = payload.players.find(p => p.mine) || payload.players[0];
-    save.setAttribute("aria-label", "Save your photo strip");
-    save.title = "Save your photo strip";
-    if(local) save.dataset.playerId = local.id;
-    else delete save.dataset.playerId;
+    /* THE 1V1 BREAKDOWN SHOWS BOTH PLAYERS AT ONCE, so the one button under it
+       has to save both. It used to quietly save only your own reel, which made
+       the rival's whole panel — their photos, sat right there on screen — the
+       one thing on this page you could look at and not keep. The party
+       breakdown is a different control: it pages ONE player at a time, so
+       there the button follows the focused player, as it always has. */
+    save.setAttribute("aria-label", "Save both photo strips");
+    save.title = "Save both photo strips";
+    if(label) label.textContent = "SAVE PHOTO STRIPS";
+    delete save.dataset.playerId;
   }else{
     save.removeAttribute("aria-label");
     save.removeAttribute("title");
+    if(label) label.textContent = "SAVE PHOTO STRIP";
     delete save.dataset.playerId;
   }
 }
 
-function savePhotoStrip(){
-  const local = payload.players.find(player => player.mine) || payload.players[0];
-  const targetId = is1v1()
-    ? local?.id
-    : focusId;
-  const p = payload.players.find(x => x.id === targetId);
-  const list = shots.get(targetId) || [];
-  if(!list.length){ toast("No photos to save from this round yet."); return; }
+/* One column per player, one row per word, on the same cream ground the
+   boards are made of. Solo and Party pass a single player and get the strip
+   they always got; 1v1 passes both and gets them side by side, which is also
+   the only arrangement in which the two reels stay comparable word for word.
+   Nothing leaves the machine: these are in-memory data URLs. */
+function stitchStrip(columns, filename){
   const pad = 18, w = SHOT_W, h = SHOT_H;
+  const head = 54;                        // name band above each column
+  const rows = Math.max(...columns.map(c => c.list.length));
   const c = document.createElement("canvas");
-  c.width = w + pad * 2;
-  c.height = pad + list.length * (h + pad);
+  c.width = pad + columns.length * (w + pad);
+  c.height = pad + head + rows * (h + pad);
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#f4ece0";
   ctx.fillRect(0, 0, c.width, c.height);
+
+  /* A single column is the original strip and needs no caption to tell you
+     whose it is; two columns are unreadable without one. */
+  if(columns.length > 1){
+    ctx.fillStyle = "#17356f";
+    ctx.font = "700 30px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    columns.forEach((col, i) => {
+      ctx.fillText(col.name.toUpperCase(),
+        pad + i * (w + pad) + w / 2, pad + head / 2, w);
+    });
+  }
+
+  const total = columns.reduce((n, col) => n + col.list.length, 0);
   let settled = 0, drawn = 0;
   const finish = () => {
-    if(++settled !== list.length) return;
-    if(!drawn){
-      toast("Couldn’t decode the photos for this strip.");
-      return;
-    }
+    if(++settled !== total) return;
+    if(!drawn){ toast("Couldn’t decode the photos for this strip."); return; }
     const a = document.createElement("a");
-    a.download = "pose-party-" +
-      (p ? p.name.toLowerCase().replace(/\W+/g, "-") : "strip") + ".png";
+    a.download = filename;
     a.href = c.toDataURL("image/png");
     a.click();
-    toast(drawn === list.length ? "Photo strip saved." : "Photo strip saved with the available shots.");
+    toast(drawn === total
+      ? (columns.length > 1 ? "Both photo strips saved." : "Photo strip saved.")
+      : "Photo strip saved with the available shots.");
   };
-  list.forEach((s, i) => {
+  columns.forEach((col, i) => col.list.forEach((shot, r) => {
     const img = new Image();
     img.onload = () => {
-      ctx.drawImage(img, pad, pad + i * (h + pad), w, h);
+      ctx.drawImage(img, pad + i * (w + pad), pad + head + r * (h + pad), w, h);
       drawn++;
       finish();
     };
     img.onerror = finish;
-    img.src = s.url;
-  });
+    img.src = shot.url;
+  }));
+}
+
+const slug = name => String(name || "strip").toLowerCase().replace(/\W+/g, "-")
+  .replace(/^-|-$/g, "") || "player";
+
+function savePhotoStrip(){
+  const columns = (is1v1()
+    ? payload.players
+    : payload.players.filter(x => x.id === focusId))
+    .map(p => ({ name: p.name, list: shots.get(p.id) || [] }))
+    .filter(col => col.list.length);
+
+  if(!columns.length){ toast("No photos to save from this round yet."); return; }
+  stitchStrip(columns, "pose-party-" + columns.map(c => slug(c.name)).join("-vs-") + ".png");
 }
 
 function teardownResultsMedia(){
