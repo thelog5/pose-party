@@ -19,6 +19,29 @@ export const HAND_BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9]
 export const MODEL_POINTS = JOINTS.length;
 
 export const SAMPLE_MS = 66, WIN = 30, STRIDE = 8, K = 7;
+/* Every clip is also trained mirrored and at these tempos — see classifier.js
+   for why. Widening the list costs model size (and therefore classify time)
+   linearly, so keep it to the range a person actually performs at. */
+export const TIME_SCALES = [0.8, 1, 1.25];
+/* Floor on a feature dimension's standard deviation before the kNN divides by
+   it, as a fraction of the MEDIAN standard deviation of its own block.
+
+   IT HAS TO BE RELATIVE, AND THIS IS THE WHOLE REASON. Frames are hip-centred
+   and torso-scaled, so the hips sit ON the origin and the shoulders barely
+   move off it: measured on the shipped deck their standard deviations are
+   .009-.023 against .34-.86 for the wrists, which are the joints a charades
+   pose is actually made of. An ABSOLUTE floor leaves those dimensions being
+   divided by ~.012, which multiplies whatever noise the tracker put on a hip
+   by eighty and makes the least informative dimensions in the vector the
+   loudest ones. The clean leave-one-clip-out number cannot see this at all —
+   its query is a recorded clip whose hips are exactly as noisy as the ones it
+   was trained on — which is precisely how an absolute 5e-3 got shipped.
+
+   Against simulated hip jitter of .06 torso-lengths, the absolute floor scored
+   35% and this one scores 74%, with clean accuracy unchanged (88.1 -> 88.7).
+   Sweep BOTH numbers before touching it: clean accuracy alone will happily
+   tell you any value between .4 and 1.0 is identical. */
+export const FEATURE_SD_FLOOR = 0.75;
 export const HOLD_MS = 250, THRESH = 0.60, RIVAL_THRESH = 0.60;
 export const ROUNDS = 5, WORD_MS = 30000;
 /* Scoring (matches the on-screen copy): 100 per word, +100 fast bonus if

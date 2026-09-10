@@ -98,7 +98,10 @@ function runTraining(opts={}){
 
   const worst=Object.entries(missBy).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);
   rep.innerHTML =
-    'AI trained on <b>'+labels.length+'</b> words, <b>'+state.dataset.clips.length+'</b> clips, <b>'+state.model.samples.length+'</b> body-motion windows.<br><b>Hands are visual + exported only</b> so noisy finger tracking does not hurt the guesser.'+
+    /* `samples` counts the augmented deck — every clip is trained mirrored and
+       at three tempos (classifier.js) — so say so rather than quoting a window
+       count six times what was recorded. */
+    'AI trained on <b>'+labels.length+'</b> words, <b>'+state.dataset.clips.length+'</b> clips, <b>'+state.model.samples.length+'</b> motion windows (each clip is also trained mirrored and at three speeds).<br><b>Hands are visual + exported only</b> so noisy finger tracking does not hurt the guesser.'+
     (acc!==null ? '<br>Quick holdout check: <b>'+acc+'%</b> of test clips guessed right.' : '<br>Record 4+ clips per word to unlock the accuracy check.')+
     (worst.length ? '<br><span class="warn">Most confused: '+worst.map(esc).join(", ")+'. Record more of these or swap them out.</span>' : '')+
     '<br>Watch it guess live below, then go play.';
