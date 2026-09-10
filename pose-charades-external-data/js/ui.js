@@ -265,34 +265,33 @@ export function showTimesUp(){
    as the phase lasts (overlays.css). */
 /* ── MOVE BACK ────────────────────────────────────────────────────────────
    Driven off `presence().cropped` — head or hips outside the picture — with
-   all of the timing owned here, because every number below is a decision about
-   how to TALK to somebody, not about what the camera can see.
+   all of the timing owned here, because each number is a decision about how to
+   talk to somebody, not about what the camera can see.
 
-   THE HARD PART IS KNOWING WHEN TO STOP. Some rooms are small, some cameras
-   are bolted to a laptop lid at desk height, and for those players the crop is
-   not something they can fix. A warning they cannot act on, pinned to the
-   middle of the screen for a whole match, would make the game unplayable for
-   exactly the people it is trying to help. So it says its piece, gives them a
-   few seconds to move, and then gets out of the way for a good long while.
-   Same principle as the robot's nudge lines: a player who is trying does not
-   get nagged. */
-const MVB_SHOW_AFTER_MS = 900;    // hold before we say anything: a lean forward is not a problem
+   IT STAYS UP FOR AS LONG AS THE PLAYER IS TOO CLOSE. It used to say its piece
+   for 4.2s and then go quiet for 25s, so a player in a small room would not be
+   nagged through a whole match. The player asked for the opposite, and it is
+   their game: a warning that vanishes while you are still cropped reads as the
+   problem having gone away. The small-room case is handled by WHAT counts as
+   too close instead (head and hips only, feet never required — see
+   presence.js), not by hiding the message.
+
+   Two short delays remain, and both are about flicker, not about nagging: a
+   lean forward does not raise it, and a moment of hips-back-in-frame does not
+   drop it. */
+const MVB_SHOW_AFTER_MS = 900;    // a lean forward is not a problem
 const MVB_CLEAR_AFTER_MS = 400;   // and it comes down promptly once they move
-const MVB_MAX_SHOW_MS = 4200;     // it has said its piece by now
-const MVB_COOLDOWN_MS = 25000;    // and then leaves them alone, fixed or not
 const MVB_SCREENS = new Set(["solo", "match", "pmatch", "train"]);
-let mvbSince = 0, mvbClearSince = 0, mvbShownAt = 0, mvbMutedUntil = 0;
-/* The screen this state belongs to. A change of screen is a change of framing
-   and often of person, so it clears everything, the cooldown included: that
-   cooldown is about not nagging inside one run, not about only ever saying it
-   once. Tracked HERE rather than hooked from screens.js's render(): having
-   screens.js import ui.js for it broke the four-player party suite outright
-   (bisected: that one import + call, nothing else), and this module already
-   sees every frame's screen. */
+let mvbSince = 0, mvbClearSince = 0;
+/* The screen this state belongs to: a change of screen is a change of framing
+   and often of person, so it starts clean. Tracked HERE rather than hooked
+   from screens.js's render(): having screens.js import ui.js for it broke the
+   four-player party suite outright (bisected: that one import + call, nothing
+   else), and this module already sees every frame's screen. */
 let mvbScreen = "";
 
 export function resetMoveBack(){
-  mvbSince = mvbClearSince = mvbShownAt = mvbMutedUntil = 0;
+  mvbSince = mvbClearSince = 0;
   $("moveBack")?.classList.add("hidden");
 }
 
@@ -304,29 +303,22 @@ export function updateMoveBack(p, now){
     mvbScreen = state.screen;
     resetMoveBack();
   }
-  const showing = !showingHidden(card);
+  const showing = !card.classList.contains("hidden");
   /* Only where a body is actually being read. Home and the lobbies show the
-     camera too, but nobody is trying to be recognised on them. */
+     camera too, but nobody is trying to be recognised on them. And nobody in
+     shot is not the same as somebody too close. */
   if(!MVB_SCREENS.has(state.screen) || !p || !p.seen){
-    if(showing) hideMoveBack(card);
+    if(showing) card.classList.add("hidden");
     mvbSince = mvbClearSince = 0;
     return;
   }
 
   if(p.cropped){
     mvbClearSince = 0;
+    if(showing) return;
     if(!mvbSince) mvbSince = now;
-    if(showing){
-      if(now - mvbShownAt >= MVB_MAX_SHOW_MS){
-        hideMoveBack(card);
-        mvbMutedUntil = now + MVB_COOLDOWN_MS;   // said once, that is enough
-      }
-      return;
-    }
-    if(now < mvbMutedUntil) return;
     if(now - mvbSince < MVB_SHOW_AFTER_MS) return;
     card.classList.remove("hidden");
-    mvbShownAt = now;
     blip([294, 233], .09);
     return;
   }
@@ -335,17 +327,9 @@ export function updateMoveBack(p, now){
   if(!showing) return;
   if(!mvbClearSince) mvbClearSince = now;
   if(now - mvbClearSince >= MVB_CLEAR_AFTER_MS){
-    hideMoveBack(card);
-    /* they FIXED it, so there is no cooldown — if they drift back in, the
-       warning has earned the right to say so again */
-    mvbMutedUntil = 0;
+    card.classList.add("hidden");
+    mvbClearSince = 0;
   }
-}
-
-const showingHidden = card => card.classList.contains("hidden");
-function hideMoveBack(card){
-  card.classList.add("hidden");
-  mvbClearSince = 0;
 }
 
 let suddenTimer = 0;

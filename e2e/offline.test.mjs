@@ -2634,6 +2634,40 @@ console.log("move back:");
     `it sits under sudden death and the tutorial (z ${card.z})`);
   ok(card.nowrap === "nowrap" && card.title === "MOVE BACK!",
     "the headline cannot reflow onto the sub");
+
+  /* The timing, driven straight through updateMoveBack in ONE synchronous
+     block: the live camera loop also calls it every frame (with no body, so it
+     hides the card), and any await here would let a frame interleave. */
+  const timing = await page.evaluate(async () => {
+    const { state } = await import("/js/state.js");
+    const { updateMoveBack } = await import("/js/ui.js");
+    const card = document.getElementById("moveBack");
+    const up = () => !card.classList.contains("hidden");
+    const was = state.screen, crop = { seen:true, cropped:true },
+          fine = { seen:true, cropped:false }, gone = { seen:false, cropped:false };
+    const r = {};
+    state.screen = "solo";
+    updateMoveBack(crop, 1000); updateMoveBack(crop, 1500); r.lean = up();
+    updateMoveBack(crop, 2000);                              r.shown = up();
+    for(let t = 2100; t <= 60000; t += 100) updateMoveBack(crop, t);
+    r.stillUpAfterAMinute = up();
+    updateMoveBack(fine, 60100); updateMoveBack(fine, 60300); r.blip = up();
+    updateMoveBack(fine, 60600);                             r.cleared = up();
+    updateMoveBack(crop, 61000); updateMoveBack(crop, 62000); updateMoveBack(gone, 62100);
+    r.walkedOut = up();
+    state.screen = "home";
+    updateMoveBack(crop, 63000); updateMoveBack(crop, 65000); r.home = up();
+    state.screen = was;
+    card.classList.add("hidden");
+    return r;
+  });
+  ok(!timing.lean && timing.shown, "a lean forward does not raise it; a real crop does, after 0.9s");
+  ok(timing.stillUpAfterAMinute,
+    "it stays up for as long as the player is too close, a full minute included");
+  ok(timing.blip && !timing.cleared,
+    "it comes down 0.4s after they step back, not on the first good frame");
+  ok(!timing.walkedOut, "nobody in shot is not somebody too close");
+  ok(!timing.home, "never on Home, where nobody is being read");
 }
 
 /* ---- dev chrome ---- */
