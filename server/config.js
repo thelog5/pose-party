@@ -114,6 +114,16 @@ export const config = {
   stunUrls: (process.env.STUN_URLS || "stun:stun.l.google.com:19302")
     .split(",").map(s => s.trim()).filter(Boolean),
 
+  /* THE PRIVATE-BETA LOCK. Unset means the game is open exactly as it
+     shipped; set it and nothing behind /healthz is reachable without the
+     code. It gates the page AND the socket, so the game API is not left
+     open to anyone who skips the page.
+     ACCESS_SECRET only needs setting if you want to invalidate everyone's
+     cookie without changing the code they type (or the reverse). */
+  accessCode: (process.env.ACCESS_CODE || "").trim(),
+  accessSecret: (process.env.ACCESS_SECRET || "").trim(),
+  accessTtlSec: int(process.env.ACCESS_TTL_SEC, 30 * 24 * 60 * 60),
+
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),
   maxRooms: int(process.env.MAX_ROOMS, 500),

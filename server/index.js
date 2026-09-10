@@ -19,6 +19,8 @@ import { config } from "./config.js";
 import { createRoomStore } from "./rooms.js";
 import { createLimiter } from "./ratelimit.js";
 import { cleanName, cleanLabels, cleanCode, cleanSettings, isPlainObject, signalOk } from "./validate.js";
+import { COOKIE, makeTicket, ticketValid, readCookie, codeMatches } from "./accessgate.js";
+import { gatePage } from "./gatepage.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GAME_DIR = path.join(__dirname, "..", "pose-charades-external-data");
@@ -65,6 +67,54 @@ app.get("/healthz", (req, res) => {
   res.json({ ok: true, rooms: store._rooms.size, uptimeSec: Math.round(process.uptime()) });
 });
 
+/* THE PRIVATE-BETA LOCK -----------------------------------------------------
+   Sits AFTER /healthz, because the platform's health check must never need a
+   password, and BEFORE express.static, because everything it protects is
+   underneath that. Unset ACCESS_CODE leaves the game wide open exactly as it
+   shipped, which is what local dev and every test suite expect. */
+const gateOn = !!config.accessCode;
+const gateSecret = config.accessSecret || config.accessCode;
+/* A shared code is guessable at speed, so attempts are capped per IP. The
+   bucket is on the SUBMIT path only: rate-limiting page views would lock out
+   somebody who simply reloaded. */
+const gateLimit = createLimiter({ tokens: 10, perMs: 60_000 });
+setInterval(() => gateLimit.sweep(), 60_000).unref();
+
+function gateOk(req){
+  return !gateOn || ticketValid(gateSecret, readCookie(req.headers.cookie, COOKIE));
+}
+
+if(gateOn){
+  app.use(express.urlencoded({ extended: false, limit: "1kb" }));
+
+  app.post("/__gate", (req, res) => {
+    if(!gateLimit.allow(req.ip)){
+      log(`gate: too many attempts from ${req.ip}`);
+      return res.status(429).type("html")
+        .send(gatePage({ error: "Too many tries. Wait a minute." }));
+    }
+    if(!codeMatches(String(req.body?.code || "").trim(), config.accessCode)){
+      log(`gate: wrong code from ${req.ip}`);
+      return res.status(401).type("html")
+        .send(gatePage({ error: "That code is not right." }));
+    }
+    /* `secure` would make the cookie undeliverable over plain http, which is
+       how this runs on a LAN and in the test suites. Everything real is
+       behind TLS, where the flag is set. */
+    res.cookie(COOKIE, makeTicket(gateSecret, config.accessTtlSec), {
+      httpOnly: true, sameSite: "lax", maxAge: config.accessTtlSec * 1000,
+      secure: config.trustProxy,
+    });
+    log(`gate: admitted ${req.ip}`);
+    res.redirect(303, "/");
+  });
+
+  app.use((req, res, next) => {
+    if(gateOk(req)) return next();
+    res.status(401).type("html").set("Cache-Control", "no-store").send(gatePage());
+  });
+}
+
 /* CACHE THE ART HARD, NEVER THE CODE. `assets/` is ~30 MB across 275 files
    and barely changes; served with the Express default (`max-age=0`) every
    one of them revalidates on every visit. Markup, JS and CSS are NOT
@@ -87,6 +137,17 @@ const io = new Server(httpServer, {
   cors: { origin: config.corsOrigins, methods: ["GET", "POST"] },
   maxHttpBufferSize: 64 * 1024, // largest legal payload is an SDP blob
 });
+
+/* THE SAME LOCK ON THE SOCKET. Gating only the HTML would leave the whole
+   game API reachable by anyone who skips the page and opens a socket
+   directly, which is the entire thing worth protecting. */
+if(gateOn)
+  io.use((socket, next) => {
+    if(ticketValid(gateSecret, readCookie(socket.handshake.headers.cookie, COOKIE)))
+      return next();
+    log(`gate: socket refused from ${socket.handshake.address}`);
+    next(new Error("forbidden"));
+  });
 
 const store = createRoomStore({
   config,
