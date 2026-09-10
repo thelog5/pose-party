@@ -52,6 +52,11 @@ export const CATEGORIES = {
    specifier must be a literal, so the version can't be interpolated there. */
 const MEDIAPIPE_VERSION = "0.10.14";
 export const WASM_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}/wasm`;
-export const POSE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+/* `full`, not `lite`. Lite is roughly half the inference cost and visibly
+   worse on exactly the joints this game is built on: elbows, wrists and
+   anything partly out of frame, where it snaps and invents positions. The loop
+   already runs off requestVideoFrameCallback (one pass per camera frame, not
+   per display frame) and Party caps it at 30 Hz, so the headroom is there. */
+export const POSE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task";
 export const HAND_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
 export const FACE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";

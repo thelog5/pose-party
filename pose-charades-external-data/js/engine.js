@@ -9,6 +9,7 @@ import { state } from "./state.js";
 import { SAMPLE_MS, WIN, WASM_URL, POSE_MODEL_URL, HAND_MODEL_URL,
          FACE_MODEL_URL } from "./constants.js";
 import { normalize } from "./pose.js";
+import { createLandmarkFilter, filterLandmarks } from "./smooth.js";
 import { drawSkeleton } from "./draw.js";
 import { features, classify } from "./classifier.js";
 import { showStatus, renderGuesses } from "./ui.js";
@@ -32,6 +33,7 @@ let lastVisionT = -Infinity;
 let lastFaceTrackT = 0;
 let lastFaceSeenT = -Infinity;
 let visionRuntime = null;
+const poseFilter = createLandmarkFilter();
 let faceLoad = null;
 let faceLoadFailed = false;
 
@@ -239,7 +241,16 @@ async function acquireCamera(consent, control){
     let candidate = null;
     try{
       candidate = await navigator.mediaDevices.getUserMedia({
-        video:{ width:640, height:480 }, audio:false,
+        /* `ideal`, not a fixed size: 480p across a whole standing body is a
+           few hundred pixels of person, and the pose model crops its region of
+           interest out of the frame we hand it — so a coarse frame is a coarse
+           elbow. Every one of these degrades rather than failing if the camera
+           cannot meet it. */
+        video:{
+          width:{ ideal:1280, min:640 },
+          height:{ ideal:720, min:480 },
+          frameRate:{ ideal:30, min:15 },
+        }, audio:false,
       });
       if(control.cancelled){
         stopStream(candidate);
@@ -329,7 +340,18 @@ export async function boot(){
     setBootProgress("LOADING THE BODY MODEL");
     state.landmarker = await PoseLandmarker.createFromOptions(vision,{
       baseOptions:{ modelAssetPath:POSE_MODEL_URL, delegate:"GPU" },
-      runningMode:"VIDEO", numPoses:1
+      runningMode:"VIDEO", numPoses:1,
+      /* Spelled out rather than left on the .5 defaults. Detection is loosened
+         because a player mid-word is often a shape the detector has never been
+         shown; presence and tracking are tightened because the failure this
+         addresses is the opposite one — the tracker holding on to a body that
+         has left, or half-left, the frame and drawing its guess at full
+         confidence. Losing the skeleton for a frame is honest; painting an
+         invented one is not. */
+      minPoseDetectionConfidence:.4,
+      minPosePresenceConfidence:.6,
+      minTrackingConfidence:.6,
+      outputSegmentationMasks:false,
     });
   }catch(e){
     cameraControl.cancelled = true;
@@ -421,7 +443,12 @@ function loop(){
 
   ctx.clearRect(0,0,overlay.width,overlay.height);
 
-  const lm = res.landmarks && res.landmarks[0];
+  /* Filtered ONCE, here, so the overlay the player watches and the frames the
+     classifier reads are the same numbers. Filtering only one of them would
+     make the dots agree with the body while the AI still saw the jitter, or
+     the reverse. Recording goes through the same path, so clips captured from
+     now on match what live inference sees. */
+  const lm = filterLandmarks(poseFilter, res.landmarks && res.landmarks[0], now);
   /* Unconditional, and ahead of the crown/skeleton/sample block so it reads
      the landmarks before anything else can consume them: presence.js needs the
      empty frames too, or its "how long since we saw you" clock never runs. */
