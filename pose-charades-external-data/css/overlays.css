@@ -173,8 +173,19 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 .htp.hidden{display:none}
 @keyframes htpScrim{from{opacity:0}to{opacity:1}}
 
+/* THE AUTHORED SIZE IS A CEILING, NOT A TARGET. Figma draws this card at
+   1088 on a 1440 frame — 75.6% of the width — and 74vw reproduced that
+   faithfully, which on a laptop is a modal covering three quarters of the
+   screen in both directions. It reads as a page, not as a card over a board,
+   and in multiplayer it buries a live match behind itself for the whole
+   tutorial grace. Every size inside is `cqw` against this box, so shrinking
+   the box is the ONLY edit needed: the whole composition scales with it and
+   no percentage in this file changes. `1088px` still caps it on a large
+   monitor, which is why the three numbers now land within a few points of
+   each other at every target viewport instead of being widest on the
+   smallest screen. */
 .htp-panel{position:relative;container-type:inline-size;
-  width:min(74vw,152vh,1088px);aspect-ratio:1088/643;
+  width:min(62vw,124vh,1088px);aspect-ratio:1088/643;
   font-family:var(--f-lobby);font-weight:400;
   animation:htpDrop .52s cubic-bezier(.16,1.5,.32,1) both}
 @keyframes htpDrop{
