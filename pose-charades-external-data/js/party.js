@@ -13,6 +13,7 @@
 import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { toast } from "./ui.js";
+import { seenFor } from "./wordOrder.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
@@ -112,7 +113,7 @@ async function createParty(){
     wirePartySocket(nextSocket);
     myId = nextSocket.id;
     setLobbyStatus("Opening a party room…");
-    nextSocket.emit("party:create", { name: myName(), settings: lobbySettings(), labels: state.model.labels }, res => {
+    nextSocket.emit("party:create", { name: myName(), settings: lobbySettings(), labels: state.model.labels, seen: seenFor(state.model.labels) }, res => {
       finishPartyRequest(request);
       if(!partyRequestActive(request)){
         cleanLatePartyRoom(request, nextSocket, res);
@@ -155,7 +156,7 @@ async function joinParty(code){
     wirePartySocket(nextSocket);
     myId = nextSocket.id;
     setLobbyStatus("Joining party " + code + "…");
-    nextSocket.emit("party:join", { code, name: myName(), labels: state.model.labels }, res => {
+    nextSocket.emit("party:join", { code, name: myName(), labels: state.model.labels, seen: seenFor(state.model.labels) }, res => {
       finishPartyRequest(request);
       if(!partyRequestActive(request)){
         cleanLatePartyRoom(request, nextSocket, res);

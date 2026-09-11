@@ -42,6 +42,7 @@ import {
   showResults,
 } from "./results.js";
 import { showHowToPlay } from "./howToPlay.js";
+import { markWordSeen, seenFor } from "./wordOrder.js";
 import { leaveLobby } from "./lobbyAlive.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp,
@@ -504,7 +505,7 @@ async function createRoom(){
     const s=await ensureSocket();
     if(!roomAttemptActive(attempt)) return;
     setLobbyStatus("Creating room…");
-    s.emit("room:create", { name, labels:state.model.labels, settings }, res=>{
+    s.emit("room:create", { name, labels:state.model.labels, seen:seenFor(state.model.labels), settings }, res=>{
       if(!roomAttemptActive(attempt)) return;
       if(!res || res.error){
         const why = lobbyError(res);
@@ -529,7 +530,7 @@ async function joinRoom(code){
     const s=await ensureSocket();
     if(!roomAttemptActive(attempt)) return;
     setLobbyStatus("Joining "+code+"…");
-    s.emit("room:join", { code, name, labels:state.model.labels }, res=>{
+    s.emit("room:join", { code, name, labels:state.model.labels, seen:seenFor(state.model.labels) }, res=>{
       if(!roomAttemptActive(attempt)) return;
       if(res && res.error==="party-room"){
         // that code is a party — hop over with the same code
@@ -865,6 +866,7 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   if(gameState()!=="playing" && !transition("playing")) return;
   game.roundId=roundId;
   game.word=String(word||"");
+  markWordSeen(game.word);
   game.round=roundNum||game.round+1;
   game.claimed=false;
   game.holdSince=0;

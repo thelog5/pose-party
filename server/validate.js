@@ -32,6 +32,24 @@ export function cleanLabels(raw){
   return out.length ? out : null;
 }
 
+/* When this player last saw each word (wordOrder.js on the client). Optional
+   and advisory: anything odd gives {} and NEVER rejects the payload, because
+   an older client does not send it at all. Only the player's own labels are
+   kept, so the map can never be bigger than their word list. */
+const SEEN_FUTURE_MS = 24 * 3600 * 1000;
+export function cleanSeen(raw, labels){
+  const out = {};
+  if(!isPlainObject(raw) || !Array.isArray(labels)) return out;
+  const latest = Date.now() + SEEN_FUTURE_MS;
+  for(const [k, v] of Object.entries(raw)){
+    if(typeof k !== "string" || typeof v !== "number") continue;
+    const label = k.replace(STRIP_RE, "").trim().toLowerCase().slice(0, MAX_LABEL);
+    if(!labels.includes(label) || !Number.isFinite(v) || v <= 0) continue;
+    out[label] = Math.min(v, latest);
+  }
+  return out;
+}
+
 export function cleanCode(raw){
   if(typeof raw !== "string") return null;
   const s = raw.trim().toUpperCase();

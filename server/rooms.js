@@ -21,6 +21,7 @@ import {
   PARTY_CHASE_WINDOW_MS,
   calculatePartyPlayerPoints,
 } from "../pose-charades-external-data/js/scoring.js";
+import { freshOrder } from "../pose-charades-external-data/js/wordOrder.js";
 
 export function createRoomStore({ config, emit }){
   const rooms = new Map();          // code -> room
@@ -45,7 +46,7 @@ export function createRoomStore({ config, emit }){
 
   /* ---------------- lifecycle ---------------- */
 
-  function createRoom(socketId, name, labels, settings){
+  function createRoom(socketId, name, labels, settings, seen = {}){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     if(rooms.size >= config.maxRooms) return { error: "server-full" };
     const code = randomCode();
@@ -53,7 +54,7 @@ export function createRoomStore({ config, emit }){
       code,
       kind: "1v1",
       createdAt: Date.now(),
-      players: [{ id: socketId, name, labels, score: 0, ready: false }],
+      players: [{ id: socketId, name, labels, seen, score: 0, ready: false }],
       /* host-picked, validated in index.js; falls back to server config */
       settings: {
         matchMs: settings?.matchMs ?? config.matchMs,
@@ -78,14 +79,14 @@ export function createRoomStore({ config, emit }){
     return { code };
   }
 
-  function joinRoom(socketId, code, name, labels){
+  function joinRoom(socketId, code, name, labels, seen = {}){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     const room = rooms.get(code);
     if(!room) return { error: "no-such-room" };
     if(room.kind === "party") return { error: "party-room" }; // client retries as party
     if(room.players.length >= 2) return { error: "room-full" };
     if(room.phase !== "lobby") return { error: "match-in-progress" };
-    room.players.push({ id: socketId, name, labels, score: 0, ready: false });
+    room.players.push({ id: socketId, name, labels, seen, score: 0, ready: false });
     socketRoom.set(socketId, code);
     const host = room.players[0];
     emit(host.id, "room:peer", { name });
@@ -142,13 +143,23 @@ export function createRoomStore({ config, emit }){
     return { ok: true };
   }
 
+  /* Unseen words first, then the ones seen longest ago (wordOrder.js). A
+     word's time is the LATEST any player in the room saw it, or this room
+     dealt it, so a rematch starts with the words the last match did not
+     reach. The first element is the next word: deal with dealWord(). */
+  const cryptoRand = () => crypto.randomInt(2 ** 31) / 2 ** 31;
   function shuffledDeck(room){
-    const words = room.sharedWords.slice();
-    for(let i = words.length - 1; i > 0; i--){
-      const j = crypto.randomInt(i + 1);
-      [words[i], words[j]] = [words[j], words[i]];
-    }
-    return words;
+    const seen = { ...(room.dealtAt || {}) };
+    for(const p of room.players)
+      for(const [w, t] of Object.entries(p.seen || {})) if(!(seen[w] >= t)) seen[w] = t;
+    return freshOrder(room.sharedWords, seen, cryptoRand);
+  }
+
+  function dealWord(room){
+    if(!room.deck.length) room.deck = shuffledDeck(room);
+    const word = room.deck.shift();
+    (room.dealtAt ||= {})[word] = Date.now();
+    return word;
   }
 
   function startMatch(room){
@@ -242,9 +253,8 @@ export function createRoomStore({ config, emit }){
       room.matchExpired = true;
       return finishMatchOrSuddenDeath(room);
     }
-    if(!room.deck.length) room.deck = shuffledDeck(room);
     room.phase = room.suddenDeath ? "sudden" : "round";
-    room.word = room.deck.pop();
+    room.word = dealWord(room);
     room.roundId = crypto.randomBytes(8).toString("hex");
     room.roundStart = Date.now();
     room.roundEnd = room.suddenDeath
@@ -527,13 +537,13 @@ export function createRoomStore({ config, emit }){
   }
   const teamCount = (room, team) => room.players.filter(p => p.team === team).length;
 
-  function partyCreate(socketId, name, settings, labels){
+  function partyCreate(socketId, name, settings, labels, seen = {}){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     if(rooms.size >= config.maxRooms) return { error: "server-full" };
     const code = randomCode();
     const room = {
       code, kind: "party", createdAt: Date.now(),
-      players: [{ id: socketId, name, team: "blue", labels: labels || [], score: 0 }],
+      players: [{ id: socketId, name, team: "blue", labels: labels || [], seen, score: 0 }],
       settings: {
         matchMs: settings?.matchMs ?? config.matchMs,
         wordMs: settings?.wordMs ?? config.wordMs,
@@ -545,7 +555,7 @@ export function createRoomStore({ config, emit }){
     return { code, roster: partyRoster(room) };
   }
 
-  function partyJoin(socketId, code, name, labels){
+  function partyJoin(socketId, code, name, labels, seen = {}){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
     const room = rooms.get(code);
     if(!room) return { error: "no-such-room" };
@@ -554,7 +564,7 @@ export function createRoomStore({ config, emit }){
     if(room.phase !== "lobby") return { error: "match-in-progress" };
     const blue = teamCount(room, "blue"), orange = teamCount(room, "orange");
     const team = orange < blue ? "orange" : (blue < orange ? "blue" : (blue < TEAM_CAP ? "blue" : "orange"));
-    room.players.push({ id: socketId, name, team, labels: labels || [], score: 0 });
+    room.players.push({ id: socketId, name, team, labels: labels || [], seen, score: 0 });
     socketRoom.set(socketId, code);
     broadcastRoster(room);
     return { code, roster: partyRoster(room) };
@@ -715,10 +725,9 @@ export function createRoomStore({ config, emit }){
   function startPartyRound(room){
     if(!rooms.has(room.code) || room.phase === "done") return;
     if(room.matchExpired || Date.now() >= room.matchEndsAt) return endPartyMatch(room);
-    if(!room.deck.length) room.deck = shuffledDeck(room);
     room.roundNum++;
     room.phase = "round";
-    room.word = room.deck.pop();
+    room.word = dealWord(room);
     room.roundId = crypto.randomBytes(8).toString("hex");
     room.roundStart = Date.now();
     room.roundEnd = Math.min(room.roundStart + room.settings.wordMs, room.matchEndsAt);

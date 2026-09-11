@@ -37,6 +37,7 @@ import {
   fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
+import { freshOrder, wordsSeen, markWordSeen } from "./wordOrder.js";
 import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
 
 /* One second a step, matching the server-driven 1v1/Party countdown
@@ -109,10 +110,10 @@ function runNumerals(done){
   }, PRECOUNT_STEP_MS);
 }
 
+/* Unseen words first, then the ones seen longest ago (wordOrder.js). The
+   first element is the next word, so the deck is dealt with shift(). */
 function shuffledDeck(){
-  const words=state.model.labels.filter(l=>l!=="idle");
-  for(let i=words.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [words[i],words[j]]=[words[j],words[i]]; }
-  return words;
+  return freshOrder(state.model.labels.filter(l=>l!=="idle"), wordsSeen());
 }
 
 const setTxt=(id,v)=>{ const el=$(id); if(el) el.textContent=v; };
@@ -242,7 +243,8 @@ function nextWord(){
   if(!ai && game.round>game.rounds){ endGame(); return; }
   if(ai && game.roundEndsAt-performance.now()<=0){ endSoloRun(); return; }
   if(!game.deck.length) game.deck=shuffledDeck();
-  game.word=game.deck.pop();
+  game.word=game.deck.shift();
+  markWordSeen(game.word);
   game.wordStart=performance.now();
   game.wordLimitMs=ai ? SOLO.wordMs : WORD_MS;
   game.wordEnd=game.wordStart+game.wordLimitMs;

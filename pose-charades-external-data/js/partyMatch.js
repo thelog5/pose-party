@@ -18,6 +18,7 @@ import { state } from "./state.js";
 import { fmtTime, fmtScore, setCountdown, showTimesUp,
          showFrameCheck, hideFrameCheck } from "./ui.js";
 import { blip } from "./audio.js";
+import { markWordSeen } from "./wordOrder.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS,
@@ -487,6 +488,7 @@ export function onPartyRound(payload){
   if(gameState() !== "playing" && !transition("playing")) return;
   g.roundId = payload.roundId;
   g.word = String(payload.word || "");
+  markWordSeen(g.word);
   g.claimed = false;
   g.holdSince = 0;
   g.myPlace = null;

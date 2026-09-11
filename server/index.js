@@ -18,7 +18,7 @@ import { Server } from "socket.io";
 import { config } from "./config.js";
 import { createRoomStore } from "./rooms.js";
 import { createLimiter } from "./ratelimit.js";
-import { cleanName, cleanLabels, cleanCode, cleanSettings, isPlainObject, signalOk } from "./validate.js";
+import { cleanName, cleanLabels, cleanSeen, cleanCode, cleanSettings, isPlainObject, signalOk } from "./validate.js";
 import { COOKIE, makeTicket, ticketValid, readCookie, codeMatches } from "./accessgate.js";
 import { gatePage } from "./gatepage.js";
 
@@ -394,7 +394,7 @@ io.on("connection", socket => {
     const labels = cleanLabels(payload.labels);
     const settings = cleanSettings(payload.settings);
     if(!name || !labels || settings === null) return cb({ error: "bad-payload" });
-    const res = store.createRoom(socket.id, name, labels, settings);
+    const res = store.createRoom(socket.id, name, labels, settings, cleanSeen(payload.seen, labels));
     log(`create by "${name}" -> ${res.code || "ERROR " + res.error}`);
     cb(res);
   });
@@ -410,7 +410,7 @@ io.on("connection", socket => {
       log(`join rejected: bad payload (code=${JSON.stringify(payload.code)})`);
       return cb({ error: "bad-payload" });
     }
-    const res = store.joinRoom(socket.id, code, name, labels);
+    const res = store.joinRoom(socket.id, code, name, labels, cleanSeen(payload.seen, labels));
     log(`join ${code} by "${name}" -> ${res.error ? "ERROR " + res.error : "ok, peer " + res.peerName}`);
     cb(res);
   });
@@ -476,7 +476,7 @@ io.on("connection", socket => {
     const settings = cleanSettings(payload.settings);
     const labels = cleanLabels(payload.labels);
     if(!name || settings === null || !labels) return cb({ error: "bad-payload" });
-    const res = store.partyCreate(socket.id, name, settings, labels);
+    const res = store.partyCreate(socket.id, name, settings, labels, cleanSeen(payload.seen, labels));
     log(`party create by "${name}" -> ${res.code || "ERROR " + res.error}`);
     cb(res);
   });
@@ -488,7 +488,7 @@ io.on("connection", socket => {
     const name = cleanName(payload.name);
     const labels = cleanLabels(payload.labels);
     if(!code || !name || !labels) return cb({ error: "bad-payload" });
-    const res = store.partyJoin(socket.id, code, name, labels);
+    const res = store.partyJoin(socket.id, code, name, labels, cleanSeen(payload.seen, labels));
     log(`party join ${code} by "${name}" -> ${res.error ? "ERROR " + res.error : "ok (" + res.roster.players.length + " players)"}`);
     cb(res);
   });
