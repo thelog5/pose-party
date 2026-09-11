@@ -30,7 +30,7 @@ import {
   playWordMissFeedback,
   fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
-import { captureShot, showResults, setRematchState } from "./results.js";
+import { captureMoment, showResults, setRematchState } from "./results.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp, swapSeatAwards,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
@@ -529,7 +529,7 @@ export function onPartyGot({ id, place } = {}){
   /* the pose they were holding when the AI got it is the funny frame */
   const slot = el.querySelector(".slot");
   const vid = slot?.querySelector("video") || (id === ctx.myId ? $("video") : null);
-  captureShot(id, g?.word, vid, id === ctx.myId);
+  captureMoment(id, g?.word, vid, id === ctx.myId);
   if(g) recordFinish(g, id, place);
   /* The server sorts finishes by timestamp at the END of the word, so nothing
      authoritative exists yet — quote the same shared formula it scores with,

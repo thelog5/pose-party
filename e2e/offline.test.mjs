@@ -2670,6 +2670,35 @@ console.log("move back:");
   ok(!timing.home, "never on Home, where nobody is being read");
 }
 
+/* ---- photo pairs ----
+   Two stills per recognition, and every pair kept: the reel used to cap at 8
+   and lose most of a good run. Ten recognitions must yield twenty stills, in
+   pairs that share one moment, and a pair whose second still lands after the
+   list was cleared must not leak into the next one. */
+{
+  const pairs = await page.evaluate(async () => {
+    const m = await import("/js/results.js");
+    const v = document.getElementById("video");
+    m.captureMoment("pairprobe", "ghost", v, true);
+    m.clearShots();                              // the ghost's second still is now stale
+    for(let i = 0; i < 10; i++){
+      m.captureMoment("pairprobe", "w" + i, v, true);
+      await new Promise(r => setTimeout(r, 30));
+    }
+    await new Promise(r => setTimeout(r, 900));
+    const list = m._shotsFor("pairprobe");
+    const byMoment = new Map();
+    for(const s of list) byMoment.set(s.moment, (byMoment.get(s.moment) || 0) + 1);
+    m.clearShots();
+    return { count: list.length, moments: byMoment.size,
+      allPairs: [...byMoment.values()].every(n => n === 2),
+      ghost: list.some(s => s.word === "ghost") };
+  });
+  ok(pairs.count === 20 && pairs.moments === 10 && pairs.allPairs,
+    `ten recognitions keep twenty stills, two per word (${pairs.count} / ${pairs.moments})`);
+  ok(!pairs.ghost, "a pair's late second still cannot leak into a cleared list");
+}
+
 /* ---- dev chrome ---- */
 {
   /* The rule keys on body[data-state], so read it there rather than driving

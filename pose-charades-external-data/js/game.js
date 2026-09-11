@@ -23,7 +23,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
 import { partyCheck } from "./partyMatch.js";
-import { captureShot, showResults } from "./results.js";
+import { captureMoment, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
          ROUND_END_PAUSE_MS, confettiFrom, deliverScorePenalty,
@@ -232,7 +232,7 @@ function nextWord(){
     game.pendingPts=pointsForCurrentWord();
     /* the still is grabbed at recognition, not when the chip lands */
     soloBegin(game.word, onSoloResolve,
-      ()=>captureShot("me", game.word, $("video"), true));
+      ()=>captureMoment("me", game.word, $("video"), true));
   }else{
     const stage=$("matchStage");
     stage?.classList.remove("you-locked","rival-locked");

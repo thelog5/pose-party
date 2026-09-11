@@ -20,12 +20,28 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 
 const SHOT_W = 640, SHOT_H = 426;     // 3:2 — covers both the square thumb and the frame
-const MAX_SHOTS = 8;                  // per player
+/* TWO PHOTOS PER WORD, AND KEEP THEM ALL. There used to be one still per
+   word and a cap of 8, so a good run lost most of its own photos before the
+   breakdown ever showed them. Now every word a player gets yields a pair —
+   the instant the AI locks it, and SHOT_PAIR_GAP_MS later, which is usually
+   the reaction — and the reel flips through every one.
+   MAX_SHOTS is a memory guard, not a design limit: the most words anybody can
+   get in a two-minute run is about forty, so 2 x 40. Each still is a ~50KB
+   JPEG data URL, and a six-player party holds six of these lists. */
+const MAX_SHOTS = 80;                 // per player
+const SHOT_PAIR_GAP_MS = 700;
 const SEATS = ["blue0", "blue1", "blue2", "orange0", "orange1", "orange2"];
 
-/* playerId -> [{url, word}] — in memory for this results screen only */
+/* playerId -> [{url, word, moment}] — in memory for this results screen only.
+   `moment` ties the two stills of one recognition together, so the strip can
+   lay them side by side. */
 const shots = new Map();
 let shotCanvas = null;
+let momentSeq = 0;
+/* Bumped on every clear. The second still of a pair is taken on a timer, and
+   one fired by the final word of a match must not land in a list that has
+   since been emptied for the NEXT match's results. */
+let shotEpoch = 0;
 
 let payload = null;       // the match summary being displayed
 let cycleTimer = 0;       // drives the GIF-style still cycle
@@ -75,10 +91,22 @@ function setResultsPage(page){
 
 /* ---------------- capture ---------------- */
 
-/* Called at each recognition. `videoEl` is whichever element is already
-   showing that player, so remote players are captured from their mesh feed
-   without anything extra crossing the wire. */
-export function captureShot(playerId, word, videoEl, mirror = false){
+/* Called at each recognition: the pair for one word. `videoEl` is whichever
+   element is already showing that player, so remote players are captured from
+   their mesh feed without anything extra crossing the wire. The element is
+   held by reference, so the second still follows the same player even if
+   Party hands their seat over in the meantime. */
+export function captureMoment(playerId, word, videoEl, mirror = false){
+  if(!playerId || !videoEl) return;
+  const moment = ++momentSeq, epoch = shotEpoch;
+  captureShot(playerId, word, videoEl, mirror, moment);
+  setTimeout(() => {
+    if(epoch === shotEpoch) captureShot(playerId, word, videoEl, mirror, moment);
+  }, SHOT_PAIR_GAP_MS);
+}
+
+/* One still. Exported on its own for the dev fixture, which seeds the reel. */
+export function captureShot(playerId, word, videoEl, mirror = false, moment = 0){
   if(!playerId || !videoEl) return;
   if(!videoEl.videoWidth || !videoEl.videoHeight) return;
   if(!shotCanvas){
@@ -99,12 +127,16 @@ export function captureShot(playerId, word, videoEl, mirror = false){
   try{ url = shotCanvas.toDataURL("image/jpeg", .72); }
   catch{ return; }                          // tainted canvas: skip silently
   const list = shots.get(playerId) || [];
-  list.push({ url, word: word || "" });
+  list.push({ url, word: word || "", moment: moment || ++momentSeq });
   while(list.length > MAX_SHOTS) list.shift();
   shots.set(playerId, list);
 }
 
-export function clearShots(){ shots.clear(); }
+export function clearShots(){ shots.clear(); shotEpoch++; }
+
+/* Test hook, read-only (same convention as fsm.js's _reset): a copy of one
+   player's stills, so the suite can count the pairs without a results screen. */
+export const _shotsFor = id => (shots.get(id) || []).map(s => ({ ...s }));
 
 /* ---------------- awards ----------------
    Everyone gets exactly one. Ending a match with no callout is the difference
@@ -994,36 +1026,64 @@ function syncPhotoStripTarget(){
   }
 }
 
-/* One column per player, one row per word, on the same cream ground the
-   boards are made of. Solo and Party pass a single player and get the strip
-   they always got; 1v1 passes both and gets them side by side, which is also
-   the only arrangement in which the two reels stay comparable word for word.
-   Nothing leaves the machine: these are in-memory data URLs. */
+/* One row per WORD, with that word's two stills side by side, and one pair
+   of columns per player, on the same cream ground the boards are made of.
+   Solo and Party pass a single player; 1v1 passes both, so the two reels stay
+   comparable word for word.
+
+   Rows, not one still per row: at two stills per word a strong run is about
+   eighty stills, and eighty 426px rows is ~36,000px tall — past the 32,767px a
+   Chrome canvas can be, which saves a blank image rather than failing loudly.
+   STRIP_MAX_SIDE / STRIP_MAX_AREA shrink the whole sheet if even the rows
+   would pass what Safari allows. Nothing leaves the machine: these are
+   in-memory data URLs. */
+const STRIP_MAX_SIDE = 16000, STRIP_MAX_AREA = 60e6;
+/* Grouped by the recognition each still belongs to, not by adjacency: the
+   second still lands on a timer, so two words recognised close together would
+   interleave and a "consecutive" grouping would split every pair. Rows keep
+   the order their words were first seen in, and never hold more than two. */
+function pairsOf(list){
+  const rows = new Map();
+  for(const shot of list){
+    const row = rows.get(shot.moment);
+    if(!row) rows.set(shot.moment, [shot]);
+    else if(row.length < 2) row.push(shot);
+  }
+  return [...rows.values()];
+}
 function stitchStrip(columns, filename){
   const pad = 18, w = SHOT_W, h = SHOT_H;
-  const head = 54;                        // name band above each column
-  const rows = Math.max(...columns.map(c => c.list.length));
+  const head = 54;                        // name band above each player
+  const players = columns.map(col => ({ name: col.name, rows: pairsOf(col.list) }));
+  const rows = Math.max(...players.map(p => p.rows.length));
+  const perPlayer = 2 * (w + pad);
+  const W = pad + players.length * perPlayer + (players.length - 1) * pad;
+  const H = pad + head + rows * (h + pad);
+  const k = Math.min(1, STRIP_MAX_SIDE / W, STRIP_MAX_SIDE / H, Math.sqrt(STRIP_MAX_AREA / (W * H)));
   const c = document.createElement("canvas");
-  c.width = pad + columns.length * (w + pad);
-  c.height = pad + head + rows * (h + pad);
+  c.width = Math.ceil(W * k);
+  c.height = Math.ceil(H * k);
   const ctx = c.getContext("2d");
+  ctx.scale(k, k);
   ctx.fillStyle = "#f4ece0";
-  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillRect(0, 0, W, H);
+  const x0 = i => pad + i * (perPlayer + pad);
 
-  /* A single column is the original strip and needs no caption to tell you
-     whose it is; two columns are unreadable without one. */
-  if(columns.length > 1){
+  /* A single player is the original strip and needs no caption to say whose
+     it is; two are unreadable without one. */
+  if(players.length > 1){
     ctx.fillStyle = "#17356f";
     ctx.font = "700 30px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    columns.forEach((col, i) => {
-      ctx.fillText(col.name.toUpperCase(),
-        pad + i * (w + pad) + w / 2, pad + head / 2, w);
-    });
+    players.forEach((pl, i) => ctx.fillText(pl.name.toUpperCase(),
+      x0(i) + (perPlayer - pad) / 2, pad + head / 2, perPlayer - pad));
   }
 
-  const total = columns.reduce((n, col) => n + col.list.length, 0);
+  const cells = [];
+  players.forEach((pl, i) => pl.rows.forEach((pair, r) => pair.forEach((shot, j) =>
+    cells.push({ shot, x: x0(i) + j * (w + pad), y: pad + head + r * (h + pad) }))));
+  const total = cells.length;
   let settled = 0, drawn = 0;
   const finish = () => {
     if(++settled !== total) return;
@@ -1036,16 +1096,12 @@ function stitchStrip(columns, filename){
       ? (columns.length > 1 ? "Both photo strips saved." : "Photo strip saved.")
       : "Photo strip saved with the available shots.");
   };
-  columns.forEach((col, i) => col.list.forEach((shot, r) => {
+  for(const { shot, x, y } of cells){
     const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, pad + i * (w + pad), pad + head + r * (h + pad), w, h);
-      drawn++;
-      finish();
-    };
+    img.onload = () => { ctx.drawImage(img, x, y, w, h); drawn++; finish(); };
     img.onerror = finish;
     img.src = shot.url;
-  }));
+  }
 }
 
 const slug = name => String(name || "strip").toLowerCase().replace(/\W+/g, "-")

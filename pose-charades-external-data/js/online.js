@@ -35,7 +35,7 @@ import {
   fitGameplayText,
 } from "./gameplayFeedback.js";
 import {
-  captureShot,
+  captureMoment,
   setRematchState,
   setRematchUnavailable,
   showResults,
@@ -909,8 +909,8 @@ function showMatchAward(side, points){
   if(!rival) confettiFrom($("vsWordCard"));
   /* grab whoever was recognised, from the feed already showing them */
   const word = state.game?.word;
-  if(rival) captureShot("rival", word, $("videoRemote"), false);
-  else captureShot("me", word, $("video"), true);
+  if(rival) captureMoment("rival", word, $("videoRemote"), false);
+  else captureMoment("me", word, $("video"), true);
 }
 
 /* End of the word: every paper still on the board is carried into the card it
