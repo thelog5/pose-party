@@ -2787,7 +2787,7 @@ console.log("move back:");
   const framing = await page.evaluate(async () => {
     const { notePresence, presence, resetPresence } =
       await import("/js/presence.js");
-    const body = ({ noseY, shY, hipY, span }) => {
+    const body = ({ noseY, shY, hipY, span, kneeY = hipY + .30 }) => {
       const lm = Array.from({ length: 33 }, () => ({ x:.5, y:.5, z:0, visibility:1 }));
       lm[0]  = { x:.5, y:noseY, z:0, visibility:1 };
       lm[7]  = { x:.5 - span*.18, y:noseY, z:0, visibility:1 };
@@ -2796,13 +2796,17 @@ console.log("move back:");
       lm[12] = { x:.5 + span/2, y:shY, z:0, visibility:1 };
       lm[23] = { x:.5 - span*.35, y:hipY, z:0, visibility:1 };
       lm[24] = { x:.5 + span*.35, y:hipY, z:0, visibility:1 };
+      lm[25] = { x:.5 - span*.30, y:kneeY, z:0, visibility:1 };
+      lm[26] = { x:.5 + span*.30, y:kneeY, z:0, visibility:1 };
       return lm;
     };
-    const read = cfg => { resetPresence();
+    const settle = cfg => { resetPresence();
       let t = 0;
       for(let i = 0; i < 6; i++){ t += 33; notePresence(body(cfg), t); }
-      return presence().cropped;
+      return presence();
     };
+    const read = cfg => settle(cfg).cropped;
+    const far = cfg => settle(cfg).farEnough;
     return {
       roomy:     read({ noseY:.12, shY:.28, hipY:.62,  span:.30 }),
       smallRoom: read({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
@@ -2810,6 +2814,11 @@ console.log("move back:");
       tooClose:  read({ noseY:.05, shY:.24, hipY:1.15, span:.40 }),
       headOff:   read({ noseY:-.10, shY:.20, hipY:.90, span:.40 }),
       farAway:   read({ noseY:.30, shY:.38, hipY:1.10, span:.13 }),
+      /* the clear rule: head in AND knees in */
+      backRoomy: far({ noseY:.12, shY:.28, hipY:.62,  span:.30 }),
+      hipsOnly:  far({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
+      kneesIn:   far({ noseY:.08, shY:.22, hipY:.70,  span:.32, kneeY:.98 }),
+      stillClose:far({ noseY:.05, shY:.24, hipY:1.15, span:.40 }),
     };
   });
   ok(framing.tooClose && framing.headOff,
@@ -2820,6 +2829,10 @@ console.log("move back:");
     "a small room with the hips low but visible is never told to move back");
   ok(!framing.farAway,
     "a far-away hip misread cannot fire it (the shoulder-span gate)");
+  ok(framing.backRoomy && framing.kneesIn,
+    "head and knees in the picture count as far enough back");
+  ok(!framing.hipsOnly && !framing.stillClose,
+    "hips back on the bottom edge are NOT far enough back to clear it");
 
   const card = await page.evaluate(() => {
     const el = document.getElementById("moveBack");
@@ -2848,20 +2861,24 @@ console.log("move back:");
     const { updateMoveBack } = await import("/js/ui.js");
     const card = document.getElementById("moveBack");
     const up = () => !card.classList.contains("hidden");
-    const was = state.screen, crop = { seen:true, cropped:true },
-          fine = { seen:true, cropped:false }, gone = { seen:false, cropped:false };
+    const was = state.screen, crop = { seen:true, cropped:true, farEnough:false },
+          halfway = { seen:true, cropped:false, farEnough:false },
+          fine = { seen:true, cropped:false, farEnough:true },
+          gone = { seen:false, cropped:false, farEnough:false };
     const r = {};
     state.screen = "solo";
     updateMoveBack(crop, 1000); updateMoveBack(crop, 1500); r.lean = up();
     updateMoveBack(crop, 2000);                              r.shown = up();
     for(let t = 2100; t <= 60000; t += 100) updateMoveBack(crop, t);
     r.stillUpAfterAMinute = up();
-    updateMoveBack(fine, 60100); updateMoveBack(fine, 60300); r.blip = up();
-    updateMoveBack(fine, 60600);                             r.cleared = up();
-    updateMoveBack(crop, 61000); updateMoveBack(crop, 62000); updateMoveBack(gone, 62100);
+    for(let t = 60100; t <= 62000; t += 100) updateMoveBack(halfway, t);
+    r.halfwayStaysUp = up();
+    updateMoveBack(fine, 62100); updateMoveBack(fine, 62300); r.blip = up();
+    updateMoveBack(fine, 62600);                             r.cleared = up();
+    updateMoveBack(crop, 63000); updateMoveBack(crop, 64000); updateMoveBack(gone, 64100);
     r.walkedOut = up();
     state.screen = "home";
-    updateMoveBack(crop, 63000); updateMoveBack(crop, 65000); r.home = up();
+    updateMoveBack(crop, 65000); updateMoveBack(crop, 67000); r.home = up();
     state.screen = was;
     card.classList.add("hidden");
     return r;
@@ -2869,6 +2886,8 @@ console.log("move back:");
   ok(!timing.lean && timing.shown, "a lean forward does not raise it; a real crop does, after 0.9s");
   ok(timing.stillUpAfterAMinute,
     "it stays up for as long as the player is too close, a full minute included");
+  ok(timing.halfwayStaysUp,
+    "out of the crop but not yet far enough back: it stays up");
   ok(timing.blip && !timing.cleared,
     "it comes down 0.4s after they step back, not on the first good frame");
   ok(!timing.walkedOut, "nobody in shot is not somebody too close");
