@@ -276,9 +276,12 @@ export function showTimesUp(){
    too close instead (head and hips only, feet never required — see
    presence.js), not by hiding the message.
 
+   IT COMES DOWN ONLY WHEN THEY ARE MOST OF THE WAY BACK. Up on `cropped`
+   (head or hips out), down only on `farEnough` (head and KNEES in). Hips
+   back on the bottom edge used to be enough, and that is still too close.
+
    Two short delays remain, and both are about flicker, not about nagging: a
-   lean forward does not raise it, and a moment of hips-back-in-frame does not
-   drop it. */
+   lean forward does not raise it, and one good frame does not drop it. */
 const MVB_SHOW_AFTER_MS = 900;    // a lean forward is not a problem
 const MVB_CLEAR_AFTER_MS = 400;   // and it comes down promptly once they move
 const MVB_SCREENS = new Set(["solo", "match", "pmatch", "train"]);
@@ -339,6 +342,8 @@ export function updateMoveBack(p, now){
 
   mvbSince = 0;
   if(!showing) return;
+  /* out of the crop, but not back far enough yet: it stays up */
+  if(!p.farEnough){ mvbClearSince = 0; return; }
   if(!mvbClearSince) mvbClearSince = now;
   if(now - mvbClearSince >= MVB_CLEAR_AFTER_MS){
     card.classList.add("hidden");

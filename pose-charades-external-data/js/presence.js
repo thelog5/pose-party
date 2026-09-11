@@ -164,6 +164,17 @@ const CROP_MARGIN = .03;
    SHOULDER_REF (.30) is normal playing distance, so this is well short of it
    and cannot fire on somebody across the room. */
 const CROP_MIN_SPAN = .20;
+/* ── AND TAKING IT DOWN IS STRICTER THAN PUTTING IT UP ─────────────────────
+   Hysteresis. The warning goes UP on a crop (head or hips out). It comes DOWN
+   only when the player is most of the way back: head in the picture AND the
+   knees in it too. The old rule took it down the moment the hips were back on
+   the bottom edge, which is still too close to read a pose, and the player
+   asked for it to be stricter. A small room is still safe: somebody whose
+   hips were never out never sees the warning at all, so they never have to
+   clear it. When the knees are not reported, the hips must sit this far up
+   the picture instead. */
+const KNEES_IN = 1.0;
+const HIPS_UP_FALLBACK = .85;
 
 const out = {
   x: 0, y: 0, scale: 0, energy: 0, seen: false, lostMs: 0, t: 0,
@@ -172,6 +183,9 @@ const out = {
      keep saying it, are presentation decisions and only the consumer knows
      them. Same reasoning as `seen`/`lostMs` above. */
   cropped: false,
+  /* raw, this-frame: head AND knees in the picture (or far away). The
+     consumer takes a warning down only on this, never on `!cropped`. */
+  farEnough: true,
 };
 
 /* Head above the top edge, or hips below the bottom one. */
@@ -181,6 +195,18 @@ function croppedNow(lm){
   if(Number.isFinite(nose?.y) && nose.y < -CROP_MARGIN) return true;
   if(!Number.isFinite(hipL?.y) || !Number.isFinite(hipR?.y)) return false;
   return (hipL.y + hipR.y) / 2 > 1 + CROP_MARGIN;
+}
+
+/* Head in, and knees in. See the hysteresis note above. */
+function farEnoughNow(lm){
+  if(mSpan < CROP_MIN_SPAN) return true;
+  const nose = lm[0], kneeL = lm[25], kneeR = lm[26], hipL = lm[23], hipR = lm[24];
+  if(Number.isFinite(nose?.y) && nose.y < 0) return false;
+  if(Number.isFinite(kneeL?.y) && Number.isFinite(kneeR?.y))
+    return (kneeL.y + kneeR.y) / 2 <= KNEES_IN;
+  if(Number.isFinite(hipL?.y) && Number.isFinite(hipR?.y))
+    return (hipL.y + hipR.y) / 2 <= HIPS_UP_FALLBACK;
+  return false;
 }
 
 /* ── FRAME-RATE INDEPENDENCE ──────────────────────────────────────────────
@@ -278,6 +304,7 @@ export function notePresence(lm, now){
     out.lostMs = Math.max(0, t - (havePos ? lastGoodT : firstT));
     out.energy = pEnergy;
     out.cropped = false;      // nobody in shot is not the same as badly framed
+    out.farEnough = false;
     out.t = t;
     return;
   }
@@ -318,6 +345,7 @@ export function notePresence(lm, now){
   out.seen = true;
   out.lostMs = 0;
   out.cropped = croppedNow(lm);
+  out.farEnough = farEnoughNow(lm);
   out.t = t;
 }
 
@@ -333,6 +361,7 @@ export function presence(){ return out; }
    often a different person. Nothing in here is worth carrying across one. */
 export function resetPresence(){
   out.cropped = false;
+  out.farEnough = true;
   px = py = pScale = pEnergy = 0;
   havePos = false;
   following = false;
