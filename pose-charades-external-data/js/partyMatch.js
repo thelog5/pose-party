@@ -15,7 +15,8 @@
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
-import { fmtTime, fmtScore, setCountdown, showTimesUp } from "./ui.js";
+import { fmtTime, fmtScore, setCountdown, showTimesUp,
+         showFrameCheck, hideFrameCheck } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
@@ -139,20 +140,26 @@ export function startPartyCountdown({tutorialId, startAt, matchEndsAt}={}){
   runCountdown(startAt);
 }
 
+/* Same split as 1v1: above the last three seconds is the FULL BODY check,
+   the last three are the numerals. */
 function runCountdown(startAt){
   const cd = $("countdown");
-  cd.classList.remove("hidden");
   clearInterval(ctx.countdownTimer);
-  ctx.countdownTimer = setInterval(() => {
+  const tick = () => {
     const s = gameState();
     if(s !== "countdown" && s !== "playing"){
-      clearInterval(ctx.countdownTimer); cd.classList.add("hidden"); return;
+      clearInterval(ctx.countdownTimer); cd.classList.add("hidden"); hideFrameCheck(); return;
     }
     const left = Math.ceil((startAt - ctx.serverNow()) / 1000);
+    if(left > 3){ showFrameCheck(); cd.classList.add("hidden"); return; }
+    hideFrameCheck();
     if(left > 0){
+      cd.classList.remove("hidden");
       if(setCountdown(left)) blip([440]);
     }else{ clearInterval(ctx.countdownTimer); cd.classList.add("hidden"); }
-  }, 100);
+  };
+  tick();
+  ctx.countdownTimer = setInterval(tick, 100);
 }
 
 /* ---------------- seating ----------------

@@ -20,6 +20,12 @@ export const config = {
   matchMs: int(process.env.MATCH_MS, 120000),
   wordMs: int(process.env.WORD_MS, 20000),
   preCountMs: int(process.env.PRECOUNT_MS, 3000),
+  /* The FULL BODY warning plays before the 3-2-1, on every client at once,
+     so the server owns its length: it is added in front of preCountMs. The
+     client shows the warning for as long as more than three seconds remain
+     and the numerals for the last three, so it needs no copy of this number
+     and a client that arrives late simply sees less of the warning. */
+  frameCheckMs: int(process.env.FRAME_CHECK_MS, 2000),
   /* HOW TO PLAY IS A GRACE, NOT A BARRIER. Multiplayer used to hold the match
      until every current client had dismissed the card, with a 15s fallback
      for a crashed tab. In practice that meant a room of six sat on a screen

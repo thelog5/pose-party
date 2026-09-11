@@ -21,7 +21,7 @@ import { state } from "./state.js";
 import { toast, fmtTime, fmtScore, fitMatchPaperText,
          renderRemoteMatchGuess, setCountdown, showTimesUp,
          showSuddenDeath, hideSuddenDeath, stopMatchFill,
-         MATCH_ROBOT } from "./ui.js";
+         MATCH_ROBOT, showFrameCheck, hideFrameCheck } from "./ui.js";
 import { robotMiss } from "./robot.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
@@ -831,15 +831,24 @@ function onMatchStart({tutorialId, startAt, matchEndsAt, players}={}){
   if($("v1MatchTime")) $("v1MatchTime").textContent=fmtTime(
     initialMatchLeft,{compact:true});
 
+  /* The server's lead is frameCheckMs + preCountMs. Everything above the last
+     three seconds is the FULL BODY check, the last three are the numerals, so
+     this needs no copy of either number and a late client just sees less of
+     the check. */
   const cd=$("countdown");
-  cd.classList.remove("hidden");
   clearInterval(countdownTimer);
-  countdownTimer=setInterval(()=>{
-    if(gameState()!=="countdown" && gameState()!=="playing"){ clearInterval(countdownTimer); cd.classList.add("hidden"); return; }
+  const tick=()=>{
+    if(gameState()!=="countdown" && gameState()!=="playing"){
+      clearInterval(countdownTimer); cd.classList.add("hidden"); hideFrameCheck(); return;
+    }
     const left=Math.ceil((startAt-serverNow())/1000);
-    if(left>0){ if(setCountdown(left)) blip([440]); }
+    if(left>3){ showFrameCheck(); cd.classList.add("hidden"); return; }
+    hideFrameCheck();
+    if(left>0){ cd.classList.remove("hidden"); if(setCountdown(left)) blip([440]); }
     else { clearInterval(countdownTimer); cd.classList.add("hidden"); }
-  },100);
+  };
+  tick();
+  countdownTimer=setInterval(tick,100);
 }
 
 function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){

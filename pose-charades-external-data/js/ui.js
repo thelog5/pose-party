@@ -290,6 +290,20 @@ let mvbSince = 0, mvbClearSince = 0;
    else), and this module already sees every frame's screen. */
 let mvbScreen = "";
 
+/* ── FULL BODY CHECK ──────────────────────────────────────────────────────
+   One beat between HOW TO PLAY and the 3·2·1, in every mode. Idempotent in
+   both directions because the multiplayer countdowns call it from a 100ms
+   tick: it sounds once when it appears and never again while it stays up. */
+export function showFrameCheck(){
+  const el = $("frameCheck");
+  if(!el || !el.classList.contains("hidden")) return;
+  $("moveBack")?.classList.add("hidden");     // one red paper at a time
+  el.classList.remove("hidden");
+  blip([330, 262], .1);
+}
+export function hideFrameCheck(){ $("frameCheck")?.classList.add("hidden"); }
+const frameCheckUp = () => !$("frameCheck")?.classList.contains("hidden");
+
 export function resetMoveBack(){
   mvbSince = mvbClearSince = 0;
   $("moveBack")?.classList.add("hidden");
@@ -307,7 +321,7 @@ export function updateMoveBack(p, now){
   /* Only where a body is actually being read. Home and the lobbies show the
      camera too, but nobody is trying to be recognised on them. And nobody in
      shot is not the same as somebody too close. */
-  if(!MVB_SCREENS.has(state.screen) || !p || !p.seen){
+  if(!MVB_SCREENS.has(state.screen) || !p || !p.seen || frameCheckUp()){
     if(showing) card.classList.add("hidden");
     mvbSince = mvbClearSince = 0;
     return;

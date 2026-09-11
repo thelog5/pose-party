@@ -21,6 +21,9 @@ const ENV = {
   ROUNDS: "3",
   WORD_MS: "1200",
   PRECOUNT_MS: "250",
+  /* the FULL BODY check sits in front of the pre-count; kept short for the
+     same reason the pre-count is */
+  FRAME_CHECK_MS: "100",
   /* HOW TO PLAY is a grace, not a barrier: long enough here that the
      deliberate one-acknowledgement-at-a-time assertions below still see the
      room held, short enough that the grace-only release is quick to prove. */
@@ -330,7 +333,10 @@ try {
   await emit(H, "match:tutorial-ready", { tutorialId:hp.tutorialId });
   await emit(I, "match:tutorial-ready", { tutorialId:ip.tutorialId });
   const hs = await hStart;
-  ok(hs.matchEndsAt - Date.now() <= 10500, "deadline ≈ startAt + 10s");
+  ok(Math.abs(hs.matchEndsAt - hs.startAt - 10000) < 50, "deadline ≈ startAt + 10s");
+  const lead = hs.startAt - Date.now();
+  ok(lead > 150 && lead <= 350,
+    `the start leaves room for the FULL BODY check plus the 3-2-1 (${lead}ms of 350)`);
   // Trigger a chase just before the 10s match deadline. It must own its full
   // five seconds, then end the match without dealing another word.
   const hr1 = await once(H, "round:start");

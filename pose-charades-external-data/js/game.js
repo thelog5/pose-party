@@ -16,7 +16,8 @@ import { ROUNDS, WORD_MS, RIVAL_THRESH, SOLO,
          PTS_CORRECT, PTS_FAST_BONUS, FAST_WINDOW_MS, PTS_SKIP } from "./constants.js";
 import { toast, flash, renderGuesses, topGuesses, fmtTime, fmtScore,
          localMatchGuessIs, setCountdown, showTimesUp,
-         setMatchLockHandler, MATCH_ROBOT } from "./ui.js";
+         setMatchLockHandler, MATCH_ROBOT,
+         showFrameCheck, hideFrameCheck } from "./ui.js";
 import { robotMiss } from "./robot.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
@@ -43,6 +44,10 @@ import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
    same overlay, and its 2.4s barely cleared the 1.25s HUD entrance — so the
    board was still landing on "2". */
 const PRECOUNT_FROM = 3, PRECOUNT_STEP_MS = 1000;
+/* The FULL BODY check that plays before the numerals. The same length as the
+   server's `frameCheckMs`, so Solo and the online modes share one rhythm. */
+const FRAME_CHECK_MS = 2000;
+let frameCheckTimer = 0;
 /* Long enough for the whole payoff to finish: 180ms of recognition impact,
    then the award paper's 640ms hold and 560ms delivery into the score card.
    At the old 1050ms the next word started while the points were still in the
@@ -73,10 +78,24 @@ export function bindGameLifecycle(){
 
 function cancelPreCount(){
   if(preCountTimer){ clearInterval(preCountTimer); preCountTimer=null; }
+  clearTimeout(frameCheckTimer); frameCheckTimer=0;
+  hideFrameCheck();
   $("countdown").classList.add("hidden");
 }
 
+/* FULL BODY check first, then the numerals. Everything the check sets up is
+   torn down by cancelPreCount, so leaving mid-check (Esc) leaves nothing up. */
 function runPreCount(done){
+  clearTimeout(frameCheckTimer);
+  showFrameCheck();
+  frameCheckTimer=setTimeout(()=>{
+    frameCheckTimer=0;
+    hideFrameCheck();
+    runNumerals(done);
+  }, FRAME_CHECK_MS);
+}
+
+function runNumerals(done){
   let n=PRECOUNT_FROM;
   const cd=$("countdown");
   cd.classList.remove("hidden"); setCountdown(n);

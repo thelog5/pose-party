@@ -195,7 +195,8 @@ export function createRoomStore({ config, emit }){
     if(!rooms.has(room.code) || room.phase !== "tutorial") return false;
     clearTimeout(room.timer);
     room.phase = "starting";
-    const startAt = Date.now() + config.preCountMs;
+    const lead = config.frameCheckMs + config.preCountMs;
+    const startAt = Date.now() + lead;
     /* time-based mode: the match clock starts when round 1 does */
     room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
@@ -205,7 +206,7 @@ export function createRoomStore({ config, emit }){
         matchEndsAt: room.matchEndsAt,
         players: scoresPayload(room),
       });
-    room.timer = setTimeout(() => startRound(room), config.preCountMs);
+    room.timer = setTimeout(() => startRound(room), lead);
     room.matchTimer = setTimeout(() => onMatchDeadline(room),
       Math.max(0, room.matchEndsAt - Date.now()));
     return true;
@@ -671,7 +672,8 @@ export function createRoomStore({ config, emit }){
     if(!rooms.has(room.code) || room.phase !== "tutorial") return false;
     clearTimeout(room.timer);
     room.phase = "starting";
-    const startAt = Date.now() + config.preCountMs;
+    const lead = config.frameCheckMs + config.preCountMs;
+    const startAt = Date.now() + lead;
     room.matchEndsAt = startAt + room.settings.matchMs;
     for(const p of room.players)
       emit(p.id, "party:countdown", {
@@ -679,7 +681,7 @@ export function createRoomStore({ config, emit }){
         startAt,
         matchEndsAt: room.matchEndsAt,
       });
-    room.timer = setTimeout(() => startPartyRound(room), config.preCountMs);
+    room.timer = setTimeout(() => startPartyRound(room), lead);
     room.matchTimer = setTimeout(() => {
       room.matchExpired = true;
       room.matchTimer = null;

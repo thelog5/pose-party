@@ -583,6 +583,31 @@ ok(await page.evaluate(() =>
   document.getElementById("howToPlay").classList.contains("hidden")),
   "I'M READY dismisses the card");
 
+/* FULL BODY CHECK: one beat between the card and the numerals. It has to come
+   FIRST and give way cleanly, never share the screen with a numeral. */
+const check = await page.evaluate(async () => {
+  const up = id => !document.getElementById(id).classList.contains("hidden");
+  const at0 = { check: up("frameCheck"), numeral: up("countdown"),
+    text: document.querySelector("#frameCheck .fc-title").textContent,
+    art: document.querySelector("#frameCheck img").getAttribute("src") };
+  let overlap = false, sawNumeral = false;
+  const t0 = performance.now();
+  while(performance.now() - t0 < 3200 && !sawNumeral){
+    if(up("frameCheck") && up("countdown")) overlap = true;
+    if(up("countdown")) sawNumeral = true;
+    await new Promise(r => setTimeout(r, 25));
+  }
+  return { at0, overlap, sawNumeral, checkGone: !up("frameCheck"),
+    switchedAt: Math.round(performance.now() - t0) };
+});
+ok(check.at0.check && !check.at0.numeral,
+  "Solo shows the FULL BODY check before any numeral");
+ok(check.at0.text === "MAKE SURE YOUR FULL BODY IS IN CAMERA" &&
+  check.at0.art === "assets/ui/figma/warn-paper-red.png",
+  "it is the Figma warning paper with the full-body line");
+ok(check.sawNumeral && check.checkGone && !check.overlap,
+  `then it gives way to the 3·2·1, never sharing the screen (${check.switchedAt}ms)`);
+
 await page.waitForFunction(() => document.body.dataset.state === "playing", { timeout: 8000 });
 ok(await fsmState() === "playing", "countdown -> playing");
 ok(await bodyScreen() === "solo", "solo screen shown");
