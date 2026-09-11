@@ -28,7 +28,7 @@ import { captureMoment, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
          ROUND_END_PAUSE_MS, confettiFrom, deliverScorePenalty,
-         clearCelebrations, resetSoloBoard } from "./soloRound.js";
+         clearCelebrations, resetSoloBoard, redFlash } from "./soloRound.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
 import {
@@ -383,7 +383,7 @@ function finishWord(winner, opts={}){
         onLand: () => { scorePaintHeld=false; paintPracticeScores(); },
       });
     }
-    else showTimesUp();
+    else{ showTimesUp(); redFlash($("vsWordCard")); }
     playWordMissFeedback($("vsWordCard"),1);
     robotMiss(MATCH_ROBOT.my, opts.skip ? "skip" : "timeout");
     flash("bad");

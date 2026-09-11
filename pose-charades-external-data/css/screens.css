@@ -459,9 +459,23 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 .solostage:has(#spGuessBot.empty) #spTapeGuessBottom{opacity:0}
 
 /* green win flash */
-.sp-flash{position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 55%,rgba(63,201,140,.55),rgba(27,117,50,.35) 70%,transparent)}
-.sp-flash.fire{animation:spflash .8s ease-out}
-@keyframes spflash{0%{opacity:1}100%{opacity:0}}
+/* YOU GOT IT, in green, and YOU RAN OUT OF TIME, in red — as big as the
+   screen. The flash used to be a soft glow in the middle that faded over
+   0.8s, and players looked straight past it. It is now the whole stage: a
+   tint over the camera (so you flash green yourself), a thick border and a
+   deep glow in from every edge, snapped on and HELD for about half a second
+   before it fades, because a flash that starts fading on its first frame is
+   the easy one to miss. The red is the same flash in the deadline red every
+   clock in this game already uses. It sits over the camera and the robot and
+   under nothing that matters: the award paper and confetti are fixed to the
+   body, above every stage. */
+.sp-flash{--fx:63,201,140;position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;
+  background:rgba(var(--fx),.34);
+  box-shadow:inset 0 0 0 min(1.3vw,2.3vh) rgba(var(--fx),.95),
+    inset 0 0 min(14vw,25vh) min(4vw,7vh) rgba(var(--fx),.85)}
+.sp-flash.miss{--fx:232,64,42}
+.sp-flash.fire{animation:spflash 1.15s ease-out}
+@keyframes spflash{0%{opacity:0}7%{opacity:1}45%{opacity:1}100%{opacity:0}}
 
 /* --- paper cards -------------------------------------------------------
    Each card is an inline-size container, so `cqw` == 1% of the card width.

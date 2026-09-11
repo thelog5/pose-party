@@ -27,7 +27,7 @@ import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { gameTick } from "./game.js";
 import { createPeer } from "./webrtc.js";
-import { confettiFrom, greenFlash } from "./soloRound.js";
+import { confettiFrom, greenFlash, redFlash } from "./soloRound.js";
 import { THRESH } from "./constants.js";
 import {
   markGuessRecognized,
@@ -1093,6 +1093,8 @@ function onRoundResult({
   const localSucceeded=iWasFirst || (caught&&iWasChaser);
   if(!localSucceeded){
     playWordMissFeedback($("vsWordCard"),THRESH);
+    /* the word or the five-second chase ran out on you */
+    redFlash($("vsWordCard"));
     robotMiss(MATCH_ROBOT.my);
   }
   const stage=$("matchStage");

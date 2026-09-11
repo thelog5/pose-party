@@ -22,7 +22,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS,
          calculatePartyPlayerPoints } from "./scoring.js";
-import { confettiFrom, greenFlash } from "./soloRound.js";
+import { confettiFrom, greenFlash, redFlash } from "./soloRound.js";
 import {
   RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
   createGuessHistory, resetGuessHistory, updateGuessHistory,
@@ -640,6 +640,8 @@ export function onPartyResult(payload){
   if(!mine && payload.reason === "timeout") showTimesUp();
   if(!mine){
     playWordMissFeedback($("pmWordCard"), CLAIM_THRESH);
+    /* the word closed without you: the clock or the final chase beat you */
+    redFlash($("pmWordCard"));
     robotMiss("pmRobotMine");
   }
 }

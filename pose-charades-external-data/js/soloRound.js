@@ -231,12 +231,19 @@ function beginLock(){
    to be Solo-only: 1v1 fired ui.js's flash(), which lives INSIDE #cameraDock
    and so tinted just the local half of the split, and Party fired nothing at
    all. Same lookup confettiFrom uses, so the two always land together. */
-export function greenFlash(node){
+/* One flash element per stage, two colours: green when YOU get the word, red
+   when the clock beats you. A skip is the player's own choice and gets
+   neither. */
+function stageFlash(node, miss){
   const stage = node?.closest(".solostage,.matchstage,.pmstage");
   const f = stage?.querySelector(".sp-flash");
   if(!f) return;
-  f.classList.remove("fire"); void f.offsetWidth; f.classList.add("fire");
+  f.classList.remove("fire", "miss"); void f.offsetWidth;
+  if(miss) f.classList.add("miss");
+  f.classList.add("fire");
 }
+export const greenFlash = node => stageFlash(node, false);
+export const redFlash = node => stageFlash(node, true);
 
 /* Winning the LAST word of a run starts a ~1200ms award delivery and a 2500ms
    confetti burst, but the screen leaves for Results 1250ms later — both used
@@ -566,6 +573,7 @@ export function failRound(skipped){
   if(rstate !== "guessing") return false;
   setState("round_end");
   playWordMissFeedback(el("soloWordCard"), LOCK_THRESHOLD);
+  if(!skipped) redFlash(el("soloWordCard"));
   /* TIME'S UP is a 1.5s full-screen paper but the next word arrives at
      ROUND_END_PAUSE_MS (1250ms), so firing it on every ordinary word timeout
      started the next word underneath it — and made a routine miss read like

@@ -1388,7 +1388,18 @@ ok(await page.evaluate(() => parseFloat(document.getElementById("soloWordFill").
 ok(await txt("#soloScoreVal") === scoreBefore,
   "score NOT incremented while the award paper is still being carried to it");
 ok(await page.evaluate(() => document.getElementById("soloWordCard").classList.contains("locked")), "word card turned green + popped");
-ok(await page.evaluate(() => document.getElementById("soloFlash").classList.contains("fire")), "green screen flash fired");
+ok(await page.evaluate(() => {
+  const f = document.getElementById("soloFlash");
+  return f.classList.contains("fire") && !f.classList.contains("miss");
+}), "the whole screen flashes GREEN on a catch");
+/* big means big: a full-stage fill plus a thick edge glow, not the old soft
+   centre glow that faded from its first frame */
+ok(await page.evaluate(() => {
+  const f = document.getElementById("soloFlash"), cs = getComputedStyle(f);
+  const stage = f.parentElement.getBoundingClientRect(), r = f.getBoundingClientRect();
+  return r.width >= stage.width - 1 && r.height >= stage.height - 1 &&
+    /inset/.test(cs.boxShadow) && cs.animationDuration === "1.15s";
+}), "the flash covers the whole stage, with an edge glow, and holds before it fades");
 ok(await page.evaluate(() => !!document.querySelector(".burstwrap")), "confetti burst");
 ok(await page.evaluate(() => document.getElementById("soloAward").classList.contains("show")), "POINTS AWARD paper shown");
 ok(/^\+\d/.test(await txt("#soloAwardPts")), `award shows points (${await txt("#soloAwardPts")})`);
@@ -1455,6 +1466,8 @@ await page.waitForFunction(n => parseInt(
   { timeout: 4000, polling: 40 }, beforeSkip);
 const afterSkip = parseInt((await txt("#soloScoreVal")).replace(/[^0-9]/g,""));
 ok(afterSkip === Math.max(0, beforeSkip - 250), `skip cost 250 (${beforeSkip} -> ${afterSkip})`);
+ok(await page.evaluate(() => !document.getElementById("soloFlash").classList.contains("miss")),
+  "skip: no red flash, because a skip is a choice and not the clock beating you");
 ok(await page.evaluate(() =>
   document.getElementById("soloScoreCard").classList.contains("bump-hit")),
   "skip: the score card recoils rather than swelling");
@@ -1678,6 +1691,10 @@ await sleep(900);
 ok(await page.evaluate(() =>
   !document.getElementById("timesUp").classList.contains("fire")),
   "a missed word does NOT slam the full-screen TIMES UP paper");
+ok(await page.evaluate(() => {
+  const f = document.getElementById("soloFlash");
+  return f.classList.contains("fire") && f.classList.contains("miss");
+}), "running out of time on a word flashes the whole screen RED");
 await page.evaluate(async () => {
   const { state } = await import(location.origin + "/js/state.js");
   state.game.roundEndsAt = performance.now() + 200;   // the run itself expires
