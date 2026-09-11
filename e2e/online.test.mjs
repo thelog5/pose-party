@@ -201,12 +201,13 @@ try {
   ok(htp1v1.labels.join("|") ===
     "SEE THE WORD AND ACT IT OUT|GET AI TO GUESS YOUR ACTION FIRST|5 SECONDS TO ACT IF YOUR OPPONENT GETS IT FIRST",
     `1v1's three columns show 1v1-specific copy (${htp1v1.labels.join(" / ")})`);
-  /* The one control on the card also has to say WHEN, or a player watching a
-     silent screen has no way to tell a grace from a hang. */
+  /* 1V1: I'M READY, AND NO COUNTDOWN. The button is the card's one control
+     and carries no count. A player who waits too long does not hold the room:
+     when the grace runs out the match starts BEHIND their card, which stays
+     up until they press. Party keeps its count (party.test.mjs). */
   const graceCount = await A.evaluate(() =>
     document.getElementById("htpCount").textContent.trim());
-  ok(/^[1-6]$/.test(graceCount),
-    `the READY button counts the grace down so nobody wonders why (${graceCount})`);
+  ok(graceCount === "", `1v1's I'M READY carries no countdown (${JSON.stringify(graceCount)})`);
   await act(A, () => readyUp(A));
   ok(await A.evaluate(() => document.getElementById("howToPlay").classList.contains("hidden")),
     "I'M READY acknowledges and dismisses the local 1v1 card");
@@ -217,11 +218,16 @@ try {
       !document.getElementById("howToPlay").classList.contains("hidden") &&
       document.getElementById("countdown").classList.contains("hidden");
   }), "inside the grace, one ready player cannot start underneath the other's instructions");
+  /* B never presses. */
+  await B.waitForFunction(() => document.body.dataset.state === "playing",
+    { timeout: 15000, polling: 50 });
+  ok(await B.evaluate(() => !document.getElementById("howToPlay").classList.contains("hidden")
+      && document.getElementById("vsWord").textContent.trim().length > 0),
+    "a player who waits too long gets the match started BEHIND their card, first word live");
   await act(B, () => readyUp(B));
-  await Promise.all([A, B].map(p => p.waitForFunction(() =>
-    !document.getElementById("countdown").classList.contains("hidden"),
-    {timeout:3000,polling:25})));
-  ok(true, "both ready releases one future countdown immediately, without waiting out the grace");
+  ok(await B.evaluate(() => document.getElementById("howToPlay").classList.contains("hidden")
+      && document.body.dataset.state === "playing"),
+    "and their I'M READY drops them straight into the running match");
 
   await waitState(A, "playing"); await waitState(B, "playing");
   ok(await A.evaluate(() => document.body.dataset.screen) === "match", "match screen shown");

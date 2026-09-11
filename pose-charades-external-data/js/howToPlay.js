@@ -18,12 +18,12 @@
    tutorial token and the timestamp at which it will start the match anyway;
    I'M READY (or Esc) acknowledges that exact token, and if EVERY current
    player acknowledges it releases on the spot. Otherwise it releases when the
-   grace runs out. `startsAt` drives a live count on the button, so the one
-   control on the screen answers "why has it not started yet" before anybody
-   has to ask — which is the whole reason the old every-player barrier had to
-   go: a room of six sat on a silent card for as long as the slowest person
-   took to find the button. The complete synchronized 3·2·1 follows the
-   release either way, so no client-only pause can desynchronize the room.
+   grace runs out. The complete synchronized 3·2·1 follows the release either
+   way, so no client-only pause can desynchronize the room.
+   The two modes then part ways. PARTY passes `startsAt`: the button counts
+   the grace down and the card closes itself at zero. 1V1 passes nothing:
+   there is no count, the card stays until its player presses I'M READY, and
+   a grace that runs out starts the match BEHIND it (see online.js).
    main.js's Esc-to-leave self-suppresses while this card is open; a second
    Esc, after the acknowledgement closes it, leaves like normal.
 

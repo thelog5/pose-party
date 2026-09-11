@@ -40,7 +40,7 @@ import {
   setRematchUnavailable,
   showResults,
 } from "./results.js";
-import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
+import { showHowToPlay } from "./howToPlay.js";
 import { leaveLobby } from "./lobbyAlive.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp,
@@ -723,7 +723,7 @@ function clearMatchBoard(){
   clearSeatAward(v1Seat(true));
 }
 
-function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
+function onMatchPrepare({tutorialId, matchMs, players}={}){
   if(typeof tutorialId!=="string" || !tutorialId) return;
   const myId=socket.id;
   const rec=(players||[]).find(p=>p.id!==myId);
@@ -757,13 +757,16 @@ function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
   requestAnimationFrame(fitMatchPaperText);
   applyScores(players);
 
-  /* The board may assemble behind the modal, but neither the 3-2-1 nor a
-     word is live until the server releases the room. BOTH players readying
-     releases it at once; otherwise the server's grace does, and
-     `tutorialStartsAt` is that moment — handed to the card so it can count it
-     down on its own button rather than leaving anyone to wonder. Esc counts
-     as an acknowledgement too: it dismisses the same decision and must not
-     strand the peer. */
+  /* 1V1'S CARD WAITS FOR ITS PLAYER, AND THE ROOM DOES NOT WAIT FOR THE CARD.
+     I'M READY is the card's one control and there is no countdown on it. BOTH
+     players readying releases the room at once; otherwise the server's grace
+     does, and the match simply starts BEHIND any card still up: the FULL BODY
+     check, the 3-2-1 and the first word all play under it, and that player
+     joins whenever they press. That is what the player asked for. It is the
+     opposite of what Party does (Party counts down on the button and closes
+     itself), so neither onMatchStart nor onRoundStart closes this card.
+     Esc counts as an acknowledgement too: it dismisses the same decision and
+     must not strand the peer. */
   clearInterval(countdownTimer);
   $("countdown").classList.add("hidden");
   const acknowledge=()=>{
@@ -773,8 +776,7 @@ function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
         toast("Couldn’t ready the match ("+res.error+")");
     });
   };
-  showHowToPlay({ mode:"1v1", ready:acknowledge, back:acknowledge,
-    startsAt: Number(tutorialStartsAt) ? perfFromServer(Number(tutorialStartsAt)) : 0 });
+  showHowToPlay({ mode:"1v1", ready:acknowledge, back:acknowledge });
 
   state.onlineClaim = () => {
     const g=state.game;
@@ -816,11 +818,8 @@ function onMatchPrepare({tutorialId, tutorialStartsAt, matchMs, players}={}){
 function onMatchStart({tutorialId, startAt, matchEndsAt, players}={}){
   const game=state.game;
   if(!game || game.mode!=="online" || game.tutorialId!==tutorialId) return;
-  /* The grace releases the room whether or not this client answered, so the
-     3-2-1 can arrive with the card still up on a tab that was slow, paused or
-     mid-decode. Counting in behind it would deal the first word underneath a
-     modal. */
-  hideHowToPlay();
+  /* No hideHowToPlay() here, on purpose: a player who has not pressed I'M
+     READY keeps their card while the match starts behind it. */
   game.matchEndsAt=perfFromServer(matchEndsAt);
   game.matchLimitMs=Math.max(0,Number(matchEndsAt)-Number(startAt)) ||
     game.matchLimitMs;
@@ -854,10 +853,8 @@ function onMatchStart({tutorialId, startAt, matchEndsAt, players}={}){
 function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   const game=state.game;
   if(!game || game.mode!=="online") return;
-  /* The bounded server fallback can release a room whose tab never clicked.
-     Give it the whole fallback + count-in to read, then guarantee live play
-     is never hidden behind the tutorial. */
-  hideHowToPlay();
+  /* The card is NOT closed here either: the first word plays behind it until
+     the player presses I'M READY (see onMatchPrepare). */
   if(gameState()!=="playing" && !transition("playing")) return;
   game.roundId=roundId;
   game.word=String(word||"");
