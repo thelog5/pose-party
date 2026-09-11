@@ -24,7 +24,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { renderDots } from "./screens.js";
 import { fakeRivalGuesses } from "./rival.js";
 import { partyCheck } from "./partyMatch.js";
-import { captureMoment, showResults } from "./results.js";
+import { captureMoment, setCandidSources, showResults } from "./results.js";
 import { beginRound as soloBegin, failRound as soloFail, endRound as soloEnd,
          timerFrozen as soloFrozen, roundState as soloState,
          ROUND_END_PAUSE_MS, confettiFrom, deliverScorePenalty,
@@ -191,6 +191,9 @@ export function startGame(mode="ai"){
                results:[], bestWrong:{},
                roundEndsAt: mode==="ai" ? performance.now()+SOLO.roundMs : 0 };
   if(!transition("countdown")){ state.game=null; return; }
+  /* candids for the photo strips. The practice rival is simulated and has
+     no camera, so there is only ever one feed to take them from. */
+  setCandidSources(()=>[{ id:"me", video:$("video"), mirror:true }]);
   scorePaintHeld=false;
   if(mode!=="ai"){
     clearSeatAward(practiceSeat(false));

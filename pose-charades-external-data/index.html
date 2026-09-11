@@ -1066,11 +1066,33 @@
         <img class="rs-back-arrow" src="assets/ui/figma/rs-arrow-left-teal.png" alt="">
         <b>BACK TO RESULTS</b>
       </button>
-      <button class="rs-save pbtn" id="rsSaveStrip">
-        <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
-        <b>SAVE PHOTO STRIP</b>
-        <img class="rs-cam" src="assets/ui/figma/rs-camera.png" alt="">
+      <!-- the hop lives on the inner span, so it never fights the button's
+           own entrance, hover lift or press for the same property -->
+      <button class="rs-save pbtn" id="rsSeeStrips">
+        <span class="rs-see-hop">
+          <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+          <b>SEE PHOTO STRIPS</b>
+          <img class="rs-cam" src="assets/ui/figma/rs-camera.png" alt="">
+        </span>
       </button>
+
+      <!-- ===== PHOTO STRIPS: Figma "1v1 photo strips" 377:498, "Party photo
+           strips" 381:616, "Single Player photo strips" 381:757. The board is
+           built by js/photoStrips.js from the Figma matrices; it covers the
+           whole stage while [data-strips] is set. ===== -->
+      <div class="rs-strips" id="rsStrips">
+        <div class="ps-board" id="psBoard" role="img" aria-label="Photo strips"></div>
+        <button class="ps-back pbtn" id="psBack">
+          <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+          <img class="rs-back-arrow" src="assets/ui/figma/rs-arrow-left-teal.png" alt="">
+          <b>BACK TO RESULTS</b>
+        </button>
+        <button class="ps-save pbtn" id="psSave">
+          <img class="rs-bd-art" src="assets/ui/figma/sp-word.png" alt="">
+          <b>SAVE PHOTO STRIPS</b>
+          <img class="rs-cam" src="assets/ui/figma/rs-camera.png" alt="">
+        </button>
+      </div>
     </div>
   </section>
 

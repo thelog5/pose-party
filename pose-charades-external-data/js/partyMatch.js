@@ -31,7 +31,7 @@ import {
   playWordMissFeedback,
   fitGameplayText, impactFrozen,
 } from "./gameplayFeedback.js";
-import { captureMoment, showResults, setRematchState } from "./results.js";
+import { captureMoment, setCandidSources, showResults, setRematchState } from "./results.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp, swapSeatAwards,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
@@ -87,6 +87,12 @@ export function startPartyMatch(bridge, payload){
   state.game = g;
   ctx.roster = payload.roster;
   if(!transition("countdown")){ state.game = null; return; }
+  /* candids for the photo strips: whoever sits in each seat at the moment
+     the clock fires, so a featured-seat handover never mixes two people up */
+  setCandidSources(() => [...seats].filter(([, pid]) => pid).map(([key, pid]) => ({
+    id: pid, mirror: pid === ctx.myId,
+    video: pid === ctx.myId ? $("video") : seatEl(key)?.querySelector(".slot video"),
+  })));
 
   layoutSeats();
   scorePaintHeld = false;

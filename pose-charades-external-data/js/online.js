@@ -36,6 +36,7 @@ import {
 } from "./gameplayFeedback.js";
 import {
   captureMoment,
+  setCandidSources,
   setRematchState,
   setRematchUnavailable,
   showResults,
@@ -739,6 +740,12 @@ function onMatchPrepare({tutorialId, matchMs, players}={}){
                roundPhase:"waiting", firstId:null, firstPoints:0,
                suddenDeath:false };
   if(!transition("countdown")){ state.game=null; return; }
+  /* candids for the photo strips, from the same two elements the
+     recognition stills come from */
+  setCandidSources(()=>[
+    { id:"me", video:$("video"), mirror:true },
+    { id:"rival", video:$("videoRemote"), mirror:false },
+  ]);
 
   resetRivalPanel();
   /* Clear last match's board BEFORE the 3·2·1: the lock classes pin the fill

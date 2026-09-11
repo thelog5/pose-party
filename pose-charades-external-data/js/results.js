@@ -9,8 +9,10 @@
 
    Stills are grabbed from the video elements already on screen at the moment
    the AI recognises someone — that pose is the funny frame, not a posed shot
-   afterwards. They live in memory only, are never uploaded, and are dropped
-   when the screen closes. */
+   afterwards — plus CANDIDS on a plain clock, so nobody's photos depend on
+   their score. They live in memory only, are never uploaded, and are dropped
+   when the screen closes. SEE PHOTO STRIPS lays them out on the Figma photo
+   strip boards (js/photoStrips.js) and saves that board as one picture. */
 
 import { $, esc } from "./dom.js";
 import { state } from "./state.js";
@@ -18,6 +20,8 @@ import { toast } from "./ui.js";
 import { blip } from "./audio.js";
 import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
+import { mountPhotoStrips, unmountPhotoStrips, renderPhotoStrips, stripSlots }
+  from "./photoStrips.js";
 
 const SHOT_W = 640, SHOT_H = 426;     // 3:2 — covers both the square thumb and the frame
 /* TWO PHOTOS PER WORD, AND KEEP THEM ALL. There used to be one still per
@@ -32,10 +36,26 @@ const MAX_SHOTS = 80;                 // per player
 const SHOT_PAIR_GAP_MS = 700;
 const SEATS = ["blue0", "blue1", "blue2", "orange0", "orange1", "orange2"];
 
-/* playerId -> [{url, word, moment}] — in memory for this results screen only.
-   `moment` ties the two stills of one recognition together, so the strip can
-   lay them side by side. */
+/* A PLAYER WHO SCORES NOTHING STILL GETS PHOTOS. Recognition stills only
+   exist for words the AI got, so a player who went zero used to reach the
+   photo strips with sixteen empty windows. CANDIDS are taken on a plain
+   clock for everybody on the board while a word is live, and they fill the
+   windows the recognition stills cannot. They are kept apart from `shots`
+   so they can never push a real recognition out of MAX_SHOTS.
+   MAX_CANDIDS is a memory guard. Past it the list is THINNED (every other
+   still dropped), not trimmed from the front, so a long match keeps photos
+   from its whole length rather than only from its end. */
+const CANDID_MS = 4000, CANDID_FIRST_MS = 1500, MAX_CANDIDS = 48;
+
+/* playerId -> [{url, word, moment, at}] — in memory for this results screen
+   only. `moment` ties the two stills of one recognition together; `at` puts
+   every still, candid or not, back in match order on the strips. */
 const shots = new Map();
+const candids = new Map();
+/* () => [{id, video, mirror}] — whichever elements are showing each player.
+   Each mode registers its own when a match starts. */
+let candidSources = null;
+let candidTimer = 0;
 let shotCanvas = null;
 let momentSeq = 0;
 /* Bumped on every clear. The second still of a pair is taken on a timer, and
@@ -105,10 +125,9 @@ export function captureMoment(playerId, word, videoEl, mirror = false){
   }, SHOT_PAIR_GAP_MS);
 }
 
-/* One still. Exported on its own for the dev fixture, which seeds the reel. */
-export function captureShot(playerId, word, videoEl, mirror = false, moment = 0){
-  if(!playerId || !videoEl) return;
-  if(!videoEl.videoWidth || !videoEl.videoHeight) return;
+/* One frame of `videoEl` as a JPEG data URL, or null. */
+function stillOf(videoEl, mirror){
+  if(!videoEl?.videoWidth || !videoEl.videoHeight) return null;
   if(!shotCanvas){
     shotCanvas = document.createElement("canvas");
     shotCanvas.width = SHOT_W; shotCanvas.height = SHOT_H;
@@ -123,20 +142,73 @@ export function captureShot(playerId, word, videoEl, mirror = false, moment = 0)
   if(mirror){ ctx.translate(SHOT_W, 0); ctx.scale(-1, 1); }
   ctx.drawImage(videoEl, (SHOT_W - dw) / 2, (SHOT_H - dh) / 2, dw, dh);
   ctx.restore();
-  let url;
-  try{ url = shotCanvas.toDataURL("image/jpeg", .72); }
-  catch{ return; }                          // tainted canvas: skip silently
+  try{ return shotCanvas.toDataURL("image/jpeg", .72); }
+  catch{ return null; }                     // tainted canvas: skip silently
+}
+
+/* One still. Exported on its own for the dev fixture, which seeds the reel. */
+export function captureShot(playerId, word, videoEl, mirror = false, moment = 0){
+  if(!playerId) return;
+  const url = stillOf(videoEl, mirror);
+  if(!url) return;
   const list = shots.get(playerId) || [];
-  list.push({ url, word: word || "", moment: moment || ++momentSeq });
+  list.push({ url, word: word || "", moment: moment || ++momentSeq, at: performance.now() });
   while(list.length > MAX_SHOTS) list.shift();
   shots.set(playerId, list);
 }
 
-export function clearShots(){ shots.clear(); shotEpoch++; }
+/* One candid. Exported for the dev fixture, like captureShot. */
+export function captureCandid(playerId, videoEl, mirror = false){
+  if(!playerId) return;
+  const url = stillOf(videoEl, mirror);
+  if(!url) return;
+  let list = candids.get(playerId) || [];
+  list.push({ url, word: "", moment: 0, at: performance.now() });
+  if(list.length > MAX_CANDIDS) list = list.filter((_, i) => i % 2 === 1);
+  candids.set(playerId, list);
+}
 
-/* Test hook, read-only (same convention as fsm.js's _reset): a copy of one
-   player's stills, so the suite can count the pairs without a results screen. */
+/* Each mode hands over a way to find every player's video when its match
+   starts. The clock itself runs off the FSM (see wireResults), so a mode
+   never has to remember to stop it. */
+export function setCandidSources(fn){
+  candidSources = typeof fn === "function" ? fn : null;
+}
+
+const wordLive = () => gameState() === "playing" || gameState() === "word-won";
+
+function candidTick(){
+  candidTimer = 0;
+  if(!wordLive() || !candidSources) return;
+  let sources = [];
+  try{ sources = candidSources() || []; }catch{ sources = []; }
+  const epoch = shotEpoch;
+  /* Staggered: six JPEG encodes on one frame is a hitch in a party of six. */
+  sources.forEach((src, i) => setTimeout(() => {
+    if(epoch === shotEpoch && wordLive()) captureCandid(src.id, src.video, src.mirror);
+  }, i * 90));
+  candidTimer = setTimeout(candidTick, CANDID_MS);
+}
+
+function stopCandids(){
+  clearTimeout(candidTimer);
+  candidTimer = 0;
+}
+
+export function clearShots(){ shots.clear(); candids.clear(); shotEpoch++; }
+
+/* What a player's reel shows: their recognitions, or their candids when the
+   AI never recognised them. Nobody reaches the breakdown with a blank frame
+   because they had a bad round. */
+function reelOf(id){
+  const list = shots.get(id);
+  return list?.length ? list : candids.get(id) || [];
+}
+
+/* Test hooks, read-only (same convention as fsm.js's _reset): a copy of one
+   player's stills, so the suite can count them without a results screen. */
 export const _shotsFor = id => (shots.get(id) || []).map(s => ({ ...s }));
+export const _candidsFor = id => (candids.get(id) || []).map(s => ({ ...s }));
 
 /* ---------------- awards ----------------
    Everyone gets exactly one. Ending a match with no callout is the difference
@@ -195,7 +267,6 @@ export function showResults(next){
   st.dataset.size = String(payload.size || 3);
   st.dataset.mode = mode;
   setResultsPage(mode === "solo" ? "solo" : "stage");
-  syncPhotoStripTarget();
   const divider = st.querySelector(".rs-divider");
   if(divider)
     divider.src = mode === "1v1" || mode === "solo"
@@ -314,7 +385,7 @@ function orderResultsControls(page){
   const rematch = $("rsRematch");
   const status = $("rsRematchStatus");
   if(!rematch) return;
-  if(page === "solo") $("rsSaveStrip")?.after(rematch, status);
+  if(page === "solo") $("rsSeeStrips")?.after(rematch, status);
   else if(page === "breakdown") $("rsBack")?.after(rematch, status);
   else $("rsSeeBreakdown")?.before(rematch, status);
 }
@@ -427,7 +498,7 @@ function mountSeatVideo(el, p){
   }
   /* no live feed (offline, or they left): fall back to their last still */
   removeDirect("video");
-  const last = (shots.get(p.id) || []).slice(-1)[0];
+  const last = reelOf(p.id).slice(-1)[0];
   if(last){
     const images = [...slot.querySelectorAll(":scope > img")];
     const img = images.shift() || document.createElement("img");
@@ -662,7 +733,7 @@ function renderBreakdown(){
       t.dataset.team = team;
       t.setAttribute("aria-pressed", String(p.id === focusId));
       t.setAttribute("aria-label", "View " + disp(p.name) + "’s result photos");
-      const last = (shots.get(p.id) || []).slice(-1)[0];
+      const last = reelOf(p.id).slice(-1)[0];
       t.innerHTML =
         '<div class="shotwrap">' + (last ? '<img src="' + last.url + '" alt="">' : "") + "</div>" +
         '<img class="rs-border" src="assets/ui/figma/rs-photo-' + team + '.png" alt="">' +
@@ -705,7 +776,7 @@ function selectBreakdownPlayer(id, control){
    suffix "" is the primary panel; "B" is the mirrored 1v1 one. */
 function paintPanel(suffix, p){
   if(!p) return;
-  const list = shots.get(p.id) || [];
+  const list = reelOf(p.id);
   panelState.set(suffix, { suffix, pid: p.id, ix: 0 });
 
   const wrap = $("rsFocusShots" + suffix);
@@ -714,7 +785,7 @@ function paintPanel(suffix, p){
         '<img class="' + (i === 0 ? "on" : "") + '" src="' + s.url +
         '" alt="" aria-hidden="' + (i === 0 ? "false" : "true") +
         '" data-active="' + (i === 0 ? "true" : "false") + '">').join("")
-    : '<div class="rs-empty">No photos this round.<br>They’re taken the moment the AI recognises you.</div>';
+    : '<div class="rs-empty">No photos this round.<br>The camera took none while you played.</div>';
 
   /* The reel plays itself. It carries no tap, swipe or key handling, so it
      is described as a plain gallery rather than an interactive control. */
@@ -947,11 +1018,12 @@ function breakdownOrder(){
    your photos; the CSS drops the cross-fade to a plain cut instead. */
 function startShotCycle(){
   stopShotCycle();
-  if(document.hidden) return;
+  /* nothing to animate under the photo strips, which cover the whole stage */
+  if(document.hidden || stripsOpen()) return;
   cycleTimer = setInterval(() => {
     let moved = false;
     for(const panel of visiblePanels()){
-      const list = shots.get(panel.pid) || [];
+      const list = reelOf(panel.pid);
       if(list.length < 2) continue;
       panel.ix = (panel.ix + 1) % list.length;
       paintPanelFrame(panel);
@@ -973,7 +1045,7 @@ function visiblePanels(){
 function syncPanelA11y(panel){
   const focus = $("rsFocus" + panel.suffix);
   if(!focus) return;
-  const list = shots.get(panel.pid) || [];
+  const list = reelOf(panel.pid);
   const p = payload?.players.find(player => player.id === panel.pid);
   focus.dataset.shotIndex = String(panel.ix);
   focus.setAttribute("aria-label", list.length
@@ -993,133 +1065,163 @@ function paintPanelFrame(panel){
     im.setAttribute("aria-hidden", String(!active));
     im.dataset.active = String(active);
   });
-  const list = shots.get(panel.pid) || [];
+  const list = reelOf(panel.pid);
   setTxt("rsShotWord" + panel.suffix,
     list.length ? (list[panel.ix]?.word || "").toUpperCase() : "");
   syncPanelA11y(panel);
 }
 
-/* ---------------- photo strip ---------------- */
+/* ---------------- photo strips ----------------
+   SEE PHOTO STRIPS opens a board of paper photo-booth strips over the whole
+   stage (js/photoStrips.js), filled from the stills this match kept, and its
+   SAVE button writes that exact board out as one picture. Nothing leaves the
+   machine: the stills are in-memory data URLs and the picture is made on a
+   local canvas.
 
-/* Stitches the focused player's stills into one image and hands it to the
-   browser as a download. Nothing leaves the machine. */
-function syncPhotoStripTarget(){
-  const save = $("rsSaveStrip");
-  if(!save) return;
-  const label = save.querySelector("b");
-  if(is1v1()){
-    /* THE 1V1 BREAKDOWN SHOWS BOTH PLAYERS AT ONCE, so the one button under it
-       has to save both. It used to quietly save only your own reel, which made
-       the rival's whole panel — their photos, sat right there on screen — the
-       one thing on this page you could look at and not keep. The party
-       breakdown is a different control: it pages ONE player at a time, so
-       there the button follows the focused player, as it always has. */
-    save.setAttribute("aria-label", "Save both photo strips");
-    save.title = "Save both photo strips";
-    if(label) label.textContent = "SAVE PHOTO STRIPS";
-    delete save.dataset.playerId;
-  }else{
-    save.removeAttribute("aria-label");
-    save.removeAttribute("title");
-    if(label) label.textContent = "SAVE PHOTO STRIP";
-    delete save.dataset.playerId;
+   Which windows are whose:
+   - Solo: all sixteen are yours, under your name.
+   - 1v1: the two strips under each name tag are that player's eight.
+   - Party: each team fills its own three strips under BLUE TEAM / RED TEAM.
+     Three players get one strip each; two split the twelve windows six and
+     six, in reading order; one alone gets all twelve. */
+
+/* Recognition poses first (the first still of each pair), then the
+   reactions, then candids, each pool spread evenly over the match rather
+   than taken from its start. The picks go back into match order, so a strip
+   reads top to bottom as the round did. */
+function photosFor(id, n){
+  if(n <= 0) return [];
+  const seen = new Set(), poses = [], reactions = [];
+  for(const s of shots.get(id) || []){
+    (seen.has(s.moment) ? reactions : poses).push(s);
+    seen.add(s.moment);
   }
+  const pick = [];
+  for(const pool of [poses, reactions, candids.get(id) || []]){
+    if(pick.length >= n) break;
+    pick.push(...spread(pool, n - pick.length));
+  }
+  return pick.sort((a, b) => a.at - b.at).map(s => s.url);
 }
+const spread = (list, k) => list.length <= k ? list.slice()
+  : Array.from({ length:k }, (_, i) => list[Math.floor((i + .5) * list.length / k)]);
+/* the i-th of `parts` contiguous, near-equal runs of `total` */
+const runLength = (total, parts, i) =>
+  Math.floor(total * (i + 1) / parts) - Math.floor(total * i / parts);
 
-/* One row per WORD, with that word's two stills side by side, and one pair
-   of columns per player, on the same cream ground the boards are made of.
-   Solo and Party pass a single player; 1v1 passes both, so the two reels stay
-   comparable word for word.
-
-   Rows, not one still per row: at two stills per word a strong run is about
-   eighty stills, and eighty 426px rows is ~36,000px tall — past the 32,767px a
-   Chrome canvas can be, which saves a blank image rather than failing loudly.
-   STRIP_MAX_SIDE / STRIP_MAX_AREA shrink the whole sheet if even the rows
-   would pass what Safari allows. Nothing leaves the machine: these are
-   in-memory data URLs. */
-const STRIP_MAX_SIDE = 16000, STRIP_MAX_AREA = 60e6;
-/* Grouped by the recognition each still belongs to, not by adjacency: the
-   second still lands on a timer, so two words recognised close together would
-   interleave and a "consecutive" grouping would split every pair. Rows keep
-   the order their words were first seen in, and never hold more than two. */
-function pairsOf(list){
-  const rows = new Map();
-  for(const shot of list){
-    const row = rows.get(shot.moment);
-    if(!row) rows.set(shot.moment, [shot]);
-    else if(row.length < 2) row.push(shot);
+function stripSpec(){
+  const mode = payload.mode;
+  const layout = mode === "solo" ? "solo" : mode === "1v1" ? "1v1" : "party";
+  const slots = stripSlots(layout);
+  const teams = { blue: [], orange: [] };
+  for(const p of payload.players) (teams[p.team] || teams.blue).push(p);
+  /* your own photos lead your side, as your seat does on the stage page */
+  for(const side of ["blue", "orange"]){
+    const mine = teams[side].findIndex(p => p.mine);
+    if(mine > 0) teams[side].unshift(teams[side].splice(mine, 1)[0]);
   }
-  return [...rows.values()];
-}
-function stitchStrip(columns, filename){
-  const pad = 18, w = SHOT_W, h = SHOT_H;
-  const head = 54;                        // name band above each player
-  const players = columns.map(col => ({ name: col.name, rows: pairsOf(col.list) }));
-  const rows = Math.max(...players.map(p => p.rows.length));
-  const perPlayer = 2 * (w + pad);
-  const W = pad + players.length * perPlayer + (players.length - 1) * pad;
-  const H = pad + head + rows * (h + pad);
-  const k = Math.min(1, STRIP_MAX_SIDE / W, STRIP_MAX_SIDE / H, Math.sqrt(STRIP_MAX_AREA / (W * H)));
-  const c = document.createElement("canvas");
-  c.width = Math.ceil(W * k);
-  c.height = Math.ceil(H * k);
-  const ctx = c.getContext("2d");
-  ctx.scale(k, k);
-  ctx.fillStyle = "#f4ece0";
-  ctx.fillRect(0, 0, W, H);
-  const x0 = i => pad + i * (perPlayer + pad);
-
-  /* A single player is the original strip and needs no caption to say whose
-     it is; two are unreadable without one. */
-  if(players.length > 1){
-    ctx.fillStyle = "#17356f";
-    ctx.font = "700 30px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    players.forEach((pl, i) => ctx.fillText(pl.name.toUpperCase(),
-      x0(i) + (perPlayer - pad) / 2, pad + head / 2, perPlayer - pad));
+  if(layout === "solo") teams.blue = payload.players.slice(0, 1);
+  const photos = {}, owners = {};
+  for(const side of ["blue", "orange"]){
+    const players = teams[side];
+    const runs = players.map((p, i) => ({ p, n: runLength(slots[side], players.length, i) }));
+    photos[side] = runs.flatMap(({ p, n }) => {
+      const urls = photosFor(p.id, n);
+      return urls.concat(Array(Math.max(0, n - urls.length)).fill(null));
+    });
+    owners[side] = runs.flatMap(({ p, n }) => Array(n).fill(p.id));
   }
-
-  const cells = [];
-  players.forEach((pl, i) => pl.rows.forEach((pair, r) => pair.forEach((shot, j) =>
-    cells.push({ shot, x: x0(i) + j * (w + pad), y: pad + head + r * (h + pad) }))));
-  const total = cells.length;
-  let settled = 0, drawn = 0;
-  const finish = () => {
-    if(++settled !== total) return;
-    if(!drawn){ toast("Couldn’t decode the photos for this strip."); return; }
-    const a = document.createElement("a");
-    a.download = filename;
-    a.href = c.toDataURL("image/png");
-    a.click();
-    toast(drawn === total
-      ? (columns.length > 1 ? "Both photo strips saved." : "Photo strip saved.")
-      : "Photo strip saved with the available shots.");
-  };
-  for(const { shot, x, y } of cells){
-    const img = new Image();
-    img.onload = () => { ctx.drawImage(img, x, y, w, h); drawn++; finish(); };
-    img.onerror = finish;
-    img.src = shot.url;
-  }
+  const labels = layout === "party"
+    ? { blue: "BLUE TEAM", orange: "RED TEAM" }
+    : { blue: teams.blue[0] ? disp(teams.blue[0].name) : "",
+        orange: teams.orange[0] ? disp(teams.orange[0].name) : "" };
+  const names = layout === "party" ? ["team"]
+    : [...teams.blue, ...teams.orange].map(p => slug(p.name));
+  return { layout, labels, photos, owners,
+    filename: "pose-party-" + names.join("-vs-") + "-photo-strips.jpg" };
 }
 
 const slug = name => String(name || "strip").toLowerCase().replace(/\W+/g, "-")
   .replace(/^-|-$/g, "") || "player";
 
-function savePhotoStrip(){
-  const columns = (is1v1()
-    ? payload.players
-    : payload.players.filter(x => x.id === focusId))
-    .map(p => ({ name: p.name, list: shots.get(p.id) || [] }))
-    .filter(col => col.list.length);
+let stripsSpec = null;
+const stripsOpen = () => !!stage()?.dataset.strips;
 
-  if(!columns.length){ toast("No photos to save from this round yet."); return; }
-  stitchStrip(columns, "pose-party-" + columns.map(c => slug(c.name)).join("-vs-") + ".png");
+function openPhotoStrips(){
+  if(!payload || stripsOpen()) return;
+  stripsSpec = stripSpec();
+  mountPhotoStrips($("psBoard"), stripsSpec);
+  const names = Object.values(stripsSpec.labels).filter(Boolean);
+  $("psBoard").setAttribute("aria-label", "Photo strips" +
+    (names.length ? ": " + names.join(" and ") : ""));
+  stage().dataset.strips = "open";
+  stopShotCycle();
+  $("psSave")?.focus({ preventScroll:true });
+  blip([659, 784, 988], .06);
+}
+
+function closePhotoStrips({ quiet = false } = {}){
+  const st = stage();
+  if(!st?.dataset.strips) return;
+  delete st.dataset.strips;
+  unmountPhotoStrips();
+  stripsSpec = null;
+  if(quiet) return;
+  startShotCycle();
+  $("rsSeeStrips")?.focus({ preventScroll:true });
+  blip([494, 392], .06);
+}
+
+async function savePhotoStrips(){
+  const btn = $("psSave");
+  if(!payload || !btn || btn.disabled) return;
+  const spec = stripsSpec || stripSpec();
+  btn.disabled = true;
+  btn.setAttribute("aria-busy", "true");
+  try{
+    const { blob, drawn, wanted } = await renderPhotoStrips(spec, 2);
+    if(!blob) throw new Error("encode");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = spec.filename;
+    a.href = url;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast(!wanted ? "Photo strips saved. The camera took no photos this round."
+      : drawn === wanted ? "Photo strips saved."
+      : "Photo strips saved with the photos that loaded.");
+  }catch{
+    toast("Couldn’t save the photo strips. Try again.");
+  }finally{
+    btn.disabled = false;
+    btn.removeAttribute("aria-busy");
+  }
+}
+
+/* Test hook, read-only: who owns each window, per side, without photos. */
+export const _stripSpecForTest = () => {
+  if(!payload) return null;
+  const { layout, labels, owners, photos, filename } = stripSpec();
+  return { layout, labels, owners, filename,
+    filled: Object.fromEntries(Object.entries(photos).map(([k, v]) => [k, v.filter(Boolean).length])) };
+};
+
+/* Test hook: the picture SAVE would download, as base64 JPEG, without the
+   download. e2e/_stripshot.mjs writes it to disk to look at. */
+export async function _renderStripsForTest(){
+  if(!payload) return null;
+  const { blob } = await renderPhotoStrips(stripsSpec || stripSpec(), 2);
+  const url = await new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+  return String(url).split(",")[1] || null;
 }
 
 function teardownResultsMedia(){
   stopShotCycle();
+  closePhotoStrips({ quiet:true });
   panelState.clear();
   entered.clear();
   clearTimeout(enterTimer);
@@ -1173,7 +1275,9 @@ export function wireResults(){
   };
   $("rsPrev").onclick = () => step(-1);
   $("rsNext").onclick = () => step(1);
-  $("rsSaveStrip").onclick = savePhotoStrip;
+  $("rsSeeStrips").onclick = openPhotoStrips;
+  $("psBack").onclick = () => closePhotoStrips();
+  $("psSave").onclick = savePhotoStrips;
   $("rsRematch").onclick = toggleRematchReady;
   addEventListener("resize", () => {
     scheduleAwardFit();
@@ -1194,6 +1298,11 @@ export function wireResults(){
      on-screen arrows do too. */
   addEventListener("keydown", e => {
     if(gameState() !== "results") return;
+    /* Esc backs out of the photo strips, the way BACK TO RESULTS does */
+    if(stripsOpen()){
+      if(e.key === "Escape" && !e.repeat){ e.preventDefault(); closePhotoStrips(); }
+      return;
+    }
     if(stage().dataset.page !== "breakdown" || is1v1()) return;
     if(e.key === "ArrowLeft") step(-1);
     if(e.key === "ArrowRight") step(1);
@@ -1202,11 +1311,19 @@ export function wireResults(){
   document.addEventListener("visibilitychange", () => {
     if(gameState() !== "results") return;
     if(document.hidden) stopShotCycle();
-    else startShotCycle();
+    else if(!stripsOpen()) startShotCycle();
   });
 
-  /* stills are for this results screen only */
   onTransition((to, from) => {
+    /* A new match starts with no photos. Leaving results already clears
+       them, but a match abandoned with Esc never reaches results, and its
+       stills would otherwise land in the NEXT match's strips. */
+    if(to === "countdown") clearShots();
+    /* candids run while a word can be live, and only then */
+    if(to === "playing" && !candidTimer)
+      candidTimer = setTimeout(candidTick, CANDID_FIRST_MS);
+    if(to !== "playing" && to !== "word-won") stopCandids();
+    /* stills are for this results screen only */
     if(from === "results" && to !== "results"){
       clearShots();
       teardownResultsMedia();
@@ -1233,6 +1350,11 @@ export async function devResults(kind = "3v3"){
       for(const p of players)
         captureShot(p.id, WORDS[(i + players.indexOf(p)) % WORDS.length], v, true);
       await new Promise(r => setTimeout(r, 160));
+    }
+    /* and a match's worth of candids, so every photo-strip window has one */
+    for(let i = 0; i < 12; i++){
+      for(const p of players) captureCandid(p.id, v, true);
+      await new Promise(r => setTimeout(r, 60));
     }
   };
   const mk = (id, name, team, mine, i) => ({
