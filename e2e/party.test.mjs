@@ -599,6 +599,17 @@ try {
     p.waitForFunction(() => document.body.dataset.screen === "results",
       { timeout: 45000, polling: 150 })));
   ok(true, "all four players reached results without leaving the party room");
+  /* Candids fill the photo strips for players the AI never got, so they must
+     come from every seat on the board: the remote feeds, not just the local
+     camera. */
+  const candidOwners = await A.evaluate(async () => {
+    const r = await import("/js/results.js");
+    const spec = r._stripSpecForTest();
+    const ids = [...new Set([...spec.owners.blue, ...spec.owners.orange])];
+    return ids.map(id => r._candidsFor(id).length);
+  });
+  ok(candidOwners.length === 4 && candidOwners.every(n => n > 0),
+    `candids were taken from all four seats, remote feeds included (${candidOwners})`);
   ok((await txt(A, "#rsRematchLabel")).includes("0/4"),
     `results starts with the authoritative ready tally (${await txt(A, "#rsRematchLabel")})`);
 

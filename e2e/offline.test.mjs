@@ -1520,7 +1520,7 @@ const soloFigma = await page.evaluate(() => {
     yellowTape:rect(".rs-tape-logo-yellow"),
     creamTape:rect(".rs-tape-logo-cream"),
     headline:rect("#rsHeadline"), score:rect("#rsScoreLine"),
-    focus:rect("#rsFocus"), save:rect("#rsSaveStrip"),
+    focus:rect("#rsFocus"), save:rect("#rsSeeStrips"),
     award:rect("#rsAward"), stat1:rect("#rsStat1"),
     stat2:rect("#rsStat2"), stat3:rect("#rsStat3"),
     rematch:rect("#rsRematch"), rematchTape:rect(".rs-tape-rematch-stage"),
@@ -1572,7 +1572,7 @@ ok(nearRect(soloFigma.rematch,[742,693,678.593,104.048]) &&
   "Solo REMATCH and its pre-rotation tape box land at the authored angles");
 ok(soloFigma.label === "REMATCH? READY UP!" &&
    /POINTS$/.test(soloFigma.scoreText) &&
-   soloFigma.tabOrder.indexOf("rsSaveStrip") < soloFigma.tabOrder.indexOf("rsRematch"),
+   soloFigma.tabOrder.indexOf("rsSeeStrips") < soloFigma.tabOrder.indexOf("rsRematch"),
   "Solo copy and keyboard order follow the combined visual flow");
 
 /* the run, pose by pose, with what each one paid */
@@ -1671,6 +1671,117 @@ ok(await page.evaluate(() => {
 }), "the still swaps as a hard cut in every motion preference");
 await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-preference" }]);
 ok(!!(await txt("#rsAwardTitle")), `solo still earns an award (${await txt("#rsAwardTitle")})`);
+
+/* ---- PHOTO STRIPS (Figma 381:757 for Solo) ----
+   The breakdown's photo button OPENS the strips now, and hops until pressed.
+   The board is built from the Figma matrices, filled from this run's stills,
+   and SAVE writes that board out as one picture. */
+console.log("photo strips (solo):");
+ok(await page.evaluate(async () =>
+  (await import("/js/results.js"))._candidsFor("me").length >= 1),
+  "candids were taken on a clock during the run, so a zero score still has photos");
+ok(await page.evaluate(() => {
+  const b = document.getElementById("rsSeeStrips");
+  return b.querySelector("b").textContent.trim() === "SEE PHOTO STRIPS" &&
+    /rsSeeHop/.test(getComputedStyle(b.querySelector(".rs-see-hop")).animationName) &&
+    /rsSeeGlow/.test(getComputedStyle(b.querySelector(".rs-see-hop")).animationName);
+}), "the photo button reads SEE PHOTO STRIPS, hops, shakes and glows to be noticed");
+await page.click("#rsSeeStrips");
+await sleep(250);
+const soloStrips = await page.evaluate(() => {
+  const stage = document.getElementById("resStage");
+  const s = stage.getBoundingClientRect();
+  const title = document.querySelector('#psBoard .ps-piece[data-art="title"]').getBoundingClientRect();
+  const tilted = document.querySelectorAll('#psBoard .ps-piece[data-art="strip"] .ps-turn')[2];
+  return {
+    open: stage.dataset.strips === "open",
+    pieces: document.querySelectorAll("#psBoard .ps-piece").length,
+    strips: document.querySelectorAll('#psBoard .ps-piece[data-art="strip"]').length,
+    shots: document.querySelectorAll("#psBoard .ps-shot img").length,
+    labels: [...document.querySelectorAll("#psBoard .ps-label")].map(b => b.textContent),
+    name: document.querySelector('[data-seat="blue0"] .rs-nametag b')?.textContent,
+    title: [title.x - s.x, title.y - s.y, title.width, title.height],
+    tilt: tilted.style.transform || getComputedStyle(tilted).transform,
+    under: getComputedStyle(document.getElementById("rsRematch")).visibility,
+    focus: document.activeElement?.id,
+  };
+});
+ok(soloStrips.open && soloStrips.pieces === 26 && soloStrips.strips === 4,
+  `the Solo board is Figma 381:757: 26 papers, 4 strips (${soloStrips.pieces}/${soloStrips.strips})`);
+ok(nearRect(soloStrips.title, [465, -28, 510, 170]),
+  `its title card sits on the Figma rectangle (${soloStrips.title.map(n => n.toFixed(1))})`);
+ok(/matrix\(0\.99293/.test(soloStrips.tilt),
+  `the third strip carries Figma's -6.8151deg (${soloStrips.tilt})`);
+ok(soloStrips.shots >= 1 && soloStrips.labels.length === 1 &&
+   soloStrips.labels[0] === soloStrips.name,
+  `photos fill the windows and the tag carries the player's name (${soloStrips.shots}, ${soloStrips.labels})`);
+ok(soloStrips.under === "hidden" && soloStrips.focus === "psSave",
+  "the results page under it is out of reach, and SAVE takes the focus");
+/* SAVE writes the board as one picture: capture the download instead of
+   letting the browser take it */
+const saved = await page.evaluate(() => new Promise(resolve => {
+  const click = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function(){
+    HTMLAnchorElement.prototype.click = click;
+    fetch(this.href).then(r => r.blob()).then(b => resolve({
+      name: this.download, type: b.type, size: b.size }));
+  };
+  document.getElementById("psSave").click();
+  setTimeout(() => resolve(null), 8000);
+}));
+ok(saved && /^pose-party-.+-photo-strips\.jpg$/.test(saved.name) &&
+   saved.type === "image/jpeg" && saved.size > 100000,
+  `SAVE PHOTO STRIPS downloads the board as one JPEG (${JSON.stringify(saved)})`);
+/* Every paper answers the pointer, and a rotated one answers for its PAPER,
+   not for the box its rotation expands to: the tape's own centre lights it,
+   the corner of that expanded box does not. A tap shakes it. */
+await sleep(1300);                      // let the arrival finish
+const tape = await page.evaluate(() => {
+  const r = document.querySelector('#psBoard .ps-piece[data-art="tape-yellow"] .ps-art')
+    .getBoundingClientRect();
+  return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, x: r.x + 3, y: r.y + 3 };
+});
+const hotArt = () => page.evaluate(() =>
+  document.querySelector("#psBoard .ps-piece.hot")?.dataset.art || null);
+await page.mouse.move(tape.cx, tape.cy);
+await sleep(60);
+const onTape = await hotArt();
+await page.mouse.move(tape.x, tape.y);
+await sleep(60);
+const offTape = await hotArt();
+await page.mouse.click(tape.cx, tape.cy);
+const shook = await page.evaluate(() => document.querySelector(
+  '#psBoard .ps-piece[data-art="tape-yellow"] .ps-live').classList.contains("shook"));
+ok(onTape === "tape-yellow" && offTape !== "tape-yellow" && shook,
+  `a rotated tape lights for its paper only, and shakes when tapped (${onTape} / ${offTape})`);
+/* The board fills the WINDOW, not the letterboxed stage: at a laptop's
+   slightly-taller-than-16:9 size the felt must reach all four edges, with
+   the composition still on the stage's own box. */
+await page.setViewport({ width:1512, height:860 });
+await sleep(200);
+const filled = await page.evaluate(() => {
+  const layer = document.getElementById("rsStrips").getBoundingClientRect();
+  const felt = document.querySelector('#psBoard .ps-piece[data-art="bg"] .ps-art').getBoundingClientRect();
+  const stage = document.getElementById("resStage").getBoundingClientRect();
+  const board = document.getElementById("psBoard").getBoundingClientRect();
+  return {
+    layer: layer.width === innerWidth && layer.height === innerHeight,
+    felt: felt.left <= 0 && felt.top <= 0 && felt.right >= innerWidth && felt.bottom >= innerHeight,
+    board: Math.abs(board.top - stage.top) < 1 && Math.abs(board.width - stage.width) < 1,
+    bars: stage.top > 0 || stage.left > 0,
+  };
+});
+ok(filled.layer && filled.felt && filled.board && filled.bars,
+  `the strips fill the whole window where the stage letterboxes (${JSON.stringify(filled)})`);
+await page.setViewport({ width:1440, height:810 });
+await sleep(150);
+await page.mouse.move(5, 5);
+await page.keyboard.press("Escape");
+await sleep(80);
+ok(await page.evaluate(() => !document.getElementById("resStage").dataset.strips &&
+  document.querySelectorAll("#psBoard .ps-piece").length === 0 &&
+  document.activeElement?.id === "rsSeeStrips"),
+  "Esc backs out of the strips and hands focus back to the button that opened them");
 
 /* Running out of time is the beat that has to be unmistakable — the Figma
    TIMES UP paper, a shake, and a red wash, not a text burst. */
@@ -2096,6 +2207,40 @@ ok(await page.evaluate(() =>
   [...document.querySelectorAll(".rs-thumb")].every(el =>
     el.tagName === "BUTTON" && el.getAttribute("aria-pressed") !== null)),
   "every blue/orange breakdown card is a native selectable button");
+
+/* A 2v2 uses the 3v3 board (Figma 381:616): each team's twelve windows split
+   six and six, in reading order, yours first. */
+await page.click("#rsSeeStrips");
+await sleep(200);
+const partyStrips = await page.evaluate(async () => {
+  const spec = (await import("/js/results.js"))._stripSpecForTest();
+  const run = list => list.reduce((out, id) => {
+    const last = out[out.length - 1];
+    if(last && last[0] === id) last[1]++; else out.push([id, 1]);
+    return out;
+  }, []);
+  return {
+    layout: spec.layout, labels: spec.labels,
+    blue: run(spec.owners.blue), orange: run(spec.owners.orange),
+    pieces: document.querySelectorAll("#psBoard .ps-piece").length,
+    flipped: document.querySelectorAll('#psBoard .ps-piece[data-art="strip"][data-flip]').length,
+    shadowless: [...document.querySelectorAll('#psBoard .ps-piece[data-art="strip"]')]
+      .every(el => !el.hasAttribute("data-shadow")),
+  };
+});
+ok(partyStrips.layout === "party" && partyStrips.pieces === 25 &&
+   partyStrips.flipped === 3 && partyStrips.shadowless,
+  "the party board is Figma 381:616: 25 papers, three mirrored strips, none of them shadowed");
+ok(JSON.stringify(partyStrips.blue) === '[["blue0",6],["blue1",6]]' &&
+   JSON.stringify(partyStrips.orange) === '[["orange0",6],["orange1",6]]',
+  `a 2v2 splits each team's twelve windows six and six (${JSON.stringify(partyStrips.blue)})`);
+ok(partyStrips.labels.blue === "BLUE TEAM" && partyStrips.labels.orange === "RED TEAM",
+  "party tags read BLUE TEAM and RED TEAM");
+await page.click("#psBack");
+await sleep(80);
+ok(await page.evaluate(() => !document.getElementById("resStage").dataset.strips &&
+  document.getElementById("resStage").dataset.page === "breakdown"),
+  "BACK TO RESULTS returns to the breakdown it came from");
 const resultsBreakdownTextFit = await page.evaluate(async () => {
   const {fitSingleLinePaperText}=await import("/js/gameplayFeedback.js");
   const names=[...document.querySelectorAll(".rs-thumb .rs-nametag b"),
@@ -2217,7 +2362,7 @@ ok(await page.evaluate(() => {
     const hit=getComputedStyle(document.getElementById(id), "::before");
     return Number.parseFloat(hit.width) >= 44 && Number.parseFloat(hit.height) >= 44;
   };
-  const breakdown=["rsExit","rsHome","rsPrev","rsNext","rsBack","rsSaveStrip","rsRematch"]
+  const breakdown=["rsExit","rsHome","rsPrev","rsNext","rsBack","rsSeeStrips","rsRematch"]
     .every(expanded);
   const page=stage.dataset.page;
   stage.dataset.page="stage";
