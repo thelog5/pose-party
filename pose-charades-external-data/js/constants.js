@@ -67,13 +67,13 @@ export const SOLO = {
   skipPenalty: 250,       // cost of pressing Skip (streak also resets)
 };
 
-export const STARTERS = ["idle","jumping jacks","swimming","boxing","guitar","archery","basketball shot","golf swing","sleeping","driving","rowing","climbing","disco dance","hula hoop","skiing","chicken dance","weightlifting","tennis serve","marching","bowling","t-rex","robot"];
+export const STARTERS = ["idle","jumping jacks","swimming","punching","guitar","basketball shot","golf swing","sleeping","driving","rowing","climbing","disco dance","hula hoop","chicken dance","weightlifting","tennis serve","marching","bowling","t-rex","robot"];
 
 export const BUNDLED_DATA_URL = "assets/data/pose-charades-data.json";
 
 export const CATEGORIES = {
-  "swimming":"Sports & Action","boxing":"Sports & Action","archery":"Sports & Action","basketball shot":"Sports & Action",
-  "golf swing":"Sports & Action","tennis serve":"Sports & Action","bowling":"Sports & Action","skiing":"Sports & Action",
+  "swimming":"Sports & Action","punching":"Sports & Action","basketball shot":"Sports & Action",
+  "golf swing":"Sports & Action","tennis serve":"Sports & Action","bowling":"Sports & Action",
   "rowing":"Sports & Action","climbing":"Sports & Action","weightlifting":"Sports & Action","jumping jacks":"Sports & Action",
   "marching":"Sports & Action","hula hoop":"Sports & Action",
   "robot":"People & Characters","t-rex":"People & Characters","chicken dance":"People & Characters",
