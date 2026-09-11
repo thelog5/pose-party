@@ -10,6 +10,8 @@ import {
   calculateFirstPoints,
   calculateChaserPoints,
 } from "../../pose-charades-external-data/js/scoring.js";
+import { freshOrder } from "../../pose-charades-external-data/js/wordOrder.js";
+import { cleanSeen } from "../validate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3789;
@@ -61,6 +63,34 @@ try {
   ok(calculateChaserPoints(500,5) === 150 && calculateChaserPoints(500,5.001) === 0,
     "five seconds earns 150; anything later earns zero");
 
+  console.log("word order:");
+  {
+    const words = Array.from({ length: 12 }, (_, i) => "w" + i);
+    const seen = { w0: 500, w1: 100, w2: 900, w3: 300 };
+    let unseenFirst = true, oldBeforeNew = true, complete = true;
+    for (let i = 0; i < 200; i++) {
+      const o = freshOrder(words, seen);
+      complete &&= o.length === 12 && new Set(o).size === 12;
+      unseenFirst &&= o.slice(0, 8).every(w => !(w in seen));
+      /* jitter moves a word at most a third of the SEEN part (4/3 places) */
+      oldBeforeNew &&= o.indexOf("w1") < o.indexOf("w2");
+    }
+    ok(complete, "the order holds every word exactly once");
+    ok(unseenFirst, "words never seen are always dealt first");
+    ok(oldBeforeNew, "the oldest seen word always comes before the newest");
+    const orders = new Set(Array.from({ length: 50 }, () => freshOrder(words, seen).join()));
+    ok(orders.size > 10, `and the order is still random (${orders.size}/50 distinct)`);
+
+    const labels = ["boxing", "guitar"];
+    const c = cleanSeen({ BOXING: 5, guitar: "7", evil: 9, nan: NaN }, labels);
+    ok(c.boxing === 5 && !("guitar" in c) && !("evil" in c) && Object.keys(c).length === 1,
+      `seen times keep only the player's own labels, as numbers (${JSON.stringify(c)})`);
+    ok(JSON.stringify(cleanSeen("junk", labels)) === "{}" && JSON.stringify(cleanSeen(undefined, labels)) === "{}",
+      "a missing or odd seen map is empty, never an error");
+    ok(cleanSeen({ boxing: Date.now() + 9e12 }, labels).boxing < Date.now() + 2 * 86400e3,
+      "a seen time far in the future is clamped");
+  }
+
   const A = connect(URL, { transports: ["websocket"] });
   const B = connect(URL, { transports: ["websocket"] });
   const C = connect(URL, { transports: ["websocket"] });
@@ -71,7 +101,10 @@ try {
   const LABELS_B = ["idle", "boxing", "archery", "guitar", "disco dance"];
   const SHARED = ["boxing", "archery", "guitar"];
 
-  let r = await emit(A, "room:create", { name: "Alice", labels: LABELS_A });
+  /* guitar is unseen, archery was seen before boxing: that is the deal order */
+  const NOW = Date.now();
+  let r = await emit(A, "room:create", { name: "Alice", labels: LABELS_A,
+    seen: { boxing: NOW - 1000, archery: NOW - 90000 } });
   ok(/^[A-Z2-9]{6}$/.test(r.code || ""), `room created with code ${r.code}`);
   const code = r.code;
 
@@ -81,7 +114,8 @@ try {
   r = await emit(B, "room:join", { code: "ZZZZZZ", name: "Bob", labels: LABELS_B });
   ok(r.error === "no-such-room", `wrong code rejected (${r.error})`);
 
-  r = await emit(B, "room:join", { code: " " + code.toLowerCase() + " ", name: "Bob<script>", labels: LABELS_B });
+  r = await emit(B, "room:join", { code: " " + code.toLowerCase() + " ", name: "Bob<script>", labels: LABELS_B,
+    seen: { archery: NOW - 60000, "disco dance": NOW } });
   ok(r.code === code, "join tolerates case/whitespace in code");
   ok(r.peerName === "Alice", `joiner told host name (${r.peerName})`);
 
@@ -203,6 +237,8 @@ try {
   // round 3 mirrors round 1 but the later recognition packet arrives first:
   // timestamps must correct the order and still create the score tie.
   const [r3] = await Promise.all([once(A, "round:start"), once(B, "round:start")]);
+  ok(r1a.word === "guitar" && r2.word === "archery" && r3.word === "boxing",
+    `the room deals unseen first, then oldest seen by ANY player (${r1a.word}, ${r2.word}, ${r3.word})`);
   const suddenA = once(A, "match:sudden", 4000);
   const firstAt3 = r3.endsAt - 1200;
   await emit(A, "round:claim", { roundId:r3.roundId, recognizedAt:firstAt3+650 });

@@ -379,6 +379,17 @@ await sleep(180);
 
 // ---- solo: the guess-bubble mechanic (soloRound.js) ----
 console.log("solo play:");
+/* WORD ORDER (wordOrder.js): mark every word as seen except one. The first
+   word dealt must be that one, and the deal must be remembered. */
+const unseenPick = await page.evaluate(async () => {
+  const { state } = await import("/js/state.js");
+  const words = state.model.labels.filter(l => l !== "idle");
+  const pick = words[Math.floor(words.length / 2)];
+  const seen = {};
+  words.forEach((w, i) => { if (w !== pick) seen[w] = Date.now() - 1e6 + i; });
+  localStorage.setItem("posePartyWordsSeen", JSON.stringify(seen));
+  return pick;
+});
 await page.click("#modeAI");
 /* the press is answered on Home first: the chosen card presses in and pops
    out towards the player, its tape lets go, everything else drops away */
@@ -616,6 +627,13 @@ const rstate = () => page.evaluate(() => document.getElementById("scrSolo").data
 ok(await rstate() === "guessing", "round state GUESSING");
 const word = await txt("#soloWord");
 ok(word && word !== "—", `word card shows the target: "${word}"`);
+const dealt = await page.evaluate(async () => {
+  const { state } = await import("/js/state.js");
+  const seen = JSON.parse(localStorage.getItem("posePartyWordsSeen") || "{}");
+  return { word: state.game.word, at: seen[state.game.word] };
+});
+ok(dealt.word === unseenPick, `the one unseen word is dealt first ("${dealt.word}")`);
+ok(Date.now() - dealt.at < 60000, "and the browser remembers that it was shown");
 ok(/^\d+:\d\d$/.test(await txt("#soloRoundTime")) &&
   !/^0\d:/.test(await txt("#soloRoundTime")),
   `blue round clock uses compact m:ss (${await txt("#soloRoundTime")})`);
