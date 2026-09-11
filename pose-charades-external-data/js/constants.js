@@ -42,6 +42,15 @@ export const TIME_SCALES = [0.8, 1, 1.25];
    Sweep BOTH numbers before touching it: clean accuracy alone will happily
    tell you any value between .4 and 1.0 is identical. */
 export const FEATURE_SD_FLOOR = 0.75;
+/* Global feature weighting (classifier.js, featureWeights). A dimension's
+   weight is how far the WORD means spread on it against how far the TAKES of
+   one word spread on it, divided by the median of that ratio and clamped to
+   [MIN, MAX]. FLOOR is added to the take spread, as a fraction of its median,
+   so a dimension two takes happen to agree on cannot win a huge weight.
+   Swept on the 2026-09-11 deck: every clamp from [.7,1.5] to [.25,4] and every
+   floor from .25 to 1 scores 68.2-68.7% clean against 65.7% unweighted, so
+   the exact numbers do not matter much. Test with scripts/pose-deck-eval.mjs. */
+export const FEATURE_WEIGHT_MIN = 0.5, FEATURE_WEIGHT_MAX = 2.0, FEATURE_WEIGHT_FLOOR = 0.5;
 export const HOLD_MS = 250, THRESH = 0.60, RIVAL_THRESH = 0.60;
 export const ROUNDS = 5, WORD_MS = 30000;
 /* Scoring (matches the on-screen copy): 100 per word, +100 fast bonus if

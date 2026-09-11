@@ -21,13 +21,17 @@
    · **Nobody performs at the recording's tempo.** Each clip is also resampled
      slower and faster, so a word acted out at three-quarter speed still lands
      on a neighbour.
+   · **Dimensions are WEIGHTED by how well they separate words** (see
+     featureWeights). One weight vector for the whole deck, learned from the
+     spread between takes. +3.0 points clean and +5 under hip jitter on the
+     2026-09-11 deck (65.7% -> 68.7%), +5.8 on the deck before it.
 
    Augmentation happens on FRAMES, before windowing, so a time-scaled clip
    produces genuinely different windows rather than a re-labelled copy. */
 
 import { MODEL_POINTS, JOINTS, LEFT_HAND_OFFSET, RIGHT_HAND_OFFSET,
-         HAND_LANDMARKS, WIN, STRIDE, K, TIME_SCALES,
-         FEATURE_SD_FLOOR } from "./constants.js";
+         HAND_LANDMARKS, WIN, STRIDE, K, TIME_SCALES, FEATURE_SD_FLOOR,
+         FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR } from "./constants.js";
 
 function pt(frame, j){
   const p=frame[j];
@@ -116,13 +120,16 @@ function* augmentedFrames(clip){
       yield factor===1 ? frames : timeScaleFrames(frames, factor);
 }
 
-export function buildModel(clips){
+/* `weigh:false` builds the unweighted model; scripts/pose-deck-eval.mjs uses
+   it as the baseline. The other options override the FEATURE_WEIGHT_* table. */
+export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
+                                    weightMax=FEATURE_WEIGHT_MAX, weightFloor=FEATURE_WEIGHT_FLOOR }={}){
   const raw=[], labels=new Set();
-  for(const c of clips){
+  clips.forEach((c, take)=>{
     labels.add(c.label);
     for(const frames of augmentedFrames(c))
-      for(const v of windowsOf({frames})) raw.push({v, label:c.label});
-  }
+      for(const v of windowsOf({frames})) raw.push({v, label:c.label, take});
+  });
   const D = raw.length ? raw[0].v.length : MODEL_POINTS*6;
   const mean=new Float32Array(D), sd=new Float32Array(D);
   if(raw.length){
@@ -133,11 +140,74 @@ export function buildModel(clips){
     applySdFloor(sd);
   }else sd.fill(1);
 
-  const samples=raw.map(s=>{
-    const v=standardize(s.v, mean, sd);
-    return { v, norm:l2(v), label:s.label };
+  const z=raw.map(s=>standardize(s.v, mean, sd));
+  const weights = weigh && raw.length
+    ? featureWeights(z, raw, { min:weightMin, max:weightMax, floor:weightFloor }) : null;
+  /* Fold the weights into sd, so classify() stays one cosine and costs the
+     same: (v-mean)/(sd/w) is exactly w*(v-mean)/sd. */
+  if(weights) for(let d=0;d<D;d++){ sd[d]/=weights[d]; for(const v of z) v[d]*=weights[d]; }
+
+  const samples=raw.map((s,i)=>({ v:z[i], norm:l2(z[i]), label:s.label, take:s.take }));
+  return { samples, labels:[...labels], mean, sd, weights };
+}
+
+function median(a){
+  const s=Float64Array.from(a).sort(), m=s.length>>1;
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+/* Root-mean-square distance of each row from `centre`, per dimension. */
+function spread(rows, centre){
+  const D=centre.length, out=new Float64Array(D);
+  for(const r of rows) for(let d=0;d<D;d++) out[d]+=(r[d]-centre[d])**2;
+  return out.map(x=>Math.sqrt(x/rows.length));
+}
+
+/* One weight per dimension, the same for every word. A dimension counts for
+   more when the WORD means differ on it and the TAKES of one word agree on it.
+   Takes, not windows: windows of one take all share that take's quirks (where
+   the player stood, which arm was lazy), so window spread says nothing about
+   what changes the next time somebody acts the word out.
+
+   PER-WORD weights were tested against this and LOST (64.9% vs 68.7% on the
+   2026-09-11 deck, and far worse under hip jitter): with two takes a word, a
+   per-word spread is an estimate from two points. Pooling the take spread over
+   every word is what makes it stable. Mixing weighted and unweighted words in
+   one kNN is worse still (54%), because their cosines are not on one scale. */
+function featureWeights(z, raw, { min, max, floor }){
+  const D=z[0].length, words=new Map();
+  z.forEach((v,i)=>{
+    const {label, take}=raw[i];
+    let w=words.get(label);
+    if(!w){ w={ n:0, sum:new Float64Array(D), takes:new Map() }; words.set(label, w); }
+    let t=w.takes.get(take);
+    if(!t){ t={ n:0, sum:new Float64Array(D) }; w.takes.set(take, t); }
+    w.n++; t.n++;
+    for(let d=0;d<D;d++){ w.sum[d]+=v[d]; t.sum[d]+=v[d]; }
   });
-  return { samples, labels:[...labels], mean, sd };
+  const list=[...words.values()];
+  for(const w of list){
+    w.mean=w.sum.map(x=>x/w.n);
+    w.takeMeans=[...w.takes.values()].map(t=>t.sum.map(x=>x/t.n));
+  }
+  const grand=new Float64Array(D);
+  for(const w of list) for(let d=0;d<D;d++) grand[d]+=w.mean[d]/list.length;
+  const between=spread(list.map(w=>w.mean), grand);
+
+  /* Only a word with two or more takes can say how takes differ. With none
+     (a fresh Training deck), the window spread inside each word stands in. */
+  const multi=list.filter(w=>w.takeMeans.length>=2), within=new Float64Array(D);
+  if(multi.length){
+    for(const w of multi){ const s=spread(w.takeMeans, w.mean); for(let d=0;d<D;d++) within[d]+=s[d]**2/multi.length; }
+  }else{
+    z.forEach((v,i)=>{ const m=words.get(raw[i].label).mean; for(let d=0;d<D;d++) within[d]+=(v[d]-m[d])**2/z.length; });
+  }
+  for(let d=0;d<D;d++) within[d]=Math.sqrt(within[d]);
+
+  const pad=floor*median(within);
+  const ratio=between.map((b,d)=>b/(within[d]+pad+1e-6));
+  const mid=median(ratio) || 1;
+  return Float32Array.from(ratio, r=>Math.min(max, Math.max(min, r/mid)));
 }
 
 /* Raise every dimension's standard deviation to at least FEATURE_SD_FLOOR of
