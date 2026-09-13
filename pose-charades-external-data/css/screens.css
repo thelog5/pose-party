@@ -1791,6 +1791,14 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .classrow .del{transition:color .14s ease,transform .14s ease}
 .classrow .del:hover{color:var(--red)}
 .classrow .del:active{transform:scale(.88)}
+/* A word's own Record button: the big button's orange and white dot, small. */
+.classrow .rec{display:inline-flex;align-items:center;gap:5px;background:var(--orange);color:#fff;
+  border-radius:999px;padding:3px 10px 3px 8px;font-size:12px;font-weight:900;line-height:1.2;
+  transition:transform .14s ease,filter .14s ease,opacity .14s ease}
+.classrow .rec .dot{width:7px;height:7px;border-radius:50%;background:#fff}
+.classrow .rec:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.classrow .rec:active{transform:scale(.9)}
+.classlist.armed .rec{opacity:.4;pointer-events:none}
 .trainreport{font-weight:800;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--panel);border-radius:var(--r-sm);padding:11px 13px;display:none}
 .trainreport b{color:var(--blue-deep)} .trainreport .warn{color:var(--red)}
 .hint{font-size:12.5px;font-weight:800;color:var(--ink-soft);line-height:1.5}

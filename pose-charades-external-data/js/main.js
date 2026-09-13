@@ -3,9 +3,9 @@
 import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { STARTERS } from "./constants.js";
-import { toast, renderClasses, setDatasetEditedHandler } from "./ui.js";
+import { toast, renderClasses, setDatasetEditedHandler, setRecordWordHandler } from "./ui.js";
 import { blip } from "./audio.js";
-import { startRecording } from "./capture.js";
+import { startRecording, recordWord } from "./capture.js";
 import { train } from "./training.js";
 import { exportData, importData, preloadBundledDataset } from "./data.js";
 import { render } from "./screens.js";
@@ -116,6 +116,7 @@ function wireControls(){
 
   /* training */
   $("btnRecord").onclick=startRecording;
+  setRecordWordHandler(recordWord);
   $("btnTrain").onclick=()=>train();
   /* deleting clips has to refit the model the live panel is using */
   setDatasetEditedHandler(()=>{ train({silent:true, defer:true}); });

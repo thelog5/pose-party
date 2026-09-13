@@ -20,6 +20,17 @@ function setArmed(armed){
   const btn = $("btnRecord"), label = $("recordLabel");
   if(btn) btn.classList.toggle("recording", armed);
   if(label) label.textContent = armed ? "Cancel" : RECORD_LABEL;
+  /* the per-word Record buttons stand down: the big button is CANCEL now */
+  $("classList")?.classList.toggle("armed", armed);
+}
+
+/* A word's own Record button in the clip list: the same 3·2·1 and clip as the
+   big button, with the word filled in, so the next big-button press repeats it. */
+export function recordWord(label){
+  if(countIn || state.recording) return;
+  const input = $("classInput");
+  if(input) input.value = label;
+  startRecording();
 }
 
 /* Leaving Training mid-3·2·1 used to arm the recorder anyway: the interval

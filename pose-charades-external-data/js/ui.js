@@ -525,10 +525,14 @@ export function renderClasses(){
     '<div class="classrow"><span>'+esc(lab)+'</span>'+
     '<span style="display:flex;align-items:center;gap:8px">'+
     '<span class="count">'+n+' clip'+(n>1?'s':'')+'</span>'+
+    '<button class="rec" data-lab="'+esc(lab)+'" title="Record another clip of '+esc(lab)+'"><span class="dot"></span>Record</button>'+
     '<button class="del" data-lab="'+esc(lab)+'" title="Delete last clip of '+esc(lab)+'">undo</button>'+
     '<button class="del delall" data-lab="'+esc(lab)+'" title="Delete ALL clips of '+esc(lab)+'">&times;</button>'+
     '</span></div>'
   ).join("") || '<div class="hint">No clips yet. Pick a word and hit record.</div>';
+  /* One press adds a take to a word already in the list, so nobody retypes
+     "dribbling a basketball" five times to record five takes of it. */
+  el.querySelectorAll(".rec").forEach(b=>b.onclick=()=>onRecordWord?.(b.dataset.lab));
   el.querySelectorAll(".del").forEach(b=>b.onclick=()=>{
     const lab=b.dataset.lab;
     const before=state.dataset.clips.length;
@@ -555,3 +559,6 @@ export function renderClasses(){
    (training.js already imports ui.js). */
 let onDatasetEdited=null;
 export function setDatasetEditedHandler(fn){ onDatasetEdited=fn; }
+/* capture.js registers the per-word Record button here, for the same reason. */
+let onRecordWord=null;
+export function setRecordWordHandler(fn){ onRecordWord=fn; }
