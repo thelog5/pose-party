@@ -327,8 +327,8 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
   /* Figma node I309:558;245:896 filters the shared white clock fill orange.
      Use that rendered color through the source alpha instead of showing the
      raw white PNG; the hard .727px shadow remains a separate node effect. */
-  -webkit-mask:url("../assets/ui/figma/sp-clock.png") center/contain no-repeat;
-  mask:url("../assets/ui/figma/sp-clock.png") center/contain no-repeat;
+  -webkit-mask:url("../assets/ui/figma/sp-clock.webp") center/contain no-repeat;
+  mask:url("../assets/ui/figma/sp-clock.webp") center/contain no-repeat;
   filter:drop-shadow(.67cqw .67cqw 0 rgba(0,0,0,.5))}
 .htp-timesup > span:not(.htp-tu-clock){position:absolute;left:22.03%;top:48.4%;width:76.5%;
   translate:0 -50%;text-align:left;font-size:14.68cqw;line-height:1;
@@ -428,7 +428,7 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 .cg-paper{left:0;top:16.301%;width:100%;aspect-ratio:1539/1211;object-fit:fill}
 /* The title card is a RENDER of this screen's own instance (321:665), for the
    same reason the two tapes below are: it is ROTATED (+0.08574 rad) and the
-   shared Home asset is not the raw art — `title-card.png` is itself a render
+   shared Home asset is not the raw art — `title-card.webp` is itself a render
    of Home's instance 47:121, which bakes in a DIFFERENT rotation (-0.10269
    rad). Hanging that bitmap in 321:665's absoluteBoundingBox — the box the
    rotation expands to, 648.26x463.65 — drew the logo ~11 degrees off Figma's,
@@ -607,7 +607,7 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
 /* TORN PAPER, not a rounded rectangle. Every other surface in this game is a
    piece of cut paper taped to a board; the toast was a bordered box with a
    box-shadow, which is the only element that ever read as a web page. The
-   backing is `cam-row.png` — the ENABLE CAMERA screen's own info-row paper —
+   backing is `cam-row.webp` — the ENABLE CAMERA screen's own info-row paper —
    stretched with object-fit:fill, which is how every re-used paper in this
    project is fitted (its authored aspect is a source ratio, never a promise).
    The shadow is a `drop-shadow` FILTER on the image, never a box-shadow: a

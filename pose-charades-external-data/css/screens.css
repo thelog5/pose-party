@@ -39,7 +39,7 @@
 body[data-screen="home"] .wrap{max-width:none;padding:0}
 #scrHome{position:fixed;inset:0;overflow:hidden;display:grid;place-items:end center;background:var(--fig-cream)}
 #scrHome::before{content:"";position:absolute;inset:0;z-index:0;
-  background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
+  background:url(../assets/ui/figma/home-bg2.webp) center/cover}
 .homestage{position:relative;z-index:1;overflow:hidden;background:none;
   width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
   aspect-ratio:var(--pp-ar)}
@@ -1159,7 +1159,7 @@ body[data-screen="solo"] .camdock .brackets{display:none}
 body[data-screen="lobby"] .wrap{max-width:none;padding:0}
 #scrLobby{position:fixed;inset:0;overflow:hidden;display:grid;place-items:end center;background:var(--fig-cream)}
 #scrLobby::before{content:"";position:absolute;inset:0;z-index:0;
-  background:url(../assets/ui/figma/home-bg2.jpg) center/cover}
+  background:url(../assets/ui/figma/home-bg2.webp) center/cover}
 .lobbystage{--lb-lift:calc(-1 * min(.28vw,.5vh));position:relative;z-index:1;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby);
   width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
   aspect-ratio:var(--pp-ar)}
@@ -1520,12 +1520,12 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .lobbystage:has(.party-orange-hit:hover) .party-orange-layer.party-panel-art{
   filter:brightness(1.035) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.27))}
 /* Every cell is the same size now, so there is no `.wide` variant and one
-   rule serves all three. The tile is its window in `pt-frame-2x2.png` plus
+   rule serves all three. The tile is its window in `pt-frame-2x2.webp` plus
    ~10 component px of bleed on each side; the icon and label percentages
    below are Figma's own positions measured against THAT box, taken from the
    BOTTOM row — Figma's top-row cells are authored ~10px above their own
    windows, and the frame art is the thing the player actually sees. */
-.pt-tile{overflow:hidden;background:#eee5d8 url("../assets/ui/figma/pt-inner.png") center/cover no-repeat;
+.pt-tile{overflow:hidden;background:#eee5d8 url("../assets/ui/figma/pt-inner.webp") center/cover no-repeat;
   box-shadow:0 0 0 min(.35vw,.62vh) #eee5d8}
 .pt-tile video,.pt-tile .camdock{width:100%;height:100%;object-fit:cover}
 .pt-tile video{display:block;transform:scaleX(-1)}

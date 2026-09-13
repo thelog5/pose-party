@@ -565,7 +565,7 @@ ok(Math.abs(htpFidelity.paperRotations[0]) < .01 &&
    Math.abs(htpFidelity.paperRotations[2] - 3.124524) < .01,
   "How to Play papers preserve Figma's 0° / +1.56178° / +3.12452° rotations");
 ok(/242,\s*141,\s*64/.test(htpFidelity.soloClock.color) &&
-   /sp-clock\.png/.test(htpFidelity.soloClock.mask) &&
+   /sp-clock\.webp/.test(htpFidelity.soloClock.mask) &&
    Math.abs(htpFidelity.soloClock.top-.207)<.01 &&
    htpFidelity.soloClock.translate==="none",
   "Solo's mini TIMES UP clock uses the orange rendered treatment from Figma");
@@ -616,7 +616,7 @@ const check = await page.evaluate(async () => {
 ok(check.at0.check && !check.at0.numeral,
   "Solo shows the FULL BODY check before any numeral");
 ok(check.at0.text === "MAKE SURE YOUR FULL BODY IS IN CAMERA" &&
-  check.at0.art === "assets/ui/figma/warn-paper-red.png",
+  check.at0.art === "assets/ui/figma/warn-paper-red.webp",
   "it is the Figma warning paper with the full-body line");
 ok(check.sawNumeral && check.checkGone && !check.overlap,
   `then it gives way to the 3·2·1, never sharing the screen (${check.switchedAt}ms)`);
@@ -641,7 +641,7 @@ ok(/^\d+:\d\d$/.test(await txt("#soloRoundTime")) &&
   `blue round clock uses compact m:ss (${await txt("#soloRoundTime")})`);
 ok(/^\d\d:\d\d$/.test(await txt("#soloWordTime")), `word timer mm:ss (${await txt("#soloWordTime")})`);
 ok(await page.evaluate(() =>
-  /sp-skip-action\.png$/.test(document.querySelector("#btnSkipSolo img")?.getAttribute("src") || "") &&
+  /sp-skip-action\.webp$/.test(document.querySelector("#btnSkipSolo img")?.getAttribute("src") || "") &&
   document.getElementById("btnSkipSolo").getAttribute("aria-label")?.includes("250")),
   "updated Figma SKIP art is used and its point cost remains accessible");
 ok(await page.evaluate(() => !document.querySelector("#soloAward.show")), "no award paper while GUESSING (single-state render)");
@@ -682,13 +682,13 @@ const soloVisual = await page.evaluate(() => {
       .every(id => parseFloat(getComputedStyle(document.getElementById(id)).opacity) === 0),
   };
 });
-ok(/sp-leave\.png$/.test(soloVisual.exitSrc), "Solo uses the updated Figma LEAVE component");
+ok(/sp-leave\.webp$/.test(soloVisual.exitSrc), "Solo uses the updated Figma LEAVE component");
 const soloRectNear = (actual,want,tolerance=1.1) =>
   actual.every((value,index) => Math.abs(value-want[index]) <= tolerance);
 ok(soloRectNear(soloVisual.exitRect,[10,121,324.9336,107.6106]) &&
    soloRectNear(soloVisual.skipRect,[41,679,245,108.6321]) &&
    soloRectNear(soloVisual.skipTapeRect,[116,657,95.5858,48.5802]) &&
-   /sp-skip-tape\.png$/.test(soloVisual.skipTapeSrc),
+   /sp-skip-tape\.webp$/.test(soloVisual.skipTapeSrc),
   "Solo LEAVE, SKIP, and its separate blue tape use the updated Figma rectangles");
 ok(soloVisual.exitArtRect[0] < soloVisual.exitRect[0] &&
    soloVisual.exitArtRect[2] > soloVisual.exitRect[2] &&
@@ -1118,8 +1118,8 @@ ok(new Set(robotPoses).size === 5,
   `the robot has a different body at every band of the meter (${robotPoses.join(" -> ")})`);
 ok(["cold", "watch", "read", "close", "got"].every(k => {
     const m = robotBands[k];
-    return /\/face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_left\.png$/.test(m.eyes) &&
-      /\/(face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_mouth|phoneme_[A-Z_]+)\.png$/.test(m.mouth) &&
+    return /\/face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_left\.webp$/.test(m.eyes) &&
+      /\/(face_(neutral|thinking|speaking|surprised|joyful|happy|confused|sad)_mouth|phoneme_[A-Z_]+)\.webp$/.test(m.mouth) &&
       /rotate\(/.test(m.arm);
   }) && new Set(["cold","watch","read","close","got"].map(k => robotBands[k].arm)).size >= 4,
   "every mood dresses the face AND moves the skeleton — the arm angle differs per band");
@@ -1146,8 +1146,8 @@ ok(robotBands.got.pose === "celebrate" && robotBands.slam,
    one plain mitten) rather than a fixed side, which is the actual promise. */
 const gesturePair = (m, gesture) => {
   const hands = [m.handL, m.handR];
-  const gestured = hands.filter(h => new RegExp(`/${gesture}_hand_character_(left|right)\\.png$`).test(h));
-  const plain = hands.filter(h => /\/hand_character_(left|right)\.png$/.test(h));
+  const gestured = hands.filter(h => new RegExp(`/${gesture}_hand_character_(left|right)\\.webp$`).test(h));
+  const plain = hands.filter(h => /\/hand_character_(left|right)\.webp$/.test(h));
   return gestured.length === 1 && plain.length === 1;
 };
 ok(gesturePair(robotBands.watch, "fist"),
@@ -1156,17 +1156,17 @@ ok(gesturePair(robotBands.watch, "fist"),
 ok(gesturePair(robotBands.read, "point"),
   `present wears the pointing hand — the finger he calls the word out with ` +
   `(${robotBands.read.handL.split("/").pop()} + ${robotBands.read.handR.split("/").pop()})`);
-ok(/\/hand_character_right\.png$/.test(robotBands.cold.handR) &&
+ok(/\/hand_character_right\.webp$/.test(robotBands.cold.handR) &&
    !/(fist|point|thumbsup)_/.test(robotBands.cold.handR),
   "and idle puts the plain hand back, so no gesture can stick");
 ok(robotBands.proud.pose === "thumbsup" &&
-   /\/face_happy_left\.png$/.test(robotBands.proud.eyes) &&
-   /\/thumbsup_hand_character_right\.png$/.test(robotBands.proud.handR) &&
-   /\/hand_character_left\.png$/.test(robotBands.proud.handL),
+   /\/face_happy_left\.webp$/.test(robotBands.proud.eyes) &&
+   /\/thumbsup_hand_character_right\.webp$/.test(robotBands.proud.handR) &&
+   /\/hand_character_left\.webp$/.test(robotBands.proud.handL),
   "the payoff settles into Figma's happy face and exact thumb hand");
 ok(robotBands.bubbleUp && robotBands.said.length > 0,
   `he says something on the catch ("${robotBands.said}")`);
-ok(/robot-speech-bubble\.png$/.test(robotBands.bubbleAsset),
+ok(/robot-speech-bubble\.webp$/.test(robotBands.bubbleAsset),
   "gameplay robots use the dedicated Figma speech-bubble component");
 ok(robotBands.bubbleZ > robotBands.rigZ,
   `the speech bubble always paints in front of the robot (${robotBands.bubbleZ} > ${robotBands.rigZ})`);
@@ -1580,7 +1580,7 @@ ok(nearRect(soloFigma.headline,[417.421,22.448,605.116,49.387]) &&
 ok(nearRect(soloFigma.focus,[752,107,660,408]) &&
    nearRect(soloFigma.save,[1152,444.051,241,50.95]) &&
    soloFigma.strayTape === "none" && soloFigma.scoreZ > soloFigma.focusZ &&
-   /v1-divider\.png$/.test(soloFigma.dividerSrc),
+   /v1-divider\.webp$/.test(soloFigma.dividerSrc),
   "the 660×408 photo aperture uses the solid-blue divider and score-paper layering");
 ok(nearRect(soloFigma.award,[-5,645,223.774,150.283]) &&
    nearRect(soloFigma.stat1,[213.042,688.424,162.307,77.492]) &&
@@ -1852,7 +1852,7 @@ const tu = await page.evaluate(() => {
     flashLayer: getComputedStyle(flash).zIndex,
   };
 });
-ok(tu.src === "rs-timesup.png", `it is the Figma asset, not a text burst (${tu.src})`);
+ok(tu.src === "rs-timesup.webp", `it is the Figma asset, not a text burst (${tu.src})`);
 ok(Math.abs(tu.ratio - 2.65) < .12, `paper keeps its Figma proportions (${tu.ratio})`);
 ok(tu.visible && tu.shake === "tuShake", `the paper shakes (${tu.shake})`);
 ok(tu.glow === "tuGlow", `it glows (${tu.glow})`);
@@ -2096,8 +2096,8 @@ ok(await page.evaluate(() => getComputedStyle(document.getElementById("lobbyRobo
 ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinBlue")).display) !== "none", "blue JOIN THIS TEAM button visible");
 ok(await page.evaluate(() => getComputedStyle(document.getElementById("btnJoinOrange")).display) !== "none", "orange JOIN THIS TEAM button visible");
 ok(await page.evaluate(() => document.querySelectorAll(".pt-tile .pt-empty").length) === 6, "six waiting tiles rendered");
-ok(await page.evaluate(() => !document.querySelector('img[src$="pt-inner.png"]') &&
-  getComputedStyle(document.getElementById("ptB0")).backgroundImage.includes("pt-inner.png")),
+ok(await page.evaluate(() => !document.querySelector('img[src$="pt-inner.webp"]') &&
+  getComputedStyle(document.getElementById("ptB0")).backgroundImage.includes("pt-inner.webp")),
   "blue and orange team tiles use their original clipped paper background");
 const joinSpec = await page.evaluate(() => {
   const button = document.getElementById("btnJoinBlue").getBoundingClientRect();
@@ -2630,14 +2630,14 @@ console.log("boot gate:");
       })(),
     };
   });
-  ok(/cam-panel\.png$/.test(authored.paper) &&
-     authored.rows.length === 3 && authored.rows.every(s => /cam-row\.png$/.test(s)) &&
+  ok(/cam-panel\.webp$/.test(authored.paper) &&
+     authored.rows.length === 3 && authored.rows.every(s => /cam-row\.webp$/.test(s)) &&
      authored.icons.length === 3 &&
      new Set(authored.icons).size === 3 &&
-     /cam-robot-point\.png$/.test(authored.body),
+     /cam-robot-point\.webp$/.test(authored.body),
     "the card is built from 322:717's own art, not a generic modal");
-  ok(/cam-tape-yellow\.png$/.test(authored.tapes.yellow.src) &&
-     /cam-tape-cream\.png$/.test(authored.tapes.cream.src) &&
+  ok(/cam-tape-yellow\.webp$/.test(authored.tapes.yellow.src) &&
+     /cam-tape-cream\.webp$/.test(authored.tapes.cream.src) &&
      authored.tapes.yellow.natural.join("x") === "405x383" &&
      authored.tapes.cream.natural.join("x") === "427x312" &&
      authored.tapes.yellow.filter === "none" &&
@@ -2849,7 +2849,7 @@ console.log("move back:");
       title: title.textContent };
   });
   ok(card.exists && card.hidden, "the card starts down");
-  ok(card.art === "assets/ui/figma/warn-paper-red.png",
+  ok(card.art === "assets/ui/figma/warn-paper-red.webp",
     "it is Figma's own warning paper (317:651), not a CSS box");
   ok(card.pe === "none", "it never eats a click");
   ok(Number(card.z) < 88,

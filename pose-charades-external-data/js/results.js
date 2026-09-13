@@ -270,8 +270,8 @@ export function showResults(next){
   const divider = st.querySelector(".rs-divider");
   if(divider)
     divider.src = mode === "1v1" || mode === "solo"
-      ? "assets/ui/figma/v1-divider.png"
-      : "assets/ui/figma/pm-divider.png";
+      ? "assets/ui/figma/v1-divider.webp"
+      : "assets/ui/figma/pm-divider.webp";
   orderResultsControls(st.dataset.page);
 
   setTxt("rsHeadline", payload.headline || "GAME OVER");
@@ -433,10 +433,10 @@ function renderSeats(){
       el.dataset.pid = p.id;
       el.innerHTML =
         '<div class="slot"></div>' +
-        '<img class="rs-border" src="assets/ui/figma/pm-border-' + team + '.png" alt="">' +
+        '<img class="rs-border" src="assets/ui/figma/pm-border-' + team + '.webp" alt="">' +
         '<div class="rs-nametag"><div class="rs-nametag-art">' +
-        '<img src="assets/ui/figma/rs-nametag-' + team + '.png" alt=""><b></b></div></div>' +
-        '<div class="rs-ready"><img src="assets/ui/figma/rs-ready-paper.png" alt=""><b>READY</b></div>';
+        '<img src="assets/ui/figma/rs-nametag-' + team + '.webp" alt=""><b></b></div></div>' +
+        '<div class="rs-ready"><img src="assets/ui/figma/rs-ready-paper.webp" alt=""><b>READY</b></div>';
     }
     /* after the rebuild, so a freshly built seat still has a paper to pop */
     if(nowReady && !wasReady && !rebuilt) popReady(el);
@@ -736,9 +736,9 @@ function renderBreakdown(){
       const last = reelOf(p.id).slice(-1)[0];
       t.innerHTML =
         '<div class="shotwrap">' + (last ? '<img src="' + last.url + '" alt="">' : "") + "</div>" +
-        '<img class="rs-border" src="assets/ui/figma/rs-photo-' + team + '.png" alt="">' +
+        '<img class="rs-border" src="assets/ui/figma/rs-photo-' + team + '.webp" alt="">' +
         '<div class="rs-nametag"><div class="rs-nametag-art">' +
-        '<img src="assets/ui/figma/rs-nametag-' + team + '.png" alt=""><b>' +
+        '<img src="assets/ui/figma/rs-nametag-' + team + '.webp" alt=""><b>' +
         esc(disp(p.name)) + "</b></div></div>";
       t.onclick = () => selectBreakdownPlayer(p.id, t);
       strip.appendChild(t);
@@ -800,7 +800,7 @@ function paintPanel(suffix, p){
 
   const tag = $("rsFocusName" + suffix);
   if(tag){
-    tag.querySelector("img").src = "assets/ui/figma/rs-nametag-" + p.team + ".png";
+    tag.querySelector("img").src = "assets/ui/figma/rs-nametag-" + p.team + ".webp";
     tag.querySelector("b").textContent = disp(p.name);
     tag.classList.toggle("orange", p.team === "orange");
   }

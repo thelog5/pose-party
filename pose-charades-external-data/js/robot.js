@@ -267,19 +267,19 @@ function preload(){
   want.add(EYE_FILE("blink", "left"));
   want.add(EYE_FILE("blink", "right"));
   for(const prefix of Object.values(HAND_ART)){
-    want.add(prefix + "hand_character_left.png");
-    want.add(prefix + "hand_character_right.png");
+    want.add(prefix + "hand_character_left.webp");
+    want.add(prefix + "hand_character_right.webp");
   }
   for(const f of want) new Image().src = ART + f;
 }
-const EYE_FILE = (state, side) => state + "_" + side + ".png";
+const EYE_FILE = (state, side) => state + "_" + side + ".webp";
 /* Five of the pack's seven mouths are visemes and carry the `phoneme_` prefix;
    `smile` and `frown` are shapes in their own right. Keyed off the viseme set
    rather than off a list of exceptions, so a new expression mouth in rig.json
    needs nothing here. */
 const VISEMES = Object.freeze(["A_AH", "E_EE", "O_OH", "M_BP", "FV"]);
 const MOUTH_FILE = shape =>
-  (VISEMES.includes(shape) ? "phoneme_" + shape : shape) + ".png";
+  (VISEMES.includes(shape) ? "phoneme_" + shape : shape) + ".webp";
 
 /* Keep support for a deliberately mixed pair; the current exact Figma states
    already encode their own left/right asymmetry in separate files. */
@@ -428,10 +428,10 @@ function dressHands(r, poseName){
      unmirrored rig, and swaps with everything else on a mirrored one. */
   const thumbL = alt && r.mirrorPose;
   const thumbR = alt && !r.mirrorPose;
-  const left = (thumbL ? alt : "") + "hand_character_left.png";
-  const right = (thumbR ? alt : "") + "hand_character_right.png";
+  const left = (thumbL ? alt : "") + "hand_character_left.webp";
+  const right = (thumbR ? alt : "") + "hand_character_right.webp";
   /* Compare the authored attribute, not an `endsWith` against the absolute
-     URL. Every alternate ends with `hand_character_left.png`, which used to
+     URL. Every alternate ends with `hand_character_left.webp`, which used to
      make the gesture art stick after the beat returned to idle. */
   if(r.handL && r.handL.getAttribute("src") !== ART + left)
     r.handL.src = ART + left;

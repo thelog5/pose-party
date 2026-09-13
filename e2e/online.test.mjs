@@ -420,7 +420,7 @@ try {
     const box=award.getBoundingClientRect();
     const cx=box.left+box.width/2;
     return document.getElementById("vsWordCard").classList.contains("locked") &&
-      award.querySelector("img").src.includes("sp-award.png") &&
+      award.querySelector("img").src.includes("sp-award.webp") &&
       cx>half.left && cx<half.right;
   }), "1v1 stamps Solo's GOT IT paper on the half that earned it");
   ok(await A.evaluate(() =>
@@ -437,7 +437,7 @@ try {
     const cx=box.left+box.width/2;
     return award.classList.contains("show") &&
       award.querySelector(".aw-got").textContent==="ALICE GOT IT!" &&
-      award.querySelector("img").src.includes("sp-award.png") &&
+      award.querySelector("img").src.includes("sp-award.webp") &&
       cx>half.left && cx<half.right;
   }), "the opponent sees the same paper stamped on that player's own half");
   const chaseClockFit=await A.evaluate(() => {
@@ -592,7 +592,7 @@ try {
   const pcode = await txt(A, "#roomCodeText");
   ok(/^[A-Z2-9]{6}$/.test(pcode), `party room created (${pcode})`);
   ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name b')?.textContent) === "Alice", "host camera tile uses the saved player name");
-  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name img')?.getAttribute("src")?.endsWith("lb-name-chip.png")), "party tile uses the 1v1 torn-paper name asset");
+  ok(await A.evaluate(() => document.querySelector('#ptB0 .pt-name img')?.getAttribute("src")?.endsWith("lb-name-chip.webp")), "party tile uses the 1v1 torn-paper name asset");
   ok(await A.evaluate(() => document.getElementById("cameraDock").parentElement.id) === "ptB0", "host camera mounted in the team tile");
   const wideCamera = await A.evaluate(() => {
     const video = document.querySelector("#ptB0 .camdock video");

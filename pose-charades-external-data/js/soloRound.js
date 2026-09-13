@@ -493,8 +493,8 @@ function bumpTarget(node, kind){
    thrown outward and then pulled down, rather than CSS shapes. (The previous
    particles had no styling at all and rendered invisible.) */
 const CONFETTI_ART = [
-  "conf-star-a.png", "conf-star-b.png", "conf-star-c.png",
-  "conf-blue-a.png", "conf-blue-b.png", "conf-red-a.png", "conf-red-b.png",
+  "conf-star-a.webp", "conf-star-b.webp", "conf-star-c.webp",
+  "conf-blue-a.webp", "conf-blue-b.webp", "conf-red-a.webp", "conf-red-b.webp",
 ];
 
 export function confettiFrom(node, origin){

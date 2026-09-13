@@ -41,20 +41,20 @@ const DIR = "assets/ui/figma/";
    that answers the pointer: "alpha" samples the paper, "ink" takes the
    strip's whole outline, because with photos in its windows it is solid. */
 const ART = {
-  "bg":          { src:"ps-bg.jpg",          fit:"cover", hit:null },
-  "title":       { src:"ps-title.png",       fit:"cover", hit:"alpha", kind:"title" },
-  "strip":       { src:"ps-strip.png",       fit:"cover", hit:"ink",   kind:"strip" },
-  "tag-blue":    { src:"ps-tag-blue.png",    fit:"cover", hit:"alpha", kind:"tag", side:"blue" },
-  "tag-red":     { src:"ps-tag-red.png",     fit:"cover", hit:"alpha", kind:"tag", side:"orange" },
-  "tape-yellow": { src:"ps-tape-yellow.png", fit:"fill",  hit:"alpha", kind:"tape" },
-  "tape-cream":  { src:"ps-tape-cream.png",  fit:"fill",  hit:"alpha", kind:"tape" },
-  "tape-blue":   { src:"ps-tape-blue.png",   fit:"fill",  hit:"alpha", kind:"tape" },
-  "tri-blue":    { src:"ps-tri-blue.png",    fit:"fill",  hit:"alpha", kind:"conf" },
-  "tri-red":     { src:"ps-tri-red.png",     fit:"fill",  hit:"alpha", kind:"conf" },
-  "star":        { src:"ps-star.png",        fit:"fill",  hit:"alpha", kind:"conf" },
+  "bg":          { src:"ps-bg.webp",          fit:"cover", hit:null },
+  "title":       { src:"ps-title.webp",       fit:"cover", hit:"alpha", kind:"title" },
+  "strip":       { src:"ps-strip.webp",       fit:"cover", hit:"ink",   kind:"strip" },
+  "tag-blue":    { src:"ps-tag-blue.webp",    fit:"cover", hit:"alpha", kind:"tag", side:"blue" },
+  "tag-red":     { src:"ps-tag-red.webp",     fit:"cover", hit:"alpha", kind:"tag", side:"orange" },
+  "tape-yellow": { src:"ps-tape-yellow.webp", fit:"fill",  hit:"alpha", kind:"tape" },
+  "tape-cream":  { src:"ps-tape-cream.webp",  fit:"fill",  hit:"alpha", kind:"tape" },
+  "tape-blue":   { src:"ps-tape-blue.webp",   fit:"fill",  hit:"alpha", kind:"tape" },
+  "tri-blue":    { src:"ps-tri-blue.webp",    fit:"fill",  hit:"alpha", kind:"conf" },
+  "tri-red":     { src:"ps-tri-red.webp",     fit:"fill",  hit:"alpha", kind:"conf" },
+  "star":        { src:"ps-star.webp",        fit:"fill",  hit:"alpha", kind:"conf" },
 };
 
-/* ps-strip.png is 1024x1536, and STRIP_INK is the frame's own ink box.
+/* ps-strip.webp is 1024x1536, and STRIP_INK is the frame's own ink box.
 
    THE PHOTOS ARE PRINTS STUCK ON THE STRIP, IN FRONT OF IT. They first sat
    BEHIND the paper, each cut to the torn edge of its window, and read as
@@ -67,7 +67,7 @@ const ART = {
      274,482 .. 753,767      258,469 .. 764,775
      276,814 .. 752,1100     258,802 .. 764,1108
      277,1147 .. 752,1415    258,1135 .. 764,1441
-   Re-check that table if ps-strip.png is ever re-exported. */
+   Re-check that table if ps-strip.webp is ever re-exported. */
 const STRIP_NAT = [1024, 1536];
 const STRIP_INK = [216, 88, 811, 1473];
 const PRINT = { x: 258, w: 506, h: 306, tops: [136, 469, 802, 1135] };

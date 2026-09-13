@@ -2,7 +2,7 @@
    render with fake members and screenshots each fill level, so the 2x2 grid
    (Figma `party blue` 134:320 / `party orange` 134:321) can be checked against
    the design without six headless clients. Also reports where each cell's
-   painted box lands against the windows in `pt-frame-2x2.png`. */
+   painted box lands against the windows in `pt-frame-2x2.webp`. */
 import puppeteer from "puppeteer-core";
 import { mkdir } from "node:fs/promises";
 import { passCameraGate } from "./_gate.mjs";
@@ -50,11 +50,11 @@ async function fill(blue, orange) {
         const tile = document.getElementById(id);
         if (ix < n) {
           tile.innerHTML = '<span class="pt-name">' +
-            '<img src="assets/ui/figma/lb-name-chip.png" alt=""><b>PLAYER ' + (ix + 1) + '</b></span>';
+            '<img src="assets/ui/figma/lb-name-chip.webp" alt=""><b>PLAYER ' + (ix + 1) + '</b></span>';
           tile.style.background = ix % 2 ? "#2f5fb8" : "#7a5a3a";
         } else {
           tile.style.removeProperty("background");
-          tile.innerHTML = '<div class="pt-empty"><img src="assets/ui/figma/pt-person.png" alt="">' +
+          tile.innerHTML = '<div class="pt-empty"><img src="assets/ui/figma/pt-person.webp" alt="">' +
             '<span>WAITING FOR PLAYER</span></div>';
         }
       });
@@ -70,7 +70,7 @@ async function fill(blue, orange) {
    img is the reference box; the four windows were measured off the PNG alpha
    and are expressed as fractions of it. A tile must COVER its window on all
    four sides, or a strip of bare paper shows beside the video. */
-const WIN = {   // [x0,x1,y0,y1] as fractions of pt-frame-2x2.png
+const WIN = {   // [x0,x1,y0,y1] as fractions of pt-frame-2x2.webp
   TL: [97 / 1565, 701 / 1565, 78 / 1005, 462 / 1005],
   TR: [744 / 1565, 1342 / 1565, 78 / 1005, 462 / 1005],
   BL: [97 / 1565, 701 / 1565, 496 / 1005, 876 / 1005],

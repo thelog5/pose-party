@@ -195,7 +195,7 @@ function resetMatchSide(prefix, key){
 /* The count is CUT PAPER for the three numbers it actually reaches. Decoding
    a 1254px PNG on the frame it is first shown drops the beat that has to land
    hardest, so all three are warmed the first time a countdown runs. */
-const CD_ART = Object.freeze({ 1:"cd-1.png", 2:"cd-2.png", 3:"cd-3.png" });
+const CD_ART = Object.freeze({ 1:"cd-1.webp", 2:"cd-2.webp", 3:"cd-3.webp" });
 const CD_DIR = "assets/ui/figma/";
 let cdWarmed = false;
 function warmCountdownArt(){

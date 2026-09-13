@@ -106,8 +106,8 @@ function warmSprites(){
   if(spritesWarmed || typeof Image !== "function") return;
   spritesWarmed = true;
   for(const [body, face] of [HOME_POSE, ...BEATS]){
-    new Image().src = ART + "cam-robot-" + body + ".png";
-    new Image().src = ART + "rb-face-" + face + ".png";
+    new Image().src = ART + "cam-robot-" + body + ".webp";
+    new Image().src = ART + "rb-face-" + face + ".webp";
   }
 }
 
@@ -117,8 +117,8 @@ function setPose(body, face){
   rig.dataset.pose = body;          // the CSS keys each face offset off this
   const b = $("cgRobotBody");
   const f = $("cgRobotFace");
-  if(b) b.src = ART + "cam-robot-" + body + ".png";
-  if(f) f.src = ART + "rb-face-" + face + ".png";
+  if(b) b.src = ART + "cam-robot-" + body + ".webp";
+  if(f) f.src = ART + "rb-face-" + face + ".webp";
 }
 
 /* Deliberately its own loop rather than robot.js's. That module drives the

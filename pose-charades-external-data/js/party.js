@@ -392,7 +392,7 @@ function renderEmptyTile(tile){
   /* never nuke the live camera dock with innerHTML */
   const dock = $("cameraDock");
   if(dock && tile.contains(dock)) document.body.appendChild(dock);
-  tile.innerHTML = '<div class="pt-empty"><img src="assets/ui/figma/pt-person.png" alt="">' +
+  tile.innerHTML = '<div class="pt-empty"><img src="assets/ui/figma/pt-person.webp" alt="">' +
     '<span>WAITING FOR PLAYER</span></div>';
   delete tile.dataset.pid;
 }
@@ -427,7 +427,7 @@ function setTileName(tile, name){
     chip = document.createElement("span");
     chip.className = "pt-name";
     const art = document.createElement("img");
-    art.src = "assets/ui/figma/lb-name-chip.png";
+    art.src = "assets/ui/figma/lb-name-chip.webp";
     art.alt = "";
     const label = document.createElement("b");
     chip.append(art, label);
@@ -464,7 +464,7 @@ function renderTiles(){
         else{
           const ph = document.createElement("div");
           ph.className = "pt-empty";
-          ph.innerHTML = '<img src="assets/ui/figma/pt-person.png" alt=""><span>CONNECTING…</span>';
+          ph.innerHTML = '<img src="assets/ui/figma/pt-person.webp" alt=""><span>CONNECTING…</span>';
           tile.appendChild(ph);
         }
       }

@@ -302,15 +302,15 @@ try {
       centred: Math.abs((stage.left + stage.width / 2) - innerWidth / 2) < 1,
     };
   })()`);
-  ok(/pm-border-blue\.png$/.test(visualContract.blue) &&
-     /pm-border-orange\.png$/.test(visualContract.orange) &&
-     /pm-border-green\.png$/.test(visualContract.green),
+  ok(/pm-border-blue\.webp$/.test(visualContract.blue) &&
+     /pm-border-orange\.webp$/.test(visualContract.orange) &&
+     /pm-border-green\.webp$/.test(visualContract.green),
     "party tiles use the exact blue/orange/recognized Figma borders");
-  ok(/crown-paper\.png$/.test(visualContract.crown) &&
-     /pm-divider\.png$/.test(visualContract.divider),
+  ok(/crown-paper\.webp$/.test(visualContract.crown) &&
+     /pm-divider\.webp$/.test(visualContract.divider),
     "paper crown and split divider use their exact Figma exports");
   ok(visualContract.tapes.every(t =>
-      /pm-tape-[a-z-]+\.png$/.test(t.src) && (t.rotate === "none" || t.rotate === "0deg")),
+      /pm-tape-[a-z-]+\.webp$/.test(t.src) && (t.rotate === "none" || t.rotate === "0deg")),
     "all Party tapes use exact pre-rotated Figma node exports");
   /* No mid-match LEAVE paper any more: the volume control took its slot and
      Esc is the way out (which still tells the room). */
@@ -509,7 +509,7 @@ try {
   ok(hitFeedback.confetti, "Party recognition erupts from the shared word card");
   ok(hitFeedback.first && hitFeedback.crownVisible && hitFeedback.crownOnHead,
     "the first player recognized wears the paper crown on their head");
-  ok(hitFeedback.awardOnSeat && /sp-award\.png$/.test(hitFeedback.awardArt) &&
+  ok(hitFeedback.awardOnSeat && /sp-award\.webp$/.test(hitFeedback.awardArt) &&
      hitFeedback.awardFits,
     "the paper is Solo's own award, stamped on the seat that earned it");
   ok(!hitFeedback.awardPaid,

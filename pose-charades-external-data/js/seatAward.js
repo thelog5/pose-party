@@ -7,7 +7,7 @@
    1.6-second flash inside it.
 
    So the paper goes back to being a stamp, and it is the same POINTS AWARD
-   paper Solo lands centre stage (`sp-award.png`, GOT IT! / +N / POINTS!):
+   paper Solo lands centre stage (`sp-award.webp`, GOT IT! / +N / POINTS!):
 
      · recognition  → it SLAMS onto that player's seat and stays there. For
        the rest of the word it is the answer to "who has already got this",
@@ -81,7 +81,7 @@ function paperFor(seat){
   node.className = "pp-award";
   node.setAttribute("aria-hidden", "true");
   node.innerHTML =
-    '<img class="sp-art" src="assets/ui/figma/sp-award.png" alt="">' +
+    '<img class="sp-art" src="assets/ui/figma/sp-award.webp" alt="">' +
     '<span class="aw-got">GOT IT!</span>' +
     '<span class="aw-pts">+0</span>' +
     '<span class="aw-lbl">POINTS!</span>';
