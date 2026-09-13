@@ -399,6 +399,9 @@ export async function boot(){
   scheduleLoop();
 }
 
+/* Learned from the deck by buildModel, so a new word needs no code change. */
+const needsLegs = label => !!label && !!state.model?.legLabels?.includes(label);
+
 function classifyLive(now){
   const input=state.poseInput;
   if(!input.tracking || input.frames.length<MIN_POSE_SAMPLES){
@@ -417,6 +420,7 @@ function classifyLive(now){
   input.predictionAt=now;
   input.accepted=result.accepted;
   input.predictionLabel=result.label;
+  input.predictionNeedsLegs=needsLegs(result.label);
   for(const lab of state.model.labels) state.smooth[lab]=0.65*(state.smooth[lab]||0)+0.35*(scores[lab]||0);
   /* solo: RAW top guess funnels through setModelOutput every inference
      frame — soloRound.js owns all smoothing/debounce from there */
@@ -476,7 +480,7 @@ function loop(){
   if(generation!==state.poseInput.generation){
     for(const label of Object.keys(state.smooth)) state.smooth[label]=0;
   }
-  const guidance=poseQualityMessage(quality, state.recording?.label || state.game?.word,
+  const guidance=poseQualityMessage(quality, needsLegs(state.recording?.label || state.game?.word),
     !!state.recording || state.screen==="train");
   const hint=$("poseHint");
   if(hint){

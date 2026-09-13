@@ -104,13 +104,15 @@ export function resetChargeMeter(meter){
 }
 
 /* Every local mode checks the same live observation at display rate. A frozen
-   camera or a rejected guess must stop charge even when inference stops too. */
+   camera or a rejected guess must stop charge even when inference stops too.
+
+   A TRACKING GAP DOES NOT RESET THE METER. The input stops, so the charge
+   bleeds down to the ratchet like any other wobble. This used to reset the
+   meter on every new pose generation, which cleared the peak too: a 250ms
+   stall in Party, a limbo lean or a fast spin cost the whole word. The old
+   motion window is still thrown away (observePose), so nothing stale charges. */
 export function advancePoseCharge(meter, confidence, elapsedFrac, input, label,
                                   now = performance.now()){
-  if(meter.poseGeneration !== input?.generation){
-    resetChargeMeter(meter);
-    meter.poseGeneration = input?.generation;
-  }
   return advanceCharge(meter, canRecognize(input, label, now) ? confidence : 0, elapsedFrac, now);
 }
 

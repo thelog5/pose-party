@@ -31,8 +31,9 @@
 
 import { MODEL_POINTS, JOINTS, LEFT_HAND_OFFSET, RIGHT_HAND_OFFSET,
          HAND_LANDMARKS, WIN, STRIDE, K, TIME_SCALES, FEATURE_SD_FLOOR,
-         FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR } from "./constants.js";
-import { clipSegments, canonicalClip } from "./poseInput.js";
+         FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR,
+         LEG_SHARE_MIN } from "./constants.js";
+import { clipSegments, canonicalClip, LEGS } from "./poseInput.js";
 
 function pt(frame, j){
   const p=frame[j];
@@ -87,11 +88,16 @@ function mirrorFrame(frame){
 
 export const mirrorFrames = frames => frames.map(mirrorFrame);
 
-/* Linear resample to `factor` of the original length. Never shorter than WIN,
-   so speeding a clip up cannot drop it below one window. */
+/* Linear resample to `factor` of the original length. A source that holds a
+   full window keeps one, so speeding it up cannot drop it below WIN. A shorter
+   source is scaled as asked and gives null under 15 frames. It used to be
+   floored at WIN too, which stretched every section under 24 frames to 30:
+   the "fast" copy and the "slow" copy both came out SLOWER. */
 export function timeScaleFrames(frames, factor){
   const n=frames.length;
-  const m=Math.max(WIN, Math.round(n*factor));
+  let m=Math.round(n*factor);
+  if(n>=WIN) m=Math.max(WIN, m);
+  else if(m<15) return null;
   if(n<2 || m===n) return frames;
   const width=frames[0].length, out=new Array(m);
   for(let i=0;i<m;i++){
@@ -121,8 +127,10 @@ function* augmentedFrames(clip){
   for(const segment of clipSegments(canonicalClip(clip))){
     if(segment.length < 15) continue;
     for(const frames of [segment, mirrorFrames(segment)])
-      for(const factor of TIME_SCALES)
-        yield factor===1 ? frames : timeScaleFrames(frames, factor);
+      for(const factor of TIME_SCALES){
+        const out = factor===1 ? frames : timeScaleFrames(frames, factor);
+        if(out) yield out;
+      }
   }
 }
 
@@ -153,7 +161,34 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
   if(weights) for(let d=0;d<D;d++){ sd[d]/=weights[d]; for(const v of z) v[d]*=weights[d]; }
 
   const samples=raw.map((s,i)=>({ v:z[i], norm:l2(z[i]), label:s.label, take:s.take }));
-  return { samples, labels:[...labels], mean, sd, weights };
+  return { samples, labels:[...labels], mean, sd, weights, legLabels:legLabels(samples, D) };
+}
+
+/* Words that need their legs SEEN before they can be recognized. Each word's
+   centroid in the weighted space is its difference from the average pose; the
+   share of that difference on knee and ankle dimensions says how much of the
+   word lives in its legs. Past LEG_SHARE_MIN its upper body is generic, so a
+   comparison with the legs masked would accept it on any standing player.
+   Cheap (one pass over the samples), so every retrain re-derives it. */
+function legLabels(samples, D){
+  const leg = JOINTS.map(j => LEGS.includes(j)), span = MODEL_POINTS*2;
+  const words = new Map();
+  for(const s of samples){
+    let w = words.get(s.label);
+    if(!w){ w = { n:0, sum:new Float64Array(D) }; words.set(s.label, w); }
+    w.n++; for(let d=0;d<D;d++) w.sum[d]+=s.v[d];
+  }
+  const out = [];
+  for(const [label, w] of words){
+    let legs = 0, all = 0;
+    for(let d=0;d<D;d++){
+      const e = (w.sum[d]/w.n)**2;
+      all += e;
+      if(leg[Math.floor((d % span)/2)]) legs += e;
+    }
+    if(all > 0 && legs/all >= LEG_SHARE_MIN) out.push(label);
+  }
+  return out;
 }
 
 function median(a){

@@ -6,7 +6,7 @@ import { JOINTS } from '../pose-charades-external-data/js/constants.js';
 import { createPoseInput, assessPose, observePose, canRecognize, clipSegments,
   canonicalClip, POSE_SPACE, windowJointMask } from '../pose-charades-external-data/js/poseInput.js';
 import { createChargeMeter, advancePoseCharge } from '../pose-charades-external-data/js/recognition.js';
-import { classifyDetailed, features, windowsOf } from '../pose-charades-external-data/js/classifier.js';
+import { buildModel, classifyDetailed, features, timeScaleFrames, windowsOf } from '../pose-charades-external-data/js/classifier.js';
 import { decodePoseDataset } from '../pose-charades-external-data/js/poseData.js';
 
 function landmarks(width=1280,height=720){
@@ -57,11 +57,12 @@ test('bent visible legs are valid; out-of-frame or low-confidence legs are not',
   assert.equal(assessPose(p).fullBody,true);
   p[27].y=1.1; assert.equal(assessPose(p).legs,false);
   const input=createPoseInput(); warm(input); input.quality=assessPose(p);
-  input.predictionLabel='squat';
+  input.predictionLabel='squat'; input.predictionNeedsLegs=true;
   assert.equal(canRecognize(input,'squat',1100),false);
-  input.predictionLabel='saluting';
+  input.predictionLabel='saluting'; input.predictionNeedsLegs=false;
   assert.equal(canRecognize(input,'saluting',1100),true);
-  input.quality=quality; input.predictionLabel='squat'; input.predictionMask=quality.mask.slice();
+  input.quality=quality; input.predictionLabel='squat'; input.predictionNeedsLegs=true;
+  input.predictionMask=quality.mask.slice();
   input.predictionMask[JOINTS.indexOf(27)]=false;
   assert.equal(canRecognize(input,'squat',1100),false);
 });
@@ -105,11 +106,45 @@ test('sustained fresh accepted predictions still complete each mode',()=>{
     assert.equal(meter.locked,true,profile);
   }
 });
-test('quality masks omit a joint until it is reliable throughout the window',()=>{
+test('one bad sample keeps a joint; a quarter of the window drops it',()=>{
   const input=createPoseInput();warm(input);
   const q={...quality,mask:quality.mask.slice()};q.mask[5]=false;
   observePose(input,base,q,1133);
+  assert.equal(windowJointMask(input)[5],true);
+  for(let at=1166;at<1500;at+=1000/30) observePose(input,base,q,at);
   assert.equal(windowJointMask(input)[5],false);
+});
+test('a tracking gap pauses the charge but keeps the ratchet',()=>{
+  const input=createPoseInput();warm(input);const meter=createChargeMeter('solo');
+  let now=1100;
+  for(;now<2100;now+=16.7){ input.seenAt=input.predictionAt=now; advancePoseCharge(meter,.99,.1,input,'saluting',now); }
+  const peak=meter.peak;
+  assert.ok(peak>.3 && !meter.locked);
+  observePose(input,null,assessPose(null),now);
+  for(const end=now+600;now<end;now+=16.7) advancePoseCharge(meter,.99,.1,input,'saluting',now);
+  observePose(input,base,quality,now);
+  advancePoseCharge(meter,.99,.1,input,'saluting',now);
+  assert.equal(input.generation,1);
+  assert.equal(meter.peak,peak);
+  assert.ok(meter.charge>=peak*.25-1e-9,`charge ${meter.charge} fell under the ratchet of ${peak}`);
+});
+test('short sections are time-scaled the way they are asked to be',()=>{
+  const frames=n=>Array.from({length:n},()=>base);
+  assert.equal(timeScaleFrames(frames(20),1.25).length,25);
+  assert.equal(timeScaleFrames(frames(20),.8).length,16);
+  assert.equal(timeScaleFrames(frames(15),.8),null);
+  assert.equal(timeScaleFrames(frames(35),.8).length,30);
+  assert.equal(timeScaleFrames(frames(80),.8).length,64);
+});
+test('words told apart by their legs need their legs seen; arm words do not',()=>{
+  /* Most words in a deck are arm words, so the average pose has still legs.
+     With two or three words every word differs from the average equally. */
+  const clip=(label,joint,phase)=>{const a=JOINTS.indexOf(joint);
+    return {label,frames:Array.from({length:45},(_,i)=>base.map((p,j)=>
+      j===a||j===a+1 ? [p[0],p[1]+.4*Math.sin(i/3+phase)] : [p[0]+.01*Math.sin(i*7+j),p[1]]))};};
+  const words={knees:25,wrists:15,elbows:13,fingers:19,shoulders:11};
+  const model=buildModel(Object.entries(words).flatMap(([l,j])=>[clip(l,j,0),clip(l,j,1)]));
+  assert.deepEqual(model.legLabels,['knees']);
 });
 test('a new accepted label cannot keep charging an old smoothed guess',()=>{
   const input=createPoseInput();warm(input);

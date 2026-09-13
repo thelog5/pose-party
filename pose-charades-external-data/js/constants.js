@@ -23,6 +23,17 @@ export const SAMPLE_MS = 66, WIN = 30, STRIDE = 8, K = 7;
    for why. Widening the list costs model size (and therefore classify time)
    linearly, so keep it to the range a person actually performs at. */
 export const TIME_SCALES = [0.8, 1, 1.25];
+/* A word NEEDS ITS LEGS SEEN when at least this share of its difference from
+   the average pose lies on the knees and ankles (buildModel's legLabels). Its
+   upper body is then generic, so with the legs masked it matches any standing
+   player. This replaced a hand-written regex of word names that was wrong both
+   ways on the 2026-09-11 deck: jumping jacks, flossing, moonwalking, griddying,
+   jump rope and tight rope walking lose NO accuracy with the legs hidden (the
+   model knows them by their arms), so the regex only blocked small-room
+   players. At .26 the deck picks kicking a soccerball (.73), bowling, limbo,
+   running, froggy jump, climbing a ladder, squat and star jump (.27). The
+   next word down is paddling a boat at .25; the median word is .10. */
+export const LEG_SHARE_MIN = .26;
 /* Floor on a feature dimension's standard deviation before the kNN divides by
    it, as a fraction of the MEDIAN standard deviation of its own block.
 

@@ -8,9 +8,14 @@ export const POSE_VISIBILITY = .35;
 export const POSE_SPACE = "torso-reference-16:9-v1";
 export const REFERENCE_ASPECT = 16 / 9;
 
+/* A joint stays in the live comparison when it is reliable in this share of
+   the window. It used to need EVERY sample, so one motion-blurred ankle
+   dropped the legs for the whole 2s window, and a leg word could not charge
+   for 2s after it. 80% of 30 samples lets about 400ms of bad frames through. */
+export const MASK_MIN_FRACTION = .8;
+
 const ANCHORS = [11, 12, 23, 24];
-const LEGS = [25, 26, 27, 28];
-const LEG_WORDS = /squat|bowling|jump|running|marching|moonwalk|kick|limbo|tight rope|griddying|flossing/i;
+export const LEGS = [25, 26, 27, 28];
 const visible = p => !!p && Number.isFinite(p.x) && Number.isFinite(p.y) &&
   p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1 &&
   Number.isFinite(p.visibility) && p.visibility >= POSE_VISIBILITY;
@@ -23,9 +28,11 @@ export function assessPose(landmarks){
   return { mask, torso, usable, fullBody:mask.every(Boolean), legs:LEGS.every(has) };
 }
 
-export function poseQualityMessage(quality, label = "", recording = false){
+/* `needsLegs` comes from the model (buildModel's legLabels), never from the
+   word's spelling. */
+export function poseQualityMessage(quality, needsLegs = false, recording = false){
   if(!quality?.torso) return "Step back so your shoulders and hips are visible.";
-  if((recording || LEG_WORDS.test(label)) && !quality.legs)
+  if((recording || needsLegs) && !quality.legs)
     return "Step back so your knees and feet are visible.";
   if(!quality.usable || (recording && !quality.fullBody))
     return "Keep your whole body visible and improve the lighting.";
@@ -35,7 +42,8 @@ export function poseQualityMessage(quality, label = "", recording = false){
 export function createPoseInput(){
   return { frames:[], masks:[], previous:null, nextAt:null, sampleAt:-Infinity,
     seenAt:-Infinity, predictionAt:-Infinity, predictedSampleAt:-Infinity,
-    tracking:false, accepted:false, quality:null, predictionMask:null, predictionLabel:null, generation:0 };
+    tracking:false, accepted:false, quality:null, predictionMask:null, predictionLabel:null,
+    predictionNeedsLegs:false, generation:0 };
 }
 
 export function resetPoseInput(input){
@@ -48,6 +56,7 @@ export function resetPoseInput(input){
   input.quality = null;
   input.predictionMask = null;
   input.predictionLabel = null;
+  input.predictionNeedsLegs = false;
   input.generation++;
 }
 
@@ -81,16 +90,20 @@ export function observePose(input, frame, quality, now){
 }
 
 export function windowJointMask(input){
-  return JOINTS.map((_, j) => input.masks.length > 0 &&
-    input.masks.every(mask => mask[j]));
+  const n = input.masks.length;
+  return JOINTS.map((_, j) => n > 0 &&
+    input.masks.reduce((sum, mask) => sum + (mask[j] ? 1 : 0), 0) >= n * MASK_MIN_FRACTION);
 }
 
+/* `predictionNeedsLegs` is set with the prediction, from the model's
+   legLabels: a word told apart mostly by its legs cannot be recognized while
+   the legs are hidden. */
 export function canRecognize(input, label, now = performance.now()){
   return !!input?.tracking && input.accepted && input.quality?.usable &&
     (!label || input.predictionLabel===label) &&
     now - input.seenAt <= POSE_GAP_MS &&
     now - input.predictionAt <= PREDICTION_MAX_AGE_MS &&
-    (!LEG_WORDS.test(label || "") || (input.quality.legs &&
+    (!input.predictionNeedsLegs || (input.quality.legs &&
       LEGS.every(j=>input.predictionMask?.[JOINTS.indexOf(j)])));
 }
 

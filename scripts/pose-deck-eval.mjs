@@ -316,6 +316,8 @@ for(const kind of QUICK ? ['clean'] : ['clean','jitter']){
   console.log(`  ${kind}: ${r.accepted} accepted, ${r.right} correct accepted, `+
     `${r.wrongRejected} wrong guesses rejected, ${r.rightRejected} correct guesses rejected`);
 }
+console.log("\nNEED LEGS  (live recognition waits for reliable knees and ankles; LEG_SHARE_MIN in constants.js)");
+console.log("  " + (buildModel(clips, BUILD).legLabels.join(", ") || "none"));
 
 /* Everything below is the game as it ships. */
 const R = results[SHIPPED].clean.words;
