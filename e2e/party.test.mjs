@@ -344,7 +344,11 @@ try {
     state.smooth[currentWord]=.45;
     window.__visionTick();
     partyCheck(currentWord,.45);
+    /* Keep the fake camera fresh through the wait. One tick is stale after
+       POSE_GAP_MS (250), so a single tick read the meter at 0 at 260ms. */
+    const fresh=setInterval(()=>window.__visionTick(),80);
     await new Promise(resolve=>setTimeout(resolve,260));
+    clearInterval(fresh);
     const card=document.getElementById("pmWordCard");
     const fill=document.getElementById("pmWordFill");
     const clock=document.getElementById("pmMatchTime");
