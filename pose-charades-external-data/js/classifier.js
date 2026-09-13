@@ -40,7 +40,29 @@ function pt(frame, j){
   return p ? p : [0,0];
 }
 
-/* Feature vector per window: per-joint mean, std, and mean absolute velocity. */
+/* DISTANCES BETWEEN JOINTS, the fourth block. Every position above is
+   measured from the hip centre, so when the tracker moves a hip, every joint
+   moves with it. The distance from a wrist to the nose does not change. On the
+   2026-09-11 deck this block leaves clean accuracy where it was (76.0% ->
+   76.1%) and takes accuracy under .02 hip-and-leg jitter from 56.7% to 67.4%.
+   It also makes the model less sensitive to body shape: test clips with legs
+   20% shorter score 71.4% against 65.6% without it. Raw MediaPipe ids; the
+   list is closed under mirroring, so a mirrored clip uses the same pairs. */
+const PAIRS = [[15,0],[16,0],[15,16],[15,23],[16,24],[15,12],[16,11],
+               [13,14],[27,28],[25,26],[15,25],[16,26]]
+  .map(pair => pair.map(j => JOINTS.indexOf(j)));
+
+/* Block layout: [mean, std, vel] are x,y per joint; then the mean and the std
+   of each pair distance. DIM_JOINTS says which joints each dimension reads,
+   so a masked joint drops every dimension that depends on it. */
+const POS_DIMS = MODEL_POINTS*2;
+export const FEATURE_DIMS = POS_DIMS*3 + PAIRS.length*2;
+const BLOCKS = [[0,POS_DIMS],[POS_DIMS,POS_DIMS*2],[POS_DIMS*2,POS_DIMS*3],[POS_DIMS*3,FEATURE_DIMS]];
+const DIM_JOINTS = Array.from({length:FEATURE_DIMS}, (_, d) => d < POS_DIMS*3
+  ? [Math.floor((d % POS_DIMS)/2)] : PAIRS[(d - POS_DIMS*3) % PAIRS.length]);
+
+/* Feature vector per window: per-joint mean, std, and mean absolute velocity,
+   then the mean and std of each joint-pair distance. */
 export function features(frames){
   const J=MODEL_POINTS, D=J*2, n=frames.length;
   const mean=new Float32Array(D), std=new Float32Array(D), vel=new Float32Array(D);
@@ -53,7 +75,14 @@ export function features(frames){
     vel[j*2]+=Math.abs(a[0]-b[0]);
     vel[j*2+1]+=Math.abs(a[1]-b[1]); }
   for(let d=0;d<D;d++) vel[d]= n>1 ? vel[d]/(n-1)*8 : 0;
-  const v=new Float32Array(D*3); v.set(mean,0); v.set(std,D); v.set(vel,D*2);
+  const P=PAIRS.length, dist=new Float64Array(P*n), dMean=new Float64Array(P), dStd=new Float64Array(P);
+  frames.forEach((f, i) => PAIRS.forEach(([a, b], k) => {
+    const p=pt(f,a), q=pt(f,b), x=Math.hypot(p[0]-q[0], p[1]-q[1]);
+    dist[i*P+k]=x; dMean[k]+=x/n;
+  }));
+  for(let i=0;i<n;i++) for(let k=0;k<P;k++) dStd[k]+=(dist[i*P+k]-dMean[k])**2/n;
+  const v=new Float32Array(FEATURE_DIMS); v.set(mean,0); v.set(std,D); v.set(vel,D*2);
+  v.set(dMean,D*3); v.set(dStd.map(Math.sqrt),D*3+P);
   return v;
 }
 
@@ -143,7 +172,7 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
     for(const frames of augmentedFrames(c))
       for(const v of windowsOf({frames})){ labels.add(c.label); raw.push({v, label:c.label, take}); }
   });
-  const D = raw.length ? raw[0].v.length : MODEL_POINTS*6;
+  const D = raw.length ? raw[0].v.length : FEATURE_DIMS;
   const mean=new Float32Array(D), sd=new Float32Array(D);
   if(raw.length){
     for(const s of raw) for(let d=0;d<D;d++) mean[d]+=s.v[d];
@@ -171,7 +200,11 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
    comparison with the legs masked would accept it on any standing player.
    Cheap (one pass over the samples), so every retrain re-derives it. */
 function legLabels(samples, D){
-  const leg = JOINTS.map(j => LEGS.includes(j)), span = MODEL_POINTS*2;
+  /* Measured on the three POSITION blocks only. The distance block mixes arm
+     and leg in one number (wrist to knee), so counting it pushed overhead
+     bicep flex (.249) up level with squat (.255) and froggy jump (.254). On
+     the position blocks the deck keeps a clear gap at LEG_SHARE_MIN. */
+  const leg = JOINTS.map(j => LEGS.includes(j)), span = POS_DIMS*3;
   const words = new Map();
   for(const s of samples){
     let w = words.get(s.label);
@@ -181,10 +214,10 @@ function legLabels(samples, D){
   const out = [];
   for(const [label, w] of words){
     let legs = 0, all = 0;
-    for(let d=0;d<D;d++){
+    for(let d=0;d<span;d++){
       const e = (w.sum[d]/w.n)**2;
       all += e;
-      if(leg[Math.floor((d % span)/2)]) legs += e;
+      if(leg[DIM_JOINTS[d][0]]) legs += e;
     }
     if(all > 0 && legs/all >= LEG_SHARE_MIN) out.push(label);
   }
@@ -256,15 +289,14 @@ function featureWeights(z, raw, { min, max, floor }){
    the whole vector because position, spread and velocity live at genuinely
    different magnitudes and comparing them to one another means nothing. */
 function applySdFloor(sd){
-  const D=sd.length, blocks=3, span=D/blocks;
-  for(let b=0;b<blocks;b++){
-    const from=b*span, block=Array.from(sd.slice(from, from+span)).sort((x,y)=>x-y);
+  for(const [from, to] of BLOCKS){
+    const block=Array.from(sd.slice(from, to)).sort((x,y)=>x-y);
     const mid=block.length>>1;
     const median=block.length%2 ? block[mid] : (block[mid-1]+block[mid])/2;
     /* the +1e-6 is the only true divide-by-zero guard here; the floor above it
        is the thing that actually matters */
     const floor=Math.max(median*FEATURE_SD_FLOOR, 1e-6);
-    for(let d=from;d<from+span;d++) sd[d]=Math.max(sd[d], floor);
+    for(let d=from;d<to;d++) sd[d]=Math.max(sd[d], floor);
   }
 }
 
@@ -286,13 +318,18 @@ export function classify(v, m){
 /* Closed-set voting is retained for deck comparisons. Live recognition also
    requires a nearby example and separation from the closest competing word.
    Scores are vote shares, never probabilities that an arbitrary action is known. */
-export const REJECTION = Object.freeze({ minSimilarity:.55, minMargin:.005 });
+/* minSimilarity was .55 before the distance block. The new space has more
+   dimensions, so the same number rejected less: 49 wrong guesses and 151 of
+   558 unseen actions, against 56 and 172 before. At .66 it rejects 57 and 183
+   and costs 2 more correct windows (23 of 434). The margin does most of the
+   work: up to .64 no correct window changes at all. */
+export const REJECTION = Object.freeze({ minSimilarity:.66, minMargin:.005 });
 
 export function classifyDetailed(v, m, { reject=true, jointMask=null,
     minSimilarity=REJECTION.minSimilarity, minMargin=REJECTION.minMargin }={}){
   const q=standardize(v, m.mean, m.sd);
   const dims = jointMask && !jointMask.every(Boolean) ? Array.from(q, (_, d) => d)
-    .filter(d => jointMask[Math.floor((d % (MODEL_POINTS * 2)) / 2)]) : null;
+    .filter(d => DIM_JOINTS[d].every(j => jointMask[j])) : null;
   const nv=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q), sims=[];
   const nearest={};
   for(const s of m.samples){

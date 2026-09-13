@@ -30,9 +30,10 @@ export const TIME_SCALES = [0.8, 1, 1.25];
    ways on the 2026-09-11 deck: jumping jacks, flossing, moonwalking, griddying,
    jump rope and tight rope walking lose NO accuracy with the legs hidden (the
    model knows them by their arms), so the regex only blocked small-room
-   players. At .26 the deck picks kicking a soccerball (.73), bowling, limbo,
-   running, froggy jump, climbing a ladder, squat and star jump (.27). The
-   next word down is paddling a boat at .25; the median word is .10. */
+   players. At .26 the deck picks kicking a soccerball (.71), bowling, limbo,
+   running, froggy jump, squat, climbing a ladder and star jump (.27). The
+   next word down is paddling a boat at .24; the median word is .10. Measured
+   on the position features only (see legLabels in classifier.js). */
 export const LEG_SHARE_MIN = .26;
 /* Floor on a feature dimension's standard deviation before the kNN divides by
    it, as a fraction of the MEDIAN standard deviation of its own block.

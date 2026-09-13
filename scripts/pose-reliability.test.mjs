@@ -136,6 +136,17 @@ test('short sections are time-scaled the way they are asked to be',()=>{
   assert.equal(timeScaleFrames(frames(35),.8).length,30);
   assert.equal(timeScaleFrames(frames(80),.8).length,64);
 });
+test('the distance block ignores a shift of the whole body; a hidden joint drops its distances',()=>{
+  const still=Array.from({length:30},(_,i)=>base.map(p=>[p[0],p[1]+.01*Math.sin(i)]));
+  const moved=still.map(f=>f.map(p=>[p[0]+.07,p[1]-.05]));
+  const a=features(still), b=features(moved), from=JOINTS.length*6;
+  assert.equal(a.length,from+24);
+  for(let d=from;d<a.length;d++) assert.ok(Math.abs(a[d]-b[d])<1e-6,`dim ${d}`);
+  const model={samples:[{label:'one',v:a,norm:Math.hypot(...a)}]};
+  const jointMask=JOINTS.map(()=>true); jointMask[JOINTS.indexOf(27)]=false;
+  const changed=a.slice(); changed[from+8]=99; changed[from+20]=-99;   // ankle-to-ankle mean and std
+  assert.equal(classifyDetailed(changed,model,{jointMask}).similarity,classifyDetailed(a,model,{jointMask}).similarity);
+});
 test('words told apart by their legs need their legs seen; arm words do not',()=>{
   /* Most words in a deck are arm words, so the average pose has still legs.
      With two or three words every word differs from the average equally. */
