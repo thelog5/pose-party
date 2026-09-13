@@ -129,12 +129,14 @@ the 15 normalized body landmarks (`MODEL_POINTS`) — fingers were too noisy.
 
 Recognition now checks fresh observations in Solo, 1v1 and Party. Missing or
 unreliable torso landmarks pause charge immediately; a gap over 250 ms clears
-the motion window. Predictions expire after 500 ms and can only charge their
-current accepted label. Reacquiring a player requires 15 new uniform samples.
-Low-visibility/out-of-frame joints are omitted from live similarity comparisons;
-leg-dependent words also require reliable knees and ankles in the prediction.
+the motion window (the charge meter keeps its ratchet). Predictions expire
+after 500 ms and can only charge their current accepted label. Reacquiring a
+player requires 15 new uniform samples. A joint that is low-visibility or out
+of frame in more than 20% of the window is omitted from live similarity
+comparisons. Words whose difference lies mostly in the legs (`legLabels`,
+learned by `buildModel`) also require reliable knees and ankles.
 The live classifier says “unsure” unless the nearest example has cosine at
-least .55 and beats the nearest competing word by .005. `classify()` retains
+least .66 and beats the nearest competing word by .005. `classify()` retains
 closed-set scores for historical deck comparisons; `classifyDetailed()` applies
 the live rejection check by default.
 
@@ -174,13 +176,23 @@ word. Held-out idle has 0/12 false action guesses and 6 abstentions. Synthetic
 transitions reject 8/45 windows. Real varied negative recordings and live play
 are still needed to validate or improve rejection beyond this baseline.
 
+The feature vector now also carries the mean and spread of 12 joint-to-joint
+distances (wrist to nose, wrist to wrist, wrist to hip, ankle to ankle, and
+others). A distance does not move when the hip centre moves, so hip and leg
+jitter hurts much less. The similarity threshold moved from .55 to .66 with
+it, because the same number rejected less in the larger space. Same deck:
+
 | Weighting | Clean | Jitter .02 |
 | --- | ---: | ---: |
-| None | 72.5% | 56.5% |
-| Global (shipped) | 76.0% | 58.2% |
-| Per-word | 70.2% | 46.1% |
-| Hybrid | 60.2% | 34.6% |
-| Mixed | 68.2% | 56.1% |
+| None | 73.7% | 63.3% |
+| Global (shipped) | 76.1% | 66.1% |
+| Per-word | 73.3% | 52.6% |
+| Hybrid | 61.1% | 39.6% |
+| Mixed | 69.6% | 62.8% |
+
+Live rejection now accepts 490 windows (411 correct), rejects 57 wrong
+guesses and 23 correct ones, and rejects 183/558 unseen-action windows.
+Held-out idle has 1/12 false action guesses and 5 abstentions.
 
 ## Party mode (2v2–3v3)
 
