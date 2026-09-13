@@ -4,6 +4,7 @@
   "type": "module",
   "description": "Headless-Chrome end-to-end tests (fake camera; vision input simulated by seeding classifier output).",
   "scripts": {
+    "pose": "node pose.test.mjs",
     "offline": "node offline.test.mjs",
     "online": "node online.test.mjs",
     "party": "node party.test.mjs"

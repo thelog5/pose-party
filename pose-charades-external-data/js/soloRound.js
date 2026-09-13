@@ -40,7 +40,7 @@ import {
   fitGameplayText, prefersReducedMotion,
 } from "./gameplayFeedback.js";
 
-import { createChargeMeter, resetChargeMeter, advanceCharge,
+import { createChargeMeter, resetChargeMeter, advancePoseCharge,
          chargePercent } from "./recognition.js";
 import { clearSeatAwards } from "./seatAward.js";
 import { robotCharge, robotMiss, robotNewWord,
@@ -158,7 +158,7 @@ function frame(){
      the paper; its bar and lock begin only once that target paper pops in. */
   const targetIsDisplayed = !!target && guessHistory.items[0]?.label === target;
   const raw = targetIsDisplayed ? (state.smooth?.[target] || 0) : 0;
-  advanceCharge(meter, raw, wordElapsedFrac());
+  advancePoseCharge(meter, raw, wordElapsedFrac(), state.poseInput, target);
 
   const fillEl = el("soloWordFill");
   if(fillEl) fillEl.style.width = (RECOGNITION_FILL_MIN +

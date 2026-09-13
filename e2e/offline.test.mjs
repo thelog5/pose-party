@@ -3,6 +3,7 @@
    state.smooth (classifier output) and calling gameCheck(); everything else
    (FSM, scoring, DOM, dataset load, MediaPipe boot) is the real app. */
 import puppeteer from "puppeteer-core";
+import { installVisionFixture } from "./vision-fixture.mjs";
 
 const APP = process.env.APP_URL || "http://localhost:8123";
 const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -78,6 +79,7 @@ const settledLobby = () => page.waitForFunction(
 
 // ---- boot ----
 await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000 });
+await installVisionFixture(page);
 console.log("boot:");
 ok(true, "engine + camera booted (status overlay hidden)");
 /* --use-fake-ui-for-media-stream reports the origin as already granted, which
@@ -767,6 +769,7 @@ const feed = (labelExpr, conf) => page.evaluate(`(async () => {
   const { setModelOutput } = await import('${APP}/js/soloRound.js');
   const label = ${labelExpr};
   window.__feed = setInterval(() => {
+    window.__visionTick(label);
     setModelOutput(label, ${conf});
     state.smooth[label] = ${conf};   // the fill reads the smoothed target channel
   }, 80);
@@ -1354,6 +1357,7 @@ const chargeTrace = await page.evaluate(async () => {
   const samples = [];
   let hundredEarly = false;
   while(performance.now() - started < 4000){
+    window.__visionTick(word);
     setModelOutput(word, .95);
     state.smooth[word] = .95;
     await new Promise(r => requestAnimationFrame(r));

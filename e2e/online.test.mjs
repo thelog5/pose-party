@@ -3,6 +3,7 @@
    room, host settings, host-controlled start). Only the vision input is
    simulated. */
 import puppeteer from "puppeteer-core";
+import { installVisionFixture } from "./vision-fixture.mjs";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 
@@ -71,6 +72,7 @@ async function player(tag){
   await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
   await passCameraGate(page);
   await page.waitForFunction(() => document.getElementById("status").style.display === "none", { timeout: 60000, polling: 400 });
+  await installVisionFixture(page);
   return page;
 }
 async function act(page, fn){ await page.bringToFront(); return fn(); }
@@ -95,6 +97,7 @@ const winNow = page => page.evaluate(`(async () => {
   const { renderGuesses } = await import('${APP}/js/ui.js');
   const w = state.game.word;
   clearInterval(window.__win);
+  clearTimeout(window.__winStop);
   window.__unpin?.();
   const labels = state.model.labels.slice();
   const pin = (label, value, writable) => Object.defineProperty(state.smooth, label,
@@ -109,6 +112,7 @@ const winNow = page => page.evaluate(`(async () => {
   const rid = state.game.roundId;
   const stop = () => { clearInterval(window.__win); window.__unpin?.(); };
   const tick = () => {
+    window.__visionTick();
     /* The pin must never outlive its own round: carried into the next word it
        hands that word away the instant it is dealt, which is not a thing a
        player can do and not what any of these assertions mean to measure. */
@@ -119,7 +123,7 @@ const winNow = page => page.evaluate(`(async () => {
   };
   tick();
   window.__win = setInterval(tick, 120);
-  setTimeout(stop, 3200);
+  window.__winStop = setTimeout(stop, 3200);
   await new Promise(r => setTimeout(r, 700));
   return w;
 })()`);
@@ -359,6 +363,7 @@ try {
     const label=state.model.labels.find(l=>l!=="idle"&&l!==state.game.word);
     for(const key of state.model.labels) state.smooth[key]=.01;
     state.smooth[label]=.74;
+    window.__visionTick(label);
     renderGuesses();
     await new Promise(r=>setTimeout(r,180));
     renderGuesses();
@@ -378,6 +383,7 @@ try {
     const next=state.model.labels.find(l=>l!=="idle"&&l!==state.game.word&&l!==first);
     for(const key of state.model.labels) state.smooth[key]=.01;
     state.smooth[next]=.7;
+    window.__visionTick(next);
     renderGuesses();
     await new Promise(r=>setTimeout(r,480));
     renderGuesses();

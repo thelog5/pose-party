@@ -2,7 +2,8 @@
    replace assets/data/pose-charades-data.json whenever you export newer data.
    Must be served over http(s), not file://, or the fetch is blocked. */
 
-import { JOINTS, FRAME_POINTS, BUNDLED_DATA_URL } from "./constants.js";
+import { BUNDLED_DATA_URL } from "./constants.js";
+import { decodePoseDataset } from "./poseData.js";
 import { state } from "./state.js";
 import { toast, renderClasses } from "./ui.js";
 import { train } from "./training.js";
@@ -14,15 +15,8 @@ export function exportData(){
   URL.revokeObjectURL(a.href);
 }
 
-/* Older exports predate hand tracking; pad them out to the current frame width. */
-function padFrame(frame){
-  if(frame.length>=FRAME_POINTS) return frame.slice(0,FRAME_POINTS);
-  return frame.concat(Array.from({length:FRAME_POINTS-frame.length},()=>[0,0]));
-}
-
 function mergeClips(d){
-  if(!d || !d.clips || JSON.stringify(d.joints)!==JSON.stringify(JOINTS)) throw new Error("bad dataset");
-  const clips=d.clips.map(c=>({...c, frames:c.frames.map(padFrame)}));
+  const clips=decodePoseDataset(d);
   state.dataset.clips.push(...clips);
   renderClasses();
   return clips;

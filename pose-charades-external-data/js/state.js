@@ -3,14 +3,17 @@
    same slot without import cycles or stale bindings. */
 
 import { JOINTS, FRAME_POINTS } from "./constants.js";
+import { createPoseInput } from "./poseInput.js";
+
+const poseInput = createPoseInput();
 
 export const state = {
   /* pose engine */
   landmarker: null,
   handmarker: null,
   faceLandmarker: null,  // hidden local-only face mesh used to anchor the crown
-  lastSampleT: 0,
-  liveBuf: [],
+  poseInput,
+  liveBuf: poseInput.frames,
   mediaStream: null,   // local camera stream; shared with WebRTC in online 1v1
 
   /* online 1v1: game.js calls this instead of scoring locally when
@@ -19,7 +22,7 @@ export const state = {
   onlineGuess: null,
 
   /* captured clips */
-  dataset: { app:"pose-charades", version:2, joints:JOINTS, hands:true, framePoints:FRAME_POINTS, fps:15, clips:[] },
+  dataset: { app:"pose-charades", version:3, joints:JOINTS, hands:true, framePoints:FRAME_POINTS, fps:15, clips:[] },
   recording: null,
 
   /* classifier */

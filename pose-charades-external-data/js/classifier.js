@@ -32,6 +32,7 @@
 import { MODEL_POINTS, JOINTS, LEFT_HAND_OFFSET, RIGHT_HAND_OFFSET,
          HAND_LANDMARKS, WIN, STRIDE, K, TIME_SCALES, FEATURE_SD_FLOOR,
          FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR } from "./constants.js";
+import { clipSegments, canonicalClip } from "./poseInput.js";
 
 function pt(frame, j){
   const p=frame[j];
@@ -106,18 +107,23 @@ export function timeScaleFrames(frames, factor){
 }
 
 export function windowsOf(clip){
-  const out=[], F=clip.frames;
-  if(F.length<15) return out;
-  if(F.length<=WIN){ out.push(features(F)); return out; }
-  for(let i=0;i+WIN<=F.length;i+=STRIDE) out.push(features(F.slice(i,i+WIN)));
+  const out=[];
+  for(const F of clipSegments(canonicalClip(clip))){
+    if(F.length<15) continue;
+    if(F.length<=WIN){ out.push(features(F)); continue; }
+    for(let i=0;i+WIN<=F.length;i+=STRIDE) out.push(features(F.slice(i,i+WIN)));
+  }
   return out;
 }
 
 /* Every training view of one clip: both handednesses at every tempo. */
 function* augmentedFrames(clip){
-  for(const frames of [clip.frames, mirrorFrames(clip.frames)])
-    for(const factor of TIME_SCALES)
-      yield factor===1 ? frames : timeScaleFrames(frames, factor);
+  for(const segment of clipSegments(canonicalClip(clip))){
+    if(segment.length < 15) continue;
+    for(const frames of [segment, mirrorFrames(segment)])
+      for(const factor of TIME_SCALES)
+        yield factor===1 ? frames : timeScaleFrames(frames, factor);
+  }
 }
 
 /* `weigh:false` builds the unweighted model; scripts/pose-deck-eval.mjs uses
@@ -126,9 +132,8 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
                                     weightMax=FEATURE_WEIGHT_MAX, weightFloor=FEATURE_WEIGHT_FLOOR }={}){
   const raw=[], labels=new Set();
   clips.forEach((c, take)=>{
-    labels.add(c.label);
     for(const frames of augmentedFrames(c))
-      for(const v of windowsOf({frames})) raw.push({v, label:c.label, take});
+      for(const v of windowsOf({frames})){ labels.add(c.label); raw.push({v, label:c.label, take}); }
   });
   const D = raw.length ? raw[0].v.length : MODEL_POINTS*6;
   const mean=new Float32Array(D), sd=new Float32Array(D);
@@ -240,11 +245,31 @@ function standardize(v, mean, sd){
 
 /* Cubed similarity weighting sharpens the vote toward the nearest neighbours. */
 export function classify(v, m){
+  return classifyDetailed(v, m, { reject:false }).scores;
+}
+
+/* Closed-set voting is retained for deck comparisons. Live recognition also
+   requires a nearby example and separation from the closest competing word.
+   Scores are vote shares, never probabilities that an arbitrary action is known. */
+export const REJECTION = Object.freeze({ minSimilarity:.55, minMargin:.005 });
+
+export function classifyDetailed(v, m, { reject=true, jointMask=null,
+    minSimilarity=REJECTION.minSimilarity, minMargin=REJECTION.minMargin }={}){
   const q=standardize(v, m.mean, m.sd);
-  const nv=l2(q), sims=[];
+  const dims = jointMask && !jointMask.every(Boolean) ? Array.from(q, (_, d) => d)
+    .filter(d => jointMask[Math.floor((d % (MODEL_POINTS * 2)) / 2)]) : null;
+  const nv=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q), sims=[];
+  const nearest={};
   for(const s of m.samples){
-    let dot=0; for(let d=0;d<q.length;d++) dot+=q[d]*s.v[d];
-    sims.push({sim:dot/(nv*s.norm), label:s.label});
+    let dot=0, norm=s.norm;
+    if(dims){
+      let sq=0;
+      for(const d of dims){ dot+=q[d]*s.v[d]; sq+=s.v[d]**2; }
+      norm=Math.sqrt(sq);
+    }else for(let d=0;d<q.length;d++) dot+=q[d]*s.v[d];
+    const sim=nv>0 && norm>0 ? dot/(nv*norm) : 0;
+    sims.push({sim:Number.isFinite(sim)?sim:0, label:s.label});
+    nearest[s.label]=Math.max(nearest[s.label] ?? -1, Number.isFinite(sim)?sim:0);
   }
   sims.sort((a,b)=>b.sim-a.sim);
   const scores={}; let tot=0;
@@ -253,5 +278,12 @@ export function classify(v, m){
     scores[sims[i].label]=(scores[sims[i].label]||0)+w; tot+=w;
   }
   if(tot>0) for(const k in scores) scores[k]/=tot;
-  return scores;
+  const best=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+  const label=best?.[0] || null;
+  const similarity=nearest[label] ?? 0;
+  const runnerUp=Math.max(-1,...Object.entries(nearest).filter(([l])=>l!==label).map(([,s])=>s));
+  const margin=similarity-runnerUp;
+  const accepted=!!label && tot>0 && similarity>=minSimilarity && margin>=minMargin;
+  return { scores:reject && !accepted ? {} : scores, label:accepted || !reject ? label : null,
+    confidence:accepted || !reject ? best?.[1] || 0 : 0, accepted, similarity, margin };
 }

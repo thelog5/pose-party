@@ -37,9 +37,10 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const JS = path.join(ROOT, "pose-charades-external-data/js");
-const { buildModel, classify, windowsOf, l2 } = await import(path.join(JS, "classifier.js"));
+const { buildModel, classify, classifyDetailed, features, windowsOf, l2 } = await import(path.join(JS, "classifier.js"));
 const { JOINTS, K } = await import(path.join(JS, "constants.js"));
 const { CHARGE_PROFILES } = await import(path.join(JS, "recognition.js"));
+const { clipSegments, canonicalClip } = await import(path.join(JS, "poseInput.js"));
 
 const args = process.argv.slice(2);
 const flag = n => args.includes(n);
@@ -209,6 +210,14 @@ function score(t, label, s){
 
 const results = Object.fromEntries(MODES.map(m => [m, { clean:tally(), jitter:tally() }]));
 const focusRows = [];
+const live = {clean:{accepted:0,right:0,rightRejected:0,wrongRejected:0},
+  jitter:{accepted:0,right:0,rightRejected:0,wrongRejected:0}};
+function recordLive(kind, label, v, model){
+  const d=classifyDetailed(v,model,{reject:false}), b=live[kind];
+  const right=d.label===label;
+  if(d.accepted){b.accepted++; if(right)b.right++;}
+  else if(right)b.rightRejected++; else b.wrongRejected++;
+}
 const gauss = rng(20260911);
 const t0 = Date.now();
 
@@ -220,7 +229,9 @@ for(let i = 0; i < clips.length; i++){
     .map(m => [m, weightedModel(plain, weightsFor(m, plain, shipped.weights))]));
   const cls = (m, v) => m === "none" ? classify(v, plain) : m === SHIPPED ? classify(v, shipped) : classifyWeighted(v, wms[m]);
   const clean = windowsOf(held);
-  const noisy = QUICK ? [] : windowsOf({ frames:jitter(held.frames, gauss) });
+  const noisy = QUICK ? [] : windowsOf({ ...held, frames:jitter(held.frames, gauss) });
+  for(const v of clean) recordLive('clean',held.label,v,shipped);
+  for(const v of noisy) recordLive('jitter',held.label,v,shipped);
   for(const m of MODES){
     clean.forEach((v, wi) => {
       const s = cls(m, v), g = score(results[m].clean, held.label, s);
@@ -299,6 +310,13 @@ console.log(best === SHIPPED ? "  no other weighting beats the shipped model" :
   `  ${best} beats the shipped model: ${sign(acc(best, "clean") - acc(SHIPPED, "clean"))} clean` +
   (QUICK ? "" : `, ${sign(acc(best, "jitter") - acc(SHIPPED, "jitter"))} jitter`));
 
+console.log("\nLIVE REJECTION  (same held-out windows, before smoothing/charge; weighting table above is closed-set)");
+for(const kind of QUICK ? ['clean'] : ['clean','jitter']){
+  const r=live[kind];
+  console.log(`  ${kind}: ${r.accepted} accepted, ${r.right} correct accepted, `+
+    `${r.wrongRejected} wrong guesses rejected, ${r.rightRejected} correct guesses rejected`);
+}
+
 /* Everything below is the game as it ships. */
 const R = results[SHIPPED].clean.words;
 const show = ["none", SHIPPED, ...(best === SHIPPED ? [] : [best])];
@@ -349,4 +367,37 @@ if(focusWord){
     for(const r of focusRows.filter(r => r.m === m))
       console.log(`    clip ${String(r.clip).padStart(3)} w${r.wi}  ${r.g.padEnd(27)} ${r.c.toFixed(2)}`);
   }
+}
+
+if(flag('--open-set')){
+  let unknown=0, rejected=0;
+  for(const label of words.filter(w=>w!=='idle')){
+    const model=buildModel(clips.filter(c=>c.label!==label),BUILD);
+    for(const clip of clips.filter(c=>c.label===label)) for(const v of windowsOf(clip)){
+      unknown++;
+      if(!classifyDetailed(v,model).accepted) rejected++;
+    }
+  }
+  let idle=0, idleWrong=0, idleUnsure=0;
+  for(let i=0;i<clips.length;i++) if(clips[i].label==='idle'){
+    const model=buildModel(clips.filter((_,j)=>j!==i),BUILD);
+    for(const v of windowsOf(clips[i])){
+      const d=classifyDetailed(v,model); idle++;
+      if(!d.accepted) idleUnsure++; else if(d.label!=='idle') idleWrong++;
+    }
+  }
+  const model=buildModel(clips,BUILD);
+  let transitions=0, transitionRejected=0;
+  const prepared=clips.map(c=>clipSegments(canonicalClip(c)).filter(section=>section.length>=15));
+  for(let i=1;i<clips.length;i++) if(clips[i].label!==clips[i-1].label){
+    const a=prepared[i-1].at(-1), b=prepared[i][0];
+    if(!a || !b) continue;
+    const v=features([...a.slice(-15),...b.slice(0,15)]);
+    transitions++;
+    if(!classifyDetailed(v,model).accepted) transitionRejected++;
+  }
+  console.log('\nOPEN SET DIAGNOSTICS');
+  console.log(`  unseen actions (leave-one-word-out): ${rejected}/${unknown} rejected; ${unknown-rejected} still assigned a known word`);
+  console.log(`  held-out idle: ${idleWrong}/${idle} false action guesses; ${idleUnsure} unsure`);
+  console.log(`  synthetic action transitions: ${transitionRejected}/${transitions} rejected (diagnostic, not labeled real-camera data)`);
 }

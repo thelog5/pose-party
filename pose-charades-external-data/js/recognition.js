@@ -47,6 +47,8 @@
 
 /* Per-mode shape. Solo is the reference tuning; the two online modes charge
    faster because they are races and a word is shared by everyone. */
+import { canRecognize } from "./poseInput.js";
+
 export const CHARGE_PROFILES = Object.freeze({
   solo:  { gateFrom:.80, gateTo:.44, upMs:1250, downMs:620, lateBoost:1.00 },
   match: { gateFrom:.74, gateTo:.42, upMs:1050, downMs:560, lateBoost:1.10 },
@@ -99,6 +101,17 @@ export function resetChargeMeter(meter){
   meter.gate = meter.profile.gateFrom;
   meter.locked = false;
   meter.at = 0;
+}
+
+/* Every local mode checks the same live observation at display rate. A frozen
+   camera or a rejected guess must stop charge even when inference stops too. */
+export function advancePoseCharge(meter, confidence, elapsedFrac, input, label,
+                                  now = performance.now()){
+  if(meter.poseGeneration !== input?.generation){
+    resetChargeMeter(meter);
+    meter.poseGeneration = input?.generation;
+  }
+  return advanceCharge(meter, canRecognize(input, label, now) ? confidence : 0, elapsedFrac, now);
 }
 
 /* The gate the pose has to clear right now. Public because the HUD wants to

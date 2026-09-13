@@ -33,6 +33,8 @@
 /* how much of the clip is left — a static REC pill gave no sense of duration */
 .recdot b{font-variant-numeric:tabular-nums;opacity:.9}
 .recdot b:not(:empty)::before{content:"·";margin:0 .45em;opacity:.6}
+.posehint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:9;max-width:88%;padding:7px 12px;border-radius:8px;background:rgba(0,0,0,.78);color:#fff;font-size:13px;line-height:1.3;text-align:center;pointer-events:none}
+.posehint[hidden]{display:none}
 /* the record button doubles as CANCEL while a clip is arming or running */
 .btn.recording{background:var(--red);color:#fff}
 .flash{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:5}

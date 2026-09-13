@@ -127,6 +127,61 @@ webcam ──► MediaPipe Pose (+Hand, visual only) ──► normalize (pose.j
 Hand landmarks are drawn and exported in clips, but the classifier uses only
 the 15 normalized body landmarks (`MODEL_POINTS`) — fingers were too noisy.
 
+Recognition now checks fresh observations in Solo, 1v1 and Party. Missing or
+unreliable torso landmarks pause charge immediately; a gap over 250 ms clears
+the motion window. Predictions expire after 500 ms and can only charge their
+current accepted label. Reacquiring a player requires 15 new uniform samples.
+Low-visibility/out-of-frame joints are omitted from live similarity comparisons;
+leg-dependent words also require reliable knees and ankles in the prediction.
+The live classifier says “unsure” unless the nearest example has cosine at
+least .55 and beats the nearest competing word by .005. `classify()` retains
+closed-set scores for historical deck comparisons; `classifyDetailed()` applies
+the live rejection check by default.
+
+New exports use dataset version 3. Each new clip includes `captureVersion:3`,
+camera width/height, per-frame millisecond `timestamps`, body `visibility` and
+`inFrame` arrays, and `coordinateSpace:"torso-reference-16:9-v1"`. Coordinates
+are projected into a common 16:9 reference before torso normalization, so camera
+aspect ratio no longer changes the pose. The reference preserves the existing
+16:9 feature scale. Training and live input resample to `SAMPLE_MS=66`; training
+splits at tracking gaps or unreliable frames and uses only clear continuous
+sections. A new take needs at least one clear second. Framing guidance uses
+actual visibility and image bounds, so bending the legs is not treated as cropping.
+
+Legacy clips without camera dimensions/timestamps retain their original
+coordinates and nominal sample grid; their original aspect ratio cannot be
+recovered. Clips with known legacy geometry are migrated on import. Exporting
+a mixed deck preserves which clips are legacy. The bundled recordings have
+not been changed. `train_model.py` uses the same timing/quality preprocessing
+for version 3 exports.
+
+Pose reliability checks:
+
+```bash
+node --test scripts/pose-reliability.test.mjs       # from repository root
+node scripts/pose-deck-eval.mjs                    # weighting + live rejection
+node scripts/pose-deck-eval.mjs --modes global --quick --open-set
+cd e2e && npm run pose                            # static host on port 8123
+```
+
+At checkpoint `9945afa` the 87-clip/38-word deck scored 76.0% on 570 held-out
+windows (58.2% with .02 landmark jitter). The same closed-set baseline is
+preserved. Live rejection accepts 493 windows: 412 correct and 81 wrong; it
+rejects 56 previously wrong guesses and 21 previously correct ones. This is
+a precision/coverage tradeoff, not a new-player accuracy claim. Leave-one-word-out
+diagnostics reject 172/558 unseen-action windows; 386 still resemble a known
+word. Held-out idle has 0/12 false action guesses and 6 abstentions. Synthetic
+transitions reject 8/45 windows. Real varied negative recordings and live play
+are still needed to validate or improve rejection beyond this baseline.
+
+| Weighting | Clean | Jitter .02 |
+| --- | ---: | ---: |
+| None | 72.5% | 56.5% |
+| Global (shipped) | 76.0% | 58.2% |
+| Per-word | 70.2% | 46.1% |
+| Hybrid | 60.2% | 34.6% |
+| Mixed | 68.2% | 56.1% |
+
 ## Party mode (2v2–3v3)
 
 Everyone performs the **same word at once**. Each team's featured player fills

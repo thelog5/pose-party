@@ -6,12 +6,14 @@ import { PoseLandmarker, HandLandmarker, FaceLandmarker, FilesetResolver } from 
 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
-import { SAMPLE_MS, WIN, WASM_URL, POSE_MODEL_URL, HAND_MODEL_URL,
+import { JOINTS, WASM_URL, POSE_MODEL_URL, HAND_MODEL_URL,
          FACE_MODEL_URL } from "./constants.js";
 import { normalize } from "./pose.js";
 import { createLandmarkFilter, filterLandmarks } from "./smooth.js";
 import { drawSkeleton } from "./draw.js";
-import { features, classify } from "./classifier.js";
+import { features, classifyDetailed } from "./classifier.js";
+import { assessPose, observePose, resetPoseInput, windowJointMask,
+         MIN_POSE_SAMPLES, poseQualityMessage } from "./poseInput.js";
 import { showStatus, renderGuesses, updateMoveBack } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
@@ -30,6 +32,7 @@ const CAMERA_PLAY_TIMEOUT_MS = 1400;
 let video, overlay, ctx;
 let lastClassifyT = 0;
 let lastVisionT = -Infinity;
+let lastVideoTime = -1;
 let lastFaceTrackT = 0;
 let lastFaceSeenT = -Infinity;
 let visionRuntime = null;
@@ -396,16 +399,29 @@ export async function boot(){
   scheduleLoop();
 }
 
-function classifyLive(){
-  if(state.liveBuf.length<15) return;
-  const scores=classify(features(state.liveBuf.slice(-WIN)), state.model);
+function classifyLive(now){
+  const input=state.poseInput;
+  if(!input.tracking || input.frames.length<MIN_POSE_SAMPLES){
+    if(state.game?.mode==="ai") setModelOutput("unsure",0);
+    renderGuesses();
+    return;
+  }
+  if(input.sampleAt<=input.predictedSampleAt) return;
+  input.predictedSampleAt=input.sampleAt;
+  const jointMask=windowJointMask(input);
+  input.predictionMask=jointMask;
+  const result=jointMask.filter(Boolean).length>=9
+    ? classifyDetailed(features(input.frames), state.model, {jointMask})
+    : {scores:{},accepted:false,label:null,confidence:0};
+  const scores=result.scores;
+  input.predictionAt=now;
+  input.accepted=result.accepted;
+  input.predictionLabel=result.label;
   for(const lab of state.model.labels) state.smooth[lab]=0.65*(state.smooth[lab]||0)+0.35*(scores[lab]||0);
   /* solo: RAW top guess funnels through setModelOutput every inference
      frame — soloRound.js owns all smoothing/debounce from there */
   if(state.game?.mode==="ai"){
-    let top=null;
-    for(const k in scores) if(!top || scores[k]>scores[top]) top=k;
-    if(top) setModelOutput(top, scores[top]);
+    setModelOutput(result.label || "unsure", result.confidence);
   }
   renderGuesses();
   if(state.game) gameCheck();
@@ -425,11 +441,13 @@ function scheduleLoop(){
 function loop(){
   scheduleLoop();
   if(!state.landmarker || video.readyState<2) return;
-  if(document.hidden) return;
+  if(document.hidden){ resetPoseInput(state.poseInput); return; }
+  if(video.currentTime===lastVideoTime) return;
 
   const now=performance.now();
   if(state.screen==="pmatch" && now-lastVisionT<PARTY_VISION_MIN_MS) return;
   lastVisionT=now;
+  lastVideoTime=video.currentTime;
   const res=state.landmarker.detectForVideo(video, now);
   /* Live classification consumes only the 15 body landmarks. The hand model
      is reserved for Training/recording, where its points are actually drawn
@@ -448,7 +466,37 @@ function loop(){
      make the dots agree with the body while the AI still saw the jitter, or
      the reverse. Recording goes through the same path, so clips captured from
      now on match what live inference sees. */
-  const lm = filterLandmarks(poseFilter, res.landmarks && res.landmarks[0], now);
+  const rawLandmarks=res.landmarks?.[0];
+  const quality=assessPose(rawLandmarks);
+  const lm = filterLandmarks(poseFilter, rawLandmarks, now);
+  const camera={width:video.videoWidth,height:video.videoHeight};
+  const f=lm && quality.usable ? normalize(lm, handRes, camera) : null;
+  const generation=state.poseInput.generation;
+  observePose(state.poseInput, f, quality, now);
+  if(generation!==state.poseInput.generation){
+    for(const label of Object.keys(state.smooth)) state.smooth[label]=0;
+  }
+  const guidance=poseQualityMessage(quality, state.recording?.label || state.game?.word,
+    !!state.recording || state.screen==="train");
+  const hint=$("poseHint");
+  if(hint){
+    const text=["solo","match","pmatch","train"].includes(state.screen) ? guidance : "";
+    if(hint.textContent!==text) hint.textContent=text;
+    hint.hidden=!text;
+  }
+  if(state.recording){
+    const r=state.recording;
+    r.observed++;
+    if(f){
+      r.frames.push(f);
+      r.timestamps.push(now-r.startedAt);
+      r.visibility.push(JOINTS.map(j=>rawLandmarks[j]?.visibility ?? 0));
+      r.inFrame.push(JOINTS.map(j=>{
+        const p=rawLandmarks[j]; return !!p && p.x>=0 && p.x<=1 && p.y>=0 && p.y<=1;
+      }));
+      if(!quality.fullBody) r.rejected++;
+    }else r.rejected++;
+  }
   /* Unconditional, and ahead of the crown/skeleton/sample block so it reads
      the landmarks before anything else can consume them: presence.js needs the
      empty frames too, or its "how long since we saw you" clock never runs. */
@@ -460,14 +508,6 @@ function loop(){
   if(lm){
     if(faceEvery && now-lastFaceSeenT>350) positionLocalCrownFromPose(lm);
     drawSkeleton(lm, handRes, ctx, overlay);
-    if(now-state.lastSampleT >= SAMPLE_MS){
-      state.lastSampleT=now;
-      const f=normalize(lm, handRes);
-      if(f){
-        state.liveBuf.push(f); if(state.liveBuf.length>WIN) state.liveBuf.shift();
-        if(state.recording) state.recording.frames.push(f);
-      }
-    }
   }
 
   if(faceEvery && state.faceLandmarker && now-lastFaceTrackT>=faceEvery){
@@ -485,5 +525,5 @@ function loop(){
   }
 
   if(state.recording && now>=state.recording.endAt) finishRecording();
-  if(state.model && now-lastClassifyT>CLASSIFY_EVERY_MS){ lastClassifyT=now; classifyLive(); }
+  if(state.model && now-lastClassifyT>CLASSIFY_EVERY_MS){ lastClassifyT=now; classifyLive(now); }
 }

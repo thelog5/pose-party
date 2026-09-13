@@ -10,7 +10,7 @@ import {
   setWordRecognitionMotion,
   fitGameplayText,
 } from "./gameplayFeedback.js";
-import { createChargeMeter, resetChargeMeter, advanceCharge,
+import { createChargeMeter, resetChargeMeter, advancePoseCharge,
          chargePercent } from "./recognition.js";
 import { robotCharge, robotNewWord } from "./robot.js";
 
@@ -69,7 +69,8 @@ export const fmtTime = (ms, { compact=false }={}) => {
 export const fmtScore = n => (n|0).toLocaleString("en-US");
 
 /* ---------------- guess rendering ---------------- */
-export const topGuesses = (n=5) => Object.entries(state.smooth).sort((a,b)=>b[1]-a[1]).slice(0,n);
+export const topGuesses = (n=5) => state.poseInput.accepted
+  ? Object.entries(state.smooth).sort((a,b)=>b[1]-a[1]).slice(0,n) : [["unsure",0]];
 
 const displayName = lab => lab==="idle" ? "just standing" : lab;
 
@@ -146,7 +147,7 @@ function matchFillFrame(){
     matchMeter.locked = true;
     matchMeter.at = performance.now();
   }else{
-    advanceCharge(matchMeter, matchFillTarget, matchWordElapsedFrac(g));
+    advancePoseCharge(matchMeter, matchFillTarget, matchWordElapsedFrac(g), state.poseInput, g.word);
     if(matchMeter.locked) matchLockHandler?.();
   }
   fill.style.width = (matchMeter.display * 95) + "%";

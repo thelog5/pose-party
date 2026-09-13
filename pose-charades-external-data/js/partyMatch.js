@@ -36,7 +36,7 @@ import { captureMoment, setCandidSources, showResults, setRematchState } from ".
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp, swapSeatAwards,
          SEAT_AWARD_HOLD_MS } from "./seatAward.js";
-import { createChargeMeter, resetChargeMeter, advanceCharge,
+import { createChargeMeter, resetChargeMeter, advancePoseCharge,
          chargePercent } from "./recognition.js";
 import { robotCharge, robotMiss, robotNewWord } from "./robot.js";
 import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
@@ -715,7 +715,7 @@ function frame(){
   const targetIsDisplayed = !!g.word &&
     partyGuess.pmMyTop.items[0]?.label === g.word;
   const raw = targetIsDisplayed ? (state.smooth?.[g.word] || 0) : 0;
-  advanceCharge(meter, raw, wordElapsedFrac(g));
+  advancePoseCharge(meter, raw, wordElapsedFrac(g), state.poseInput, g.word);
   const fill = $("pmWordFill");
   if(fill) fill.style.width = (RECOGNITION_FILL_MIN +
     meter.display * (RECOGNITION_FILL_MAX - RECOGNITION_FILL_MIN)) + "%";

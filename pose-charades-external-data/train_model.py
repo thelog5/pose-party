@@ -33,6 +33,54 @@ SEED = 7
 BODY_MIRROR_PAIRS = [(1,2),(3,4),(5,6),(7,8),(9,10),(11,12),(13,14)]
 LEFT_HAND_OFFSET = len(BODY_JOINTS)
 RIGHT_HAND_OFFSET = len(BODY_JOINTS) + HAND_LANDMARKS
+POSE_SPACE = "torso-reference-16:9-v1"
+SAMPLE_MS = 66
+
+
+def prepared_segments(clip):
+    """Same camera-space migration and timed quality sections as poseInput.js."""
+    a = np.asarray([pad_frame(fr) for fr in clip["frames"]], dtype=np.float32)
+    space = clip.get("coordinateSpace", "legacy-image")
+    if space not in ("legacy-image", POSE_SPACE):
+        raise ValueError("Unsupported pose coordinate space")
+    camera = clip.get("camera", {})
+    if space == "legacy-image" and camera.get("width") and camera.get("height"):
+        factor = (camera["width"] / camera["height"]) / (16 / 9)
+        a[:, :, 0] *= factor
+        scale = np.linalg.norm((a[:, 1, :] + a[:, 2, :]) / 2, axis=1)
+        if np.any(scale < 1e-4):
+            raise ValueError("Invalid torso scale")
+        a /= scale[:, None, None]
+    if "timestamps" not in clip:
+        return [a.tolist()]
+    times = np.asarray(clip["timestamps"], dtype=float)
+    if len(times) != len(a) or not np.all(np.isfinite(times)) or np.any(np.diff(times) <= 0):
+        raise ValueError("Invalid pose timestamps")
+    valid = np.ones(len(a), dtype=bool)
+    if "visibility" in clip:
+        valid &= np.all(np.asarray(clip["visibility"]) >= .35, axis=1)
+    if "inFrame" in clip:
+        valid &= np.all(np.asarray(clip["inFrame"]), axis=1)
+    sections, current = [], []
+    for i in range(len(a)):
+        if not valid[i] or (current and times[i] - times[current[-1]] > 250):
+            if current:
+                sections.append(current)
+            current = []
+        if valid[i]:
+            current.append(i)
+    if current:
+        sections.append(current)
+    out = []
+    for indices in sections:
+        ts, points = times[indices], a[indices]
+        grid = np.arange(ts[0], ts[-1] + .001, SAMPLE_MS)
+        if len(grid) < 15:
+            continue
+        flat = points.reshape(len(points), -1)
+        sample = np.stack([np.interp(grid, ts, flat[:, d]) for d in range(flat.shape[1])], axis=1)
+        out.append(sample.reshape(len(grid), TOTAL_POINTS, 2).tolist())
+    return out
 
 # ---- load -------------------------------------------------------------------
 def pad_frame(frame):
@@ -49,7 +97,8 @@ def load(paths):
             d = json.load(f)
         assert d.get("joints") == BODY_JOINTS, f"{p}: body joint set mismatch — re-export from the current app"
         for c in d["clips"]:
-            clips.append({**c, "frames": [pad_frame(fr) for fr in c["frames"]]})
+            for frames in prepared_segments(c):
+                clips.append({**c, "frames": frames})
     print(f"Loaded {len(clips)} clips, "
           f"{len(set(c['label'] for c in clips))} classes, "
           f"{len(set(c.get('person','?') for c in clips))} people")

@@ -3,6 +3,7 @@
    and then plays a round — only the vision input is simulated (recognition
    is injected at the same funnel the classifier feeds). */
 import puppeteer from "puppeteer-core";
+import { installVisionFixture } from "./vision-fixture.mjs";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 
@@ -76,6 +77,7 @@ async function player(tag, name){
   await page.waitForFunction(() => document.getElementById("status").style.display === "none",
     { timeout: 60000, polling: 400 });
   page.tag = tag;
+  await installVisionFixture(page);
   return page;
 }
 
@@ -340,6 +342,7 @@ try {
     const {fitGameplayText,fitSingleLinePaperText}=
       await import("/js/gameplayFeedback.js");
     state.smooth[currentWord]=.45;
+    window.__visionTick();
     partyCheck(currentWord,.45);
     await new Promise(resolve=>setTimeout(resolve,260));
     const card=document.getElementById("pmWordCard");
@@ -438,6 +441,7 @@ try {
     const { state } = await import('${APP}/js/state.js');
     clearInterval(window.__rec);
     window.__rec = setInterval(() => {
+      window.__visionTick();
       const w = state.game?.word;
       if(!w) return;
       state.smooth[w] = .95;
