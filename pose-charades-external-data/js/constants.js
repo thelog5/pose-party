@@ -63,6 +63,30 @@ export const FEATURE_SD_FLOOR = 0.75;
    floor from .25 to 1 scores 68.2-68.7% clean against 65.7% unweighted, so
    the exact numbers do not matter much. Test with scripts/pose-deck-eval.mjs. */
 export const FEATURE_WEIGHT_MIN = 0.5, FEATURE_WEIGHT_MAX = 2.0, FEATURE_WEIGHT_FLOOR = 0.5;
+/* OFF since the 2026-09-13 deck (190 clips, 3+ takes of every word). There the
+   unweighted model wins clean AND under noise: 80.7% / 76.9% against 79.8% /
+   75.2% over the whole deck, and 80.4% / 76.5% against 79.2% / 73.8% on the
+   capture-v3 clips alone. With five takes per word the takes themselves carry
+   the variety the weighting used to supply. */
+export const FEATURE_WEIGHTING = false;
+
+/* PER-WORD JOINT EMPHASIS, for one word only, on purpose. When the model
+   compares a window with a SQUAT example, knee and ankle dimensions count x2
+   and arm dimensions x.5 (a pair distance takes the mean of its two joints).
+   Squat's five takes agree on the legs and put the arms in two places
+   (wrists at mid-torso in three takes, at head height in two), so on the arms
+   the takes look like froggy jump and ballerina twirl. Arms are the elbows,
+   wrists and index fingers; legs are the knees and ankles. Measured on the v3 clips:
+   squat 25% -> 100%, froggy jump 100% -> 94%, total 80.4% -> 82.8% clean and
+   76.5% -> 79.0% under .02 jitter.
+   The same idea FAILED for the other words it was tried on. Legs x2 for froggy
+   jump, head x2 for limbo, arms x2 for bowling and volleyball spike: total
+   78.0%, and 67.3% under jitter. A word that ignores its arms matches every
+   pose with the same legs, so each weighted word pulls windows from the rest.
+   Add a word here only with a leave-one-clip-out number. */
+export const WORD_JOINT_WEIGHTS = Object.freeze({
+  squat: { legs:2, arms:.5 },
+});
 export const HOLD_MS = 250, THRESH = 0.60, RIVAL_THRESH = 0.60;
 export const ROUNDS = 5, WORD_MS = 30000;
 /* Scoring (matches the on-screen copy): 100 per word, +100 fast bonus if

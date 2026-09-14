@@ -32,7 +32,7 @@
 import { MODEL_POINTS, JOINTS, LEFT_HAND_OFFSET, RIGHT_HAND_OFFSET,
          HAND_LANDMARKS, WIN, STRIDE, K, TIME_SCALES, FEATURE_SD_FLOOR,
          FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR,
-         LEG_SHARE_MIN } from "./constants.js";
+         FEATURE_WEIGHTING, WORD_JOINT_WEIGHTS, LEG_SHARE_MIN } from "./constants.js";
 import { clipSegments, canonicalClip, LEGS } from "./poseInput.js";
 
 function pt(frame, j){
@@ -163,10 +163,37 @@ function* augmentedFrames(clip){
   }
 }
 
-/* `weigh:false` builds the unweighted model; scripts/pose-deck-eval.mjs uses
-   it as the baseline. The other options override the FEATURE_WEIGHT_* table. */
-export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
-                                    weightMax=FEATURE_WEIGHT_MAX, weightFloor=FEATURE_WEIGHT_FLOOR }={}){
+/* Joint groups WORD_JOINT_WEIGHTS can name. Arms: elbows, wrists, index
+   fingers. Legs: knees and ankles. */
+const JOINT_GROUPS = {
+  arms: [13,14,15,16,19,20].map(j => JOINTS.indexOf(j)),
+  legs: [25,26,27,28].map(j => JOINTS.indexOf(j)),
+};
+
+/* Squared per-dimension weights for each word in `table`, or null for none.
+   A pair distance takes the mean of its two joints' weights. */
+function wordDimWeights(table, labels){
+  const out = {};
+  for(const label of labels){
+    const spec = table[label];
+    if(!spec) continue;
+    const joint = new Float32Array(JOINTS.length).fill(1);
+    for(const [group, x] of Object.entries(spec)) for(const j of JOINT_GROUPS[group]) joint[j] = x;
+    out[label] = Float32Array.from({length:FEATURE_DIMS}, (_, d) => {
+      const js = DIM_JOINTS[d], w = js.reduce((s, j) => s + joint[j], 0) / js.length;
+      return w * w;
+    });
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/* `weigh` switches the learned global weighting (FEATURE_WEIGHTING);
+   `wordWeights` is the per-word joint emphasis (WORD_JOINT_WEIGHTS, `{}` for
+   none). scripts/pose-deck-eval.mjs builds every combination as a baseline.
+   The weight* options override the FEATURE_WEIGHT_* table. */
+export function buildModel(clips, { weigh=FEATURE_WEIGHTING, wordWeights=WORD_JOINT_WEIGHTS,
+                                    weightMin=FEATURE_WEIGHT_MIN, weightMax=FEATURE_WEIGHT_MAX,
+                                    weightFloor=FEATURE_WEIGHT_FLOOR }={}){
   const raw=[], labels=new Set();
   clips.forEach((c, take)=>{
     for(const frames of augmentedFrames(c))
@@ -183,14 +210,23 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
   }else sd.fill(1);
 
   const z=raw.map(s=>standardize(s.v, mean, sd));
-  const weights = weigh && raw.length
+  /* Learned even when `weigh` is off: legLabels is calibrated in this space. */
+  const learned = raw.length
     ? featureWeights(z, raw, { min:weightMin, max:weightMax, floor:weightFloor }) : null;
+  const weights = weigh ? learned : null;
   /* Fold the weights into sd, so classify() stays one cosine and costs the
      same: (v-mean)/(sd/w) is exactly w*(v-mean)/sd. */
   if(weights) for(let d=0;d<D;d++){ sd[d]/=weights[d]; for(const v of z) v[d]*=weights[d]; }
 
-  const samples=raw.map((s,i)=>({ v:z[i], norm:l2(z[i]), label:s.label, take:s.take }));
-  return { samples, labels:[...labels], mean, sd, weights, legLabels:legLabels(samples, D) };
+  /* A word with joint emphasis keeps its squared weights on each of its
+     samples, and the sample's norm is taken in that weighted metric. */
+  const wordW = raw.length ? wordDimWeights(wordWeights, labels) : null;
+  const samples=raw.map((s,i)=>{
+    const w2 = wordW?.[s.label];
+    const norm = w2 ? Math.sqrt(z[i].reduce((sum, x, d) => sum + w2[d]*x*x, 0)) || 1e-9 : l2(z[i]);
+    return w2 ? { v:z[i], norm, w2, label:s.label, take:s.take } : { v:z[i], norm, label:s.label, take:s.take };
+  });
+  return { samples, labels:[...labels], mean, sd, weights, wordWeights:wordW, legLabels:legLabels(samples, D, weights ? null : learned) };
 }
 
 /* Words that need their legs SEEN before they can be recognized. Each word's
@@ -198,8 +234,14 @@ export function buildModel(clips, { weigh=true, weightMin=FEATURE_WEIGHT_MIN,
    share of that difference on knee and ankle dimensions says how much of the
    word lives in its legs. Past LEG_SHARE_MIN its upper body is generic, so a
    comparison with the legs masked would accept it on any standing player.
-   Cheap (one pass over the samples), so every retrain re-derives it. */
-function legLabels(samples, D){
+   Cheap (one pass over the samples), so every retrain re-derives it.
+   ALWAYS IN THE LEARNED-WEIGHT SPACE, even with FEATURE_WEIGHTING off: pass
+   `learned` when the samples are unweighted. LEG_SHARE_MIN was set there, and
+   there the deck has a clear gap (star jump .30, then saluting .23). In the
+   unweighted space there is none, and .26 also gates 67, saluting, dribbling
+   a basketball and climbing a ladder, which a player with the feet out of shot
+   could then never get. */
+function legLabels(samples, D, learned=null){
   /* Measured on the three POSITION blocks only. The distance block mixes arm
      and leg in one number (wrist to knee), so counting it pushed overhead
      bicep flex (.249) up level with squat (.255) and froggy jump (.254). On
@@ -215,7 +257,7 @@ function legLabels(samples, D){
   for(const [label, w] of words){
     let legs = 0, all = 0;
     for(let d=0;d<span;d++){
-      const e = (w.sum[d]/w.n)**2;
+      const e = (w.sum[d]/w.n * (learned ? learned[d] : 1))**2;
       all += e;
       if(leg[DIM_JOINTS[d][0]]) legs += e;
     }
@@ -322,23 +364,41 @@ export function classify(v, m){
    dimensions, so the same number rejected less: 49 wrong guesses and 151 of
    558 unseen actions, against 56 and 172 before. At .66 it rejects 57 and 183
    and costs 2 more correct windows (23 of 434). The margin does most of the
-   work: up to .64 no correct window changes at all. */
-export const REJECTION = Object.freeze({ minSimilarity:.66, minMargin:.005 });
+   work: up to .64 no correct window changes at all.
+   .66 -> .62 WITH FEATURE_WEIGHTING OFF (2026-09-13 deck). Unweighted
+   cosines sit on a different scale, and at .66 the new model threw away twice
+   as many correct windows under .02 jitter (103 against 52). Swept over the
+   whole deck, leave-one-clip-out plus leave-one-word-out:
+     old model at .66: right 928 clean / 844 jitter, wrong 161 / 174, unseen rejected 322 of 1171
+     new model at .62: right 951 clean / 855 jitter, wrong 156 / 160, unseen rejected 326 of 1171
+   At .62 every count is at least as good as the old model's. */
+export const REJECTION = Object.freeze({ minSimilarity:.62, minMargin:.005 });
 
 export function classifyDetailed(v, m, { reject=true, jointMask=null,
     minSimilarity=REJECTION.minSimilarity, minMargin=REJECTION.minMargin }={}){
   const q=standardize(v, m.mean, m.sd);
   const dims = jointMask && !jointMask.every(Boolean) ? Array.from(q, (_, d) => d)
     .filter(d => DIM_JOINTS[d].every(j => jointMask[j])) : null;
-  const nv=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q), sims=[];
+  const plainNorm=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q), sims=[];
   const nearest={};
+  /* The query's norm in each emphasised word's metric, over the same dims. */
+  const wordNorm=new Map();
+  for(const [label, w2] of Object.entries(m.wordWeights || {})){
+    let sq=0;
+    if(dims) for(const d of dims) sq+=w2[d]*q[d]**2;
+    else for(let d=0;d<q.length;d++) sq+=w2[d]*q[d]**2;
+    wordNorm.set(label, Math.sqrt(sq));
+  }
   for(const s of m.samples){
+    const w2=s.w2, nv=w2 ? wordNorm.get(s.label) : plainNorm;
     let dot=0, norm=s.norm;
     if(dims){
       let sq=0;
-      for(const d of dims){ dot+=q[d]*s.v[d]; sq+=s.v[d]**2; }
+      if(w2) for(const d of dims){ dot+=w2[d]*q[d]*s.v[d]; sq+=w2[d]*s.v[d]**2; }
+      else for(const d of dims){ dot+=q[d]*s.v[d]; sq+=s.v[d]**2; }
       norm=Math.sqrt(sq);
-    }else for(let d=0;d<q.length;d++) dot+=q[d]*s.v[d];
+    }else if(w2) for(let d=0;d<q.length;d++) dot+=w2[d]*q[d]*s.v[d];
+    else for(let d=0;d<q.length;d++) dot+=q[d]*s.v[d];
     const sim=nv>0 && norm>0 ? dot/(nv*norm) : 0;
     sims.push({sim:Number.isFinite(sim)?sim:0, label:s.label});
     nearest[s.label]=Math.max(nearest[s.label] ?? -1, Number.isFinite(sim)?sim:0);

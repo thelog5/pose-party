@@ -9,10 +9,12 @@
    It imports the shipped classifier. Every weighting is learned on the
    training fold only, never on the held-out clip:
 
-     none    no weighting: buildModel(clips, {weigh:false}).
-     global  THE SHIPPED MODEL: buildModel(clips). One weight per dimension
-             for every word. A dimension counts for more when word means
-             differ on it and takes of one word agree on it.
+     shipped THE SHIPPED MODEL: buildModel(clips), i.e. FEATURE_WEIGHTING
+             and WORD_JOINT_WEIGHTS as constants.js sets them.
+     none    no weighting at all: {weigh:false, wordWeights:{}}.
+     global  the learned global weighting and nothing else. One weight per
+             dimension for every word. A dimension counts for more when word
+             means differ on it and takes of one word agree on it.
      take    one weight vector PER WORD. Same ratio, but "differ" is this
              word against the rest, and "agree" is between this word's takes.
              With one take left in the fold, the spread is within-clip wobble.
@@ -25,7 +27,8 @@
                                      [--modes none,global] [--jitter 0.02] [--quick]
 
    --drop tests the deck as if those words were not in it.
-   --modes picks the weightings to compare ("none" is always included).
+   --modes picks the weightings to compare ("shipped", "none" and "global"
+   are always included).
 
    --jitter sets the hip/knee/ankle noise, in torso lengths (default .02).
    --quick skips the hip-jitter pass (about half the run time).
@@ -72,15 +75,16 @@ const JITTER_JOINTS = [23, 24, 25, 26, 27, 28].map(j => JOINTS.indexOf(j));
 const JITTER_SD = Number(opt("--jitter") ?? 0.02);
 
 /* WEIGHT_MIN / WEIGHT_MAX / WEIGHT_FLOOR in the environment override the
-   FEATURE_WEIGHT_* constants, for a sweep. They reach the shipped model too. */
+   FEATURE_WEIGHT_* constants, for a sweep. They reach the `global` row, and
+   the shipped model too when FEATURE_WEIGHTING is on. */
 const { FEATURE_WEIGHT_MIN, FEATURE_WEIGHT_MAX, FEATURE_WEIGHT_FLOOR } = await import(path.join(JS, "constants.js"));
 const WEIGHT_LO = Number(process.env.WEIGHT_MIN ?? FEATURE_WEIGHT_MIN);
 const WEIGHT_HI = Number(process.env.WEIGHT_MAX ?? FEATURE_WEIGHT_MAX);
 const WEIGHT_FLOOR = Number(process.env.WEIGHT_FLOOR ?? FEATURE_WEIGHT_FLOOR);
 const BUILD = { weightMin:WEIGHT_LO, weightMax:WEIGHT_HI, weightFloor:WEIGHT_FLOOR };
 const MODES = (opt("--modes") || "none,global,take,hybrid,mixed").split(",");
-for(const m of ["global", "none"]) if(!MODES.includes(m)) MODES.unshift(m);
-const SHIPPED = "global";
+for(const m of ["global", "none", "shipped"]) if(!MODES.includes(m)) MODES.unshift(m);
+const SHIPPED = "shipped";
 
 /* ---------- small maths ---------- */
 
@@ -144,7 +148,7 @@ function takeWeights(w){
 }
 
 /* Map word -> weight vector (or null = unweighted) for a per-word mode, on
-   the UNWEIGHTED model. `g` is the shipped model's global vector. */
+   the UNWEIGHTED model. `g` is the learned global vector. */
 function weightsFor(mode, model, g){
   const stats = wordStats(model), out = new Map();
   for(const [label, w] of stats){
@@ -224,10 +228,12 @@ const t0 = Date.now();
 for(let i = 0; i < clips.length; i++){
   const held = clips[i];
   const fold = clips.filter((_, j) => j !== i);
-  const plain = buildModel(fold, { weigh:false }), shipped = buildModel(fold, BUILD);
-  const wms = Object.fromEntries(MODES.filter(m => m !== "none" && m !== SHIPPED)
-    .map(m => [m, weightedModel(plain, weightsFor(m, plain, shipped.weights))]));
-  const cls = (m, v) => m === "none" ? classify(v, plain) : m === SHIPPED ? classify(v, shipped) : classifyWeighted(v, wms[m]);
+  const plain = buildModel(fold, { weigh:false, wordWeights:{} }), shipped = buildModel(fold, BUILD);
+  const global = buildModel(fold, { ...BUILD, weigh:true, wordWeights:{} });
+  const wms = Object.fromEntries(MODES.filter(m => !["none", "global", SHIPPED].includes(m))
+    .map(m => [m, weightedModel(plain, weightsFor(m, plain, global.weights))]));
+  const cls = (m, v) => m === "none" ? classify(v, plain) : m === SHIPPED ? classify(v, shipped)
+    : m === "global" ? classify(v, global) : classifyWeighted(v, wms[m]);
   const clean = windowsOf(held);
   const noisy = QUICK ? [] : windowsOf({ ...held, frames:jitter(held.frames, gauss) });
   for(const v of clean) recordLive('clean',held.label,v,shipped);
