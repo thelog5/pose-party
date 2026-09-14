@@ -2982,7 +2982,7 @@ console.log("age check:");
     return { months:document.querySelectorAll("#agMonth option[value]:not([value=''])").length,
       newest:Math.max(...years), oldest:Math.min(...years), count:years.length,
       disabled:document.getElementById("agGo").disabled,
-      text:[...document.querySelectorAll('#ageGate .ag-title[data-ag-when="ask"], #ageGate .ag-note, #agGo span[data-ag-when="ask"]')].map(n => n.textContent).join(" "),
+      text:[...document.querySelectorAll('#ageGate [data-ag-when="ask"] .ag-title, #ageGate .ag-note, #agGo span[data-ag-when="ask"]')].map(n => n.textContent).join(" "),
       inView:panel.top >= 0 && panel.bottom <= innerHeight && panel.left >= 0 && panel.right <= innerWidth };
   });
   ok(form.months === 12 && form.newest === new Date().getFullYear() && form.oldest <= 1920 &&
