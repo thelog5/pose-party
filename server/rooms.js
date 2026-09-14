@@ -536,6 +536,10 @@ export function createRoomStore({ config, emit }){
     for(const p of room.players) emit(p.id, "party:roster", partyRoster(room));
   }
   const teamCount = (room, team) => room.players.filter(p => p.team === team).length;
+  /* Teams and settings change only BETWEEN matches. Team score is the sum of
+     the current members' scores (partyTeamScore), so a switch mid-match
+     carried a player's points to the other side and could hand it the win. */
+  const betweenMatches = room => room.phase === "lobby" || room.phase === "done";
 
   function partyCreate(socketId, name, settings, labels, seen = {}){
     if(socketRoom.has(socketId)) return { error: "already-in-room" };
@@ -574,7 +578,9 @@ export function createRoomStore({ config, emit }){
     const room = roomOf(socketId);
     if(!room || room.kind !== "party") return { error: "not-in-room" };
     if(team !== "blue" && team !== "orange") return { error: "bad-payload" };
+    if(!betweenMatches(room)) return { error: "match-in-progress" };
     const me = playerOf(room, socketId);
+    if(!me) return { error: "not-in-room" };
     if(me.team === team) return { ok: true };
     if(teamCount(room, team) >= TEAM_CAP) return { error: "team-full" };
     me.team = team;
@@ -599,6 +605,7 @@ export function createRoomStore({ config, emit }){
     const room = roomOf(socketId);
     if(!room || room.kind !== "party") return { error: "not-in-room" };
     if(room.players[0].id !== socketId) return { error: "not-host" };
+    if(!betweenMatches(room)) return { error: "match-in-progress" };
     room.settings = { matchMs: s.matchMs, wordMs: s.wordMs };
     broadcastRoster(room);
     return { ok: true };

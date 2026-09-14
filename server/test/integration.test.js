@@ -562,6 +562,13 @@ try {
   ok(!!round.roundId && !!round.word, `party round dealt "${round.word}"`);
   ok(PARTY_LABELS.includes(round.word), "dealt word is shared by every player");
 
+  /* Team score is the sum of the current members' scores, so a mid-match
+     switch would carry a player's points to the other side. */
+  r = await emit(blueSockets[0], "party:team", { team: "orange" });
+  ok(r.error === "match-in-progress", `no team switch during a match (${r.error})`);
+  r = await emit(M[0], "party:settings", { settings: { matchSecs: 600, wordSecs: 60 } });
+  ok(r.error === "match-in-progress", `the host cannot change settings during a match (${r.error})`);
+
   // first blue player is recognized
   const gotFirst = once(M[1], "party:got");
   r = await emit(blueSockets[0], "party:claim",
