@@ -185,8 +185,13 @@ function updateHud(){
 export function startGame(mode="ai"){
   state.lastMode=mode;
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
-    toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
-    transition("training"); return;
+    /* Only the owner is ever sent to Training. A player who is here before
+       the AI finished loading just waits a moment. */
+    if(document.body.dataset.dev){
+      toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
+      transition("training");
+    }else toast("The AI is still loading. Try again in a few seconds.");
+    return;
   }
   state.game={ mode, deck:shuffledDeck(), word:null, round:0, rounds:ROUNDS, wordEnd:0,
                wordStart:0, holdSince:0, score:0, rivalScore:0, streak:0,

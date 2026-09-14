@@ -103,7 +103,9 @@ function deckLabels(){
 }
 const stats = config.statsToken ? createWordStats({ labels: deckLabels() }) : null;
 const statsAuthLimit = createLimiter({ tokens: 10, perMs: 60_000 });
-const reportLimit = createLimiter({ tokens: 120, perMs: 60_000 });
+/* A real player sends one report per word, so even a Party of six behind
+   one home connection stays far under this. */
+const reportLimit = createLimiter({ tokens: 40, perMs: 60_000 });
 setInterval(() => { statsAuthLimit.sweep(); reportLimit.sweep(); }, 60_000).unref();
 
 function basicPassword(header){
@@ -128,6 +130,52 @@ if(stats){
     res.json(snap);
   });
   setInterval(() => log(stats.summaryLine()), 60 * 60 * 1000).unref();
+}
+
+/* THE OWNER'S TOOLS (the Training gear, sound buttons, DEV bar) are for the
+   owner only. /dev asks for the stats password and hands that browser a
+   signed, HttpOnly cookie; the client asks /dev/check on boot and shows the
+   tools only on a 204 (main.js applyDevMode). On localhost the client uses
+   its own flag instead, so local work and the E2E suites need no server.
+   The Training screen only ever trains a copy in that browser's own tab; the
+   game's model changes only when the deck file in the repo does. */
+const DEV_COOKIE = "pp_dev";
+const devSecret = config.statsToken ? "dev:" + config.statsToken : null;
+const isOwner = req => !!devSecret && ticketValid(devSecret, readCookie(req.headers.cookie, DEV_COOKIE));
+if(devSecret){
+  app.get("/dev", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if(!statsAuthLimit.allow(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a minute.");
+    const pass = basicPassword(req.headers.authorization);
+    if(!pass || !codeMatches(pass, config.statsToken))
+      return res.status(401).set("WWW-Authenticate", 'Basic realm="Pose Party owner"')
+        .type("text").send("Owner tools need the stats password.");
+    res.cookie(DEV_COOKIE, makeTicket(devSecret, 30 * 24 * 60 * 60), {
+      httpOnly: true, sameSite: "strict", maxAge: 30 * 24 * 60 * 60 * 1000, secure: req.secure });
+    log(`dev: owner tools turned on from ${req.ip}`);
+    res.redirect(303, "/");
+  });
+  app.get("/dev/off", (req, res) => {
+    res.clearCookie(DEV_COOKIE, { httpOnly: true, sameSite: "strict", secure: req.secure });
+    res.redirect(303, "/");
+  });
+}
+app.get("/dev/check", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.status(isOwner(req) ? 204 : 404).end();
+});
+
+/* A word report must come from a page of this site. Browsers always send
+   Origin on a POST, so this refuses anything typed at the endpoint from
+   elsewhere; with the rate limit and the deck check, the worst a determined
+   script can do is add a few numbers to a page only the owner can read. */
+function fromThisSite(req){
+  const o = req.headers.origin;
+  if(!o) return false;
+  try{
+    const host = new URL(o).host;
+    return host === req.headers.host || config.corsOrigins.some(c => { try{ return new URL(c).host === host; }catch{ return false; } });
+  }catch{ return false; }
 }
 
 /* THE PRIVATE-BETA LOCK -----------------------------------------------------
@@ -184,6 +232,7 @@ if(gateOn){
    Nothing about the sender is kept; the IP is only a rate-limit key. */
 if(stats){
   app.post("/stats/word", express.json({ limit: "1kb" }), (req, res) => {
+    if(!fromThisSite(req)) return res.status(403).end();
     if(!reportLimit.allow(req.ip)) return res.status(429).end();
     res.status(stats.record(req.body).ok ? 204 : 400).end();
   });

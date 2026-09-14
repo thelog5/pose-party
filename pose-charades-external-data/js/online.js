@@ -168,8 +168,13 @@ export function setPendingJoin(code){ pendingJoin=code; }
 
 export function enterLobby(mode="1v1"){
   if(!state.model || state.model.labels.filter(l=>l!=="idle").length<1){
-    toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
-    transition("training"); return;
+    /* Only the owner is ever sent to Training. A player who is here before
+       the AI finished loading just waits a moment. */
+    if(document.body.dataset.dev){
+      toast("Train the AI first. Record idle plus at least one action word, then tap SETTINGS.");
+      transition("training");
+    }else toast("The AI is still loading. Try again in a few seconds.");
+    return;
   }
   /* render() runs inside transition listeners. Publish the lobby variant
      first so the first party frame mounts the camera/controls into the party

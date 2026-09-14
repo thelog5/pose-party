@@ -94,8 +94,10 @@ sends its copies to anyone). The page and the match server still need it.
 ## The owner's tools
 
 Players never see the settings gear (the way into Training, where takes are
-recorded), the sound buttons or the DEV bar. Open the site once as
-`https://<your-app>/?dev` to show them in that browser; `?dev=0` hides them.
+recorded), the sound buttons or the DEV bar. Open `https://<your-app>/dev`
+and type the stats password (`STATS_TOKEN`, any user name): that browser gets
+a signed cookie for 30 days and shows them. `/dev/off` hides them again. On
+localhost, `?dev` and `?dev=0` still work.
 
 ## Word stats
 

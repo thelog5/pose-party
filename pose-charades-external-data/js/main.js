@@ -156,11 +156,23 @@ function handleJoinLink(){
   tryEnter();
 }
 
-/* THE OWNER'S TOOLS ARE HIDDEN FROM PLAYERS. The Home gear (the only way into
+/* THE OWNER'S TOOLS ARE THE OWNER'S. The Home gear (the only way into
    Training), every sound button and the DEV bar show only with
-   body[data-dev] (screens.css). Open the site once with ?dev to turn it on
-   in that browser, ?dev=0 to turn it off. The E2E suites turn it on. */
+   body[data-dev] (screens.css).
+   - On a real site, only the server can switch it on: the owner visits /dev,
+     types the stats password, and gets a signed HttpOnly cookie; this asks
+     /dev/check and shows the tools on a 204. ?dev does nothing there.
+   - On localhost (your own machine, and every E2E suite) ?dev / ?dev=0 and
+     the localStorage flag still work, with no server needed. */
+const IS_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 function applyDevMode(){
+  delete document.body.dataset.dev;
+  if(!IS_LOCAL){
+    fetch("/dev/check", { cache:"no-store", credentials:"same-origin" })
+      .then(r => { if(r.status===204) document.body.dataset.dev="1"; })
+      .catch(() => {});
+    return;
+  }
   const KEY="posePartyDev";
   try{
     const q=new URLSearchParams(location.search).get("dev");
@@ -170,7 +182,6 @@ function applyDevMode(){
       history.replaceState(null,"",url.pathname+url.search+url.hash);
     }
     if(localStorage.getItem(KEY)==="1") document.body.dataset.dev="1";
-    else delete document.body.dataset.dev;
   }catch(e){ /* no storage: players' view */ }
 }
 

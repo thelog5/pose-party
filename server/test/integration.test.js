@@ -676,7 +676,13 @@ try {
   const deckWords = [...new Set((await deckRes.json()).clips.map(c => c.label))];
   const [w1, w2] = deckWords;
   const report = body => fetch(`${URL}/stats/word`, { method: "POST",
-    headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    headers: { "content-type": "application/json", origin: URL }, body: JSON.stringify(body) });
+  ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
+    "a report that does not come from a page of this site is refused");
+  ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" },
+    body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
+    "a report from another site is refused");
   ok((await report({ word: w1, mode: "ai", result: "got", ms: 4200, peak: .91, wrong: null })).status === 204,
     "a good report is accepted");
   ok((await report({ word: w1, mode: "party", result: "miss", ms: null, peak: .3, wrong: w2 })).status === 204,
@@ -713,6 +719,17 @@ try {
   ok(netSnap.relay && netSnap.relay.configured === false, "with no TURN configured, the page says the relay is not set up");
   const html = await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "text/html" } });
   ok(html.status === 200 && (await html.text()).includes("<table>"), "the totals page renders for a browser");
+  /* the owner's tools: only a browser that typed the stats password */
+  ok((await fetch(`${URL}/dev/check`)).status === 404, "no owner tools without the owner cookie");
+  ok((await fetch(`${URL}/dev`, { redirect: "manual" })).status === 401, "/dev asks for the password");
+  ok((await fetch(`${URL}/dev`, { headers: auth("wrong"), redirect: "manual" })).status === 401, "/dev refuses a wrong password");
+  const devRes = await fetch(`${URL}/dev`, { headers: auth("stats-test-token"), redirect: "manual" });
+  const devCookie = (devRes.headers.get("set-cookie") || "").split(";")[0];
+  ok(devRes.status === 303 && devCookie.startsWith("pp_dev="), "/dev with the password hands over the owner cookie");
+  ok(/HttpOnly/i.test(devRes.headers.get("set-cookie") || "") && /SameSite=Strict/i.test(devRes.headers.get("set-cookie") || ""),
+    "the owner cookie is HttpOnly and SameSite=Strict");
+  ok((await fetch(`${URL}/dev/check`, { headers: { cookie: devCookie } })).status === 204, "the owner cookie turns the tools on");
+  ok((await fetch(`${URL}/dev/check`, { headers: { cookie: "pp_dev=" + "9999999999.forged" } })).status === 404, "a forged owner cookie does not");
   for (const page of ["/privacy", "/terms"]) {
     const res = await fetch(URL + page);
     ok(res.status === 200 && /<h1/.test(await res.text()), `${page} is served`);
