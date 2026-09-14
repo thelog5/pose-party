@@ -105,3 +105,7 @@ only ever runs on your own camera. During 1v1 and Party the server relays the
 current top guess label and confidence so opponents' papers can update; it also
 sees names, trained word labels, synchronized recognition timestamps, and
 opaque connection handshakes. Live guesses are not stored.
+
+The player-facing versions are `privacy.html` and `terms.html` in the game
+folder, served at `/privacy` and `/terms` without the access code. **Keep them
+true:** a change to what the game sends or stores must change `privacy.html`.

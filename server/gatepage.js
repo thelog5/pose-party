@@ -36,6 +36,8 @@ export function gatePage({ error = "", title = "Pose Party" } = {}){
   button:hover{ filter:brightness(1.07) }
   button:active{ transform:translateY(2px) }
   .foot{ margin:1.3rem 0 0; font-size:.8rem; color:#41618a }
+  .legal{ margin:.7rem 0 0; font-size:.8rem }
+  .legal a{ color:#41618a; font-weight:700 }
 </style>
 <div class="card">
   <h1>${title}</h1>
@@ -47,5 +49,6 @@ export function gatePage({ error = "", title = "Pose Party" } = {}){
     <button type="submit">Let me in</button>
   </form>
   <p class="foot">No code? Ask whoever sent you the link.</p>
+  <p class="legal"><a href="/privacy">Privacy Policy</a> &middot; <a href="/terms">Terms of Use</a></p>
 </div>`;
 }

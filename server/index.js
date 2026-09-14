@@ -76,6 +76,16 @@ app.get("/healthz", (req, res) => {
   res.json({ ok: true, rooms: store._rooms.size, uptimeSec: Math.round(process.uptime()) });
 });
 
+/* THE PRIVACY POLICY AND TERMS OF USE ARE PUBLIC. A player must be able to
+   read them BEFORE typing the access code, and the code page links to them.
+   Both pages are self-contained (inline CSS), so nothing else opens up. */
+for(const name of ["privacy", "terms"]){
+  app.get([`/${name}`, `/${name}.html`], (req, res) => {
+    res.set("Cache-Control", "no-cache");
+    res.sendFile(path.join(GAME_DIR, `${name}.html`));
+  });
+}
+
 /* THE PRIVATE-BETA LOCK -----------------------------------------------------
    Sits AFTER /healthz, because the platform's health check must never need a
    password, and BEFORE express.static, because everything it protects is

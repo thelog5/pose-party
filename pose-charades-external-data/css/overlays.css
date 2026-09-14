@@ -390,6 +390,13 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
   -webkit-backdrop-filter:brightness(.84) saturate(1.02);
   animation:htpScrim .3s ease-out both}
 .cg.hidden{display:none}
+/* Privacy Policy and Terms of Use, on the scrim under the card. Absolute, so
+   the grid that centres the card never sees it. */
+.cg-legal{position:absolute;left:50%;bottom:max(1.4vh,10px);translate:-50% 0;
+  display:flex;gap:1.6em;font:700 clamp(11px,1.45vh,15px)/1 var(--f-label);
+  letter-spacing:.02em;white-space:nowrap}
+.cg-legal a{color:rgba(255,247,230,.82);text-decoration:none}
+.cg-legal a:hover,.cg-legal a:focus-visible{color:#fff;text-decoration:underline}
 
 /* The card and the boot readout are ONE centred column. The readout is not
    part of 322:717 but it is very much part of what the player sees, so

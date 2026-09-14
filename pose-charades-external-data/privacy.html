@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy · Pose Party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Fredoka+One&display=swap" rel="stylesheet">
+<!-- Self-contained on purpose: the server serves this page BEFORE the access
+     gate (server/index.js), and nothing else is public. Keep every style
+     inline. Keep it TRUE: every claim here is checked against the code, and a
+     change to what the game collects must change this page. No em dashes:
+     this is player-facing copy (CLAUDE.md, Conventions). -->
+<style>
+  :root{ --navy:#123477; --cream:#fbf6ea; --paper:#fffdf6; --orange:#F45A3C; --line:#e3d8bd }
+  *{ box-sizing:border-box }
+  body{ margin:0; background:var(--cream); color:var(--navy);
+    font:500 17px/1.6 'Baloo 2', system-ui, sans-serif; padding-inline:16px }
+  main{ max-width:760px; margin:0 auto; padding-block:40px 64px }
+  h1{ font:400 clamp(34px,6vw,52px)/1.05 'Fredoka One','Baloo 2',system-ui,sans-serif; margin:0 0 6px; letter-spacing:.01em }
+  h2{ font:400 24px/1.2 'Fredoka One','Baloo 2',system-ui,sans-serif; margin:34px 0 8px }
+  h3{ font-weight:800; font-size:18px; margin:20px 0 4px }
+  p, li{ margin:0 0 10px }
+  ul{ padding-left:22px; margin:0 0 10px }
+  .date{ opacity:.75; margin-bottom:22px }
+  .summary{ background:var(--paper); border:2px solid var(--line); border-radius:14px; padding:18px 22px; box-shadow:0 5px 0 rgba(18,52,119,.08) }
+  .summary h2{ margin-top:0 }
+  a{ color:var(--orange); font-weight:700 }
+  nav{ display:flex; gap:18px; flex-wrap:wrap; margin-bottom:26px; font-weight:700 }
+  .todo{ background:#ffe9a8; padding:0 6px; border-radius:6px }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="./">Back to the game</a><a href="terms.html">Terms of Use</a></nav>
+
+  <h1>Privacy Policy</h1>
+  <p class="date">Last updated: September 14, 2026</p>
+
+  <section class="summary">
+    <h2>The short version</h2>
+    <ul>
+      <li>Your camera image is processed on your own device. We never receive it.</li>
+      <li>In online games, your video goes only to the players in your lobby. It is encrypted, so we never see it.</li>
+      <li>Other players in your lobby can see your IP address and can save photos of you from the match.</li>
+      <li>There are no accounts, no ads and no tracking cookies. We do not sell data.</li>
+      <li>Our server sees the name you type and what happens in your match. It keeps this while your room is open, and its logs keep a short record for a limited time.</li>
+    </ul>
+  </section>
+
+  <h2>Who we are</h2>
+  <p>Pose Party is a browser game. "We" and "us" mean the people who run Pose Party.
+  To contact us, email <span class="todo" id="contact">[contact email to be added]</span>.</p>
+
+  <h2>What stays on your device</h2>
+  <ul>
+    <li><strong>Your camera image.</strong> An AI model runs in your browser. It turns each camera frame into body points, such as your shoulders, elbows and knees, and guesses your pose from them. The camera image and the body points stay on your device.</li>
+    <li><strong>No sound.</strong> The game never asks for your microphone and never records sound.</li>
+    <li><strong>Two small notes in your browser.</strong> Your browser remembers the name you type for online games, and when you last saw each word, so the game can show you new words first. To delete them, clear this site's data in your browser settings.</li>
+    <li><strong>Training clips.</strong> Clips you record on the Training screen stay in your browser's memory. They leave your device only if you export them to a file yourself.</li>
+  </ul>
+
+  <h2>What leaves your device</h2>
+
+  <h3>Your video, in online games (1v1 and Party)</h3>
+  <p>Your video goes to the other players in your lobby over a direct, encrypted connection (WebRTC). When a direct connection is not possible, the video can pass through a relay run by Cloudflare. The relay passes on encrypted data that it cannot decrypt. We do not receive or record your video.</p>
+  <p>In Solo play and in the practice match against the robot, your video does not leave your device.</p>
+
+  <h3>Photos taken by other players' games</h3>
+  <p>During an online match, each player's game takes still photos of every player from the video on that player's own screen. The photos make the photo strips at the end of the match. They stay in that player's browser and are deleted when they leave the results, but a player can save their photo strip as a picture. <strong>This means another player can keep a photo of you.</strong> Only play with people you trust.</p>
+
+  <h3>Your IP address</h3>
+  <p>The other players in your lobby can see your IP address, because that is how direct video connections work. Our server also sees it, as every website does.</p>
+
+  <h3>What our game server receives in online games</h3>
+  <ul>
+    <li>the name you type, and the room code</li>
+    <li>the list of words your game knows, and when you last saw each one</li>
+    <li>during a match, the AI's current guess about your pose and how sure it is, and the time it recognized you</li>
+    <li>the connection details needed to start the video between players, which include IP addresses</li>
+  </ul>
+  <p>The server keeps this in memory only. A room is deleted when everyone leaves, or at the latest 30 minutes after its last match started. We do not store it in a database. The server log keeps a short record of names and room codes, as described below.</p>
+
+  <h3>Word results, in every mode</h3>
+  <p>After each word, your game can send a short report: the word, the game mode, whether the AI recognized you, how long it took, how close the AI came, and the word it guessed instead. The report has no name and no ID. Our server adds it to totals for each word and does not keep the single report. We use the totals to find the words the AI has trouble with, so we can improve it.</p>
+
+  <h3>When the game loads</h3>
+  <ul>
+    <li><strong>Render</strong> hosts our game server. Like every web server, it sees your IP address and the pages you load, and it keeps server logs for a limited time. Our server writes your IP address into these logs when you load the game, connect, or type the access code, and the name you type and your room code when you create or join a room.</li>
+    <li>Your browser also loads files from other companies: fonts from <strong>Google Fonts</strong>, the AI's code from <strong>jsDelivr</strong>, and the AI model files from <strong>Google Cloud Storage</strong>. In online games it also contacts a <strong>Google</strong> server that helps players connect, and possibly Cloudflare's relay. These companies see your IP address as part of these requests, and their own privacy policies apply.</li>
+  </ul>
+
+  <h3>Cookies</h3>
+  <p>If the game asks for an access code, one cookie remembers that you typed it. It lasts 30 days. We use no advertising or tracking cookies.</p>
+
+  <h2>What we use it for</h2>
+  <p>We use this information to run the game: to connect players, keep score, stop abuse (for example, by limiting how fast one IP address can create rooms), and improve the AI. We do not sell or rent it, and we do not use it for ads.</p>
+
+  <h2>Children</h2>
+  <p>Pose Party is for people aged 13 or older. We do not knowingly collect personal information from children under 13. If you think a child under 13 has given us personal information, contact us and we will delete what we hold.</p>
+
+  <h2>How long we keep it</h2>
+  <ul>
+    <li>Room information: until the room is deleted, as described above.</li>
+    <li>Word totals: we keep these. They contain no personal information.</li>
+    <li>Server logs: kept by Render for a limited time.</li>
+    <li>Information in your browser: until you clear this site's data.</li>
+  </ul>
+
+  <h2>Security</h2>
+  <p>The game uses HTTPS, and video between players is encrypted. We do not have accounts or passwords to protect. No system is perfectly secure, but we collect as little as we can.</p>
+
+  <h2>Your choices and rights</h2>
+  <ul>
+    <li>You can refuse camera access. The game then cannot see you.</li>
+    <li>You can play Solo, which keeps your video on your device.</li>
+    <li>You can clear this site's data in your browser at any time.</li>
+    <li>Depending on where you live (for example, in the EU, the UK or California), you may have the right to ask what we hold about you, or to ask us to delete it. We do not store information linked to you, so there is usually nothing to hand over or delete, but contact us and we will answer.</li>
+  </ul>
+
+  <h2>Changes</h2>
+  <p>If we change what the game collects, we will update this page and the date at the top.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or requests: <span class="todo">[contact email to be added]</span>.</p>
+
+  <nav style="margin-top:40px"><a href="./">Back to the game</a><a href="terms.html">Terms of Use</a></nav>
+</main>
+</body>
+</html>

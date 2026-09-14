@@ -667,6 +667,12 @@ try {
   ok(r.error === "bad-payload", "object name rejected");
 
   for (const s of [A, B, C, E, F, G]) s.disconnect();
+
+  console.log("legal pages:");
+  for (const page of ["/privacy", "/terms"]) {
+    const res = await fetch(URL + page);
+    ok(res.status === 200 && /<h1/.test(await res.text()), `${page} is served`);
+  }
 } catch (e) {
   fails++;
   console.log("  FAIL (exception):", e.message);
