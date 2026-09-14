@@ -62,6 +62,35 @@ A redeploy restarts the server and ends every room, so deploy when nobody is
 playing. Every push to the branch deploys again unless you turn off
 auto-deploy.
 
+### Your own domain, with Cloudflare's free CDN in front
+
+Cloudflare keeps copies of the art near each player, so Render sends each
+file once per Cloudflare location instead of once per player. It needs a
+domain whose DNS is on Cloudflare (Cloudflare Registrar puts it there).
+
+1. Check the game works on the `onrender.com` address first.
+2. Render: **Settings > Custom Domains**, add the domain. Render shows the
+   record to create.
+3. Cloudflare DNS: create that record with the proxy **OFF** (grey cloud,
+   "DNS only"). Render must reach the domain directly to verify it and issue
+   its certificate.
+4. When Render shows the domain as verified, turn the proxy **ON** (orange
+   cloud).
+5. Cloudflare **SSL/TLS**: set the mode to **Full (strict)**. A weaker mode
+   leaves part of the path unencrypted or loops redirects.
+6. Leave Cloudflare's caching on its defaults. The server already says what
+   may be kept: art for 30 days; the page, code and pose deck are checked
+   every time (`no-cache`), so a deploy shows up at once.
+7. Render: set `CORS_ORIGINS` to `https://<your-domain>`.
+8. Do the `TRUST_PROXY` log check again. Cloudflare adds a proxy, so it is
+   probably `2` now. The log must show YOUR IP.
+
+After a deploy that CHANGES an existing art file, choose **Caching > Purge
+Everything** in Cloudflare. New file names need nothing.
+
+With the CDN on, art files are served without the access code (Cloudflare
+sends its copies to anyone). The page and the match server still need it.
+
 ## Privacy
 
 Video is WebRTC peer-to-peer (a full mesh in Party) and never recorded.

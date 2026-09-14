@@ -131,12 +131,16 @@ if(gateOn){
    one of them revalidates on every visit. Markup, JS and CSS are NOT
    content-hashed here, so caching those the same way would strand players on
    a stale build after a deploy. They keep must-revalidate instead, which is
-   a few KB of conditional requests. */
+   a few KB of conditional requests.
+   `assets/data/` (the pose deck) is NOT art: it changes whenever the deck
+   does, and a CDN in front (Cloudflare) would otherwise keep the old deck
+   at its edge for the whole max-age. no-cache still lets a browser or a CDN
+   keep a copy; it only has to ask first, and an unchanged deck is a 304. */
 app.use(express.static(GAME_DIR, {
   index: "index.html",
   setHeaders: (res, filePath) => {
-    const rel = path.relative(GAME_DIR, filePath);
-    const isArt = rel.split(path.sep)[0] === "assets";
+    const rel = path.relative(GAME_DIR, filePath).split(path.sep);
+    const isArt = rel[0] === "assets" && rel[1] !== "data";
     res.set("Cache-Control", isArt
       ? `public, max-age=${config.staticMaxAge}`
       : "no-cache");
