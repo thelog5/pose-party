@@ -180,12 +180,13 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    and in multiplayer it buries a live match behind itself for the whole
    tutorial grace. Every size inside is `cqw` against this box, so shrinking
    the box is the ONLY edit needed: the whole composition scales with it and
-   no percentage in this file changes. `1088px` still caps it on a large
-   monitor, which is why the three numbers now land within a few points of
-   each other at every target viewport instead of being widest on the
-   smallest screen. */
+   no percentage in this file changes.
+   2026-09-14: smaller again, min(54vw,108vh,800px), at the owner's request
+   ("a bit too large on all screens"). The cap also keeps the art closer to
+   sharp: htp-panel.webp is 1400 px wide, so above ~700 CSS px a 2x screen
+   is stretching it. Every child is cqw of this box, so nothing else moved. */
 .htp-panel{position:relative;container-type:inline-size;
-  width:min(62vw,124vh,1088px);aspect-ratio:1088/643;
+  width:min(54vw,108vh,800px);aspect-ratio:1088/643;
   font-family:var(--f-lobby);font-weight:400;
   animation:htpDrop .52s cubic-bezier(.16,1.5,.32,1) both}
 @keyframes htpDrop{
