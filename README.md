@@ -32,6 +32,31 @@ npm run party                # spawns server + four headless players (2v2 round)
 npm run offline
 ```
 
+## Deploy on Render
+
+`render.yaml` is a Render Blueprint. It runs ONE instance on purpose: rooms
+live in memory, so a second instance cannot see the first one's rooms.
+
+1. In Render, choose **New > Blueprint**, pick this repo, and pick the branch
+   to deploy.
+2. Fill in the environment values it asks for:
+
+   | key | value |
+   | --- | --- |
+   | `ACCESS_CODE` | the code players type to get in. Leave it empty to open the game to everyone. |
+   | `CORS_ORIGINS` | optional. The game and the socket share one origin, so it works without it. |
+   | `TURN_CF_KEY_ID`, `TURN_CF_API_TOKEN` | the Cloudflare TURN key. Copy from your local `.env`. |
+   | `TURN_CF_ACCOUNT_ID`, `TURN_CF_ANALYTICS_TOKEN` | turn on the spend cap. Without them the relay stays off. |
+
+3. Keep the **Starter** plan. The free plan sleeps after 15 minutes idle,
+   takes about a minute to wake, and loses any open rooms.
+4. When the deploy is live, open `https://<your-app>.onrender.com/healthz`.
+   It answers `{"ok":true,...}` without the access code.
+
+A redeploy restarts the server and ends every room, so deploy when nobody is
+playing. Every push to the branch deploys again unless you turn off
+auto-deploy.
+
 ## Privacy
 
 Video is WebRTC peer-to-peer (a full mesh in Party) and never recorded.
