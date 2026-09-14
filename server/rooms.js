@@ -660,6 +660,10 @@ export function createRoomStore({ config, emit }){
   function startPartyMatch(room){
     clearTimeout(room.timer);
     clearTimeout(room.matchTimer);
+    /* The sweep deletes a room roomTtlMs after `createdAt`. 1v1's startMatch
+       resets it, and Party never did: a group that kept pressing REMATCH lost
+       its room mid-match about 30 minutes after creating it. */
+    room.createdAt = Date.now();
     room.phase = "tutorial";
     room.deck = shuffledDeck(room);
     room.roundNum = 0;
