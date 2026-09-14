@@ -25,11 +25,13 @@ services:
         value: production
       # Render terminates TLS in front of this process. Without this every
       # player looks like the platform proxy and they all share ONE bucket
-      # of RATE_CREATE rooms per minute. CHECK IT after the first deploy: the
-      # log line "page load from <ip>" must show YOUR public IP. If it shows
-      # a proxy address, raise this to 2 (a hop count), and no higher.
+      # of RATE_CREATE rooms per minute. "cloudflare" reads the visitor from
+      # CF-Connecting-IP: Render's edge is Cloudflare, and with a proxied
+      # Cloudflare domain in front there are two Cloudflare layers, so "1"
+      # logged Cloudflare addresses for every player. CHECK IT: the log line
+      # "page load from <ip>" must show YOUR public IP.
       - key: TRUST_PROXY
-        value: "1"
+        value: cloudflare
       # Set to the real https origin once Render assigns it.
       - key: CORS_ORIGINS
         sync: false

@@ -7,6 +7,7 @@
    top guess label and confidence are relayed so the rival paper can update. */
 
 import fs from "fs";
+import net from "net";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
@@ -34,7 +35,21 @@ const app = express();
 /* Behind Render/Railway/Fly this makes `req.ip` the real client rather than
    the platform proxy. Off by default: an untrusted `X-Forwarded-For` is a
    free supply of rate-limit keys. See config.trustProxy. */
-if(config.trustProxy) app.set("trust proxy", config.trustProxy);
+if(config.trustProxy) app.set("trust proxy", config.trustProxy === "cloudflare" ? 1 : config.trustProxy);
+
+/* TRUST_PROXY=cloudflare: the visitor is Cloudflare's CF-Connecting-IP (see
+   config.trustProxy). `req.ip` is redefined on the request so every limiter
+   and log line below keys on the real visitor with no change of its own.
+   A request without the header keeps the one-hop answer, and says so once. */
+const cfIp = h => { const v = String(h || "").trim(); return net.isIP(v) ? v : null; };
+let cfMissingLogged = false;
+if(config.trustProxy === "cloudflare")
+  app.use((req, res, next) => {
+    const ip = cfIp(req.headers["cf-connecting-ip"]);
+    if(ip) Object.defineProperty(req, "ip", { value: ip, configurable: true });
+    else if(!cfMissingLogged){ cfMissingLogged = true; console.warn("TRUST_PROXY=cloudflare but a request had no CF-Connecting-IP; using the one-hop address."); }
+    next();
+  });
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -288,7 +303,7 @@ if(gateOn)
   io.use((socket, next) => {
     if(ticketValid(gateSecret, readCookie(socket.handshake.headers.cookie, COOKIE)))
       return next();
-    log(`gate: socket refused from ${socket.handshake.address}`);
+    log(`gate: socket refused from ${clientIp(socket)}`);
     next(new Error("forbidden"));
   });
 
@@ -341,6 +356,10 @@ io.engine.on("connection_error", err => {
    name its own rate-limit key, and the create and join limits did nothing.
    `socket.request` is the handshake's own http request. */
 function clientIp(socket){
+  if(config.trustProxy === "cloudflare"){
+    const ip = cfIp(socket.handshake.headers["cf-connecting-ip"]);
+    if(ip) return ip;
+  }
   if(config.trustProxy)
     return proxyaddr(socket.request, app.get("trust proxy fn")) || "unknown";
   return socket.handshake.address || "unknown";

@@ -12,6 +12,7 @@ const bool = (v, d) => (v == null || v === "") ? d : /^(1|true|yes|on)$/i.test(S
 const proxyTrust = v => {
   const s = String(v ?? "").trim().toLowerCase();
   if(s === "loopback") return "loopback";
+  if(s === "cloudflare") return "cloudflare";
   if(/^[1-9]$/.test(s)) return Number(s);
   return bool(s, false) ? 1 : false;
 };
@@ -84,7 +85,13 @@ export const config = {
      `true` trusts ONE hop (a platform proxy). `loopback` trusts the header
      only when the connection comes from this machine: that is the right
      value for a tunnel such as cloudflared on the same computer, because a
-     LAN client connecting to the port directly cannot then spoof it. */
+     LAN client connecting to the port directly cannot then spoof it.
+     `cloudflare` reads the visitor from Cloudflare's CF-Connecting-IP header.
+     It is the right value on Render with a proxied Cloudflare domain: Render's
+     own edge is Cloudflare too, so there are two Cloudflare layers and no hop
+     count lands on the visitor (TRUST_PROXY=1 logged Cloudflare addresses for
+     every player). Cloudflare overwrites that header, so a visitor cannot set
+     it, and every request to a Render service passes through Cloudflare. */
   trustProxy: proxyTrust(process.env.TRUST_PROXY),
 
   /* Static cache lifetime for `assets/`, in seconds. The art is the bulk of
