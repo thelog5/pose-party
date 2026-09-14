@@ -1238,6 +1238,45 @@
   </div>
 </div>
 
+<!-- ============ AGE CHECK before online play (js/ageGate.js).
+     Built from the HOW TO PLAY card's own art: the same cream backing, title
+     type and yellow READY paper. It follows the FTC's COPPA guidance for a
+     NEUTRAL age screen: month and year, every year listed, nothing that says
+     which answer gets in, and the answer is remembered so a child cannot go
+     back and try another year. Only the RESULT is kept, never the birthday.
+     No em dashes: player-facing copy. -->
+<div class="ag hidden" id="ageGate" role="dialog" aria-modal="true" aria-labelledby="agTitle">
+  <div class="ag-panel" id="agPanel" data-view="ask">
+    <img class="ag-paper" src="assets/ui/figma/htp-panel.webp" alt="">
+
+    <span class="ag-title" id="agTitle" data-ag-when="ask">WHEN WERE YOU BORN?</span>
+    <div class="ag-body" data-ag-when="ask">
+      <div class="ag-pick">
+        <select id="agMonth" aria-label="Birth month">
+          <option value="" selected disabled>MONTH</option>
+        </select>
+        <select id="agYear" aria-label="Birth year">
+          <option value="" selected disabled>YEAR</option>
+        </select>
+      </div>
+      <p class="ag-note">We ask once. We don't keep your birthday.</p>
+    </div>
+
+    <span class="ag-title" data-ag-when="young">SOLO TIME!</span>
+    <div class="ag-body" data-ag-when="young">
+      <p class="ag-say">Online games with other players are for older players.
+        You can still play Solo and try to beat the AI!</p>
+      <button class="ag-back" id="agBack" type="button">BACK TO HOME</button>
+    </div>
+
+    <button class="ag-go" id="agGo" type="button" disabled>
+      <img src="assets/ui/figma/htp-ready.webp" alt="">
+      <span data-ag-when="ask">LET'S GO!</span>
+      <span data-ag-when="young">PLAY SOLO</span>
+    </button>
+  </div>
+</div>
+
 <!-- ============ ENABLE CAMERA — the boot gate (js/cameraGate.js).
      Figma "ENABLE CAMERA SCREEN" 322:717, 1539x1460. Every left/top/width
      below is that component's percentage. The paper, the three info rows,

@@ -16,6 +16,7 @@ import { enterLobby, leaveRoom, setPendingJoin } from "./online.js";
 import { enterParty, wireParty, leaveParty } from "./party.js";
 import { wireHomeAlive, pickMode } from "./homeAlive.js";
 import { wireHowToPlay, isHowToPlayOpen } from "./howToPlay.js";
+import { requireOnlineAge, isAgeGateOpen } from "./ageGate.js";
 import { wireCameraGate } from "./cameraGate.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
 import { boot } from "./engine.js";
@@ -61,7 +62,7 @@ function wireControls(){
      is not there. Without it, entering an online match would be a one-way
      door — the header is hidden on every play stage. */
   addEventListener("keydown", e => {
-    if(e.key!=="Escape" || e.repeat || isHowToPlayOpen()) return;
+    if(e.key!=="Escape" || e.repeat || isHowToPlayOpen() || isAgeGateOpen()) return;
     if(state.screen==="match"){ leaveRoom(); transition("menu"); }
     else if(state.screen==="pmatch"){ leaveParty(); transition("menu"); }
     else return;
@@ -72,9 +73,11 @@ function wireControls(){
      pickMode() pops the pressed card off the board first and calls through
      when it is gone — the press has to be answered before the next screen
      exists, and for 1v1/Party the lobby then re-lands the same component. */
-  $("modeAI").onclick=()=>pickMode("ai",()=>startGame("ai"));
-  $("modeVS").onclick=()=>pickMode("vs",()=>enterLobby());
-  $("modeParty").onclick=()=>pickMode("party",()=>enterParty());
+  $("modeAI").onclick=playSolo;
+  /* Online play asks the player's age first (ageGate.js); under 13 is kept
+     to Solo, which the card's PLAY SOLO button starts. */
+  $("modeVS").onclick=()=>requireOnlineAge(()=>pickMode("vs",()=>enterLobby()), { solo:playSolo });
+  $("modeParty").onclick=()=>requireOnlineAge(()=>pickMode("party",()=>enterParty()), { solo:playSolo });
   $("btnHomeGear").onclick=()=>transition("training");
   wireHomeAlive();
   wireLobbyAlive();
@@ -127,6 +130,9 @@ function wireControls(){
   wireParty();
 }
 
+/* The SOLO card, and the age card's PLAY SOLO button. */
+function playSolo(){ pickMode("ai",()=>startGame("ai")); }
+
 function buildStarterWords(){
   const dl=$("classSuggestions"), chips=$("starterChips");
   for(const w of STARTERS){
@@ -144,7 +150,7 @@ function handleJoinLink(){
   history.replaceState(null,"",location.pathname); // don't re-join on refresh
   setPendingJoin(m[1].toUpperCase());
   const tryEnter=()=>{
-    if(state.model){ enterLobby(); return; }
+    if(state.model){ requireOnlineAge(()=>enterLobby(), { solo:playSolo }); return; }
     setTimeout(tryEnter, 400);
   };
   tryEnter();

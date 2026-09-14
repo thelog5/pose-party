@@ -382,6 +382,68 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    the player must not act on; this sits over a Home that is deliberately
    mid-assembly (see .home-held in screens.css) and dimming it to the same
    depth hides the very thing it is there to show. */
+/* ===================== AGE CHECK (js/ageGate.js) =====================
+   The HOW TO PLAY card's family: same scrim, the same htp-panel paper at its
+   authored aspect, the same title type and the same READY paper hanging off
+   the bottom (so the panel keeps HTP's 1088/643 box and the button keeps its
+   rectangle). Every size inside is cqw against .ag-panel. z 91: over HOW TO
+   PLAY (90), under the boot gate (92). */
+.ag{position:fixed;inset:0;z-index:91;display:grid;place-items:center;
+  padding:2vh 2vw;
+  background:radial-gradient(circle at 50% 46%,rgba(9,22,62,.5) 0 34%,
+    rgba(9,22,62,.72) 100%);
+  backdrop-filter:brightness(.72) saturate(1.02);
+  -webkit-backdrop-filter:brightness(.72) saturate(1.02);
+  animation:htpScrim .3s ease-out both}
+.ag.hidden{display:none}
+.ag-panel{position:relative;container-type:inline-size;
+  width:min(48vw,96vh,760px);aspect-ratio:1088/643;
+  font-family:var(--f-lobby);font-weight:400;color:#17356f;
+  animation:htpDrop .52s cubic-bezier(.16,1.5,.32,1) both}
+.ag-panel:not([data-view="ask"]) [data-ag-when="ask"],
+.ag-panel:not([data-view="young"]) [data-ag-when="young"]{display:none}
+.ag-paper{position:absolute;left:0;top:0;width:100%;aspect-ratio:1.9054;object-fit:fill;
+  filter:drop-shadow(0 min(.55vw,.98vh) min(.42vw,.75vh) rgba(0,0,0,.35))}
+.ag-title{position:absolute;left:6%;top:8.5%;width:88%;text-align:center;
+  font-size:7.4cqw;line-height:1;letter-spacing:.06cqw;text-wrap:balance;
+  text-shadow:.46cqw .46cqw 0 rgba(255,255,255,.9)}
+.ag-body{position:absolute;left:10%;top:25%;width:80%;height:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.4cqw;
+  text-align:center}
+.ag-pick{display:flex;gap:2.6cqw;justify-content:center}
+.ag-pick select{appearance:none;-webkit-appearance:none;cursor:pointer;
+  font:400 4.3cqw/1 var(--f-lobby);color:#17356f;letter-spacing:.04em;
+  background:#fffaf0 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2317356f' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 1.9cqw center/2.2cqw;
+  border:.42cqw solid #17356f;border-radius:1.5cqw;
+  padding:1.5cqw 5.4cqw 1.5cqw 2.4cqw;min-width:24cqw;
+  box-shadow:0 .6cqw 0 rgba(23,53,111,.25);
+  transition:translate .15s ease,box-shadow .15s ease}
+.ag-pick select:hover{translate:0 -.3cqw;box-shadow:0 .9cqw 0 rgba(23,53,111,.25)}
+.ag-pick select:focus-visible{outline:.42cqw solid #f5b51c;outline-offset:.4cqw}
+.ag-note{margin:0;font:700 2.7cqw/1.3 var(--f-label);opacity:.8}
+.ag-say{margin:0;font:700 3.6cqw/1.35 var(--f-label);text-wrap:balance}
+.ag-back{background:none;border:0;padding:.6cqw 1cqw;cursor:pointer;color:#17356f;
+  font:400 2.9cqw/1 var(--f-lobby);letter-spacing:.05em;text-decoration:underline;
+  text-underline-offset:.5cqw;transition:translate .15s ease,color .15s ease}
+.ag-back:hover,.ag-back:focus-visible{color:#f45a3c;translate:0 -.2cqw}
+.ag-back:active{translate:0 .2cqw}
+.ag-go{position:absolute;left:28.125%;top:77.605%;width:43.75%;height:22.395%;
+  background:none;border:0;padding:0;cursor:pointer;container-type:inline-size;
+  transition:translate .18s cubic-bezier(.2,1.3,.35,1),
+    scale .18s cubic-bezier(.2,1.3,.35,1),filter .18s ease,opacity .18s ease}
+.ag-go img{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
+  filter:drop-shadow(0 min(.5vw,.89vh) min(.36vw,.64vh) rgba(0,0,0,.38))}
+.ag-go span{position:absolute;left:0;top:49.5%;width:100%;translate:0 -50%;
+  text-align:center;font-size:15.5cqw;line-height:1;color:#fff;
+  text-shadow:1.1cqw 1.1cqw 0 rgba(0,0,0,.3)}
+.ag-go:not(:disabled):hover,.ag-go:not(:disabled):focus-visible{
+  translate:0 calc(-1 * min(.34vw,.6vh));scale:1.035;filter:brightness(1.06)}
+.ag-go:not(:disabled):active{scale:.975;filter:brightness(.97)}
+.ag-go:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.28vw,.5vh)}
+.ag-go:disabled{cursor:default;opacity:.6;filter:saturate(.55)}
+@media (prefers-reduced-motion:reduce){ .ag,.ag-panel{animation:none} }
+@media (max-aspect-ratio:1/1){ .ag-panel{width:min(94vw,152vh)} }
+
 .cg{position:fixed;inset:0;z-index:92;display:grid;place-items:center;
   padding:2vh 2vw;
   background:radial-gradient(circle at 50% 46%,rgba(9,22,62,.34) 0 34%,

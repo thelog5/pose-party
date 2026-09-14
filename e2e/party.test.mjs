@@ -47,6 +47,9 @@ async function passCameraGate(page){
   await page.waitForFunction(() =>
     !document.getElementById("camGate").classList.contains("hidden"),
     { timeout: 30000, polling: 50 });
+  /* a returning adult player: the online age check (ageGate.js) is answered.
+     The age card itself is tested in offline.test.mjs on a page of its own. */
+  await page.evaluate(() => { try{ localStorage.setItem("posePartyOnlineAge", "ok"); }catch(e){} });
   await page.click("#cgEnable");
 }
 

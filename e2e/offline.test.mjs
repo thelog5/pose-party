@@ -41,6 +41,9 @@ async function passCameraGate(page){
   await page.waitForFunction(() =>
     !document.getElementById("camGate").classList.contains("hidden"),
     { timeout: 30000, polling: 50 });
+  /* a returning adult player: the online age check (ageGate.js) is answered.
+     The age card itself is tested in offline.test.mjs on a page of its own. */
+  await page.evaluate(() => { try{ localStorage.setItem("posePartyOnlineAge", "ok"); }catch(e){} });
   const seen = await page.evaluate(() => ({
     granted:document.getElementById("camGate").hasAttribute("data-granted"),
     label:document.getElementById("cgEnableLabel").textContent.trim(),
@@ -2947,6 +2950,78 @@ console.log("move back:");
     "the dev bar stands down wherever a real game is set up or played");
   ok(devbar.menu !== "none" && devbar.training !== "none",
     "and is still there on Home and Training, where it is used from");
+}
+
+/* THE AGE CHECK before online play (ageGate.js), on a page of its own: a
+   first-time player, so nothing has answered it yet. It must be NEUTRAL (the
+   FTC's COPPA FAQ): month and year, every year listed, no hint of which
+   answer gets in, and a remembered result so a second try cannot change it. */
+console.log("age check:");
+{
+  const ag = await browser.newPage();
+  await ag.setViewport({ width:1440, height:810 });
+  const agErrors = [];
+  ag.on("pageerror", e => agErrors.push(e.message));
+  await ag.goto(APP, { waitUntil:"networkidle2", timeout:60000 });
+  await ag.waitForFunction(() => !document.getElementById("camGate").classList.contains("hidden"), { timeout:30000, polling:50 });
+  await ag.click("#cgEnable");
+  await ag.waitForFunction(() => document.getElementById("camGate").classList.contains("hidden"), { timeout:30000, polling:100 });
+  await ag.evaluate(() => localStorage.removeItem("posePartyOnlineAge"));
+  const view = () => ag.evaluate(() => ({
+    open:!document.getElementById("ageGate").classList.contains("hidden"),
+    view:document.getElementById("agPanel").dataset.view,
+    screen:document.body.dataset.screen,
+    stored:localStorage.getItem("posePartyOnlineAge") }));
+
+  await ag.click("#modeVS"); await sleep(300);
+  let v = await view();
+  ok(v.open && v.view === "ask" && v.screen === "home", "1V1 asks when you were born before any lobby opens");
+  const form = await ag.evaluate(() => {
+    const years = [...document.querySelectorAll("#agYear option")].map(o => o.value).filter(Boolean).map(Number);
+    const panel = document.getElementById("agPanel").getBoundingClientRect();
+    return { months:document.querySelectorAll("#agMonth option[value]:not([value=''])").length,
+      newest:Math.max(...years), oldest:Math.min(...years), count:years.length,
+      disabled:document.getElementById("agGo").disabled,
+      text:[...document.querySelectorAll('#ageGate .ag-title[data-ag-when="ask"], #ageGate .ag-note, #agGo span[data-ag-when="ask"]')].map(n => n.textContent).join(" "),
+      inView:panel.top >= 0 && panel.bottom <= innerHeight && panel.left >= 0 && panel.right <= innerWidth };
+  });
+  ok(form.months === 12 && form.newest === new Date().getFullYear() && form.oldest <= 1920 &&
+     form.count === form.newest - form.oldest + 1,
+    `neutral: 12 months and EVERY year from ${form.oldest} to ${form.newest}, not only the ones that pass`);
+  ok(!/\b1[0-9]\b|older|under|must|allowed/i.test(form.text), `neutral: nothing hints at which answer gets in ("${form.text.replace(/\s+/g," ").trim()}")`);
+  ok(form.disabled, "LET'S GO waits for both a month and a year");
+  ok(form.inView, "the card fits the window");
+
+  const kidYear = new Date().getFullYear() - 10;
+  await ag.select("#agMonth", "1"); await ag.select("#agYear", String(kidYear));
+  await ag.click("#agGo"); await sleep(300);
+  v = await view();
+  ok(v.open && v.view === "young" && v.stored === "young" && v.screen === "home",
+    "a 10-year-old gets the SOLO TIME card, no lobby, and the answer is remembered");
+  ok(!(await ag.evaluate(() => JSON.stringify(localStorage)).then(s => s.includes(String(new Date().getFullYear() - 10)))),
+    "the birth year itself is never stored");
+  await ag.click("#agBack"); await sleep(250);
+  await ag.click("#modeParty"); await sleep(300);
+  v = await view();
+  ok(v.open && v.view === "young", "PARTY does not ask again: a second try cannot change the answer");
+  await ag.click("#agGo"); await sleep(900);
+  ok(await ag.evaluate(() => !document.getElementById("howToPlay").classList.contains("hidden") &&
+    document.getElementById("ageGate").classList.contains("hidden")),
+    "PLAY SOLO starts Solo");
+  await ag.keyboard.press("Escape"); await sleep(600);
+
+  await ag.evaluate(() => localStorage.removeItem("posePartyOnlineAge"));
+  await ag.click("#modeVS"); await sleep(300);
+  await ag.keyboard.press("Escape"); await sleep(200);
+  v = await view();
+  ok(!v.open && v.screen === "home" && v.stored === null, "Esc closes the card without an answer");
+  await ag.click("#modeVS"); await sleep(300);
+  await ag.select("#agMonth", "6"); await ag.select("#agYear", String(new Date().getFullYear() - 30));
+  await ag.click("#agGo"); await sleep(900);
+  v = await view();
+  ok(!v.open && v.stored === "ok" && v.screen === "lobby", `an adult goes straight on into the 1V1 lobby (${JSON.stringify(v)})`);
+  ok(agErrors.length === 0, `the age check raised no page errors (${agErrors.length})`);
+  await ag.close();
 }
 
 // ---- console errors ----
