@@ -13,6 +13,7 @@ import http from "http";
 import crypto from "crypto";
 import express from "express";
 import helmet from "helmet";
+import compression from "compression";
 import { Server } from "socket.io";
 import proxyaddr from "proxy-addr";
 
@@ -52,6 +53,13 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false, // CDN resources carry no CORP headers
 }));
+
+/* GZIP THE TEXT. The pose deck alone is 8.3 MB of JSON and gzips to about
+   1.8 MB, and it is the one download a first visit waits on. The markup, JS
+   and CSS compress the same way. WebP art is already compressed, and the
+   filter skips image types. Socket.IO attaches to the http server, not to
+   this app, so it is not affected. */
+app.use(compression());
 
 /* Support log: note page loads so LAN reachability problems are visible. */
 app.use((req, res, next) => {
