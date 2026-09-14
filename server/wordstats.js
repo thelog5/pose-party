@@ -21,6 +21,10 @@ export function createWordStats({ labels }){
   const since = new Date().toISOString();
   const words = new Map();
   let reports = 0;
+  /* Video links, from the clients' own net:report (one per side of each link,
+     so a link that both players report counts twice; the SHARES are still
+     right). Relayed = either end used the TURN relay. Counts only. */
+  const net = {};
 
   function record(p){
     if(!p || typeof p !== "object") return { error: "bad-payload" };
@@ -49,9 +53,15 @@ export function createWordStats({ labels }){
     return { ok: true };
   }
 
+  function recordNet(mode, result, relayed){
+    const n = net[mode] ??= { connected:0, relayed:0, failed:0 };
+    if(result === "failed") n.failed++;
+    else { n.connected++; if(relayed) n.relayed++; }
+  }
+
   const snapshot = (extra = {}) => ({
     bootId, since, now: new Date().toISOString(), reports, ...extra,
-    words: Object.fromEntries(words),
+    net, words: Object.fromEntries(words),
   });
 
   /* One line for the log, so the hourly history survives in the host's logs
@@ -63,7 +73,29 @@ export function createWordStats({ labels }){
       (rows.length ? `; weakest ${rows.map(([w, r]) => `${w} ${Math.round(r * 100)}%`).join(", ")}` : "");
   }
 
-  return { record, snapshot, summaryLine };
+  return { record, recordNet, snapshot, summaryLine };
+}
+
+/* Video links and the relay's monthly use, above the word table. */
+function netSection(snap){
+  const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "-";
+  const rows = Object.entries(snap.net || {}).map(([mode, n]) => {
+    const all = n.connected + n.failed;
+    return `<tr><td>${mode}</td><td>${all}</td><td>${pct(n.connected - n.relayed, all)}</td>` +
+      `<td>${pct(n.relayed, all)}</td><td>${pct(n.failed, all)}</td></tr>`;
+  }).join("");
+  const r = snap.relay;
+  const relayLine = !r ? "" : !r.configured
+    ? "<p>Relay: not configured on this server, so links that cannot connect directly fail.</p>"
+    : r.usedGb == null
+      ? `<p>Relay: ${r.on ? "on" : "off"}. No usage reading from Cloudflare yet.</p>`
+      : `<p>Relay use since ${r.since}: <b>${r.usedGb.toFixed(2)} GB of ${r.capGb} GB</b> ` +
+        `(${Math.round(100 * r.usedGb / r.capGb)}%). The relay is <b>${r.on ? "on" : "OFF"}</b>. ` +
+        `Read ${r.readAgoMin} min ago.</p>`;
+  return `<h2>Video connections</h2>${relayLine}
+<table><tr><th>mode</th><th>links</th><th>direct</th><th>relay</th><th>failed</th></tr>
+${rows || '<tr><td colspan="5">No video links yet.</td></tr>'}</table>
+<p class="hint">Each player reports their own side of a link. "failed" links would need the relay.</p>`;
 }
 
 /* The admin page: the same snapshot as a table, worst word first. */
@@ -80,14 +112,17 @@ export function statsPage(snap){
         `<td>${Math.round(100 * w.peakSum / w.played)}%</td><td>${wrong}</td></tr>`;
     }).join("");
   return `<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">
-<title>Pose Party word stats</title>
+<title>Pose Party stats</title>
 <style>body{font:15px/1.4 system-ui,sans-serif;margin:24px;color:#123477;background:#fbf6ea}
 table{border-collapse:collapse;width:100%}th,td{padding:6px 10px;border-bottom:1px solid #d9cfb6;text-align:left}
-th{background:#123477;color:#fff}td:nth-child(n+2):nth-child(-n+6){text-align:right}</style>
-<h1>Word stats</h1>
+th{background:#123477;color:#fff}td:nth-child(n+2):nth-child(-n+6){text-align:right}
+h2{margin:28px 0 8px}.hint{opacity:.7;font-size:13px}</style>
+<h1>Pose Party stats</h1>
 <p>Since this server started: ${esc(snap.since)} &middot; ${snap.reports} reports &middot;
 ${snap.online?.sockets ?? 0} connected now &middot; ${snap.online?.rooms ?? 0} rooms.
 Pull these to your computer with <code>node scripts/pull-stats.mjs</code>; a restart starts over.</p>
+${netSection(snap)}
+<h2>Words</h2>
 <table><tr><th>word</th><th>played</th><th>got</th><th>skipped</th><th>avg time</th><th>AI got to</th><th>guessed instead</th></tr>
 ${rows || '<tr><td colspan="7">No reports yet.</td></tr>'}</table>`;
 }

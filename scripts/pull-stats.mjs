@@ -77,3 +77,23 @@ for(const [word, w] of rows){
     `${pct(w.peakSum, w.played).padStart(10)}  ${wrong}`);
 }
 if(!rows.length) console.log("No reports yet.");
+
+/* ---- video links, summed over boots; the relay reading from the newest ---- */
+const net = {};
+for(const snap of Object.values(store.boots))
+  for(const [mode, n] of Object.entries(snap.net || {})){
+    const t = net[mode] ??= { connected:0, relayed:0, failed:0 };
+    for(const k of ["connected", "relayed", "failed"]) t[k] += n[k] || 0;
+  }
+console.log("\nVideo links (each player reports their own side):");
+for(const [mode, n] of Object.entries(net)){
+  const all = n.connected + n.failed;
+  console.log(`  ${mode.padEnd(6)} ${String(all).padStart(5)} links   direct ${pct(n.connected - n.relayed, all)}   ` +
+    `relay ${pct(n.relayed, all)}   failed ${pct(n.failed, all)}`);
+}
+if(!Object.keys(net).length) console.log("  none yet");
+const newest = Object.values(store.boots).sort((a, b) => String(b.now).localeCompare(String(a.now)))[0];
+const r = newest?.relay;
+if(r?.usedGb != null)
+  console.log(`Relay use since ${r.since}: ${r.usedGb.toFixed(2)} GB of ${r.capGb} GB. Relay is ${r.on ? "on" : "OFF"}.`);
+else if(r) console.log(`Relay: ${r.configured ? "configured, no usage reading yet" : "not configured"}.`);

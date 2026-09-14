@@ -122,7 +122,8 @@ if(stats){
     if(!pass || !codeMatches(pass, config.statsToken))
       return res.status(401).set("WWW-Authenticate", 'Basic realm="Pose Party stats"')
         .type("text").send("The stats page needs the stats password.");
-    const snap = stats.snapshot({ online: { sockets: io.engine.clientsCount, rooms: store._rooms.size } });
+    const snap = stats.snapshot({ online: { sockets: io.engine.clientsCount, rooms: store._rooms.size },
+      relay: relayStatus() });
     if((req.headers.accept || "").includes("text/html")) return res.type("html").send(statsPage(snap));
     res.json(snap);
   });
@@ -409,6 +410,20 @@ function relayAllowed(){
   return true;
 }
 
+/* For the /stats page: the same facts relayAllowed() decides on, without its
+   logging side effect. */
+function relayStatus(){
+  const configured = !!(config.cfTurnKeyId && config.cfTurnApiToken) || config.turnUrls.length > 0;
+  if(!budgetEnforced()) return { configured, on: configured, capGb: null, usedGb: null, since: null };
+  const fresh = budget.readAt && Date.now() - budget.readAt <= config.cfBudgetStaleMs;
+  return {
+    configured, capGb: config.cfTurnBudgetGb, since: budgetWindowStart(),
+    usedGb: budget.readAt ? budget.bytes / GB : null,
+    readAgoMin: budget.readAt ? Math.round((Date.now() - budget.readAt) / 60000) : null,
+    on: !!(config.cfAccountId && config.cfAnalyticsToken && fresh && budget.bytes < config.cfTurnBudgetGb * GB),
+  };
+}
+
 let cfCache = { servers: null, expiresAt: 0 };
 
 async function cloudflareIceServers(){
@@ -660,6 +675,7 @@ io.on("connection", socket => {
       ? `${type(payload.local)}/${type(payload.remote)}` : "none";
     const ms = Number.isFinite(+payload.ms) ? Math.round(+payload.ms) : -1;
     log(`net ${mode} ${result} ${pair} ${ms}ms`);
+    stats?.recordNet(mode, result, payload.local === "relay" || payload.remote === "relay");
   });
 
   /* Asked for once per lobby visit, before the first peer is built. Costs a

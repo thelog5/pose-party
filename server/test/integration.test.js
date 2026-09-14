@@ -698,6 +698,19 @@ try {
   ok(tw?.modes.ai?.got === 1 && tw?.modes.party?.played === 1, "totals split by mode");
   ok(!JSON.stringify(snap).includes("127.0.0.1") && !JSON.stringify(snap).includes("::1"),
     "no IP address is stored with the stats");
+
+  /* video links: the clients' own net:report, counted by mode and path */
+  const N = connect(URL, { transports: ["websocket"] });
+  await once(N, "connect");
+  N.emit("net:report", { mode: "1v1", result: "connected", local: "srflx", remote: "host", ms: 400 });
+  N.emit("net:report", { mode: "1v1", result: "connected", local: "relay", remote: "srflx", ms: 900 });
+  N.emit("net:report", { mode: "party", result: "failed", ms: 15000 });
+  await sleep(200);
+  N.disconnect();
+  const netSnap = await (await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "application/json" } })).json();
+  ok(netSnap.net?.["1v1"]?.connected === 2 && netSnap.net["1v1"].relayed === 1 && netSnap.net.party?.failed === 1,
+    "video links are counted: direct, through the relay, and failed");
+  ok(netSnap.relay && netSnap.relay.configured === false, "with no TURN configured, the page says the relay is not set up");
   const html = await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "text/html" } });
   ok(html.status === 200 && (await html.text()).includes("<table>"), "the totals page renders for a browser");
   for (const page of ["/privacy", "/terms"]) {
