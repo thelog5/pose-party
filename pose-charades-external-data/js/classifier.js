@@ -357,9 +357,10 @@ export function classify(v, m){
   return classifyDetailed(v, m, { reject:false }).scores;
 }
 
-/* Closed-set voting is retained for deck comparisons. Live recognition also
-   requires a nearby example and separation from the closest competing word.
-   Scores are vote shares, never probabilities that an arbitrary action is known. */
+/* Scores are vote shares, never probabilities that an arbitrary action is known.
+   LIVE PLAY DOES NOT REJECT (since 2026-09-14): engine.js passes reject:false,
+   so the AI always names its best guess and never shows UNSURE. `accepted`
+   and REJECTION below remain as a diagnostic for pose-deck-eval. */
 /* minSimilarity was .55 before the distance block. The new space has more
    dimensions, so the same number rejected less: 49 wrong guesses and 151 of
    558 unseen actions, against 56 and 172 before. At .66 it rejects 57 and 183

@@ -316,7 +316,7 @@ console.log(best === SHIPPED ? "  no other weighting beats the shipped model" :
   `  ${best} beats the shipped model: ${sign(acc(best, "clean") - acc(SHIPPED, "clean"))} clean` +
   (QUICK ? "" : `, ${sign(acc(best, "jitter") - acc(SHIPPED, "jitter"))} jitter`));
 
-console.log("\nLIVE REJECTION  (same held-out windows, before smoothing/charge; weighting table above is closed-set)");
+console.log("\nREJECTION  (diagnostic only: live play does not reject since 2026-09-14)");
 for(const kind of QUICK ? ['clean'] : ['clean','jitter']){
   const r=live[kind];
   console.log(`  ${kind}: ${r.accepted} accepted, ${r.right} correct accepted, `+

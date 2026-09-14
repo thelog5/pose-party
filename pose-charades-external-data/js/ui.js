@@ -69,8 +69,10 @@ export const fmtTime = (ms, { compact=false }={}) => {
 export const fmtScore = n => (n|0).toLocaleString("en-US");
 
 /* ---------------- guess rendering ---------------- */
+/* Empty when there is no guess (no body in shot): renderGuesses then leaves
+   every paper on its last guess rather than writing UNSURE over it. */
 export const topGuesses = (n=5) => state.poseInput.accepted
-  ? Object.entries(state.smooth).sort((a,b)=>b[1]-a[1]).slice(0,n) : [["unsure",0]];
+  ? Object.entries(state.smooth).sort((a,b)=>b[1]-a[1]).slice(0,n) : [];
 
 const displayName = lab => lab==="idle" ? "just standing" : lab;
 

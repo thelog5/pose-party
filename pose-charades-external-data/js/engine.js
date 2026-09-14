@@ -404,8 +404,9 @@ const needsLegs = label => !!label && !!state.model?.legLabels?.includes(label);
 
 function classifyLive(now){
   const input=state.poseInput;
+  /* No body, or not enough of one: there is nothing to guess, so the papers
+     keep their last guess. They never say UNSURE. */
   if(!input.tracking || input.frames.length<MIN_POSE_SAMPLES){
-    if(state.game?.mode==="ai") setModelOutput("unsure",0);
     renderGuesses();
     return;
   }
@@ -413,19 +414,24 @@ function classifyLive(now){
   input.predictedSampleAt=input.sampleAt;
   const jointMask=windowJointMask(input);
   input.predictionMask=jointMask;
+  /* THE AI ALWAYS COMMITS TO ITS BEST GUESS (reject:false). It used to drop
+     any window that was not close enough to a training example and show
+     UNSURE, which in a guessing game means the guesser is not playing. The
+     charge rule still decides what scores: the raw guess AND the smoothed top
+     guess must both be the word, held over time. */
   const result=jointMask.filter(Boolean).length>=9
-    ? classifyDetailed(features(input.frames), state.model, {jointMask})
+    ? classifyDetailed(features(input.frames), state.model, {jointMask, reject:false})
     : {scores:{},accepted:false,label:null,confidence:0};
   const scores=result.scores;
   input.predictionAt=now;
-  input.accepted=result.accepted;
+  input.accepted=!!result.label;
   input.predictionLabel=result.label;
   input.predictionNeedsLegs=needsLegs(result.label);
   for(const lab of state.model.labels) state.smooth[lab]=0.65*(state.smooth[lab]||0)+0.35*(scores[lab]||0);
   /* solo: RAW top guess funnels through setModelOutput every inference
      frame — soloRound.js owns all smoothing/debounce from there */
-  if(state.game?.mode==="ai"){
-    setModelOutput(result.label || "unsure", result.confidence);
+  if(state.game?.mode==="ai" && result.label){
+    setModelOutput(result.label, result.confidence);
   }
   renderGuesses();
   if(state.game) gameCheck();
