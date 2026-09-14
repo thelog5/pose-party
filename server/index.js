@@ -14,6 +14,7 @@ import crypto from "crypto";
 import express from "express";
 import helmet from "helmet";
 import { Server } from "socket.io";
+import proxyaddr from "proxy-addr";
 
 import { config } from "./config.js";
 import { createRoomStore } from "./rooms.js";
@@ -30,7 +31,7 @@ const app = express();
 /* Behind Render/Railway/Fly this makes `req.ip` the real client rather than
    the platform proxy. Off by default: an untrusted `X-Forwarded-For` is a
    free supply of rate-limit keys. See config.trustProxy. */
-if(config.trustProxy) app.set("trust proxy", 1);
+if(config.trustProxy) app.set("trust proxy", config.trustProxy);
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -98,12 +99,14 @@ if(gateOn){
       return res.status(401).type("html")
         .send(gatePage({ error: "That code is not right." }));
     }
-    /* `secure` would make the cookie undeliverable over plain http, which is
-       how this runs on a LAN and in the test suites. Everything real is
-       behind TLS, where the flag is set. */
+    /* `secure` follows the request that set it. An always-on flag would make
+       the cookie undeliverable over plain http, which is how this runs on a
+       LAN and in the test suites. Tying it to TRUST_PROXY left it OFF behind
+       a tunnel that does serve https. With trust proxy on, `req.secure`
+       reads the proxy's X-Forwarded-Proto. */
     res.cookie(COOKIE, makeTicket(gateSecret, config.accessTtlSec), {
       httpOnly: true, sameSite: "lax", maxAge: config.accessTtlSec * 1000,
-      secure: config.trustProxy,
+      secure: req.secure,
     });
     log(`gate: admitted ${req.ip}`);
     res.redirect(303, "/");
@@ -191,16 +194,15 @@ io.engine.on("connection_error", err => {
 });
 
 /* THE RATE BUCKETS ARE KEYED BY THIS, so it has to be the player and not the
-   platform proxy in front of them. `X-Forwarded-For` is client-writable, so
-   it is only read when the operator has said there IS a proxy. */
+   platform proxy in front of them. It is the SAME answer Express gives for
+   `req.ip`, from the same trust setting. It used to take the FIRST entry of
+   `X-Forwarded-For`, which is the one the CLIENT writes: a proxy appends the
+   address it saw, it does not replace the header. So every socket could
+   name its own rate-limit key, and the create and join limits did nothing.
+   `socket.request` is the handshake's own http request. */
 function clientIp(socket){
-  if(config.trustProxy){
-    const fwd = socket.handshake.headers["x-forwarded-for"];
-    if(typeof fwd === "string"){
-      const first = fwd.split(",")[0].trim();
-      if(first) return first;
-    }
-  }
+  if(config.trustProxy)
+    return proxyaddr(socket.request, app.get("trust proxy fn")) || "unknown";
   return socket.handshake.address || "unknown";
 }
 

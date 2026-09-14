@@ -5,6 +5,12 @@ const int = (v, d) => Number.isFinite(+v) ? +v : d;
 /* Same coercion, but the value is genuinely fractional (GB budgets). */
 const num = (v, d) => Number.isFinite(+v) && String(v).trim() !== "" ? +v : d;
 const bool = (v, d) => (v == null || v === "") ? d : /^(1|true|yes|on)$/i.test(String(v).trim());
+/* Express's own "trust proxy" value: false, 1 (one hop) or `loopback`. */
+const proxyTrust = v => {
+  const s = String(v ?? "").trim().toLowerCase();
+  if(s === "loopback") return "loopback";
+  return bool(s, false) ? 1 : false;
+};
 
 export const config = {
   port: int(process.env.PORT, 3000),
@@ -70,8 +76,12 @@ export const config = {
      The forwarded header is only trusted when this is on, because a client
      can write whatever it likes into `X-Forwarded-For`. Trusting it on a
      directly-exposed server would hand every abuser an unlimited supply of
-     fresh rate-limit keys. Off locally, on in production. */
-  trustProxy: bool(process.env.TRUST_PROXY, false),
+     fresh rate-limit keys. Off locally, on in production.
+     `true` trusts ONE hop (a platform proxy). `loopback` trusts the header
+     only when the connection comes from this machine: that is the right
+     value for a tunnel such as cloudflared on the same computer, because a
+     LAN client connecting to the port directly cannot then spoof it. */
+  trustProxy: proxyTrust(process.env.TRUST_PROXY),
 
   /* Static cache lifetime for `assets/`, in seconds. The art is the bulk of
      the payload (about 30 MB over 275 files) and it is stable between
