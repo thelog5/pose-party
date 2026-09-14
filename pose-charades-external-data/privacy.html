@@ -27,7 +27,6 @@
   .summary h2{ margin-top:0 }
   a{ color:var(--orange); font-weight:700 }
   nav{ display:flex; gap:18px; flex-wrap:wrap; margin-bottom:26px; font-weight:700 }
-  .todo{ background:#ffe9a8; padding:0 6px; border-radius:6px }
 </style>
 </head>
 <body>
@@ -50,7 +49,7 @@
 
   <h2>Who we are</h2>
   <p>Pose Party is a browser game run from Ontario, Canada. "We" and "us" mean the people who run Pose Party.
-  To contact us, email <span class="todo" id="contact">[contact email to be added]</span>.</p>
+  To contact us, email <a href="mailto:privacy@poseparty.ca">privacy@poseparty.ca</a>.</p>
 
   <h2>What stays on your device</h2>
   <ul>
@@ -87,6 +86,7 @@
 
   <h3>When the game loads</h3>
   <ul>
+    <li><strong>Cloudflare</strong> sits in front of our server for security and speed, so every request to poseparty.ca passes through it, and it sees your IP address. It keeps copies of the game's pictures near players, and it also forwards email sent to our privacy address.</li>
     <li><strong>Render</strong> hosts our game server. Like every web server, it sees your IP address and the pages you load, and it keeps server logs for a limited time. Our server writes your IP address into these logs when you load the game, connect, or type the access code, and the name you type and your room code when you create or join a room.</li>
     <li>Your browser also loads files from other companies: fonts from <strong>Google Fonts</strong>, the AI's code from <strong>jsDelivr</strong>, and the AI model files from <strong>Google Cloud Storage</strong>. In online games it also contacts a <strong>Google</strong> server that helps players connect, and possibly Cloudflare's relay. These companies see your IP address as part of these requests, and their own privacy policies apply.</li>
   </ul>
@@ -140,7 +140,7 @@
   <p>If we change what the game collects, we will update this page and the date at the top.</p>
 
   <h2>Contact</h2>
-  <p>Questions or requests: <span class="todo">[contact email to be added]</span>.</p>
+  <p>Questions or requests: <a href="mailto:privacy@poseparty.ca">privacy@poseparty.ca</a>.</p>
 
   <nav style="margin-top:40px"><a href="./">Back to the game</a><a href="terms.html">Terms of Use</a></nav>
 </main>
