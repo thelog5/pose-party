@@ -43,6 +43,7 @@ import {
 } from "./results.js";
 import { showHowToPlay } from "./howToPlay.js";
 import { markWordSeen, seenFor } from "./wordOrder.js";
+import { statsBegin } from "./wordStats.js";
 import { leaveLobby } from "./lobbyAlive.js";
 import { stampSeatAward, deliverSeatAward, clearSeatAward,
          setSeatAwardPoints, seatAwardIsUp,
@@ -867,6 +868,7 @@ function onRoundStart({roundId, word, roundNum, endsAt, suddenDeath=false}={}){
   game.roundId=roundId;
   game.word=String(word||"");
   markWordSeen(game.word);
+  statsBegin(game.word, "online");
   game.round=roundNum||game.round+1;
   game.claimed=false;
   game.holdSince=0;

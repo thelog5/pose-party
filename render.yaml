@@ -38,6 +38,11 @@ services:
       # later signs everyone out; they type the code again.
       - key: ACCESS_SECRET
         generateValue: true
+      # Turns on anonymous word stats, and is the password for /stats. Render
+      # makes a random value; copy it from the Environment tab into your local
+      # .env as STATS_TOKEN to run scripts/pull-stats.mjs.
+      - key: STATS_TOKEN
+        generateValue: true
       # TURN. All four are needed: the last two arm the spend cap, and
       # without them the relay stays off by design.
       - key: TURN_CF_KEY_ID

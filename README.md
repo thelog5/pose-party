@@ -91,6 +91,20 @@ Everything** in Cloudflare. New file names need nothing.
 With the CDN on, art files are served without the access code (Cloudflare
 sends its copies to anyone). The page and the match server still need it.
 
+## Word stats
+
+Anonymous per-word results from real players: how often each word is
+recognized, how long it takes, and what the AI guesses instead. On when the
+server has `STATS_TOKEN` (Render generates one).
+
+- Look: open `https://<your-app>/stats`. The password is `STATS_TOKEN`; any
+  user name works.
+- Keep: put `STATS_URL=https://<your-app>` and `STATS_TOKEN=...` in the root
+  `.env`, then run `node scripts/pull-stats.mjs`. It saves to `stats/`
+  (never committed) and prints every word, worst first.
+- The server keeps totals in memory only. **A restart starts over**, so pull
+  before you deploy. Pulling twice never counts anything twice.
+
 ## Privacy
 
 Video is WebRTC peer-to-peer (a full mesh in Party) and never recorded.
@@ -104,7 +118,9 @@ head tracking that places the 1v1 crown and the Party "GOT IT" sticker, which
 only ever runs on your own camera. During 1v1 and Party the server relays the
 current top guess label and confidence so opponents' papers can update; it also
 sees names, trained word labels, synchronized recognition timestamps, and
-opaque connection handshakes. Live guesses are not stored.
+opaque connection handshakes. Live guesses are not stored. With `STATS_TOKEN`
+set, it also keeps anonymous per-word totals (see Word stats), and never a
+single report.
 
 The player-facing versions are `privacy.html` and `terms.html` in the game
 folder, served at `/privacy` and `/terms` without the access code. **Keep them

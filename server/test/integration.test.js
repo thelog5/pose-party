@@ -33,6 +33,8 @@ const ENV = {
   BETWEEN_ROUNDS_MS: "150",
   RATE_JOIN: "50",
   RATE_CREATE: "10",
+  /* word stats on, so the report endpoint and the totals page are tested */
+  STATS_TOKEN: "stats-test-token",
 };
 
 let fails = 0;
@@ -668,7 +670,36 @@ try {
 
   for (const s of [A, B, C, E, F, G]) s.disconnect();
 
-  console.log("legal pages:");
+  console.log("word stats and legal pages:");
+  const deckRes = await fetch(`${URL}/assets/data/pose-charades-data.json`);
+  ok(deckRes.headers.get("x-word-stats") === "on", "the deck tells the client to send word reports");
+  const deckWords = [...new Set((await deckRes.json()).clips.map(c => c.label))];
+  const [w1, w2] = deckWords;
+  const report = body => fetch(`${URL}/stats/word`, { method: "POST",
+    headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  ok((await report({ word: w1, mode: "ai", result: "got", ms: 4200, peak: .91, wrong: null })).status === 204,
+    "a good report is accepted");
+  ok((await report({ word: w1, mode: "party", result: "miss", ms: null, peak: .3, wrong: w2 })).status === 204,
+    "a miss with its wrong guess is accepted");
+  ok((await report({ word: "not a deck word", mode: "ai", result: "got", ms: 1, peak: .5 })).status === 400,
+    "a word that is not in the deck is refused");
+  ok((await report({ word: w1, mode: "ai", result: "won", ms: 1, peak: .5 })).status === 400,
+    "an unknown result is refused");
+  ok((await report({ word: w1, mode: "ai", result: "miss", ms: null, peak: 7 })).status === 400,
+    "a peak outside 0..1 is refused");
+  const auth = t => ({ authorization: "Basic " + Buffer.from("x:" + t).toString("base64") });
+  ok((await fetch(`${URL}/stats`)).status === 401, "the totals page needs its password");
+  ok((await fetch(`${URL}/stats`, { headers: auth("wrong") })).status === 401, "a wrong stats password is refused");
+  const snap = await (await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "application/json" } })).json();
+  const tw = snap.words[w1];
+  ok(snap.bootId && snap.reports === 2, `the totals count only the good reports (${snap.reports})`);
+  ok(tw?.played === 2 && tw.got === 1 && tw.miss === 1 && tw.msN === 1 && tw.wrong[w2] === 1,
+    "per-word totals: played, got, missed, time and the wrong guess");
+  ok(tw?.modes.ai?.got === 1 && tw?.modes.party?.played === 1, "totals split by mode");
+  ok(!JSON.stringify(snap).includes("127.0.0.1") && !JSON.stringify(snap).includes("::1"),
+    "no IP address is stored with the stats");
+  const html = await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "text/html" } });
+  ok(html.status === 200 && (await html.text()).includes("<table>"), "the totals page renders for a browser");
   for (const page of ["/privacy", "/terms"]) {
     const res = await fetch(URL + page);
     ok(res.status === 200 && /<h1/.test(await res.text()), `${page} is served`);

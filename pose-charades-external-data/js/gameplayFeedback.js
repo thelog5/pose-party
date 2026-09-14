@@ -9,6 +9,7 @@
    awarded. Nothing here can score a word or acknowledge a network claim. */
 
 import { robotGot } from "./robot.js";
+import { statsGot } from "./wordStats.js";
 import { fitWrappedTextToBox } from "./textFit.js";
 
 export const GUESS_LABEL_DEBOUNCE_MS = 420;
@@ -93,6 +94,7 @@ export function restartFeedbackAnimation(node, className){
    through paintMatchSide), and party — so this is the one call that can fire
    his celebration exactly once per word without each of those paths having to
    remember to. The `.recognized` guard below is what makes it once. */
+const LOCAL_PAPERS = new Set(["spGuessTop", "myGuessTop", "pmMyTop"]);
 const GUESS_ROBOT = Object.freeze({
   spGuessTop:   "spRobot",
   myGuessTop:   "v1RobotYou",
@@ -108,6 +110,8 @@ export function markGuessRecognized(node, active=true){
       restartFeedbackAnimation(node, "recognized");
       const robot = GUESS_ROBOT[node.id];
       if(robot) robotGot(robot);
+      /* the LOCAL player's papers only: a rival's catch is not yours */
+      if(LOCAL_PAPERS.has(node.id)) statsGot();
     }
   }else{
     node.classList.remove("recognized");

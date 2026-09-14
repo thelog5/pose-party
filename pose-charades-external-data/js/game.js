@@ -38,6 +38,7 @@ import {
 } from "./gameplayFeedback.js";
 import { calculateFirstPoints } from "./scoring.js";
 import { freshOrder, wordsSeen, markWordSeen } from "./wordOrder.js";
+import { statsBegin, statsSkip } from "./wordStats.js";
 import { showHowToPlay, hideHowToPlay } from "./howToPlay.js";
 
 /* One second a step, matching the server-driven 1v1/Party countdown
@@ -245,6 +246,7 @@ function nextWord(){
   if(!game.deck.length) game.deck=shuffledDeck();
   game.word=game.deck.shift();
   markWordSeen(game.word);
+  statsBegin(game.word, game.mode);
   game.wordStart=performance.now();
   game.wordLimitMs=ai ? SOLO.wordMs : WORD_MS;
   game.wordEnd=game.wordStart+game.wordLimitMs;
@@ -289,6 +291,7 @@ function onSoloResolve({won, skip}){
   }else{
     game.streak=0;
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!skip});
+    if(skip) statsSkip();
   }
   updateHud();
 
@@ -375,6 +378,7 @@ function finishWord(winner, opts={}){
   }else{
     game.streak=0;
     game.results.push({word:game.word, ok:false, thought:game.bestWrong.lab, skipped:!!opts.skip});
+    if(opts.skip) statsSkip();
     if(opts.skip){
       /* Same delivery as Solo's, aimed at this mode's own score card. The
          value is already off `game.score` by the time we get here (missWord

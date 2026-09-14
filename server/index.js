@@ -6,6 +6,7 @@
    landmarks or training data. During a match, only the already-computed
    top guess label and confidence are relayed so the rival paper can update. */
 
+import fs from "fs";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
@@ -23,6 +24,7 @@ import { createLimiter } from "./ratelimit.js";
 import { cleanName, cleanLabels, cleanSeen, cleanCode, cleanSettings, isPlainObject, signalOk } from "./validate.js";
 import { COOKIE, makeTicket, ticketValid, readCookie, codeMatches } from "./accessgate.js";
 import { gatePage } from "./gatepage.js";
+import { createWordStats, statsPage } from "./wordstats.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GAME_DIR = path.join(__dirname, "..", "pose-charades-external-data");
@@ -86,6 +88,47 @@ for(const name of ["privacy", "terms"]){
   });
 }
 
+/* WORD STATS (wordstats.js). On only with STATS_TOKEN: without a way to read
+   them there is no reason to collect them. The totals page sits BEFORE the
+   gate with its own password (HTTP Basic, any user name), so a script on the
+   owner's computer can pull it without the players' access cookie. */
+function deckLabels(){
+  try{
+    const deck = JSON.parse(fs.readFileSync(path.join(GAME_DIR, "assets/data/pose-charades-data.json"), "utf8"));
+    return [...new Set(deck.clips.map(c => c.label))];
+  }catch(e){
+    console.warn("word stats: could not read the deck's words, so every report will be refused.", e.message);
+    return [];
+  }
+}
+const stats = config.statsToken ? createWordStats({ labels: deckLabels() }) : null;
+const statsAuthLimit = createLimiter({ tokens: 10, perMs: 60_000 });
+const reportLimit = createLimiter({ tokens: 120, perMs: 60_000 });
+setInterval(() => { statsAuthLimit.sweep(); reportLimit.sweep(); }, 60_000).unref();
+
+function basicPassword(header){
+  const m = /^Basic\s+(.+)$/i.exec(header || "");
+  if(!m) return "";
+  const pair = Buffer.from(m[1], "base64").toString("utf8");
+  const i = pair.indexOf(":");
+  return i < 0 ? "" : pair.slice(i + 1);
+}
+
+if(stats){
+  app.get("/stats", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if(!statsAuthLimit.allow(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a minute.");
+    const pass = basicPassword(req.headers.authorization);
+    if(!pass || !codeMatches(pass, config.statsToken))
+      return res.status(401).set("WWW-Authenticate", 'Basic realm="Pose Party stats"')
+        .type("text").send("The stats page needs the stats password.");
+    const snap = stats.snapshot({ online: { sockets: io.engine.clientsCount, rooms: store._rooms.size } });
+    if((req.headers.accept || "").includes("text/html")) return res.type("html").send(statsPage(snap));
+    res.json(snap);
+  });
+  setInterval(() => log(stats.summaryLine()), 60 * 60 * 1000).unref();
+}
+
 /* THE PRIVATE-BETA LOCK -----------------------------------------------------
    Sits AFTER /healthz, because the platform's health check must never need a
    password, and BEFORE express.static, because everything it protects is
@@ -136,6 +179,15 @@ if(gateOn){
   });
 }
 
+/* A word report. AFTER the gate, so only a player who got in can send one.
+   Nothing about the sender is kept; the IP is only a rate-limit key. */
+if(stats){
+  app.post("/stats/word", express.json({ limit: "1kb" }), (req, res) => {
+    if(!reportLimit.allow(req.ip)) return res.status(429).end();
+    res.status(stats.record(req.body).ok ? 204 : 400).end();
+  });
+}
+
 /* CACHE THE ART HARD, NEVER THE CODE. `assets/` is ~30 MB across 275 files
    and barely changes; served with the Express default (`max-age=0`) every
    one of them revalidates on every visit. Markup, JS and CSS are NOT
@@ -151,6 +203,8 @@ app.use(express.static(GAME_DIR, {
   setHeaders: (res, filePath) => {
     const rel = path.relative(GAME_DIR, filePath).split(path.sep);
     const isArt = rel[0] === "assets" && rel[1] !== "data";
+    /* tells the client to send word reports (js/wordStats.js) */
+    if(stats && rel[0] === "assets" && rel[1] === "data") res.set("X-Word-Stats", "on");
     res.set("Cache-Control", isArt
       ? `public, max-age=${config.staticMaxAge}`
       : "no-cache");

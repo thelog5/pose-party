@@ -176,6 +176,12 @@ export const config = {
   accessSecret: (process.env.ACCESS_SECRET || "").trim(),
   accessTtlSec: int(process.env.ACCESS_TTL_SEC, 30 * 24 * 60 * 60),
 
+  /* WORD STATS. Set it and the game collects anonymous per-word results;
+     /stats shows the totals to anyone who has this password (HTTP Basic,
+     any user name), and scripts/pull-stats.mjs downloads them. Unset, the
+     game sends no reports at all. */
+  statsToken: (process.env.STATS_TOKEN || "").trim(),
+
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),
   maxRooms: int(process.env.MAX_ROOMS, 500),

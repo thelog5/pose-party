@@ -20,6 +20,7 @@ import { gameCheck } from "./game.js";
 import { setModelOutput } from "./soloRound.js";
 import { notePresence, presence } from "./presence.js";
 import { setRobotFeetHidden } from "./robot.js";
+import { statsTick } from "./wordStats.js";
 import { requestCameraConsent, retryCameraConsent, closeCameraGate,
          hasCameraGate, setBootProgress, setBootReady,
          setBootFailed } from "./cameraGate.js";
@@ -429,6 +430,7 @@ function classifyLive(now){
   input.predictionLabel=result.label;
   input.predictionNeedsLegs=needsLegs(result.label);
   for(const lab of state.model.labels) state.smooth[lab]=0.65*(state.smooth[lab]||0)+0.35*(scores[lab]||0);
+  if(state.game?.word) statsTick(result.label, state.smooth[state.game.word]);
   /* solo: RAW top guess funnels through setModelOutput every inference
      frame — soloRound.js owns all smoothing/debounce from there */
   if(state.game?.mode==="ai" && result.label){

@@ -7,6 +7,7 @@ import { decodePoseDataset } from "./poseData.js";
 import { state } from "./state.js";
 import { toast, renderClasses } from "./ui.js";
 import { train } from "./training.js";
+import { setWordStatsEnabled } from "./wordStats.js";
 
 export function exportData(){
   const blob=new Blob([JSON.stringify(state.dataset)],{type:"application/json"});
@@ -40,6 +41,8 @@ export async function preloadBundledDataset(){
   try{
     const res=await fetch(BUNDLED_DATA_URL,{cache:"no-cache"});
     if(!res.ok) throw new Error("Missing training data file: "+BUNDLED_DATA_URL);
+    /* the game server says whether it collects word stats (wordStats.js) */
+    setWordStatsEnabled(res.headers.get("x-word-stats")==="on");
     mergeClips(await res.json());
     if(state.dataset.clips.length) train({silent:true});
     /* the preload is expected and uneventful — no toast for it */
