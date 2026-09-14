@@ -1342,7 +1342,7 @@ export function wireResults(){
    Opens either results layout without playing a match: your camera fills every
    seat and the carousels are seeded from your own feed. */
 export async function devResults(kind = "3v3"){
-  const WORDS = ["jumping jacks", "punching", "t-rex", "hula hoop", "guitar", "limbo"];
+  const WORDS = ["jumping jacks", "punching", "t-rex", "hula hoop", "guitar", "saluting"];
   const seed = async players => {
     const v = $("video");
     if(!v || !v.videoWidth) return;
