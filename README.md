@@ -91,6 +91,12 @@ Everything** in Cloudflare. New file names need nothing.
 With the CDN on, art files are served without the access code (Cloudflare
 sends its copies to anyone). The page and the match server still need it.
 
+## The owner's tools
+
+Players never see the settings gear (the way into Training, where takes are
+recorded), the sound buttons or the DEV bar. Open the site once as
+`https://<your-app>/?dev` to show them in that browser; `?dev=0` hides them.
+
 ## Word stats
 
 Anonymous per-word results from real players: how often each word is

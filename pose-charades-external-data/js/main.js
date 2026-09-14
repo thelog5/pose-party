@@ -156,6 +156,25 @@ function handleJoinLink(){
   tryEnter();
 }
 
+/* THE OWNER'S TOOLS ARE HIDDEN FROM PLAYERS. The Home gear (the only way into
+   Training), every sound button and the DEV bar show only with
+   body[data-dev] (screens.css). Open the site once with ?dev to turn it on
+   in that browser, ?dev=0 to turn it off. The E2E suites turn it on. */
+function applyDevMode(){
+  const KEY="posePartyDev";
+  try{
+    const q=new URLSearchParams(location.search).get("dev");
+    if(q!==null){
+      if(q==="0") localStorage.removeItem(KEY); else localStorage.setItem(KEY,"1");
+      const url=new URL(location.href); url.searchParams.delete("dev");
+      history.replaceState(null,"",url.pathname+url.search+url.hash);
+    }
+    if(localStorage.getItem(KEY)==="1") document.body.dataset.dev="1";
+    else delete document.body.dataset.dev;
+  }catch(e){ /* no storage: players' view */ }
+}
+
+applyDevMode();
 wireControls();
 buildStarterWords();
 renderClasses();

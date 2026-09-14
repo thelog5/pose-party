@@ -69,6 +69,8 @@ const readyUp = async page => {
 async function player(tag, name){
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
+  /* the owner's tools (gear, sound, DEV bar) are dev-only; the suites use them */
+  await page.evaluateOnNewDocument(() => { try{ localStorage.setItem("posePartyDev", "1"); }catch(e){} });
   await page.setViewport({ width: 1280, height: 720 });
   await page.setBypassCSP(true);
   page.on("console", m => { if (m.type() === "error") errors[tag].push(m.text()); });

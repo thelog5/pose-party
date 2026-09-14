@@ -18,6 +18,8 @@ const browser = await puppeteer.launch({
   args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--no-first-run"],
 });
 const page = await browser.newPage();
+/* the owner's tools (gear, sound, DEV bar) are dev-only; the suites use them */
+await page.evaluateOnNewDocument(() => { try{ localStorage.setItem("posePartyDev", "1"); }catch(e){} });
 /* Test at the reference 16:9 viewport — the screens letterbox to the design
    aspect ratio, so composition-detail probes (wave bleed, confetti layout)
    are only meaningful at the reference composition. Cross-viewport rendering
@@ -2960,6 +2962,9 @@ console.log("age check:");
 {
   const ag = await browser.newPage();
   await ag.setViewport({ width:1440, height:810 });
+  /* a PLAYER: same origin as the main page, so its dev flag is shared and
+     must go before this page boots (a ?dev in the URL still sets it again) */
+  await ag.evaluateOnNewDocument(() => { try{ localStorage.removeItem("posePartyDev"); }catch(e){} });
   const agErrors = [];
   ag.on("pageerror", e => agErrors.push(e.message));
   await ag.goto(APP, { waitUntil:"networkidle2", timeout:60000 });
@@ -2973,6 +2978,10 @@ console.log("age check:");
     screen:document.body.dataset.screen,
     stored:localStorage.getItem("posePartyOnlineAge") }));
 
+  const prod = await ag.evaluate(() => ({ dev:document.body.dataset.dev ?? null,
+    hidden:["#btnHomeGear","#btnHomeSound",".devbar"].map(sel => getComputedStyle(document.querySelector(sel)).display) }));
+  ok(prod.dev === null && prod.hidden.every(d => d === "none"),
+    `players see no settings gear, no sound button and no DEV bar (${prod.hidden.join(", ")})`);
   await ag.click("#modeVS"); await sleep(300);
   let v = await view();
   ok(v.open && v.view === "ask" && v.screen === "home", "1V1 asks when you were born before any lobby opens");
@@ -3020,6 +3029,12 @@ console.log("age check:");
   await ag.click("#agGo"); await sleep(900);
   v = await view();
   ok(!v.open && v.stored === "ok" && v.screen === "lobby", `an adult goes straight on into the 1V1 lobby (${JSON.stringify(v)})`);
+  await ag.goto(APP + "/?dev", { waitUntil:"networkidle2" });
+  const on = await ag.evaluate(() => ({ dev:document.body.dataset.dev, gear:getComputedStyle(document.getElementById("btnHomeGear")).display, url:location.search }));
+  ok(on.dev === "1" && on.gear !== "none" && on.url === "", "?dev brings the owner's tools back, and tidies the address bar");
+  await ag.goto(APP + "/?dev=0", { waitUntil:"networkidle2" });
+  ok(await ag.evaluate(() => document.body.dataset.dev === undefined &&
+    getComputedStyle(document.getElementById("btnHomeGear")).display === "none"), "?dev=0 hides them again");
   ok(agErrors.length === 0, `the age check raised no page errors (${agErrors.length})`);
   await ag.close();
 }

@@ -68,6 +68,8 @@ const readyUp = async page => {
 async function player(tag){
   const ctx = await browser.createBrowserContext();
   const page = await ctx.newPage();
+  /* the owner's tools (gear, sound, DEV bar) are dev-only; the suites use them */
+  await page.evaluateOnNewDocument(() => { try{ localStorage.setItem("posePartyDev", "1"); }catch(e){} });
   await page.setBypassCSP(true); // for the test's own evaluate() scripts only
   page.on("console", m => { if (m.type() === "error") errors[tag].push(m.text() + " @" + (m.location()?.url||"")); });
   page.on("response", r => { if (r.status() >= 400) errors[tag].push("HTTP " + r.status() + " " + r.url()); });

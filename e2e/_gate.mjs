@@ -17,7 +17,8 @@ export async function passCameraGate(page, timeout = 30000){
     }, { timeout, polling: 50 });
     await page.click("#cgEnable");
     /* a returning adult player: the online age check is answered */
-    await page.evaluate(() => { try{ localStorage.setItem("posePartyOnlineAge", "ok"); }catch(e){} });
+    await page.evaluate(() => { try{ localStorage.setItem("posePartyOnlineAge", "ok");
+      localStorage.setItem("posePartyDev", "1"); }catch(e){} document.body.dataset.dev = "1"; });
     return true;
   }catch(e){ return false; }
 }
