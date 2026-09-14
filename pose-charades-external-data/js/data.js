@@ -33,9 +33,12 @@ export function importData(file){
   r.readAsText(file);
 }
 
+/* `no-cache`, not `no-store`: the deck is megabytes and rarely changes. The
+   browser keeps its copy and asks the server each visit; an unchanged file
+   comes back as a 304 with no body. A new deck is still picked up at once. */
 export async function preloadBundledDataset(){
   try{
-    const res=await fetch(BUNDLED_DATA_URL,{cache:"no-store"});
+    const res=await fetch(BUNDLED_DATA_URL,{cache:"no-cache"});
     if(!res.ok) throw new Error("Missing training data file: "+BUNDLED_DATA_URL);
     mergeClips(await res.json());
     if(state.dataset.clips.length) train({silent:true});

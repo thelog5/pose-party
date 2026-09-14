@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { normalize } from '../pose-charades-external-data/js/pose.js';
-import { JOINTS } from '../pose-charades-external-data/js/constants.js';
+import { JOINTS, FRAME_POINTS } from '../pose-charades-external-data/js/constants.js';
 import { createPoseInput, assessPose, observePose, canRecognize, clipSegments,
   canonicalClip, POSE_SPACE, windowJointMask } from '../pose-charades-external-data/js/poseInput.js';
 import { createChargeMeter, advancePoseCharge } from '../pose-charades-external-data/js/recognition.js';
@@ -192,8 +192,14 @@ test('legacy deck round trips unchanged and malformed timing is rejected',()=>{
   const deck=JSON.parse(fs.readFileSync(new URL('../pose-charades-external-data/assets/data/pose-charades-data.json',import.meta.url)));
   const before=JSON.stringify(deck);
   const decoded=decodePoseDataset(deck);
-  assert.equal(decoded.length,87);
-  assert.deepEqual(decoded[0].frames,deck.clips[0].frames);
+  assert.equal(decoded.length,deck.clips.length);
+  /* The shipped deck is slimmed to the body joints (scripts/slim-pose-deck.mjs);
+     the loader pads the hand points back as zeros. */
+  const legacy=deck.clips.findIndex(c=>c.coordinateSpace==='legacy-image');
+  assert.ok(legacy>=0);
+  assert.deepEqual(decoded[legacy].frames.map(f=>f.slice(0,JOINTS.length)),
+    deck.clips[legacy].frames.map(f=>f.slice(0,JOINTS.length)));
+  assert.ok(decoded[legacy].frames.every(f=>f.length===FRAME_POINTS && f.slice(JOINTS.length).every(p=>p[0]===0&&p[1]===0)));
   assert.equal(JSON.stringify(deck),before);
   const c={...decoded[0],timestamps:decoded[0].frames.map(()=>0)};
   assert.throws(()=>decodePoseDataset({...deck,clips:[c]}),/timestamps/);
