@@ -21,7 +21,9 @@ services:
         value: "22"
       # Render terminates TLS in front of this process. Without this every
       # player looks like the platform proxy and they all share ONE bucket
-      # of RATE_CREATE rooms per minute.
+      # of RATE_CREATE rooms per minute. CHECK IT after the first deploy: the
+      # log line "page load from <ip>" must show YOUR public IP. If it shows
+      # a proxy address, raise this to 2 (a hop count), and no higher.
       - key: TRUST_PROXY
         value: "1"
       # Set to the real https origin once Render assigns it.
@@ -30,6 +32,12 @@ services:
       # The private-beta lock. Unset it to open the game to everyone.
       - key: ACCESS_CODE
         sync: false
+      # Signs the access cookie. Without it the CODE is the signing key, and
+      # a short code can be guessed offline from any cookie. Render makes a
+      # long random value once, when the service is created. Changing it
+      # later signs everyone out; they type the code again.
+      - key: ACCESS_SECRET
+        generateValue: true
       # TURN. All four are needed: the last two arm the spend cap, and
       # without them the relay stays off by design.
       - key: TURN_CF_KEY_ID

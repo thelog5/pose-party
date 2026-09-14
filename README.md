@@ -44,6 +44,7 @@ live in memory, so a second instance cannot see the first one's rooms.
    | key | value |
    | --- | --- |
    | `ACCESS_CODE` | the code players type to get in. Leave it empty to open the game to everyone. |
+   | `ACCESS_SECRET` | nothing to do: Render generates a long random value. It signs the access cookie, so the code cannot be guessed from a cookie. |
    | `CORS_ORIGINS` | optional. The game and the socket share one origin, so it works without it. |
    | `TURN_CF_KEY_ID`, `TURN_CF_API_TOKEN` | the Cloudflare TURN key. Copy from your local `.env`. |
    | `TURN_CF_ACCOUNT_ID`, `TURN_CF_ANALYTICS_TOKEN` | turn on the spend cap. Without them the relay stays off. |
@@ -52,6 +53,10 @@ live in memory, so a second instance cannot see the first one's rooms.
    takes about a minute to wake, and loses any open rooms.
 4. When the deploy is live, open `https://<your-app>.onrender.com/healthz`.
    It answers `{"ok":true,...}` without the access code.
+5. Check `TRUST_PROXY`: open the game once, then find the log line
+   `page load from <ip>`. It must be YOUR public IP (compare with
+   https://ifconfig.me). If it is a proxy address, set `TRUST_PROXY` to `2`.
+   A wrong value puts every player in one rate-limit bucket.
 
 A redeploy restarts the server and ends every room, so deploy when nobody is
 playing. Every push to the branch deploys again unless you turn off
