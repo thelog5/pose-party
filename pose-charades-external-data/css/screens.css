@@ -296,7 +296,7 @@ body[data-boot] .homestage
 .pp-circle svg{width:24px;height:24px}
 /* Privacy / Terms. Centred with left+width, never translate: homePieceIn
    animates `translate` and would shove it off centre while Home arrives. */
-.home-legal{position:absolute;left:45%;width:20%;bottom:1.6%;z-index:10;
+.home-legal{position:absolute;left:40%;width:20%;bottom:1.6%;z-index:10;
   display:flex;justify-content:center;gap:1.4em;
   font:700 clamp(10px,min(1vw,1.8vh),15px)/1 var(--f-label);letter-spacing:.03em}
 .home-legal a{color:rgba(255,247,230,.86);text-decoration:none;
