@@ -65,6 +65,10 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
 @keyframes swellC{0%,100%{transform:translateX(0) scaleY(1.01)}50%{transform:translateX(.8%) scaleY(1.025)}}
 .iv.conf:hover{transform:translateY(-7px) rotate(9deg) scale(1.1)}
 .iv.boat{animation:boatrock 3.2s ease-in-out infinite;transform-origin:50% 92%}
+/* the boat's LinkedIn link: its own box is empty (the img is absolute), so the
+   keyboard focus ring goes on the boat itself */
+.boat-link:focus-visible{outline:none}
+.boat-link:focus-visible > #homeBoat{outline:3px solid #fff;outline-offset:4px;border-radius:12px}
 @keyframes boatrock{0%,100%{transform:rotate(-4deg) translateY(0)}33%{transform:rotate(2deg) translateY(-9px)}66%{transform:rotate(4deg) translateY(-3px)}}
 
 /* The page's original confetti is permanent. These are extra scraps tucked
