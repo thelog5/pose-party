@@ -19,6 +19,10 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
+      # Express hides its debug output in production. (The server also has
+      # its own error handler, so a bad request never shows a stack trace.)
+      - key: NODE_ENV
+        value: production
       # Render terminates TLS in front of this process. Without this every
       # player looks like the platform proxy and they all share ONE bucket
       # of RATE_CREATE rooms per minute. CHECK IT after the first deploy: the

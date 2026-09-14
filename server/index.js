@@ -199,6 +199,10 @@ if(stats){
    does, and a CDN in front (Cloudflare) would otherwise keep the old deck
    at its edge for the whole max-age. no-cache still lets a browser or a CDN
    keep a copy; it only has to ask first, and an unchanged deck is a 304. */
+/* The game folder also holds notes and the training script (README.md,
+   train_model.py). The repo is private and the players need none of it. */
+app.use((req, res, next) => /\.(md|py)$/i.test(req.path) ? res.status(404).end() : next());
+
 app.use(express.static(GAME_DIR, {
   index: "index.html",
   setHeaders: (res, filePath) => {
@@ -211,6 +215,16 @@ app.use(express.static(GAME_DIR, {
       : "no-cache");
   },
 }));
+
+/* NO STACK TRACES TO THE PUBLIC. Without this, Express's own handler answers
+   a malformed request (bad JSON to /stats/word, say) with the error and this
+   server's file paths whenever NODE_ENV is not "production". Status only. */
+app.use((err, req, res, next) => {
+  const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  if(status >= 500) log(`error ${req.method} ${req.path}: ${err?.message || err}`);
+  if(res.headersSent) return next(err);
+  res.status(status).type("text").send(status === 413 ? "Too large." : status < 500 ? "Bad request." : "Something went wrong.");
+});
 
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
