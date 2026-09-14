@@ -221,8 +221,14 @@ const PROUD_MS =  900;   // ...then a thumbs-up before he goes back to work
 const MISS_MS  = 1250;
 const LINE_MS  = 1700;   // how long one bubble stays up
 const NUDGE_MS = 8500;   // silence before he pokes you
+const FEET_MS  = 3000;   // silence before he asks to see your legs
 
 const robots = new Map();
+
+/* engine.js sets this every frame: the word on the board needs the legs and
+   the player's are not in shot. Only an unmuted (local) rig reads it. */
+let feetHidden = false;
+export function setRobotFeetHidden(hidden){ feetHidden = !!hidden; }
 let preloaded = false;
 
 /* Every layer, warmed once. A mood change swaps the eye and mouth art, and
@@ -1109,6 +1115,10 @@ export function robotCharge(id, display, locked = false){
        down is a lie, and a bubble on every wobble is a strobe */
     if(climbing && (band === "read" || band === "close")) say(r, band);
     scheduleIdle(r);
+  }else if(band === "idle" && feetHidden && !r.mute && now - r.lastSaidAt > FEET_MS){
+    /* The meter cannot move on a leg word until he sees the legs. Say so,
+       sooner than a nudge, because it is the one fix the player can make. */
+    say(r, "feet");
   }else if(band === "idle" && now - r.lastSaidAt > NUDGE_MS){
     /* WHO IS THE METER AT ZERO BLAMING? Until this, always the player: eight
        and a half seconds of nothing and he said "ANY TIME NOW". But an empty

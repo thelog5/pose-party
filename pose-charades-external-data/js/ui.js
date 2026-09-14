@@ -23,9 +23,10 @@ export function showStatus(msg){
   const s=$("status");
   if(!msg){ s.style.display="none"; return; }
   s.style.display="flex"; s.textContent=msg;
-  /* the home screen has no camera preview, so boot problems must not hide
-     inside the invisible dock */
-  if(state.screen==="home" && msg!==showStatus._last && !/Loading/.test(msg)) toast(msg);
+  /* The box shows only on Training (components.css). Everywhere else a
+     problem is a paper toast; the loading line is not a problem, so it is
+     not toasted. */
+  if(state.screen!=="train" && msg!==showStatus._last && !/Loading/.test(msg)) toast(msg);
   showStatus._last=msg;
 }
 

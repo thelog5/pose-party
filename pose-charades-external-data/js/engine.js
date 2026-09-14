@@ -19,6 +19,7 @@ import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
 import { setModelOutput } from "./soloRound.js";
 import { notePresence, presence } from "./presence.js";
+import { setRobotFeetHidden } from "./robot.js";
 import { requestCameraConsent, retryCameraConsent, closeCameraGate,
          hasCameraGate, setBootProgress, setBootReady,
          setBootFailed } from "./cameraGate.js";
@@ -488,12 +489,18 @@ function loop(){
   }
   const guidance=poseQualityMessage(quality, needsLegs(state.recording?.label || state.game?.word),
     !!state.recording || state.screen==="train");
+  /* THE CAPTION BOX IS TRAINING ONLY. In a match it was a dark rounded box
+     under the paper HUD, behind the WORD card. Framing in play is MOVE BACK's
+     job (head or hips out of shot), and the one thing it cannot say, that a
+     leg word needs the legs, the robot says in his own paper bubble. */
   const hint=$("poseHint");
   if(hint){
-    const text=["solo","match","pmatch","train"].includes(state.screen) ? guidance : "";
+    const text=state.screen==="train" ? guidance : "";
     if(hint.textContent!==text) hint.textContent=text;
     hint.hidden=!text;
   }
+  setRobotFeetHidden(["solo","match","pmatch"].includes(state.screen) &&
+    needsLegs(state.game?.word) && !!quality?.torso && !quality.legs);
   if(state.recording){
     const r=state.recording;
     r.observed++;

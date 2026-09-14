@@ -21,6 +21,11 @@ export const ROBOT_DIALOGUE = Object.freeze({
      told in a game played with your whole body. */
   missing: ["HELLO? WHERE'D YOU GO?", "I LOST YOU!", "STEP BACK IN!",
             "I CAN'T SEE YOU…"],
+  /* This word is read from the legs, and he cannot see yours. The meter
+     waits for knees and ankles on these words, so this is the reason it is
+     not moving. It replaced a dark caption box under the paper HUD. */
+  feet:    ["SHOW ME YOUR FEET!", "I NEED YOUR LEGS!", "STEP BACK A BIT!",
+            "WHERE ARE YOUR FEET?"],
   /* You are moving, and he still has nothing. NOTHING in this list is a note
      on your performance: the meter being empty while you work is the model's
      failure, and a character who blames you for it is a character nobody

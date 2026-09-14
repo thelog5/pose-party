@@ -5,6 +5,11 @@
 .camdock video,.camdock canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 .camdock canvas{pointer-events:none}
 .camstatus{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;background:rgba(14,27,74,.93);color:#fff;font-weight:800;font-size:15px;line-height:1.5;padding:26px;z-index:7}
+/* A navy CSS box over the camera, under the paper HUD, on screens built
+   from torn paper. Training keeps it; everywhere else a problem arrives as
+   the paper toast (showStatus in ui.js). !important because showStatus
+   writes display inline, and the E2E probes read that inline value. */
+body:not([data-screen="train"]) .camstatus{display:none!important}
 
 .camcard{position:relative;background:var(--card);border:2.5px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-big);overflow:hidden}
 .camcard .slot{position:absolute;inset:0;border-radius:inherit}
