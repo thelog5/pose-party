@@ -2787,26 +2787,27 @@ console.log("boot gate:");
 /* ---- MOVE BACK ----
    Driven off presence(), so it is exercised by feeding notePresence synthetic
    landmark sets rather than by trying to stand too close to a fake camera. The
-   point of the assertions is the JUDGEMENT, not the paper: that a small room
-   with the hips low but in shot stays quiet, that a genuine crop speaks, and
-   that it stops on its own instead of pinning itself over a match somebody
-   cannot fix. */
+   point of the assertions is the JUDGEMENT, not the paper: the AI has to see
+   the head, the knees and both sides of the body, feet are never required,
+   and it stops on its own only once the whole body is clearly back in. */
 console.log("move back:");
 {
   const framing = await page.evaluate(async () => {
     const { notePresence, presence, resetPresence } =
       await import("/js/presence.js");
-    const body = ({ noseY, shY, hipY, span, kneeY = hipY + .30 }) => {
-      const lm = Array.from({ length: 33 }, () => ({ x:.5, y:.5, z:0, visibility:1 }));
-      lm[0]  = { x:.5, y:noseY, z:0, visibility:1 };
-      lm[7]  = { x:.5 - span*.18, y:noseY, z:0, visibility:1 };
-      lm[8]  = { x:.5 + span*.18, y:noseY, z:0, visibility:1 };
-      lm[11] = { x:.5 - span/2, y:shY, z:0, visibility:1 };
-      lm[12] = { x:.5 + span/2, y:shY, z:0, visibility:1 };
-      lm[23] = { x:.5 - span*.35, y:hipY, z:0, visibility:1 };
-      lm[24] = { x:.5 + span*.35, y:hipY, z:0, visibility:1 };
-      lm[25] = { x:.5 - span*.30, y:kneeY, z:0, visibility:1 };
-      lm[26] = { x:.5 + span*.30, y:kneeY, z:0, visibility:1 };
+    const body = ({ noseY, shY, hipY, span, kneeY = hipY + .30, ankleY = kneeY + .30, cx = .5 }) => {
+      const lm = Array.from({ length: 33 }, () => ({ x:cx, y:.5, z:0, visibility:1 }));
+      lm[0]  = { x:cx, y:noseY, z:0, visibility:1 };
+      lm[7]  = { x:cx - span*.18, y:noseY, z:0, visibility:1 };
+      lm[8]  = { x:cx + span*.18, y:noseY, z:0, visibility:1 };
+      lm[11] = { x:cx - span/2, y:shY, z:0, visibility:1 };
+      lm[12] = { x:cx + span/2, y:shY, z:0, visibility:1 };
+      lm[23] = { x:cx - span*.35, y:hipY, z:0, visibility:1 };
+      lm[24] = { x:cx + span*.35, y:hipY, z:0, visibility:1 };
+      lm[25] = { x:cx - span*.30, y:kneeY, z:0, visibility:1 };
+      lm[26] = { x:cx + span*.30, y:kneeY, z:0, visibility:1 };
+      lm[27] = { x:cx - span*.30, y:ankleY, z:0, visibility:1 };
+      lm[28] = { x:cx + span*.30, y:ankleY, z:0, visibility:1 };
       return lm;
     };
     const settle = cfg => { resetPresence();
@@ -2818,30 +2819,34 @@ console.log("move back:");
     const far = cfg => settle(cfg).farEnough;
     return {
       roomy:     read({ noseY:.12, shY:.28, hipY:.62,  span:.30 }),
-      smallRoom: read({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
-      onEdge:    read({ noseY:.05, shY:.22, hipY:1.00, span:.34 }),
+      noFeet:    read({ noseY:.10, shY:.26, hipY:.60,  span:.30, kneeY:.88, ankleY:1.25 }),
+      kneesOff:  read({ noseY:.06, shY:.22, hipY:.80,  span:.34, kneeY:1.06 }),
+      hipsLow:   read({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
       tooClose:  read({ noseY:.05, shY:.24, hipY:1.15, span:.40 }),
-      headOff:   read({ noseY:-.10, shY:.20, hipY:.90, span:.40 }),
-      farAway:   read({ noseY:.30, shY:.38, hipY:1.10, span:.13 }),
-      /* the clear rule: head in AND knees in */
+      headOff:   read({ noseY:-.06, shY:.20, hipY:.60, span:.30, kneeY:.85 }),
+      sideOff:   read({ noseY:.12, shY:.28, hipY:.62,  span:.30, cx:.93 }),
+      farAway:   read({ noseY:.30, shY:.38, hipY:.80,  span:.13, kneeY:1.10 }),
+      /* the clear rule: head, knees and both sides clearly in */
       backRoomy: far({ noseY:.12, shY:.28, hipY:.62,  span:.30 }),
-      hipsOnly:  far({ noseY:.06, shY:.22, hipY:.97,  span:.34 }),
-      kneesIn:   far({ noseY:.08, shY:.22, hipY:.70,  span:.32, kneeY:.98 }),
+      kneesIn:   far({ noseY:.08, shY:.22, hipY:.62,  span:.32, kneeY:.93 }),
+      kneesEdge: far({ noseY:.08, shY:.22, hipY:.68,  span:.32, kneeY:.98 }),
+      kneesEdgeUp: read({ noseY:.08, shY:.22, hipY:.68, span:.32, kneeY:.98 }),
       stillClose:far({ noseY:.05, shY:.24, hipY:1.15, span:.40 }),
     };
   });
-  ok(framing.tooClose && framing.headOff,
-    "a body cropped at the hips or the head is flagged");
-  ok(!framing.roomy && !framing.onEdge,
-    "hips ON the bottom edge are still in shot and stay quiet");
-  ok(!framing.smallRoom,
-    "a small room with the hips low but visible is never told to move back");
+  ok(framing.tooClose && framing.headOff && framing.hipsLow,
+    "a body cut off at the head or the hips is flagged");
+  ok(framing.kneesOff,
+    "knees below the bottom edge are flagged: the AI needs the knees");
+  ok(framing.sideOff, "a body half off the side of the picture is flagged");
+  ok(!framing.roomy && !framing.noFeet,
+    "a whole body is quiet, and the feet are never required");
   ok(!framing.farAway,
-    "a far-away hip misread cannot fire it (the shoulder-span gate)");
+    "a far-away misread cannot fire it (the shoulder-span gate)");
   ok(framing.backRoomy && framing.kneesIn,
-    "head and knees in the picture count as far enough back");
-  ok(!framing.hipsOnly && !framing.stillClose,
-    "hips back on the bottom edge are NOT far enough back to clear it");
+    "head and knees clearly in the picture count as far enough back");
+  ok(!framing.kneesEdge && !framing.kneesEdgeUp && !framing.stillClose,
+    "knees on the bottom edge neither raise it nor clear it (hysteresis)");
 
   const card = await page.evaluate(() => {
     const el = document.getElementById("moveBack");
@@ -2888,6 +2893,8 @@ console.log("move back:");
     r.walkedOut = up();
     state.screen = "home";
     updateMoveBack(crop, 65000); updateMoveBack(crop, 67000); r.home = up();
+    state.screen = "pmatch";
+    updateMoveBack(crop, 68000); updateMoveBack(crop, 69000); r.party = up();
     state.screen = was;
     card.classList.add("hidden");
     return r;
@@ -2901,6 +2908,7 @@ console.log("move back:");
     "it comes down 0.4s after they step back, not on the first good frame");
   ok(!timing.walkedOut, "nobody in shot is not somebody too close");
   ok(!timing.home, "never on Home, where nobody is being read");
+  ok(timing.party, "Party gets it too: every player is told to move back");
 }
 
 /* ---- photo pairs ----

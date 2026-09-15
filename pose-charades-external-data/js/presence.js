@@ -142,71 +142,101 @@ let mX = 0, mY = 0, mSpan = 0;
    runs per video frame in three modes and a fresh literal per read is exactly
    the kind of garbage a 30 Hz loop does not need. Read it, don't retain it. */
 /* ── FRAMING ──────────────────────────────────────────────────────────────
-   "Too close" is not a distance, it is a CROP. The only question worth asking
-   is whether enough of the player is in the picture for a pose to be readable
-   at all, and the answer is: their head and their hips both have to be in it.
-   Knees and ankles are NOT required. That is deliberate — plenty of people
-   play in a room where their feet will never be in shot, and a warning they
-   cannot act on is worse than no warning.
+   "Too close" is not a distance, it is a CROP. The question is whether the
+   whole body the AI reads is in the picture: the head, the hips, the KNEES,
+   and both sides of the body. Feet are the one part NOT required, because
+   plenty of rooms cannot fit them and a warning somebody cannot act on is
+   worse than no warning.
+
+   THIS USED TO ASK ONLY FOR THE HEAD AND THE HIPS, and the player said it was
+   not strict enough: in Party it never showed at all, because a phone on a
+   table sees the hips of somebody standing close and cuts them off at the
+   thigh. The AI reads the knees on every leg word, so a body cut off above
+   them is a body it cannot read. The knees are now required, and so are the
+   shoulders and hips not being off the side of the picture.
 
    Measured on the RAW landmark coordinates rather than on `visibility`,
    because MediaPipe extrapolates a landmark that has left the frame and marks
    it low-visibility for exactly that reason: gating on visibility would
    suppress the one signal we are looking for. An off-frame landmark reports a
-   coordinate outside 0..1, and that is what this reads.
-
-   The margin is generous on purpose. Hips at y = 1.0 are on the bottom edge
-   and still technically visible, so nothing fires until they are a clear 3%
-   past it. */
+   coordinate outside 0..1, and that is what this reads. */
 const CROP_MARGIN = .03;
-/* Below this shoulder span the player is far enough away that a hip reading
-   past the bottom edge is a tracker guess, not a person standing too close.
+/* Below this shoulder span the player is far enough away that a joint reading
+   past the edge is a tracker guess, not a person standing too close.
    SHOULDER_REF (.30) is normal playing distance, so this is well short of it
    and cannot fire on somebody across the room. */
 const CROP_MIN_SPAN = .20;
 /* ── AND TAKING IT DOWN IS STRICTER THAN PUTTING IT UP ─────────────────────
-   Hysteresis. The warning goes UP on a crop (head or hips out). It comes DOWN
-   only when the player is most of the way back: head in the picture AND the
-   knees in it too. The old rule took it down the moment the hips were back on
-   the bottom edge, which is still too close to read a pose, and the player
-   asked for it to be stricter. A small room is still safe: somebody whose
-   hips were never out never sees the warning at all, so they never have to
-   clear it. When the knees are not reported, the hips must sit this far up
-   the picture instead. */
-const KNEES_IN = 1.0;
+   Hysteresis, so the warning does not flicker at the edge. It goes UP when
+   the lower knee is off the bottom edge (y > KNEES_OUT), the nose is off the
+   top, or the shoulders or hips are off a side. It comes DOWN only when the
+   lower knee is clearly inside (y <= KNEES_IN), the nose is clearly below the
+   top edge (y >= HEAD_IN), and the shoulders and hips are inside both sides.
+   When the knees are not reported, the hips stand in for them. */
+const KNEES_OUT = 1.0;
+const KNEES_IN = .95;
+const HEAD_IN = .04;
+const HIPS_OUT_FALLBACK = .9;
 const HIPS_UP_FALLBACK = .85;
+const SIDE_POINTS = [11, 12, 23, 24];    // shoulders and hips
 
 const out = {
   x: 0, y: 0, scale: 0, energy: 0, seen: false, lostMs: 0, t: 0,
-  /* raw, this-frame: head or hips outside the picture. Deliberately NOT
-     debounced here — how long to wait before saying something, and how long to
-     keep saying it, are presentation decisions and only the consumer knows
-     them. Same reasoning as `seen`/`lostMs` above. */
+  /* raw, this-frame: part of the body the AI reads is out of the picture.
+     Deliberately NOT debounced here — how long to wait before saying
+     something, and how long to keep saying it, are presentation decisions and
+     only the consumer knows them. Same reasoning as `seen`/`lostMs` above. */
   cropped: false,
-  /* raw, this-frame: head AND knees in the picture (or far away). The
-     consumer takes a warning down only on this, never on `!cropped`. */
+  /* raw, this-frame: the whole body is clearly in the picture (or far away).
+     The consumer takes a warning down only on this, never on `!cropped`. */
   farEnough: true,
 };
 
-/* Head above the top edge, or hips below the bottom one. */
-function croppedNow(lm){
-  if(mSpan < CROP_MIN_SPAN) return false;
-  const nose = lm[0], hipL = lm[23], hipR = lm[24];
-  if(Number.isFinite(nose?.y) && nose.y < -CROP_MARGIN) return true;
-  if(!Number.isFinite(hipL?.y) || !Number.isFinite(hipR?.y)) return false;
-  return (hipL.y + hipR.y) / 2 > 1 + CROP_MARGIN;
+const finiteY = p => Number.isFinite(p?.y);
+/* the LOWER knee: a body is only in the picture if both knees are */
+function kneeY(lm){
+  const a = lm[25], b = lm[26];
+  if(!finiteY(a) || !finiteY(b)) return null;
+  return Math.max(a.y, b.y);
+}
+function hipY(lm){
+  const a = lm[23], b = lm[24];
+  if(!finiteY(a) || !finiteY(b)) return null;
+  return (a.y + b.y) / 2;
+}
+/* how far the shoulders and hips reach past the left or right edge */
+function sideOut(lm){
+  let worst = -Infinity;
+  for(const i of SIDE_POINTS){
+    const x = lm[i]?.x;
+    if(!Number.isFinite(x)) continue;
+    worst = Math.max(worst, -x, x - 1);
+  }
+  return worst;
 }
 
-/* Head in, and knees in. See the hysteresis note above. */
+/* Part of the body the AI reads is out of the picture. */
+function croppedNow(lm){
+  if(mSpan < CROP_MIN_SPAN) return false;
+  const nose = lm[0];
+  if(finiteY(nose) && nose.y < 0) return true;
+  if(sideOut(lm) > CROP_MARGIN) return true;
+  const knees = kneeY(lm);
+  if(knees !== null) return knees > KNEES_OUT;
+  const hips = hipY(lm);
+  return hips !== null && hips > HIPS_OUT_FALLBACK;
+}
+
+/* The whole body is clearly in. See the hysteresis note above. */
 function farEnoughNow(lm){
   if(mSpan < CROP_MIN_SPAN) return true;
-  const nose = lm[0], kneeL = lm[25], kneeR = lm[26], hipL = lm[23], hipR = lm[24];
-  if(Number.isFinite(nose?.y) && nose.y < 0) return false;
-  if(Number.isFinite(kneeL?.y) && Number.isFinite(kneeR?.y))
-    return (kneeL.y + kneeR.y) / 2 <= KNEES_IN;
-  if(Number.isFinite(hipL?.y) && Number.isFinite(hipR?.y))
-    return (hipL.y + hipR.y) / 2 <= HIPS_UP_FALLBACK;
-  return false;
+  const nose = lm[0];
+  if(finiteY(nose) && nose.y < HEAD_IN) return false;
+  if(sideOut(lm) > 0) return false;
+  const knees = kneeY(lm);
+  if(knees !== null) return knees <= KNEES_IN;
+  const hips = hipY(lm);
+  return hips !== null && hips <= HIPS_UP_FALLBACK;
 }
 
 /* ── FRAME-RATE INDEPENDENCE ──────────────────────────────────────────────

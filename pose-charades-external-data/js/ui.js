@@ -268,21 +268,19 @@ export function showTimesUp(){
    in, plus the screen-edge pulse that keeps running underneath it for as long
    as the phase lasts (overlays.css). */
 /* ── MOVE BACK ────────────────────────────────────────────────────────────
-   Driven off `presence().cropped` — head or hips outside the picture — with
-   all of the timing owned here, because each number is a decision about how to
-   talk to somebody, not about what the camera can see.
+   Driven off `presence().cropped` — head, knees or a side of the body outside
+   the picture — with all of the timing owned here, because each number is a
+   decision about how to talk to somebody, not about what the camera can see.
 
    IT STAYS UP FOR AS LONG AS THE PLAYER IS TOO CLOSE. It used to say its piece
    for 4.2s and then go quiet for 25s, so a player in a small room would not be
    nagged through a whole match. The player asked for the opposite, and it is
    their game: a warning that vanishes while you are still cropped reads as the
-   problem having gone away. The small-room case is handled by WHAT counts as
-   too close instead (head and hips only, feet never required — see
-   presence.js), not by hiding the message.
+   problem having gone away. Feet are never required (see presence.js), so a
+   small room can still clear it.
 
-   IT COMES DOWN ONLY WHEN THEY ARE MOST OF THE WAY BACK. Up on `cropped`
-   (head or hips out), down only on `farEnough` (head and KNEES in). Hips
-   back on the bottom edge used to be enough, and that is still too close.
+   IT COMES DOWN ONLY WHEN THE WHOLE BODY IS CLEARLY IN. Up on `cropped`,
+   down only on `farEnough` (head, knees and both sides clearly inside).
 
    Two short delays remain, and both are about flicker, not about nagging: a
    lean forward does not raise it, and one good frame does not drop it. */
