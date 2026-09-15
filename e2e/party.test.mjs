@@ -539,12 +539,42 @@ try {
     { timeout: 8000, polling: 100 });
   ok(true, "every other client sees that player go green too");
 
+  /* The TEAM BONUS is the points paper now, not a toast. It is up for well
+     under two seconds, so record it as it lands rather than polling. */
+  for (const p of [A, B]) await p.evaluate(() => {
+    window.__bonus = null;
+    const paper = document.getElementById("pmTeamAward");
+    const st = document.getElementById("pmStage").getBoundingClientRect();
+    new MutationObserver(() => {
+      if(window.__bonus || !paper.classList.contains("show")) return;
+      const r = paper.getBoundingClientRect();
+      const toast = document.getElementById("toast");
+      window.__bonus = {
+        title: paper.querySelector(".aw-got").textContent,
+        pts: paper.querySelector(".aw-pts").textContent,
+        cx: ((r.left + r.width / 2) - st.left) / st.width,
+        toast: !!toast?.classList.contains("show") &&
+          /finished|bonus/i.test(toast.textContent),
+      };
+    }).observe(paper, { attributes:true, attributeFilter:["class"] });
+  });
+
   // C completes blue -> +150 and a five-second chase for orange
   await recognize(C);
   await Promise.all([A, B, C, D].map(p =>
     p.waitForFunction(() => document.getElementById("pmStage").dataset.phase === "chase",
       { timeout: 10000, polling: 100 })));
   ok(true, "blue completing the team opened the final chase on every client");
+  const bonusA = await A.waitForFunction(() => window.__bonus, { timeout: 3000, polling: 25 })
+    .then(h => h.jsonValue(), () => null);
+  const bonusB = await B.waitForFunction(() => window.__bonus, { timeout: 3000, polling: 25 })
+    .then(h => h.jsonValue(), () => null);
+  ok(bonusA?.title === "TEAM BONUS!" && bonusA?.pts === "+150",
+    `the team bonus lands as the points paper (${bonusA?.title} ${bonusA?.pts})`);
+  ok(bonusA?.cx < .5 && bonusB?.cx < .5,
+    `it lands over the blue half on both teams' boards (${bonusA?.cx?.toFixed(2)}, ${bonusB?.cx?.toFixed(2)})`);
+  ok(bonusA && !bonusA.toast && bonusB && !bonusB.toast,
+    "no toast at the bottom edge says it a second time");
   ok(/FINAL CHASE/i.test(await txt(A, "#pmWordTimerLabel")) &&
     await A.evaluate(() => {
       const label=document.getElementById("pmWordTimerLabel");

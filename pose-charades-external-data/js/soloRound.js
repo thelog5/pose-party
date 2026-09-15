@@ -305,23 +305,35 @@ export function clearCelebrations(){
    is correct after a resize between words. */
 export const AWARD_ANCHOR = Object.freeze({ x: .26, y: .5 });
 
-function anchorAward(a, stage){
+function anchorAward(a, stage, anchor = AWARD_ANCHOR){
   const box = stage?.getBoundingClientRect();
   if(!box?.width){
     a.style.removeProperty("left");
     a.style.removeProperty("top");
     return;
   }
-  a.style.left = (box.left + box.width * AWARD_ANCHOR.x) + "px";
-  a.style.top = (box.top + box.height * AWARD_ANCHOR.y) + "px";
+  a.style.left = (box.left + box.width * anchor.x) + "px";
+  a.style.top = (box.top + box.height * anchor.y) + "px";
 }
 
+/* `anchor` and `title` let another mode put the same paper somewhere else
+   with its own first line: Party's TEAM BONUS lands over the team that
+   earned it. `width` is a fraction of the stage width, for a paper whose
+   CSS width does not follow the letterboxed stage. */
 export function deliverPointsAward({
-  awardId, pointsId, points = 0, toEl, onLand, stage,
+  awardId, pointsId, points = 0, toEl, onLand, stage, anchor, title, width,
 } = {}){
   const a = el(awardId);
   if(!a){ onLand?.(); return; }
-  anchorAward(a, stage);
+  anchorAward(a, stage, anchor);
+  if(width){
+    const box = stage?.getBoundingClientRect();
+    if(box?.width) a.style.width = (box.width * width) + "px";
+  }
+  if(title){
+    const head = a.querySelector(".aw-got");
+    if(head) head.textContent = title;
+  }
   const value = el(pointsId);
   if(value){
     value.textContent = "+" + (points || 0).toLocaleString("en-US");

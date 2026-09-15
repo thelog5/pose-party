@@ -24,7 +24,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { PARTY_CHASE_WINDOW_MS,
          calculatePartyPlayerPoints } from "./scoring.js";
-import { confettiFrom, greenFlash, redFlash } from "./soloRound.js";
+import { confettiFrom, greenFlash, redFlash, deliverPointsAward } from "./soloRound.js";
 import {
   RECOGNITION_FILL_MIN, RECOGNITION_FILL_MAX,
   createGuessHistory, resetGuessHistory, updateGuessHistory,
@@ -750,11 +750,43 @@ export function onPartyChase({ team, chaseEndsAt, bonus } = {}){
   fitGameplayText($("pmWordTimerLabel"));
   fitGameplayText($("pmWordTime"));
   const mine = team === myTeam();
-  ctx.toast(mine
-    ? "Your team finished! +" + bonus + " bonus"
-    : (team === "blue" ? "Blue" : "Orange") + " team finished! " +
-      Math.round(PARTY_CHASE_WINDOW_MS / 1000) + "s to land yours!");
   blip(mine ? [659, 880] : [330, 262]);
+  showTeamBonus(team, Number(bonus) || 0, mine);
+}
+
+/* THE TEAM BONUS IS THE POINTS PAPER, NOT A TOAST. It used to be a line of
+   text on the paper slip at the bottom edge ("Your team finished! +150
+   bonus"), which nobody mid-pose reads. It is now the same GOT IT paper
+   every catch uses, with TEAM BONUS! on it, landed over the half of the team
+   that earned it and thrown into that team's score card. The FINAL CHASE
+   clock and the edge pulse already tell the other team to hurry. */
+/* On the OUTER part of the team's half, above the GOT IT paper on the big
+   seat (which starts at 55% of the stage height) and clear of the centre
+   tiles (which start at 31.9% of the width, mirrored for orange). */
+const TEAM_AWARD_AT = { blue: { x: .185, y: .35 }, orange: { x: .815, y: .35 } };
+const TEAM_AWARD_WIDTH = .24;     // of the stage width
+
+function showTeamBonus(team, bonus, mine){
+  if(!bonus || !TEAM_AWARD_AT[team]) return;
+  const g = state.game;
+  const roundId = g?.roundId;
+  if(mine) confettiFrom($("pmWordCard"), TEAM_AWARD_AT[team]);
+  deliverPointsAward({
+    awardId: "pmTeamAward", pointsId: "pmTeamAwardPts", points: bonus,
+    title: "TEAM BONUS!", stage: stage(), anchor: TEAM_AWARD_AT[team],
+    width: TEAM_AWARD_WIDTH,
+    toEl: $(team === "orange" ? "pmScoreOrange" : "pmScoreBlue"),
+    onLand: () => {
+      blip([880]);
+      const live = state.game;
+      /* The word's result carries totals that already include the bonus.
+         Once it has arrived, that paint covers it and adding it here would
+         count it twice. */
+      if(!live || live.mode !== "party" || live.roundId !== roundId || scorePaintHeld) return;
+      paintedTeams[team] += bonus;
+      setTxt(team === "orange" ? "pmOrangeScore" : "pmBlueScore", fmtScore(paintedTeams[team]));
+    },
+  });
 }
 
 export function onPartyResult(payload){
@@ -1034,6 +1066,9 @@ function resetGuessPapers(){
 
 /* Never let the team total jump ahead of the paper that is carrying it. */
 let scorePaintHeld = false;
+/* the totals on the two cards right now, so the TEAM BONUS paper can add
+   itself on arrival */
+const paintedTeams = { blue: 0, orange: 0 };
 
 function applyScores(scores){
   if(!scores) return;
@@ -1042,8 +1077,10 @@ function applyScores(scores){
      paper, so releasing the hold has a current total to show. */
   if(g) g.scores = scores;
   if(scorePaintHeld) return;
+  paintedTeams.blue = scores.teams?.blue || 0;
+  paintedTeams.orange = scores.teams?.orange || 0;
   const prevB = $("pmBlueScore")?.textContent, prevO = $("pmOrangeScore")?.textContent;
-  const b = fmtScore(scores.teams?.blue || 0), o = fmtScore(scores.teams?.orange || 0);
+  const b = fmtScore(paintedTeams.blue), o = fmtScore(paintedTeams.orange);
   setTxt("pmBlueScore", b);
   setTxt("pmOrangeScore", o);
   if(prevB !== undefined && prevB !== b) bump("pmScoreBlue");
