@@ -252,37 +252,52 @@ let spectating = false;
 let spectateTimer = 0;
 let baseOrder = { blue: [], orange: [] };
 
-/* the team-mate most worth watching: still here, still hunting the word */
-function spectateTarget(){
+/* The team-mate most worth watching. First choice: one still hunting the
+   word. With `anyMate`, a team-mate who already has it is good enough, as
+   long as they are still in the room. */
+function spectateTarget(anyMate = false){
   const team = myTeam();
   for(const key of [team + "0", team + "1", team + "2"]){
     const id = seats.get(key);
     if(!id || id === ctx.myId) continue;
     const el = seatEl(key);
-    if(!el || el.classList.contains("got") || el.classList.contains("gone")) continue;
+    if(!el || el.classList.contains("gone")) continue;
+    if(!anyMate && el.classList.contains("got")) continue;
     return key;
   }
   return null;
 }
 
+/* ONCE THE BIG HALF IS HANDED OVER, IT STAYS HANDED OVER. It used to come
+   back to you the moment the team-mate you were watching got the word too,
+   so the player lost sight of the person they had just watched win. The
+   player asked for the opposite. Now:
+     · you get it          -> the half goes to a team-mate (one still
+                              hunting if there is one, else any team-mate)
+     · that team-mate gets -> it moves on to a team-mate still hunting, and
+       it too                 if there is none, it STAYS on them
+     · they leave the room -> another team-mate, and only with nobody left
+                              does it come back to you
+   The next word starts with you featured again (restoreTeamOrder). */
 function handOverFeaturedSeat(){
   const team = myTeam();
   const featured = team + "0";
   const showingMe = seats.get(featured) === ctx.myId;
-  /* Nothing to do if the big seat is already showing somebody who is still
-     going — which is the case every time a spectated team-mate gets it and
-     the next one is promoted in their place. */
-  if(!showingMe){
+  let target;
+  if(showingMe){
+    target = spectateTarget() || spectateTarget(true);
+  }else{
     const cur = seatEl(featured);
-    if(!cur?.classList.contains("got") && !cur?.classList.contains("gone")) return;
+    const gone = !!cur?.classList.contains("gone");
+    /* still hunting: they are exactly who is worth watching */
+    if(!gone && !cur?.classList.contains("got")) return;
+    target = spectateTarget() || (gone ? spectateTarget(true) : null);
+    if(!target){
+      if(gone) restoreMyFeaturedSeat();
+      return;                    // they got it and nobody else is left: stay
+    }
   }
-  const target = spectateTarget();
-  if(!target || target === featured){
-    /* nobody left worth watching — a half-screen of your own frozen pose
-       still beats a half-screen of somebody else's */
-    if(!showingMe) restoreMyFeaturedSeat();
-    return;
-  }
+  if(!target || target === featured) return;
   swapSeats(featured, target);
   spectating = seats.get(featured) !== ctx.myId;
 }
@@ -303,9 +318,9 @@ function scheduleSpectate(roundId, delayMs){
   else run();
 }
 
-/* Put me back on my own half, mid-word, when there is suddenly nobody left
-   worth watching. One swap: the rest of the team stays where the player has
-   been looking at them. */
+/* Put me back on my own half, mid-word, when every team-mate has left the
+   room. One swap: the rest of the team stays where the player has been
+   looking at them. */
 function restoreMyFeaturedSeat(){
   clearTimeout(spectateTimer);
   spectateTimer = 0;
@@ -451,10 +466,7 @@ export function markPartyPlayerGone(pid){
      paper for the rest of the match. Promote the next one still seated. */
   /* Spectating someone who has just walked out is the one case where the big
      half is worth LESS than your own feed. Re-pick, or take it back. */
-  if(spectating){
-    if(spectateTarget()) handOverFeaturedSeat();
-    else restoreMyFeaturedSeat();
-  }
+  if(spectating) handOverFeaturedSeat();
   if(pid === foeFeaturedId){
     const foeTeam = myTeam() === "blue" ? "orange" : "blue";
     foeFeaturedId = [...seats]
