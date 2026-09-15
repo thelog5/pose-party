@@ -9,6 +9,7 @@
 import puppeteer from "puppeteer-core";
 import { mkdir } from "node:fs/promises";
 import { passCameraGate } from "./_gate.mjs";
+import { installVisionFixture } from "./vision-fixture.mjs";
 
 const APP = process.env.APP_URL || "http://localhost:3199";
 const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -129,6 +130,42 @@ if (!ONLY || ONLY === "party") {
   await sleep(1500);
   await shoot(A, "match-party");
 
+  /* A catch: the green seat, the stamped paper and the handover. */
+  await installVisionFixture(A);
+  await A.evaluate(async () => {
+    const { partyCheck } = await import("/js/partyMatch.js");
+    const { state } = await import("/js/state.js");
+    clearInterval(window.__rec);
+    window.__rec = setInterval(() => { const w = state.game?.word; if (!w) return;
+      window.__visionTick(w); state.smooth[w] = .95; partyCheck(w, .95); }, 70);
+  });
+  await A.waitForFunction(() => document.querySelector("#pmStage [data-seat].mine.got"), { timeout: 15000 });
+  await A.evaluate(() => clearInterval(window.__rec));
+  await sleep(1600);
+  await shoot(A, "match-party-got");
+
+  /* The TEAM BONUS paper and MOVE BACK, laid out at every size. The bonus
+     is fired on the spot at each size, because it is only up for ~1.2s. */
+  for (const [w, h] of VIEWPORTS) {
+    await A.setViewport({ width: w, height: h, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true });
+    await sleep(600);
+    await A.evaluate(async () => {
+      const { deliverPointsAward } = await import("/js/soloRound.js");
+      deliverPointsAward({ awardId: "pmTeamAward", pointsId: "pmTeamAwardPts", points: 150,
+        title: "TEAM BONUS!", stage: document.getElementById("pmStage"),
+        anchor: { x: .185, y: .35 }, width: .24,
+        toEl: document.getElementById("pmScoreBlue") });
+    });
+    await sleep(520);
+    await A.screenshot({ path: `${OUT}/${w}x${h}-match-party-bonus.png` });
+    const o = await A.evaluate(sideways);
+    console.log(`  ${w}x${h}-match-party-bonus: ${o.length ? o.join(" | ") : "clean"}`);
+    await sleep(900);
+    await A.evaluate(() => document.getElementById("moveBack").classList.remove("hidden"));
+    await sleep(500);
+    await A.screenshot({ path: `${OUT}/${w}x${h}-match-party-moveback.png` });
+    await A.evaluate(() => document.getElementById("moveBack").classList.add("hidden"));
+  }
   for (const p of ps) await p.ctx.close();
 }
 
