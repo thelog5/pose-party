@@ -97,6 +97,7 @@ export function startPartyMatch(bridge, payload){
   })));
 
   layoutSeats();
+  startVideoWatch();
   scorePaintHeld = false;
   applyScores(payload.scores);
   stage().dataset.phase = "waiting";
@@ -197,6 +198,7 @@ function layoutSeats(){
   const biggest = Math.max(perTeam.blue.length, perTeam.orange.length);
   stage().dataset.size = biggest >= 3 ? "3" : "2";
 
+  pruneRemoteVideos(new Set(roster.players.map(p => p.id)));
   for(const key of ["blue0", "blue1", "blue2", "orange0", "orange1", "orange2"]){
     const el = seatEl(key);
     if(!el) continue;
@@ -206,8 +208,10 @@ function layoutSeats(){
     setSeatOwner(el, pid);
     resetSeatCrown(el);
     clearSeatAward(el);
-    if(pid) mountSeatVideo(el, pid);
+    setSeatVideo(el, pid);
   }
+  for(const key of ["blue0", "blue1", "blue2", "orange0", "orange1", "orange2"])
+    pruneSeatVideo(seatEl(key), seats.get(key));
 }
 
 /* Whose seat this is, in the two places it shows: the `mine` hook every rule
@@ -376,8 +380,13 @@ function swapSeats(keyA, keyB){
   swapSeatAwards(a, b);
   setSeatOwner(a, idB);
   setSeatOwner(b, idA);
+  /* Both feeds move first and only then is each slot cleared, so a player's
+     <video> goes straight from one seat into the other and is never out of
+     the page in between. */
   setSeatVideo(a, idB);
   setSeatVideo(b, idA);
+  pruneSeatVideo(a, idB);
+  pruneSeatVideo(b, idA);
   a.classList.toggle("vacant", !idB && a.classList.contains("pm-tile"));
   b.classList.toggle("vacant", !idA && b.classList.contains("pm-tile"));
   /* the swapped-in feed arrives at a new size — let it read as a move */
@@ -388,26 +397,29 @@ function swapSeats(keyA, keyB){
   }
 }
 
-/* Like mountSeatVideo, but it also EMPTIES the seat of whatever was there.
-   mountSeatVideo only ever added: the local camera dock moving into a tile
-   would sit on top of that tile's old remote <video>, which keeps painting. */
+/* Put this player's feed in the seat. It MOVES the player's own <video>
+   rather than making a new one, so the feed never restarts. pruneSeatVideo
+   then takes out whatever else the slot still holds. */
 function setSeatVideo(el, pid){
+  const slot = el?.querySelector(".slot");
+  if(!slot || !pid) return;
+  mountSeatVideo(el, pid);
+}
+
+/* Take out every feed in the slot that is not this player's. The local
+   camera dock is parked on <body> rather than left inside a seat somebody
+   else owns; a remote <video> that no seat holds any more is stopped. */
+function pruneSeatVideo(el, pid){
   const slot = el?.querySelector(".slot");
   if(!slot) return;
   const dock = $("cameraDock");
-  if(pid === ctx.myId){
-    for(const v of [...slot.querySelectorAll("video")])
-      if(!dock || !dock.contains(v)) { v.pause?.(); v.srcObject = null; v.remove(); }
-    mountCamera(slot);
-    return;
+  if(pid !== ctx.myId && dock && slot.contains(dock)) document.body.appendChild(dock);
+  const keep = pid && pid !== ctx.myId ? remoteVideos.get(pid) : null;
+  for(const v of [...slot.querySelectorAll(":scope > video")]){
+    if(v === keep) continue;
+    v.remove();
+    if(![...remoteVideos.values()].includes(v)){ v.pause?.(); v.srcObject = null; }
   }
-  /* park the dock rather than orphaning it inside a seat somebody else owns */
-  if(dock && slot.contains(dock)) document.body.appendChild(dock);
-  if(!pid){
-    for(const v of [...slot.querySelectorAll("video")]){ v.pause?.(); v.srcObject = null; v.remove(); }
-    return;
-  }
-  mountSeatVideo(el, pid);
 }
 
 /* The crown is the FIRST-place mark, not a "you were recognised" sticker —
@@ -435,14 +447,132 @@ function mountSeatVideo(el, pid){
   const slot = el.querySelector(".slot");
   if(!slot) return;
   if(pid === ctx.myId){ mountCamera(slot); return; }
-  let v = slot.querySelector("video");
-  if(!v){
-    v = document.createElement("video");
-    v.autoplay = true; v.playsInline = true; v.muted = true;
-    slot.appendChild(v);
+  const v = videoFor(pid);
+  if(v.parentElement !== slot) slot.appendChild(v);
+  attachStream(v, ctx.peers.get(pid)?.stream);
+}
+
+/* ---------------- remote feeds ----------------
+   A TEAM-MATE'S FEED WENT BLACK OR FROZE ON ONE SCREEN ONLY. Everyone else
+   could see them, so their camera and their upload were fine; the fault was
+   on the screen that watched them. Three causes, and one fix for each:
+
+   · Every handover of the big half made a NEW <video> for the team-mate and
+     threw the old one away. A new element shows nothing until the next key
+     frame arrives, and on some phones that is a long black gap. So each
+     remote player now has ONE <video> for the whole match, and a handover
+     moves it (`remoteVideos`).
+   · Nothing noticed a feed that had stopped. The watchdog below checks every
+     second that each seat video still shows new frames. If one has shown
+     none for VIDEO_STALL_MS, it attaches the stream again, which makes the
+     browser start a new decoder and ask the sender for a key frame. If that
+     does not help either, it asks the link itself to reconnect (webrtc.js,
+     `restart`).
+   · A phone can refuse `play()` without a tap (iOS Low Power Mode does). The
+     feed then stays black for good. Now the next tap anywhere plays it. */
+const VIDEO_CHECK_MS = 1000;
+const VIDEO_STALL_MS = 3000;
+const VIDEO_RETRY_MS = 4000;
+const remoteVideos = new Map();   // playerId -> their one <video>
+let videoWatch = 0;
+
+function videoFor(pid){
+  let v = remoteVideos.get(pid);
+  if(v) return v;
+  v = document.createElement("video");
+  v.autoplay = true; v.playsInline = true; v.muted = true;
+  v.dataset.pid = pid;
+  v._frameAt = performance.now();
+  /* the only exact "a new frame was shown" signal; the watchdog falls back
+     to the decoded-frame count where it is missing */
+  if(typeof v.requestVideoFrameCallback === "function"){
+    const onFrame = () => { v._frameAt = performance.now(); v.requestVideoFrameCallback(onFrame); };
+    v.requestVideoFrameCallback(onFrame);
   }
-  const stream = ctx.peers.get(pid)?.stream;
-  if(stream && v.srcObject !== stream){ v.srcObject = stream; v.play().catch(() => {}); }
+  remoteVideos.set(pid, v);
+  return v;
+}
+
+function attachStream(v, stream){
+  if(!v || !stream) return;
+  if(v.srcObject !== stream){
+    v.srcObject = stream;
+    v._frameAt = performance.now();
+  }
+  playVideo(v);
+}
+
+let tapReplayArmed = false;
+function playVideo(v){
+  v.play?.()?.catch(() => {
+    if(tapReplayArmed) return;
+    tapReplayArmed = true;
+    const replay = () => {
+      tapReplayArmed = false;
+      removeEventListener("pointerdown", replay, true);
+      removeEventListener("keydown", replay, true);
+      for(const video of remoteVideos.values())
+        if(video.srcObject && video.paused) video.play().catch(() => {});
+    };
+    addEventListener("pointerdown", replay, true);
+    addEventListener("keydown", replay, true);
+  });
+}
+
+function frameCount(v){
+  const q = v.getVideoPlaybackQuality?.();
+  return q ? q.totalVideoFrames : null;
+}
+
+function checkRemoteVideos(){
+  if(!ctx || document.hidden) return;
+  const now = performance.now();
+  for(const [pid, v] of remoteVideos){
+    const key = seatOf(pid);
+    const seat = key && seatEl(key);
+    const entry = ctx.peers.get(pid);
+    const stream = entry?.stream;
+    if(!seat || !v.isConnected || !stream || seat.classList.contains("gone")) continue;
+    if(!stream.getVideoTracks().some(t => t.readyState === "live")) continue;
+    if(v.srcObject !== stream){ attachStream(v, stream); continue; }
+    if(v.paused){ playVideo(v); continue; }
+    if(typeof v.requestVideoFrameCallback !== "function"){
+      const n = frameCount(v);
+      if(n === null) continue;
+      if(n !== v._frames){ v._frames = n; v._frameAt = now; }
+    }
+    if(now - v._frameAt < VIDEO_STALL_MS){ v._kicks = 0; continue; }
+    if(now - (v._kickAt || 0) < VIDEO_RETRY_MS) continue;
+    v._kickAt = now;
+    v._kicks = (v._kicks || 0) + 1;
+    v.srcObject = null;
+    v.srcObject = stream;
+    v._frameAt = now;
+    playVideo(v);
+    /* once per frozen spell: a sender that is simply not sending (a phone
+       with the game in the background) must not cost a restart every few
+       seconds, and the server rate-limits signaling */
+    if(v._kicks === 2) entry.peer?.restart?.();
+  }
+}
+
+function startVideoWatch(){
+  clearInterval(videoWatch);
+  videoWatch = setInterval(checkRemoteVideos, VIDEO_CHECK_MS);
+}
+
+function stopVideoWatch(){
+  clearInterval(videoWatch);
+  videoWatch = 0;
+}
+
+/* Players who are no longer in the roster lose their <video>. */
+function pruneRemoteVideos(ids){
+  for(const [pid, v] of remoteVideos){
+    if(ids.has(pid)) continue;
+    v.pause?.(); v.srcObject = null; v.remove();
+    remoteVideos.delete(pid);
+  }
 }
 
 /* Somebody walked out mid-round. Their tile kept the last frame they sent,
@@ -479,11 +609,13 @@ export function markPartyPlayerGone(pid){
 
 /* party.js calls this when a mesh stream lands after the match began */
 export function attachPartyStream(pid, stream){
+  if(state.game?.mode !== "party") return;
   const key = seatOf(pid);
-  if(!key) return;
-  const slot = seatEl(key)?.querySelector(".slot");
-  const v = slot?.querySelector("video");
-  if(v){ v.srcObject = stream; v.play().catch(() => {}); }
+  if(!key || pid === ctx?.myId) return;
+  const el = seatEl(key);
+  if(!el || el.classList.contains("gone")) return;
+  mountSeatVideo(el, pid);
+  attachStream(remoteVideos.get(pid), stream);
 }
 
 const myTeam = () =>
@@ -945,6 +1077,7 @@ function endPartyMatch(payload){
   spectateTimer = 0;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   $("countdown")?.classList.add("hidden");
+  releaseSeatVideos();
 
   const teams = payload?.scores?.teams || { blue: 0, orange: 0 };
   const mine = myTeam();
@@ -1002,5 +1135,14 @@ export function wirePartyMatch(){
       if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
       state.game = null;
     }
+    if(inGame(from) && !inGame(to)) releaseSeatVideos();
   });
+}
+
+/* Off the board, the seat videos give their streams up: Results shows the
+   same people from its own <video>s, and ONE element per stream at a time is
+   the safe number on a phone. A rematch attaches them again (layoutSeats). */
+function releaseSeatVideos(){
+  stopVideoWatch();
+  for(const v of remoteVideos.values()){ v.pause?.(); v.srcObject = null; }
 }

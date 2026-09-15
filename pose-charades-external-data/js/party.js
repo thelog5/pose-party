@@ -73,7 +73,25 @@ export function wireParty(){
       value === "word-won" || value === "results";
     if(inPartyFlow(from) && !inPartyFlow(to) && (roster || from === "party"))
       leaveParty();
+    /* The lobby's tiles give their streams up while the match holds them, so
+       each stream plays in one <video> at a time (see partyMatch.js). */
+    if(from === "party" && to !== "party") setTileStreams(false);
+    if(to === "party" && from !== "party") setTileStreams(true);
   });
+}
+
+function setTileStreams(on){
+  for(const ids of Object.values(TILES)) for(const id of ids){
+    const tile = $(id);
+    const pid = tile?.dataset.pid;
+    if(!pid || pid === myId) continue;
+    const v = tile.querySelector(":scope > video");
+    if(!v) continue;
+    const stream = on ? peers.get(pid)?.stream || null : null;
+    if(v.srcObject !== stream) v.srcObject = stream;
+    if(stream) v.play().catch(() => {});
+    else v.pause?.();
+  }
 }
 
 function resetPartyUi(){
@@ -579,7 +597,7 @@ function syncPeers(){
         if(tile){
           tile.querySelector(".pt-empty")?.remove();
           const v = tile.querySelector("video");
-          if(v){ v.srcObject = stream; v.play().catch(() => {}); }
+          if(v && gameState() === "party"){ v.srcObject = stream; v.play().catch(() => {}); }
         }
       },
     });

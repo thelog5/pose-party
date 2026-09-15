@@ -10,6 +10,8 @@ import puppeteer from "puppeteer-core";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { mkdir } from "node:fs/promises";
+import { passCameraGate } from "./_gate.mjs";
+import { installVisionFixture } from "./vision-fixture.mjs";
 
 const PORT = 3477;
 const APP = `http://localhost:${PORT}`;
@@ -56,11 +58,12 @@ async function player(tag, name) {
   page.on("pageerror", e => errors[tag].push("PAGEERROR: " + e.message));
   await page.evaluateOnNewDocument(n => localStorage.setItem("poseCharadesName", n), name);
   await page.goto(APP, { waitUntil: "networkidle2", timeout: 60000 });
-  await page.waitForFunction(() => !document.getElementById("camGate").classList.contains("hidden"),
-    { timeout: 30000, polling: 50 });
-  await page.click("#cgEnable");
+  await passCameraGate(page);
   await page.waitForFunction(() => document.getElementById("status").style.display === "none",
     { timeout: 60000, polling: 400 });
+  /* the charge rule wants a fresh raw guess too, so recognition is injected
+     through the same fixture party.test.mjs uses */
+  await installVisionFixture(page);
   return page;
 }
 const txt = (p, sel) => p.evaluate(s => document.querySelector(s)?.textContent ?? null, sel);
@@ -152,13 +155,25 @@ try {
     `the YOU chip is meaningfully bigger (${before.seats[mineKey].tagW}px vs ${before.seats[mateKey].tagW}px)`);
   await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-before.png` });
 
+  /* Mark the team-mate's <video> so the handover can prove it MOVED the
+     element rather than making a new one (a new one starts black). */
+  await A.evaluate(k => {
+    const v = document.querySelector(`#pmStage [data-seat="${k}"] .slot > video`);
+    if (v) v.__probeMark = true;
+    const f = document.getElementById("pmFlash");
+    window.__flash = false;
+    new MutationObserver(() => {
+      if (f.classList.contains("fire") && !f.classList.contains("miss")) window.__flash = true;
+    }).observe(f, { attributes: true, attributeFilter: ["class"] });
+  }, mateKey);
+
   /* ---- recognize A ---- */
   await A.evaluate(`(async () => {
     const { partyCheck } = await import('${APP}/js/partyMatch.js');
     const { state } = await import('${APP}/js/state.js');
     const w = state.game.word;
     clearInterval(window.__rec);
-    window.__rec = setInterval(() => { state.smooth[w] = .95; partyCheck(w, .95); }, 70);
+    window.__rec = setInterval(() => { window.__visionTick(w); state.smooth[w] = .95; partyCheck(w, .95); }, 70);
   })()`);
   await A.waitForFunction(() => document.querySelector('#pmStage [data-seat].mine.got'),
     { timeout: 10000, polling: 60 });
@@ -172,9 +187,14 @@ try {
   const sameWord = async () => await A.evaluate(
     `(async () => (await import('${APP}/js/state.js')).state.game?.roundId)()`) === wordId;
 
-  /* the paper is stamped on the big half first — capture it there */
-  await sleep(420);
+  /* the flash is on at full strength for ~0.5s: shoot it inside that */
+  await A.waitForFunction(() => window.__flash, { timeout: 2000, polling: 25 }).catch(() => {});
+  ok(await A.evaluate(() => window.__flash), "your own catch fires the whole-stage green flash");
+  /* the paper is stamped on the big half first — capture it there, before
+     the slow screenshot can run into the 1.1s handover */
+  await sleep(200);
   const stamped = await board();
+  await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-flash.png` });
   ok(await sameWord(), "the stamp is read inside the word that earned it");
   await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-stamped.png` });
 
@@ -209,6 +229,83 @@ try {
   ok(movedAward?.seat === nowMine,
     `A's award paper followed them to ${nowMine} (paper says ${movedAward?.seat})`);
   await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-spectating.png` });
+
+  const feed = await A.evaluate(async () => {
+    const v = document.querySelector('#pmStage [data-seat="blue0"] .slot > video');
+    if (!v) return null;
+    const count = () => v.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+    const a = count();
+    await new Promise(r => setTimeout(r, 700));
+    return { same: !!v.__probeMark, frames: count() - a, paused: v.paused,
+             videos: document.querySelectorAll('#pmStage [data-seat="blue0"] .slot > video').length };
+  });
+  ok(feed?.same, "the handover MOVED the team-mate's own <video> (no new, black element)");
+  ok(feed && feed.frames > 3 && !feed.paused,
+    `the moved feed keeps showing new frames (${feed?.frames} in 0.7s)`);
+  ok(feed?.videos === 1, `the big half holds exactly one feed (${feed?.videos})`);
+
+  /* ---- the team-mate gets it too: the big half STAYS on them ---- */
+  const names = { A: "ALICE", B: "BOB", C: "CARA", D: "DAN" };
+  const mateTag = after.seats.blue0?.tag;
+  const matePage = [B, C, D].find((p, i) => names[["B", "C", "D"][i]] === mateTag);
+  await A.evaluate(() => {
+    window.__bonus = null;
+    const paper = document.getElementById("pmTeamAward");
+    const st = document.getElementById("pmStage").getBoundingClientRect();
+    new MutationObserver(() => {
+      if (window.__bonus || !paper.classList.contains("show")) return;
+      const r = paper.getBoundingClientRect();
+      window.__bonus = { title: paper.querySelector(".aw-got").textContent,
+        pts: paper.querySelector(".aw-pts").textContent,
+        L: (r.left - st.left) / st.width * 100, R: (r.right - st.left) / st.width * 100,
+        T: (r.top - st.top) / st.height * 100, B: (r.bottom - st.top) / st.height * 100 };
+    }).observe(paper, { attributes: true, attributeFilter: ["class"] });
+  });
+  ok(!!matePage, `found the team-mate's page (${mateTag})`);
+  if (matePage) {
+    await matePage.evaluate(`(async () => {
+      const { partyCheck } = await import('${APP}/js/partyMatch.js');
+      const { state } = await import('${APP}/js/state.js');
+      clearInterval(window.__rec);
+      window.__rec = setInterval(() => { const w = state.game?.word; if (!w) return;
+        window.__visionTick(w); state.smooth[w] = .95; partyCheck(w, .95); }, 70);
+    })()`);
+    await A.waitForFunction(() => document.querySelector('#pmStage [data-seat="blue0"].got'),
+      { timeout: 10000, polling: 60 });
+    await matePage.evaluate(() => clearInterval(window.__rec));
+    await A.waitForFunction(() => window.__bonus, { timeout: 3000, polling: 25 }).catch(() => {});
+    await sleep(250);
+    await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-team-bonus.png` });
+    await sleep(1200);
+    const stay = await board();
+    ok(await sameWord(), "the team-mate's catch is read inside the same word");
+    ok(stay.seats.blue0?.tag === mateTag && !stay.seats.blue0?.mine,
+      `after the team-mate gets it too, the big half STAYS on them (${stay.seats.blue0?.tag})`);
+    const bonus = await A.evaluate(() => window.__bonus);
+    ok(bonus?.title === "TEAM BONUS!" && bonus?.pts === "+150",
+      `the team bonus is the points paper (${bonus?.title} ${bonus?.pts})`);
+    if (bonus) console.log(`      bonus  L${bonus.L.toFixed(1)} T${bonus.T.toFixed(1)} R${bonus.R.toFixed(1)} B${bonus.B.toFixed(1)}`);
+    ok(bonus && bonus.R <= 50.5 && bonus.L >= 0,
+      "it lands inside the blue team's half");
+  }
+
+  /* the watchdog: a feed that loses its stream, or is paused, comes back */
+  const healed = await A.evaluate(async () => {
+    const v = document.querySelector('#pmStage [data-seat="blue0"] .slot > video');
+    const count = () => v.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
+    v.srcObject = null;
+    await new Promise(r => setTimeout(r, 1600));
+    const back = !!v.srcObject && !v.paused;
+    v.pause();
+    await new Promise(r => setTimeout(r, 2200));
+    const a = count();
+    await new Promise(r => setTimeout(r, 1000));
+    return { back, playing: !v.paused, frames: count() - a };
+  });
+  ok(healed.back, "a feed that lost its stream is attached again within ~1s");
+  ok(healed.playing && healed.frames > 3,
+    `a paused feed is played again and shows frames (${healed.frames} in 1s)`);
+
 
   /* ---- and it must not outlast the word ----
      Wait for a NEW roundId, not for `data-phase === "round"`: this word is
