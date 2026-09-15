@@ -502,8 +502,20 @@ try {
       teamBorder: getComputedStyle(seat.querySelector('.pm-border-team') || seat).opacity,
       greenBorder: getComputedStyle(seat.querySelector('.pm-border-got') || seat).opacity,
       confetti: !!document.querySelector(".burstwrap"),
+      /* the whole-stage green flash, as in Solo and 1v1 */
+      flash: document.getElementById('pmFlash').classList.contains('fire') &&
+        !document.getElementById('pmFlash').classList.contains('miss'),
+      /* and the seat itself stays tinted green for the rest of the word */
+      wash: (() => {
+        const [el, pseudo] = seat.classList.contains('pm-tile')
+          ? [seat.querySelector('.slot'), '::after'] : [seat, '::before'];
+        const cs = getComputedStyle(el, pseudo);
+        return cs.content !== 'none' && /rgba\\(63, 201, 140/.test(cs.backgroundColor);
+      })(),
     };
   })()`);
+  ok(hitFeedback.flash, "your own catch fires the whole-stage green flash");
+  ok(hitFeedback.wash, "a seat that got it is washed green, so it reads from across the room");
   ok(hitFeedback.award && hitFeedback.awardLabel === "POINTS!" &&
      /^\+\d/.test(hitFeedback.awardPts),
     `recognition shows one points paper, not a placement ("${hitFeedback.awardTitle} ${hitFeedback.awardPts} ${hitFeedback.awardLabel}")`);

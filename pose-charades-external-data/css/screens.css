@@ -1943,23 +1943,45 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
   filter:grayscale(1) brightness(.42);transition:filter .5s ease}
 .pm-tile.gone .pm-nametag,.pm-side.gone .pm-nametag{opacity:.45}
 
-/* --- recognition: the frame goes green and a sticker lands on the player --- */
+/* --- recognition: the frame goes green and a sticker lands on the player ---
+   A GOT SEAT HAS TO READ FROM ACROSS THE ROOM. A thin green frame and a
+   small paper were all it had, and on a phone at arm's length or a TV across
+   the room nobody could tell who was in. So the whole seat turns green: a
+   wash over the video that flashes bright on the catch and then stays as a
+   tint for the rest of the word, inside a thick green frame with a glow.
+   Colour is the one thing that reads at any distance. The wash is the same
+   green as the stage flash (`.sp-flash`), so the two read as one event. */
 .pm-tile.got .pm-border-team{opacity:0}
 .pm-tile.got .pm-border-got{opacity:1}
-.pm-tile.got{animation:pmseatgot .52s cubic-bezier(.18,1.55,.32,1)}
+.pm-tile.got{animation:pmseatgot .52s cubic-bezier(.18,1.55,.32,1);
+  filter:drop-shadow(0 0 min(.55dvw,.98dvh) rgba(63,201,140,.95))
+    drop-shadow(0 min(.3dvw,.53dvh) min(.36dvw,.64dvh) rgba(0,0,0,.38))}
 @keyframes pmseatgot{
   0%{scale:.96}
   52%{scale:1.075}
   100%{scale:1}
 }
+.pm-tile.got .slot::after,.pm-side.got::before{content:"";position:absolute;inset:0;
+  z-index:1;pointer-events:none;background:rgba(63,201,140,.26);
+  animation:pmgotwash 1.3s ease-out both}
+@keyframes pmgotwash{
+  0%{background:rgba(63,201,140,.72)}
+  35%{background:rgba(63,201,140,.6)}
+  100%{background:rgba(63,201,140,.26)}
+}
+.pm-tile.got .slot::after{
+  box-shadow:inset 0 0 min(2dvw,3.6dvh) min(.5dvw,.9dvh) rgba(63,201,140,.85)}
 .pm-side.got::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;
-  border:min(.72dvw,1.28dvh) solid #62b53c;
-  box-shadow:inset 0 0 min(2.4dvw,4.3dvh) rgba(98,181,60,.5);
+  border:min(1.25dvw,2.2dvh) solid #3fc98c;
+  box-shadow:inset 0 0 min(4dvw,7dvh) min(1dvw,1.8dvh) rgba(63,201,140,.75);
   animation:pmsidegot .48s cubic-bezier(.18,1.45,.32,1)}
 @keyframes pmsidegot{
   0%{opacity:0;scale:1.05}
   60%{opacity:1;scale:1}
   100%{opacity:1}
+}
+@media (prefers-reduced-motion:reduce){
+  .pm-tile.got .slot::after,.pm-side.got::before{animation:none}
 }
 
 .pm-nametag{position:absolute;z-index:3;container-type:inline-size;
