@@ -207,7 +207,7 @@ body[data-screen="home"] .wrap{max-width:none;padding:0}
    because MediaPipe's wasm and both model files are downloading behind it. */
 body[data-boot] .homestage
   :is(#logoHomeCraft,.fh.card,.fh.iv.tape,.fh.iv.conf,#homeBoat,#homeRobot,.fh.bubble,
-      .pp-corner){
+      .pp-corner,.home-legal){
   opacity:0;translate:0 2.4%;pointer-events:none}
 
 /* Releasing it. The cards and tapes already own an entrance; this is for the
@@ -302,7 +302,7 @@ body[data-boot] .homestage
    animates `translate` and would shove it off centre while Home arrives. */
 .home-legal{position:absolute;left:40%;width:20%;bottom:1.6%;z-index:10;
   display:flex;justify-content:center;gap:1.4em;
-  font:700 clamp(10px,min(1vw,1.8vh),15px)/1 var(--f-label);letter-spacing:.03em}
+  font:700 clamp(10px,min(1dvw,1.8dvh),15px)/1 var(--f-label);letter-spacing:.03em}
 .home-legal a{color:rgba(255,247,230,.86);text-decoration:none;
   transition:color .15s ease,transform .15s ease;display:inline-block}
 .home-legal a:hover,.home-legal a:focus-visible{color:#fff;text-decoration:underline;transform:translateY(-1px)}
@@ -448,6 +448,10 @@ body[data-boot] .homestage
 /* solo: camera + HUD share the letterboxed 16:9 stage so the HUD always
    aligns to the camera edges; navy fills any margin */
 body[data-screen="solo"] .wrap{max-width:none;padding:0}
+/* An iPhone in landscape keeps the page out of the notch and paints the BODY
+   colour in the strips beside it. On the three play screens that has to be
+   the navy of their letterbox, or two light bars frame the camera. */
+body:is([data-screen="solo"],[data-screen="match"],[data-screen="pmatch"]){background:#0e1b4a}
 #scrSolo{position:fixed;inset:0;overflow:hidden;display:grid;place-items:center;background:#0E1B4A}
 .solostage{position:relative;z-index:1;overflow:hidden;background:#0E1B4A;font-family:var(--f-lobby,'Baloo 2',sans-serif);
   width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
@@ -484,8 +488,8 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    body, above every stage. */
 .sp-flash{--fx:63,201,140;position:absolute;inset:0;z-index:8;pointer-events:none;opacity:0;
   background:rgba(var(--fx),.34);
-  box-shadow:inset 0 0 0 min(1.3vw,2.3vh) rgba(var(--fx),.95),
-    inset 0 0 min(14vw,25vh) min(4vw,7vh) rgba(var(--fx),.85)}
+  box-shadow:inset 0 0 0 min(1.3dvw,2.3dvh) rgba(var(--fx),.95),
+    inset 0 0 min(14dvw,25dvh) min(4dvw,7dvh) rgba(var(--fx),.85)}
 .sp-flash.miss{--fx:232,64,42}
 .sp-flash.fire{animation:spflash 1.15s ease-out}
 @keyframes spflash{0%{opacity:0}7%{opacity:1}45%{opacity:1}100%{opacity:0}}
@@ -498,7 +502,7 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    in Figma; the soft one here is what lifts it off the live camera. */
 .sp-card,.sp-guess,.sp-word,.sp-skip,.sp-award{container-type:inline-size}
 .sp-art,.gcard,.sp-word-bg{width:100%;display:block;
-  filter:drop-shadow(0 min(.292vw,.519vh) min(.167vw,.296vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.292dvw,.519dvh) min(.167dvw,.296dvh) rgba(0,0,0,.35))}
 
 .sp-card{position:absolute;z-index:4}
 .sp-card>span{position:absolute;left:0;width:100%;text-align:center;white-space:nowrap;overflow:hidden}
@@ -904,7 +908,7 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   right:calc(77.858% - var(--talk-x) + var(--talk-gap-x))}
 .grobot[data-side="left"] .rb-bubble img{scale:-1 1}
 .grobot .rb-bubble img{position:absolute;inset:0;width:100%;height:100%;
-  filter:drop-shadow(0 min(.24vw,.42vh) min(.3vw,.53vh) rgba(0,0,0,.28))}
+  filter:drop-shadow(0 min(.24dvw,.42dvh) min(.3dvw,.53dvh) rgba(0,0,0,.28))}
 /* The Figma component authors the horizontal copy region at x=146..1210
    inside 1356px (10.77% / 78.47%). Its browser box is deliberately taller
    than Figma's text node because dialogue is editable and may wrap to two
@@ -1005,9 +1009,9 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   width:100.517460%;height:104.297251%;max-width:none;
   display:block;object-fit:fill;pointer-events:none;filter:none}
 .sp-exit:hover:not([disabled]),.sp-exit:focus-visible{
-  opacity:1;translate:0 calc(-1 * min(.22vw,.39vh));scale:1.018;
+  opacity:1;translate:0 calc(-1 * min(.22dvw,.39dvh));scale:1.018;
   filter:brightness(1.035)}
-.sp-exit:focus-visible{outline:min(.208vw,.37vh) solid #fff;outline-offset:min(.208vw,.37vh)}
+.sp-exit:focus-visible{outline:min(.208dvw,.37dvh) solid #fff;outline-offset:min(.208dvw,.37dvh)}
 
 /* In-match volume. The header is hidden on every play screen, so each stage
    carries its own — sitting just under the LEAVE paper and wearing the same
@@ -1018,15 +1022,15 @@ body[data-screen="solo"] .camdock .brackets{display:none}
   display:flex;align-items:center;justify-content:center;
   background:var(--fig-cream);color:var(--fig-blue);
   border:none;border-radius:50%;padding:0;cursor:pointer;opacity:.14;
-  box-shadow:0 min(.28vw,.5vh) min(.55vw,.98vh) rgba(23,53,111,.35);
+  box-shadow:0 min(.28dvw,.5dvh) min(.55dvw,.98dvh) rgba(23,53,111,.35);
   transition:opacity .18s ease,translate .2s cubic-bezier(.2,1.2,.35,1),
     scale .2s cubic-bezier(.2,1.2,.35,1),filter .18s ease}
 .sp-sound svg{width:56%;height:56%;display:block;pointer-events:none}
 .sp-sound:hover,.sp-sound:focus-visible{
-  opacity:1;translate:0 calc(-1 * min(.22vw,.39vh));scale:1.06}
+  opacity:1;translate:0 calc(-1 * min(.22dvw,.39dvh));scale:1.06}
 .sp-sound:active{scale:.93;filter:brightness(.96)}
-.sp-sound:focus-visible{outline:min(.208vw,.37vh) solid #fff;
-  outline-offset:min(.208vw,.37vh)}
+.sp-sound:focus-visible{outline:min(.208dvw,.37dvh) solid #fff;
+  outline-offset:min(.208dvw,.37dvh)}
 /* muted is a state, not a hover — it stays legible so you can see why it is quiet */
 .sp-sound.muted{opacity:.62;background:#f4622e;color:#fff}
 .sp-sound.muted:hover,.sp-sound.muted:focus-visible{opacity:1}
@@ -1050,14 +1054,14 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    (soloRound.js), because the stage letterboxes and a flat viewport
    percentage lands outside the board entirely at 5:4. */
 .sp-award{position:fixed;left:26%;top:50%;transform:translate(-50%,-50%) scale(.6);z-index:95;
-  width:min(44vw,640px);pointer-events:none;opacity:0}
+  width:min(44dvw,640px);pointer-events:none;opacity:0}
 .sp-award::before{content:"";position:absolute;left:50%;top:50%;width:122%;aspect-ratio:1;
   translate:-50% -50%;z-index:-1;opacity:0;
   background:radial-gradient(circle,rgba(255,231,150,.85) 0 26%,
     rgba(255,205,64,.42) 44%,rgba(255,190,40,.14) 62%,transparent 72%);
-  filter:blur(min(.5vw,.9vh))}
+  filter:blur(min(.5dvw,.9dvh))}
 .sp-award .sp-art{aspect-ratio:2.098;
-  filter:drop-shadow(0 min(.7vw,1.24vh) min(.4vw,.71vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.7dvw,1.24dvh) min(.4dvw,.71dvh) rgba(0,0,0,.35))}
 .sp-award span{position:absolute;left:0;width:100%;text-align:center;translate:0 -50%;
   font-family:var(--f-lobby);font-weight:400;line-height:1;color:#1b7532;white-space:nowrap;
   text-shadow:.6cqw .6cqw 0 rgba(0,0,0,.18)}
@@ -1105,12 +1109,12 @@ body[data-screen="solo"] .camdock .brackets{display:none}
    instead, which is the same #e8402a every deadline in this game uses. */
 .sp-penalty{position:fixed;left:26%;top:50%;z-index:95;
   transform:translate(-50%,-50%);pointer-events:none;opacity:0;
-  width:min(30vw,420px);container-type:inline-size;text-align:center}
+  width:min(30dvw,420px);container-type:inline-size;text-align:center}
 .sp-penalty::before{content:"";position:absolute;left:50%;top:50%;
   width:150%;aspect-ratio:1;translate:-50% -50%;z-index:-1;opacity:0;
   background:radial-gradient(circle,rgba(232,64,42,.62) 0 24%,
     rgba(232,64,42,.30) 46%,rgba(232,64,42,.10) 64%,transparent 74%);
-  filter:blur(min(.6vw,1.06vh))}
+  filter:blur(min(.6dvw,1.06dvh))}
 .sp-penalty .pen-val{display:block;
   font-family:var(--f-lobby);font-weight:400;line-height:.94;
   font-size:34cqw;color:#e8402a;white-space:nowrap;
@@ -1173,7 +1177,7 @@ body[data-screen="lobby"] .wrap{max-width:none;padding:0}
 #scrLobby{position:fixed;inset:0;overflow:hidden;display:grid;place-items:end center;background:var(--fig-cream)}
 #scrLobby::before{content:"";position:absolute;inset:0;z-index:0;
   background:url(../assets/ui/figma/home-bg2.webp) center/cover}
-.lobbystage{--lb-lift:calc(-1 * min(.28vw,.5vh));position:relative;z-index:1;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby);
+.lobbystage{--lb-lift:calc(-1 * min(.28dvw,.5dvh));position:relative;z-index:1;overflow:hidden;background:var(--fig-cream);font-family:var(--f-lobby);
   width:min(100dvw, calc(100dvh * (var(--pp-ar))), var(--pp-maxw));
   aspect-ratio:var(--pp-ar)}
 @media (max-aspect-ratio: 1/1){ .lobbystage{width:100dvw} }
@@ -1184,16 +1188,16 @@ body[data-screen="lobby"] .wrap{max-width:none;padding:0}
 .lb.deco.lobby-tape{pointer-events:auto}
 .lb.passthru{pointer-events:none}
 #logoLobby{cursor:pointer}
-.fig-shadow-lg{filter:drop-shadow(0 min(.486vw,.864vh) min(.278vw,.494vh) rgba(0,0,0,.35))}
-.fig-shadow-sm{filter:drop-shadow(0 min(.174vw,.309vh) min(.104vw,.185vh) rgba(0,0,0,.35))}
-.fig-shadow-xs{filter:drop-shadow(0 min(.104vw,.185vh) min(.063vw,.111vh) rgba(0,0,0,.35))}
-.fig-shadow-card{filter:drop-shadow(0 min(.236vw,.42vh) min(.139vw,.247vh) rgba(0,0,0,.35))}
+.fig-shadow-lg{filter:drop-shadow(0 min(.486dvw,.864dvh) min(.278dvw,.494dvh) rgba(0,0,0,.35))}
+.fig-shadow-sm{filter:drop-shadow(0 min(.174dvw,.309dvh) min(.104dvw,.185dvh) rgba(0,0,0,.35))}
+.fig-shadow-xs{filter:drop-shadow(0 min(.104dvw,.185dvh) min(.063dvw,.111dvh) rgba(0,0,0,.35))}
+.fig-shadow-card{filter:drop-shadow(0 min(.236dvw,.42dvh) min(.139dvw,.247dvh) rgba(0,0,0,.35))}
 
 /* Paper pieces lift independently, while the two camera compositions move as
    complete stacks so their backgrounds, feeds, borders and labels stay glued. */
 .lobby-float,.lobby-tape{cursor:pointer;transition:translate .2s ease,scale .2s ease,rotate .2s ease,filter .2s ease}
-.lobby-float:hover,.lobby-float:focus-within{translate:0 var(--lb-lift);scale:1.012;filter:brightness(1.035) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
-.lobby-tape:hover{translate:0 var(--lb-lift);rotate:-3deg;scale:1.045;filter:brightness(1.04) drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(23,53,111,.25))}
+.lobby-float:hover,.lobby-float:focus-within{translate:0 var(--lb-lift);scale:1.012;filter:brightness(1.035) drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(23,53,111,.28))}
+.lobby-tape:hover{translate:0 var(--lb-lift);rotate:-3deg;scale:1.045;filter:brightness(1.04) drop-shadow(0 min(.28dvw,.5dvh) min(.2dvw,.36dvh) rgba(23,53,111,.25))}
 .lobby-react.lobby-bop{animation:lobbyBop .42s cubic-bezier(.2,1.55,.4,1)}
 @keyframes lobbyBop{0%{transform:scale(1)}45%{transform:scale(1.07) rotate(1.5deg)}100%{transform:scale(1)}}
 .lobby-you-layer,.lobby-rival-layer{transition:translate .2s ease,filter .2s ease}
@@ -1202,11 +1206,11 @@ body[data-screen="lobby"] .wrap{max-width:none;padding:0}
 .lobbystage:has(#lobbyRobotWait:hover) .lobby-rival-layer{translate:0 var(--lb-lift)}
 .lobbystage:has(#slotLobbyYou:hover) .lobby-you-layer.lobby-panel-art,
 .lobbystage:has(#slotLobbyRival:hover) .lobby-rival-layer.lobby-panel-art,
-.lobbystage:has(#lobbyRobotWait:hover) .lobby-rival-layer.lobby-panel-art{filter:brightness(1.035) drop-shadow(0 min(.28vw,.5vh) min(.2vw,.36vh) rgba(23,53,111,.24))}
+.lobbystage:has(#lobbyRobotWait:hover) .lobby-rival-layer.lobby-panel-art{filter:brightness(1.035) drop-shadow(0 min(.28dvw,.5dvh) min(.2dvw,.36dvh) rgba(23,53,111,.24))}
 
 /* buttons share one press/hover family */
 .pbtn{background:none;border:none;padding:0;cursor:pointer;transition:translate .16s ease, scale .16s ease, filter .16s ease}
-.pbtn:hover:not([disabled]){translate:0 var(--lb-lift);scale:1.02;filter:brightness(1.05) drop-shadow(0 min(.42vw,.74vh) min(.56vw,.99vh) rgba(23,53,111,.25))}
+.pbtn:hover:not([disabled]){translate:0 var(--lb-lift);scale:1.02;filter:brightness(1.05) drop-shadow(0 min(.42dvw,.74dvh) min(.56dvw,.99dvh) rgba(23,53,111,.25))}
 .pbtn:active:not([disabled]){translate:0 1px;scale:.97;filter:brightness(.97)}
 
 /* video sandwich: slot sits between panel art and torn-frame overlay */
@@ -1218,7 +1222,7 @@ body[data-screen="lobby"] .camdock .livebadge,
 body[data-screen="lobby"] .camdock .aipill,
 body[data-screen="lobby"] .camdock .brackets{display:none}
 .namechip{pointer-events:none}
-.namechip span{position:absolute;inset:8% 4% 20%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(2.25vw,4vh),100px);letter-spacing:.01em;text-shadow:min(.139vw,.247vh) min(.139vw,.247vh) 0 rgba(0,0,0,.5);text-transform:uppercase;overflow:hidden;white-space:nowrap}
+.namechip span{position:absolute;inset:8% 4% 20%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:min(2.25dvw,4dvh);letter-spacing:.01em;text-shadow:min(.139dvw,.247dvh) min(.139dvw,.247dvh) 0 rgba(0,0,0,.5);text-transform:uppercase;overflow:hidden;white-space:nowrap}
 .oppchip{display:none}
 
 /* ============ THE PAPER ROBOT RIG — shared by Home and the lobby ============
@@ -1294,7 +1298,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 /* The waiting robot's own box: the art rect, centred on the opponent panel.
    Hidden once someone joins. */
 .robotwait{pointer-events:none;container-type:inline-size;aspect-ratio:1087/1309}
-.waitbig{color:#FBF6EC;font-family:var(--f-lobby);font-weight:400;font-size:clamp(26px,min(3.47vw,6.17vh),160px);line-height:1.36;letter-spacing:.01em;text-align:left;text-shadow:min(.347vw,.617vh) min(.347vw,.617vh) 0 rgba(0,0,0,.5);pointer-events:none}
+.waitbig{color:#FBF6EC;font-family:var(--f-lobby);font-weight:400;font-size:min(3.47dvw,6.17dvh);line-height:1.36;letter-spacing:.01em;text-align:left;text-shadow:min(.347dvw,.617dvh) min(.347dvw,.617dvh) 0 rgba(0,0,0,.5);pointer-events:none}
 .waitbig i,.waitline i{font-style:normal}
 .lobbystage.joined .robotwait,.lobbystage.joined .waitbig{display:none}
 .lobbystage.joined .oppchip{display:block}
@@ -1317,8 +1321,8 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
     translate:0 0!important;scale:1!important;rotate:0deg!important;
     animation:none!important;transition:none!important}
 }
-.nametag .nt-label{position:absolute;left:7.2%;top:15.3%;color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(11px,min(1.12vw,1.99vh),52px);line-height:.91;letter-spacing:.01em}
-.nametag input{position:absolute;left:7.2%;top:48.5%;width:86.5%;background:none;border:none;border-bottom:min(.139vw,.247vh) solid rgba(0,42,141,.35);color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(1.79vw,3.18vh),84px);line-height:.57;letter-spacing:.01em;text-align:center;text-transform:uppercase;padding:0 20% min(.417vw,.741vh) 0}
+.nametag .nt-label{position:absolute;left:7.2%;top:15.3%;color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:min(1.12dvw,1.99dvh);line-height:.91;letter-spacing:.01em}
+.nametag input{position:absolute;left:7.2%;top:48.5%;width:86.5%;background:none;border:none;border-bottom:min(.139dvw,.247dvh) solid rgba(0,42,141,.35);color:#002a8d;font-family:var(--f-lobby);font-weight:400;font-size:min(1.79dvw,3.18dvh);line-height:.57;letter-spacing:.01em;text-align:center;text-transform:uppercase;padding:0 20% min(.417dvw,.741dvh) 0}
 .nametag input::placeholder{color:#90867d;font-size:.68em;text-transform:none;letter-spacing:.02em}
 .nametag input:focus{outline:none;border-bottom-color:#002a8d;background:rgba(255,255,255,.35)}
 .nametag .nt-pencil{position:absolute;left:74.5%;top:28%;width:19%;pointer-events:none}
@@ -1326,39 +1330,39 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 /* invite friend card */
 .invite .cardart{width:100%}
 .invite .inv-robot{position:absolute;left:1%;top:-9%;width:17%;pointer-events:none}
-.invite .inv-title{position:absolute;left:19%;top:7%;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(1.92vw,3.41vh),90px);letter-spacing:.01em;text-shadow:min(.16vw,.284vh) min(.16vw,.284vh) 0 rgba(0,0,0,.5)}
-.invite .inv-label{position:absolute;left:4%;color:#973f07;font-family:var(--f-lobby);font-weight:400;font-size:clamp(12px,min(1.28vw,2.28vh),60px);letter-spacing:.01em;text-shadow:0 min(.069vw,.123vh) min(.035vw,.062vh) rgba(0,0,0,.25)}
+.invite .inv-title{position:absolute;left:19%;top:7%;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:min(1.92dvw,3.41dvh);letter-spacing:.01em;text-shadow:min(.16dvw,.284dvh) min(.16dvw,.284dvh) 0 rgba(0,0,0,.5)}
+.invite .inv-label{position:absolute;left:4%;color:#973f07;font-family:var(--f-lobby);font-weight:400;font-size:min(1.28dvw,2.28dvh);letter-spacing:.01em;text-shadow:0 min(.069dvw,.123dvh) min(.035dvw,.062dvh) rgba(0,0,0,.25)}
 .invite .inv-box{position:absolute;left:38.5%;width:36%}
-.invite .inv-box,.invite .inv-btn img{filter:drop-shadow(0 min(.222vw,.395vh) min(.128vw,.228vh) rgba(0,0,0,.35))}
-.invite .inv-code{position:absolute;left:38.5%;top:34.5%;width:36%;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(1.92vw,3.41vh),90px);letter-spacing:.01em}
+.invite .inv-box,.invite .inv-btn img{filter:drop-shadow(0 min(.222dvw,.395dvh) min(.128dvw,.228dvh) rgba(0,0,0,.35))}
+.invite .inv-code{position:absolute;left:38.5%;top:34.5%;width:36%;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:min(1.92dvw,3.41dvh);letter-spacing:.01em}
 .invite .inv-code{cursor:pointer;white-space:nowrap;
   transition:scale .16s ease,color .16s ease}
 .invite .inv-code:hover{scale:1.035;color:#002a8d}
 .invite .inv-code:active{scale:.97;color:#0b3fa0}
-.invite input{position:absolute;left:40%;top:69%;width:33%;background:none;border:none;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:clamp(14px,min(1.6vw,2.84vh),72px);letter-spacing:.01em;text-transform:uppercase}
+.invite input{position:absolute;left:40%;top:69%;width:33%;background:none;border:none;text-align:center;color:#124c9d;font-family:var(--f-lobby);font-weight:400;font-size:min(1.6dvw,2.84dvh);letter-spacing:.01em;text-transform:uppercase}
 .invite input::placeholder{color:#90867d}
-.invite input:focus{outline:none;background:rgba(255,255,255,.5);border-radius:min(.417vw,.741vh)}
+.invite input:focus{outline:none;background:rgba(255,255,255,.5);border-radius:min(.417dvw,.741dvh)}
 .invite .inv-btn{position:absolute;left:76.5%;width:21%}
-.invite .inv-btn b{position:absolute;inset:6% 0 18%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:clamp(12px,min(1.28vw,2.28vh),60px);letter-spacing:.01em;text-shadow:min(.16vw,.284vh) min(.16vw,.284vh) 0 rgba(0,0,0,.5)}
+.invite .inv-btn b{position:absolute;inset:6% 0 18%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:min(1.28dvw,2.28dvh);letter-spacing:.01em;text-shadow:min(.16dvw,.284dvh) min(.16dvw,.284dvh) 0 rgba(0,0,0,.5)}
 
 /* match settings card */
 .settings .cardart{width:100%}
-.settings .set-title{position:absolute;left:0;top:7%;width:100%;text-align:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:clamp(20px,min(2.69vw,4.78vh),120px);line-height:.85;letter-spacing:.01em;text-shadow:min(.167vw,.296vh) min(.167vw,.296vh) 0 rgba(0,0,0,.5)}
-.settings .set-divider{position:absolute;left:50%;top:40%;width:min(.139vw,.247vh);height:53%;background:rgba(12,65,139,.35);border-radius:min(.139vw,.247vh)}
-.settings .set-label{position:absolute;top:40%;width:23.8%;text-align:center;color:#0c418b;font-family:var(--f-lobby);font-weight:400;font-size:clamp(14px,min(1.68vw,2.99vh),78px);letter-spacing:.01em;text-shadow:0 min(.069vw,.123vh) min(.035vw,.062vh) rgba(0,0,0,.25)}
+.settings .set-title{position:absolute;left:0;top:7%;width:100%;text-align:center;color:#fff;font-family:var(--f-lobby);font-weight:400;font-size:min(2.69dvw,4.78dvh);line-height:.85;letter-spacing:.01em;text-shadow:min(.167dvw,.296dvh) min(.167dvw,.296dvh) 0 rgba(0,0,0,.5)}
+.settings .set-divider{position:absolute;left:50%;top:40%;width:min(.139dvw,.247dvh);height:53%;background:rgba(12,65,139,.35);border-radius:min(.139dvw,.247dvh)}
+.settings .set-label{position:absolute;top:40%;width:23.8%;text-align:center;color:#0c418b;font-family:var(--f-lobby);font-weight:400;font-size:min(1.68dvw,2.99dvh);letter-spacing:.01em;text-shadow:0 min(.069dvw,.123dvh) min(.035dvw,.062dvh) rgba(0,0,0,.25)}
 .settings .set-btn{position:absolute;top:64%;width:7%}
 .settings .set-badge{position:absolute;top:64%;width:18.5%;pointer-events:none}
-.settings .set-btn img,.settings .set-badge img{filter:drop-shadow(min(.069vw,.123vh) min(.208vw,.37vh) min(.139vw,.247vh) rgba(0,0,0,.4))}
+.settings .set-btn img,.settings .set-badge img{filter:drop-shadow(min(.069dvw,.123dvh) min(.208dvw,.37dvh) min(.139dvw,.247dvh) rgba(0,0,0,.4))}
 .settings .set-badge img{width:100%}
-.settings .set-badge b{position:absolute;inset:6% 0 16%;display:flex;align-items:center;justify-content:center;color:#0c418b;font-family:var(--f-lobby);font-weight:400;font-size:clamp(16px,min(2.02vw,3.59vh),94px);letter-spacing:.01em;text-shadow:0 min(.069vw,.123vh) min(.035vw,.062vh) rgba(0,0,0,.25)}
+.settings .set-badge b{position:absolute;inset:6% 0 16%;display:flex;align-items:center;justify-content:center;color:#0c418b;font-family:var(--f-lobby);font-weight:400;font-size:min(2.02dvw,3.59dvh);letter-spacing:.01em;text-shadow:0 min(.069dvw,.123dvh) min(.035dvw,.062dvh) rgba(0,0,0,.25)}
 .settings .set-btn[disabled]{opacity:.45;cursor:default}
 
 /* start + status */
-.startbtn[disabled]{opacity:.72;cursor:default;filter:drop-shadow(0 min(.264vw,.469vh) min(.153vw,.272vh) rgba(0,0,0,.35)) saturate(.72) brightness(.94)}
+.startbtn[disabled]{opacity:.72;cursor:default;filter:drop-shadow(0 min(.264dvw,.469dvh) min(.153dvw,.272dvh) rgba(0,0,0,.35)) saturate(.72) brightness(.94)}
 .startbtn.ready{animation:startpop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes startpop{0%{transform:scale(.94)}60%{transform:scale(1.07)}100%{transform:scale(1)}}
-.waitline{color:#124c9d;font-family:var(--f-sign);font-weight:700;font-size:clamp(14px,min(1.67vw,2.97vh),78px);line-height:.75;letter-spacing:.04em;text-align:center;text-shadow:min(.069vw,.123vh) min(.069vw,.123vh) min(.069vw,.123vh) rgba(0,0,0,.25)}
-.waitline.compact{font-size:clamp(11px,min(1vw,1.78vh),48px);line-height:1.02;
+.waitline{color:#124c9d;font-family:var(--f-sign);font-weight:700;font-size:clamp(14px,min(1.67dvw,2.97dvh),78px);line-height:.75;letter-spacing:.04em;text-align:center;text-shadow:min(.069dvw,.123dvh) min(.069dvw,.123dvh) min(.069dvw,.123dvh) rgba(0,0,0,.25)}
+.waitline.compact{font-size:clamp(11px,min(1dvw,1.78dvh),48px);line-height:1.02;
   letter-spacing:.02em;overflow-wrap:anywhere;top:auto!important;bottom:1.5%}
 
 /* ============ LOBBY ENTRANCE — the room is dealt the way Home leaves ======
@@ -1400,7 +1404,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
    these ends at the element's natural resting state. `.lobby-entering` is
    still transient (lobbyAlive.js clears it on a timer and on the way out) so
    nothing is left mid-flight if the room is left during the entrance. */
-.lobbystage{--lb-in-drop:min(3.1vw,5.5vh)}
+.lobbystage{--lb-in-drop:min(3.1dvw,5.5dvh)}
 .lobbystage.lobby-entering .lobbytitle{
   animation:homeCardPickIn .62s cubic-bezier(.16,1.38,.32,1) .06s backwards}
 .lobbystage.lobby-entering .lobbytitle-tape{
@@ -1522,8 +1526,8 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 
 /* ---------- party team panels ---------- */
 .pt-teamname{color:#FBF6EC;font-family:var(--f-lobby);font-weight:400;text-align:center;
-  font-size:clamp(20px,min(2.73vw,4.85vh),126px);letter-spacing:.01em;pointer-events:none;
-  text-shadow:min(.28vw,.5vh) min(.28vw,.5vh) 0 rgba(0,0,0,.45)}
+  font-size:min(2.73dvw,4.85dvh);letter-spacing:.01em;pointer-events:none;
+  text-shadow:min(.28dvw,.5dvh) min(.28dvw,.5dvh) 0 rgba(0,0,0,.45)}
 .party-team-layer{transition:translate .22s cubic-bezier(.2,1.2,.35,1),filter .2s ease}
 .lobbystage:has(.party-blue-hit:hover) .party-blue-layer,
 .lobbystage:has(.party-blue-hit:focus-visible) .party-blue-layer,
@@ -1531,7 +1535,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .lobbystage:has(.party-orange-hit:focus-visible) .party-orange-layer{translate:0 calc(var(--lb-lift) * 1.45)}
 .lobbystage:has(.party-blue-hit:hover) .party-blue-layer.party-panel-art,
 .lobbystage:has(.party-orange-hit:hover) .party-orange-layer.party-panel-art{
-  filter:brightness(1.035) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.27))}
+  filter:brightness(1.035) drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(23,53,111,.27))}
 /* Every cell is the same size now, so there is no `.wide` variant and one
    rule serves all three. The tile is its window in `pt-frame-2x2.webp` plus
    ~10 component px of bleed on each side; the icon and label percentages
@@ -1539,25 +1543,25 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
    BOTTOM row — Figma's top-row cells are authored ~10px above their own
    windows, and the frame art is the thing the player actually sees. */
 .pt-tile{overflow:hidden;background:#eee5d8 url("../assets/ui/figma/pt-inner.webp") center/cover no-repeat;
-  box-shadow:0 0 0 min(.35vw,.62vh) #eee5d8}
+  box-shadow:0 0 0 min(.35dvw,.62dvh) #eee5d8}
 .pt-tile video,.pt-tile .camdock{width:100%;height:100%;object-fit:cover}
 .pt-tile video{display:block;transform:scaleX(-1)}
 .pt-empty{position:absolute;inset:0}
 .pt-empty img{position:absolute;left:50%;top:17.65%;width:19.85%;height:41.6%;min-width:26px;
   object-fit:contain;translate:-50% 0;opacity:.9}
 .pt-empty span{position:absolute;left:0;top:73.6%;width:100%;text-align:center;color:#0c418b;
-  font-family:var(--f-sign);font-weight:800;font-size:clamp(12px,min(1.706vw,3.034vh),78px);
+  font-family:var(--f-sign);font-weight:800;font-size:min(1.706dvw,3.034dvh);
   line-height:.45;letter-spacing:.04em;white-space:nowrap;opacity:.9}
-.pt-name{position:absolute;left:3.2%;top:4.5%;width:min(44%,11.5vw);aspect-ratio:1200/338;
-  display:block;filter:drop-shadow(0 min(.16vw,.28vh) min(.1vw,.18vh) rgba(0,0,0,.28));
+.pt-name{position:absolute;left:3.2%;top:4.5%;width:min(44%,11.5dvw);aspect-ratio:1200/338;
+  display:block;filter:drop-shadow(0 min(.16dvw,.28dvh) min(.1dvw,.18dvh) rgba(0,0,0,.28));
   transition:translate .18s ease,scale .18s ease,filter .18s ease;pointer-events:none}
 .pt-name img{position:absolute;inset:0;width:100%;height:100%}
 .pt-name b{position:absolute;inset:0;display:grid;place-items:center;padding:0 6%;
   color:#fff;font-family:var(--f-lobby);font-weight:400;
-  font-size:clamp(12px,min(1.52vw,2.7vh),70px);line-height:1;letter-spacing:.02em;text-align:center;
+  font-size:min(1.52dvw,2.7dvh);line-height:1;letter-spacing:.02em;text-align:center;
   text-transform:uppercase;white-space:nowrap;overflow:hidden;
-  text-shadow:min(.1vw,.18vh) min(.1vw,.18vh) 0 rgba(0,0,0,.5)}
-.pt-tile:hover .pt-name{translate:0 -7%;scale:1.025;filter:brightness(1.04) drop-shadow(0 min(.23vw,.41vh) min(.15vw,.27vh) rgba(0,0,0,.32))}
+  text-shadow:min(.1dvw,.18dvh) min(.1dvw,.18dvh) 0 rgba(0,0,0,.5)}
+.pt-tile:hover .pt-name{translate:0 -7%;scale:1.025;filter:brightness(1.04) drop-shadow(0 min(.23dvw,.41dvh) min(.15dvw,.27dvh) rgba(0,0,0,.32))}
 
 /* the JOIN card is unmistakably a button: lift, wobble hint, press.
    It owns the 2x2's bottom-right cell outright, so it carries the height of
@@ -1575,9 +1579,9 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
   translate:-50% 0;pointer-events:none;transition:transform .18s ease}
 .pt-join span{position:absolute;left:0;top:73.6%;width:100%;height:7%;
   display:block;text-align:center;color:#fff;white-space:nowrap;
-  font-family:var(--f-sign);font-weight:800;font-size:clamp(12px,min(1.706vw,3.034vh),78px);
+  font-family:var(--f-sign);font-weight:800;font-size:min(1.706dvw,3.034dvh);
   line-height:.45;letter-spacing:.04em;
-  text-shadow:min(.128vw,.228vh) min(.128vw,.228vh) 0 rgba(0,0,0,.5);pointer-events:none}
+  text-shadow:min(.128dvw,.228dvh) min(.128dvw,.228dvh) 0 rgba(0,0,0,.5);pointer-events:none}
 .pt-join:hover .pt-join-icon{transform:translateY(-6%) scale(1.06)}
 .pt-join:not(:hover) .pt-join-icon{animation:joinNudge 3.4s ease-in-out infinite}
 @keyframes joinNudge{0%,84%,100%{transform:translateY(0)}90%{transform:translateY(-4%)}96%{transform:translateY(1%)}}
@@ -1596,7 +1600,7 @@ body[data-screen="lobby"] .camdock .brackets{display:none}
 .party-vs{pointer-events:auto;cursor:pointer;
   transition:translate .2s ease,scale .2s cubic-bezier(.2,1.35,.35,1),rotate .2s ease,filter .2s ease}
 .party-vs:hover{translate:0 calc(var(--lb-lift) * 1.8);scale:1.045;rotate:-2deg;
-  filter:brightness(1.045) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+  filter:brightness(1.045) drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(23,53,111,.28))}
 
 /* =================== 1v1 MATCH =================== */
 body[data-screen="match"] .wrap{max-width:none;padding:0}
@@ -1612,7 +1616,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .v1-video-side video,.v1-video-side canvas{object-fit:cover}
 .v1-divider{position:absolute;left:48.333%;top:-20%;width:1.806%;height:145%;
   z-index:3;pointer-events:none;object-fit:fill;
-  filter:drop-shadow(0 min(.2vw,.36vh) min(.18vw,.32vh) rgba(0,0,0,.25))}
+  filter:drop-shadow(0 min(.2dvw,.36dvh) min(.18dvw,.32dvh) rgba(0,0,0,.25))}
 .v1-tape{position:absolute;z-index:7;pointer-events:none}
 .v1-tape-history{transition:opacity .22s ease}
 .matchstage:has(#myGuessPast.empty) #myGuessPastTape,
@@ -1622,7 +1626,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
    in its top 40% and the large total in the lower half. */
 .v1-scorecard{position:absolute;z-index:5;container-type:inline-size}
 .v1-scorecard>img{display:block;width:100%;
-  filter:drop-shadow(0 min(.292vw,.519vh) min(.167vw,.296vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.292dvw,.519dvh) min(.167dvw,.296dvh) rgba(0,0,0,.35))}
 .v1-scorecard>span{position:absolute;left:0;width:100%;display:flex;justify-content:center;
   text-align:center;white-space:nowrap;overflow:hidden;color:#fff;
   text-shadow:1.2cqw 1.2cqw 0 rgba(0,0,0,.5)}
@@ -1675,7 +1679,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 .v1-chase-clock{position:absolute;left:7.5%;top:36%;width:20%;z-index:2;opacity:0;
   pointer-events:none;filter:drop-shadow(1.1cqw 1.1cqw 0 rgba(0,0,0,.42))}
 .matchstage[data-phase="chase"] .v1-wordtimer{z-index:10;scale:1.16;
-  filter:drop-shadow(0 min(.55vw,.98vh) min(.35vw,.62vh) rgba(14,27,74,.42))}
+  filter:drop-shadow(0 min(.55dvw,.98dvh) min(.35dvw,.62dvh) rgba(14,27,74,.42))}
 .matchstage[data-phase="chase"] .v1-wordtimer .sp-art{
   animation:v1chasepaper .42s ease-in-out infinite}
 .matchstage[data-phase="chase"] .v1-wordtimer .sp-lab{top:-1.5%;font-size:9.7cqw}
@@ -1684,7 +1688,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
   animation:v1clockshake .22s ease-in-out infinite}
 .matchstage.chase-urgent .v1-wordtimer{scale:1.24}
 .matchstage.chase-final .v1-wordtimer{scale:1.32;filter:brightness(1.08)
-  drop-shadow(0 min(.75vw,1.33vh) min(.48vw,.85vh) rgba(232,64,42,.48))}
+  drop-shadow(0 min(.75dvw,1.33dvh) min(.48dvw,.85dvh) rgba(232,64,42,.48))}
 .v1-wordtimer.tick-pop{animation:v1tickpop .32s cubic-bezier(.18,1.65,.32,1)}
 @keyframes v1tickpop{0%{scale:1.5;rotate:-2deg}58%{rotate:1deg}100%{rotate:0}}
 @keyframes v1chasepaper{
@@ -1701,7 +1705,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
    are transmitted across the network. */
 .v1-crown{position:absolute;left:50%;top:19%;width:14%;height:auto;z-index:6;
   opacity:0;pointer-events:none;translate:-50% -50%;rotate:-11deg;scale:.45;
-  filter:drop-shadow(0 min(.35vw,.62vh) min(.25vw,.44vh) rgba(0,0,0,.4));
+  filter:drop-shadow(0 min(.35dvw,.62dvh) min(.25dvw,.44dvh) rgba(0,0,0,.4));
   transition:left .055s linear,top .055s linear,opacity .18s ease,
     width .055s linear,scale .28s cubic-bezier(.2,1.65,.4,1)}
 .matchstage.you-leading .v1-video-side.you .v1-crown,
@@ -1820,7 +1824,7 @@ body[data-screen="match"] .wrap{max-width:none;padding:0}
 /* =================== RESULTS =================== */
 #scrResults{align-items:center;justify-content:center}
 /* the old generic results card is gone — see the RESULTS block below */
-#scrResults h2{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,4vw,48px);text-align:center;letter-spacing:1px;text-transform:uppercase}
+#scrResults h2{font-family:var(--f-display);font-weight:800;font-size:clamp(30px,4dvw,48px);text-align:center;letter-spacing:1px;text-transform:uppercase}
 #scrResults .sub{text-align:center;font-size:15px;font-weight:800;color:var(--ink-soft);margin:4px 0 16px}
 .resrow{display:flex;justify-content:space-between;gap:10px;border-top:2px dashed var(--line-soft);padding:10px 2px;font-weight:800;font-size:15px;flex-wrap:wrap}
 .resrow .ok{color:#0E9B62;font-weight:900} .resrow .miss{color:var(--red);font-weight:900}
@@ -1911,7 +1915,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-side video,.pm-side canvas{object-fit:cover}
 .pm-divider{position:absolute;left:49.51%;top:-2.35%;width:1.53%;height:109.01%;
   z-index:6;pointer-events:none;
-  filter:drop-shadow(0 min(.2vw,.36vh) min(.18vw,.32vh) rgba(0,0,0,.25))}
+  filter:drop-shadow(0 min(.2dvw,.36dvh) min(.18dvw,.32dvh) rgba(0,0,0,.25))}
 .pm-divider img{width:100%;height:100%;object-fit:fill;display:block}
 
 /* --- centre tiles --- */
@@ -1919,10 +1923,10 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
   cursor:pointer;transform-origin:50% 54%;
   transition:translate .2s cubic-bezier(.2,1.35,.35,1),
     scale .2s cubic-bezier(.2,1.35,.35,1),filter .2s ease;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.36vw,.64vh) rgba(0,0,0,.38))}
-.pm-tile:hover{translate:0 calc(-1 * min(.42vw,.75vh));scale:1.027;
+  filter:drop-shadow(0 min(.3dvw,.53dvh) min(.36dvw,.64dvh) rgba(0,0,0,.38))}
+.pm-tile:hover{translate:0 calc(-1 * min(.42dvw,.75dvh));scale:1.027;
   filter:brightness(1.04)
-    drop-shadow(0 min(.55vw,.98vh) min(.48vw,.85vh) rgba(0,0,0,.42))}
+    drop-shadow(0 min(.55dvw,.98dvh) min(.48dvw,.85dvh) rgba(0,0,0,.42))}
 .pm-tile .slot{position:absolute;inset:1.8% 2.25%;overflow:hidden;background:#0e1b4a}
 .pm-tile .slot video,.pm-tile .slot canvas,.pm-tile .camdock{
   position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -1949,8 +1953,8 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
   100%{scale:1}
 }
 .pm-side.got::after{content:"";position:absolute;inset:0;z-index:4;pointer-events:none;
-  border:min(.72vw,1.28vh) solid #62b53c;
-  box-shadow:inset 0 0 min(2.4vw,4.3vh) rgba(98,181,60,.5);
+  border:min(.72dvw,1.28dvh) solid #62b53c;
+  box-shadow:inset 0 0 min(2.4dvw,4.3dvh) rgba(98,181,60,.5);
   animation:pmsidegot .48s cubic-bezier(.18,1.45,.32,1)}
 @keyframes pmsidegot{
   0%{opacity:0;scale:1.05}
@@ -1960,11 +1964,11 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 
 .pm-nametag{position:absolute;z-index:3;container-type:inline-size;
   pointer-events:auto;cursor:pointer;
-  filter:drop-shadow(0 min(.14vw,.25vh) min(.14vw,.25vh) rgba(0,0,0,.4));
+  filter:drop-shadow(0 min(.14dvw,.25dvh) min(.14dvw,.25dvh) rgba(0,0,0,.4));
   transition:translate .18s ease,scale .18s ease,filter .18s ease}
-.pm-nametag:hover{translate:0 calc(-1 * min(.25vw,.44vh));scale:1.04;
+.pm-nametag:hover{translate:0 calc(-1 * min(.25dvw,.44dvh));scale:1.04;
   filter:brightness(1.08)
-    drop-shadow(0 min(.3vw,.53vh) min(.22vw,.39vh) rgba(0,0,0,.34))}
+    drop-shadow(0 min(.3dvw,.53dvh) min(.22dvw,.39dvh) rgba(0,0,0,.34))}
 .pm-nametag img{display:block;width:100%;aspect-ratio:3.55;object-fit:fill}
 .pm-nametag b{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;padding:0 7%;font-family:var(--f-lobby);font-weight:400;
@@ -2044,7 +2048,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pp-award{position:fixed;z-index:95;container-type:inline-size;
   pointer-events:none;opacity:0;translate:-50% -50%}
 .pp-award .sp-art{display:block;width:100%;aspect-ratio:2.098;object-fit:fill;
-  filter:drop-shadow(0 min(.5vw,.89vh) min(.32vw,.57vh) rgba(0,0,0,.42))}
+  filter:drop-shadow(0 min(.5dvw,.89dvh) min(.32dvw,.57dvh) rgba(0,0,0,.42))}
 .pp-award span{position:absolute;left:0;width:100%;text-align:center;
   translate:0 -50%;font-family:var(--f-lobby);font-weight:400;line-height:1;
   color:#1b7532;white-space:nowrap;text-shadow:.6cqw .6cqw 0 rgba(0,0,0,.18)}
@@ -2089,7 +2093,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
    authored head-band position, because their poses are never transmitted. */
 .pp-crown{position:absolute;left:50%;top:5%;width:30%;height:auto;z-index:6;
   opacity:0;pointer-events:none;translate:-50% 0;rotate:-6deg;scale:.45;
-  filter:drop-shadow(0 min(.3vw,.53vh) min(.22vw,.39vh) rgba(0,0,0,.42));
+  filter:drop-shadow(0 min(.3dvw,.53dvh) min(.22dvw,.39dvh) rgba(0,0,0,.42));
   transition:opacity .18s ease,scale .3s cubic-bezier(.2,1.65,.4,1)}
 .pm-side .pp-crown{width:13%;top:3.5%}
 .pm-tile.first .pp-crown,.pm-side.first .pp-crown{opacity:1;scale:1;
@@ -2111,7 +2115,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-tape{position:absolute;z-index:9;pointer-events:none;
   transition:opacity .2s ease,translate .18s ease,
     scale .18s cubic-bezier(.2,1.35,.35,1),filter .18s ease;
-  filter:drop-shadow(0 min(.21vw,.37vh) min(.28vw,.49vh) rgba(0,0,0,.26))}
+  filter:drop-shadow(0 min(.21dvw,.37dvh) min(.28dvw,.49dvh) rgba(0,0,0,.26))}
 .pmstage:has(#pmMyPast.empty) #pmMyPastTape,
 .pmstage:has(#pmFoePast.empty) #pmFoePastTape{opacity:0}
 .pmstage:has(#pmMatchTimerCard:hover) #pmMatchTimerTape,
@@ -2124,9 +2128,9 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pmstage:has(#pmFoePast:hover) #pmFoePastTape,
 .pmstage:has(#pmWordCard:hover) #pmWordRightTape,
 .pmstage:has(#pmWordCard:hover) #pmWordLeftTape{
-  translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
+  translate:0 calc(-1 * min(.3dvw,.53dvh));scale:1.025;
   filter:brightness(1.04)
-    drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+    drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(23,53,111,.28))}
 .pm-score{z-index:8}
 #pmWordTimerCard{z-index:8}
 :is(.solostage,.matchstage,.pmstage)
@@ -2136,9 +2140,9 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 @media (hover:hover){
   :is(.solostage,.matchstage,.pmstage)
     :is(.sp-card,.v1-scorecard,.pm-score,.sp-guess,.sp-word):hover{
-    translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;
+    translate:0 calc(-1 * min(.3dvw,.53dvh));scale:1.025;
     filter:brightness(1.04)
-      drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(23,53,111,.28))}
+      drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(23,53,111,.28))}
 }
 /* guess papers: your read on the left, the rival team's featured player right */
 .pm-guess{z-index:7;container-type:inline-size}
@@ -2156,7 +2160,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pm-chase-clock{position:absolute;left:7.5%;top:36%;width:20%;z-index:2;opacity:0;
   pointer-events:none;filter:drop-shadow(1.1cqw 1.1cqw 0 rgba(0,0,0,.42))}
 .pmstage[data-phase="chase"] #pmWordTimerCard{z-index:12;scale:1.16;
-  filter:drop-shadow(0 min(.55vw,.98vh) min(.35vw,.62vh) rgba(14,27,74,.42))}
+  filter:drop-shadow(0 min(.55dvw,.98dvh) min(.35dvw,.62dvh) rgba(14,27,74,.42))}
 .pmstage[data-phase="chase"] #pmWordTimerCard .sp-art{
   animation:v1chasepaper .42s ease-in-out infinite}
 .pmstage[data-phase="chase"] #pmWordTimerCard .sp-lab{
@@ -2171,7 +2175,7 @@ body[data-screen="pmatch"] .wrap{max-width:none;padding:0}
 .pmstage.chase-urgent .pm-word{animation-duration:.16s}
 .pmstage.chase-final #pmWordTimerCard{scale:1.32;
   filter:brightness(1.08)
-    drop-shadow(0 min(.75vw,1.33vh) min(.48vw,.85vh) rgba(232,64,42,.48))}
+    drop-shadow(0 min(.75dvw,1.33dvh) min(.48dvw,.85dvh) rgba(232,64,42,.48))}
 .pmstage.chase-final .pm-word{animation-duration:.11s;
   filter:saturate(1.25) brightness(1.06)}
 #pmWordTimerCard.tick-pop{animation:v1tickpop .32s cubic-bezier(.18,1.65,.32,1)}
@@ -2211,11 +2215,11 @@ body[data-screen="match"] #rivalPlaceholder .ph-match{display:block}
 @keyframes scoreBrace{from{transform:scale(1)}to{transform:scale(1.035) rotate(-.5deg)}}
 
 /* Streak escalation: a run should visibly build rather than just increment. */
-.sp-streak[data-tier="1"] .sp-art{filter:drop-shadow(0 0 min(.7vw,1.2vh) rgba(255,196,64,.55))}
+.sp-streak[data-tier="1"] .sp-art{filter:drop-shadow(0 0 min(.7dvw,1.2dvh) rgba(255,196,64,.55))}
 .sp-streak[data-tier="2"]{animation:streakSway 1.5s ease-in-out infinite}
-.sp-streak[data-tier="2"] .sp-art{filter:drop-shadow(0 0 min(1.1vw,2vh) rgba(255,170,40,.75))}
+.sp-streak[data-tier="2"] .sp-art{filter:drop-shadow(0 0 min(1.1dvw,2dvh) rgba(255,170,40,.75))}
 .sp-streak[data-tier="3"]{animation:streakSway .85s ease-in-out infinite}
-.sp-streak[data-tier="3"] .sp-art{filter:drop-shadow(0 0 min(1.6vw,2.8vh) rgba(255,120,30,.9)) saturate(1.15)}
+.sp-streak[data-tier="3"] .sp-art{filter:drop-shadow(0 0 min(1.6dvw,2.8dvh) rgba(255,120,30,.9)) saturate(1.15)}
 .sp-streak[data-tier="3"] .sp-val{text-shadow:1.553cqw 1.553cqw 0 rgba(0,0,0,.5),0 0 .8cqw rgba(255,230,150,.9)}
 @keyframes streakSway{0%,100%{rotate:-1.4deg}50%{rotate:1.4deg}}
 
@@ -2288,18 +2292,18 @@ body[data-screen="results"] header{display:none}
   transform-origin:48% 48%;touch-action:manipulation;
   transition:translate .2s ease,scale .2s cubic-bezier(.2,1.45,.35,1),
     rotate .2s ease,filter .2s ease;
-  filter:drop-shadow(0 min(.48612vw,.8642vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.48612dvw,.8642dvh) min(.27778dvw,.49383dvh) rgba(0,0,0,.35))}
 .rs-title-art{width:100%;height:100%;display:block;object-fit:fill}
 .rs-exit{position:absolute;left:84.583333%;top:2.222222%;width:18.333333%;
   height:10.793925%;z-index:12;background:none;border:0;padding:0;cursor:pointer;
   transition:translate .18s cubic-bezier(.2,1.3,.35,1),scale .18s cubic-bezier(.2,1.3,.35,1),
     rotate .18s ease,filter .18s ease}
 .rs-exit img{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:fill}
-.rs-exit:hover{translate:0 calc(-1 * min(.32vw,.57vh));scale:1.035;rotate:-.5deg;
-  filter:brightness(1.055) drop-shadow(0 min(.35vw,.62vh) min(.24vw,.43vh) rgba(0,0,0,.25))}
-.rs-exit:active{translate:0 min(.1vw,.18vh);scale:.965;rotate:0deg;filter:brightness(.97)}
-.rs-exit:focus-visible{outline:min(.208vw,.37vh) solid #17356f;
-  outline-offset:calc(-1 * min(.278vw,.494vh))}
+.rs-exit:hover{translate:0 calc(-1 * min(.32dvw,.57dvh));scale:1.035;rotate:-.5deg;
+  filter:brightness(1.055) drop-shadow(0 min(.35dvw,.62dvh) min(.24dvw,.43dvh) rgba(0,0,0,.25))}
+.rs-exit:active{translate:0 min(.1dvw,.18dvh);scale:.965;rotate:0deg;filter:brightness(.97)}
+.rs-exit:focus-visible{outline:min(.208dvw,.37dvh) solid #17356f;
+  outline-offset:calc(-1 * min(.278dvw,.494dvh))}
 .rs-tape{position:absolute;display:block;z-index:7;pointer-events:none;object-fit:fill}
 /* These PNGs are the REST-rendered Figma nodes. Their canvases already bake
    rotation, alpha bounds, and (for the logo tapes) the authored shadows. */
@@ -2342,7 +2346,7 @@ body[data-screen="results"] header{display:none}
 /* ---- seats: video BEHIND the torn border ---- */
 .rs-seat{position:absolute;z-index:3;rotate:var(--rot,0deg);container-type:inline-size;
   transition:translate .18s ease,scale .18s cubic-bezier(.2,1.35,.35,1),filter .18s ease;
-  filter:drop-shadow(0 min(.34722vw,.61728vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.34722dvw,.61728dvh) min(.27778dvw,.49383dvh) rgba(0,0,0,.35))}
 /* Figma reports an axis-aligned bounding box after rotation. These are the
    original rectangles recovered from those bounds, with the inverse Figma
    angle applied in CSS. This avoids rotating an already-expanded box twice. */
@@ -2355,7 +2359,7 @@ body[data-screen="results"] header{display:none}
 .rs-seat[data-seat="orange1"]{left:55.1537%;top:15.4146%;width:21.5845%;aspect-ratio:.6412}
 .rs-seat[data-seat="orange2"]{left:73.113371%;top:55.478052%;width:25.084237%;aspect-ratio:1.045491}
 .rs-seat .slot{position:absolute;inset:1.65%;z-index:1;overflow:hidden;isolation:isolate;background:#0e1b4a;
-  border-radius:min(.4vw,.7vh)}
+  border-radius:min(.4dvw,.7dvh)}
 .rs-seat .slot video,.rs-seat .slot canvas,.rs-seat .slot img{
   position:absolute;inset:0;width:100%;height:100%;min-width:100%;min-height:100%;
   max-width:none;display:block;object-fit:cover;object-position:50% 50%}
@@ -2426,9 +2430,9 @@ body[data-screen="results"] header{display:none}
      score board above them. At z-index 5 it tied `.rs-board` and won on DOM
      order, so hovering a 1v1 half-screen seat painted its navy video over
      that half of the headline paper. */
-  .rs-seat:not(.vacant):hover{translate:0 calc(-1 * min(.28vw,.5vh));scale:1.018;
+  .rs-seat:not(.vacant):hover{translate:0 calc(-1 * min(.28dvw,.5dvh));scale:1.018;
     z-index:4;filter:brightness(1.035)
-      drop-shadow(0 min(.48vw,.85vh) min(.46vw,.82vh) rgba(0,0,0,.32))}
+      drop-shadow(0 min(.48dvw,.85dvh) min(.46dvw,.82dvh) rgba(0,0,0,.32))}
 }
 
 /* ---- rematch + breakdown ---- */
@@ -2483,7 +2487,7 @@ body[data-screen="results"] header{display:none}
   object-fit:fill}
 .rs-back,.ps-back{left:3.33%;top:88.95%;width:22.15%;aspect-ratio:319/63}
 :is(.rs-back,.ps-back) .rs-bd-art{position:absolute;left:11.91%;top:0;width:88.09%;height:100%;
-  filter:drop-shadow(0 min(.1612vw,.2866vh) min(.0921vw,.1638vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.1612dvw,.2866dvh) min(.0921dvw,.1638dvh) rgba(0,0,0,.35))}
 :is(.rs-back,.ps-back) b{left:27.90%;top:22.22%;width:82.10%;height:57.14%;font-size:9.404cqw;
   line-height:1.2067;justify-content:flex-start;translate:0 .313cqw;
   text-shadow:.575cqw .575cqw 0 rgba(255,255,255,.9)}
@@ -2491,7 +2495,7 @@ body[data-screen="results"] header{display:none}
   object-fit:fill}
 .rs-save,.ps-save{left:74.79%;top:88.89%;width:20.69%;aspect-ratio:298/63}
 :is(.rs-save,.ps-save) .rs-bd-art{height:100%;aspect-ratio:auto;
-  filter:drop-shadow(0 min(.1612vw,.2866vh) min(.0921vw,.1638vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.1612dvw,.2866dvh) min(.0921dvw,.1638dvh) rgba(0,0,0,.35))}
 :is(.rs-save,.ps-save) b{left:5.705%;top:22.222%;width:87.919%;height:57.143%;font-size:10.067cqw;
   line-height:1.2067;justify-content:flex-start;
   text-shadow:.616cqw .616cqw 0 rgba(255,255,255,.9)}
@@ -2547,66 +2551,66 @@ body[data-screen="results"] header{display:none}
   100%{scale:1.08}
 }
 .rs-strip.blue .rs-thumb.on{
-  translate:min(1.25vw,2.22vh) calc(-1 * min(.55vw,.98vh))}
+  translate:min(1.25dvw,2.22dvh) calc(-1 * min(.55dvw,.98dvh))}
 .rs-strip.orange .rs-thumb.on{
-  translate:calc(-1 * min(1.25vw,2.22vh)) calc(-1 * min(.55vw,.98vh))}
-.rs-strip .rs-thumb:focus-visible{outline:min(.18vw,.32vh) solid #ffc440;
-  outline-offset:min(.12vw,.21vh)}
+  translate:calc(-1 * min(1.25dvw,2.22dvh)) calc(-1 * min(.55dvw,.98dvh))}
+.rs-strip .rs-thumb:focus-visible{outline:min(.18dvw,.32dvh) solid #ffc440;
+  outline-offset:min(.12dvw,.21dvh)}
 .rs-strip .rs-thumb:focus-visible:not(.on){scale:1.02;filter:brightness(1.055)}
 .rs-thumb .shotwrap img{min-width:100%;min-height:100%;max-width:none;object-position:50% 50%}
 
 @media (hover:hover){
   body[data-screen="results"] .rs-title:hover{
-    translate:0 calc(-1 * min(.28vw,.5vh));scale:1.035;rotate:-3.35deg;
+    translate:0 calc(-1 * min(.28dvw,.5dvh));scale:1.035;rotate:-3.35deg;
     filter:brightness(1.05)
-      drop-shadow(0 min(.56vw,.99vh) min(.42vw,.75vh) rgba(0,0,0,.38))}
+      drop-shadow(0 min(.56dvw,.99dvh) min(.42dvw,.75dvh) rgba(0,0,0,.38))}
   body[data-screen="results"] .rs-rematch:hover:not(:disabled){
-    translate:0 calc(-1 * min(.3vw,.53vh));scale:1.025;filter:brightness(1.045) saturate(1.04)}
+    translate:0 calc(-1 * min(.3dvw,.53dvh));scale:1.025;filter:brightness(1.045) saturate(1.04)}
   body[data-screen="results"] .rs-breakdown:hover:not(:disabled){
-    translate:0 calc(-1 * min(.28vw,.5vh));scale:1.035;rotate:-.45deg;filter:brightness(1.045)}
+    translate:0 calc(-1 * min(.28dvw,.5dvh));scale:1.035;rotate:-.45deg;filter:brightness(1.045)}
   body[data-screen="results"] :is(.rs-back,.ps-back):hover:not(:disabled){
-    translate:calc(-1 * min(.16vw,.28vh)) calc(-1 * min(.24vw,.43vh));
+    translate:calc(-1 * min(.16dvw,.28dvh)) calc(-1 * min(.24dvw,.43dvh));
     scale:1.035;rotate:-.65deg;filter:brightness(1.045)}
   body[data-screen="results"] :is(.rs-save,.ps-save):hover:not(:disabled){
-    translate:min(.16vw,.28vh) calc(-1 * min(.24vw,.43vh));
+    translate:min(.16dvw,.28dvh) calc(-1 * min(.24dvw,.43dvh));
     scale:1.035;rotate:.65deg;filter:brightness(1.045)}
   .rs-thumb:hover:not(.on){scale:1.035;
     rotate:calc(var(--rot) + var(--riffle));
     filter:brightness(1.035) contrast(1.01)}
   .rs-thumb.on:hover{scale:1.09}
-  .rs-arrow.prev:hover{translate:calc(-1 * min(.24vw,.43vh)) 0;scale:1.15;
+  .rs-arrow.prev:hover{translate:calc(-1 * min(.24dvw,.43dvh)) 0;scale:1.15;
     filter:brightness(1.08)}
-  .rs-arrow.next:hover{translate:min(.24vw,.43vh) 0;scale:1.15;
+  .rs-arrow.next:hover{translate:min(.24dvw,.43dvh) 0;scale:1.15;
     filter:brightness(1.08)}
-  .rs-board:hover{translate:0 calc(-1 * min(.1vw,.18vh));scale:1.006;
+  .rs-board:hover{translate:0 calc(-1 * min(.1dvw,.18dvh));scale:1.006;
     filter:brightness(1.015)}
-  .rs-scorechip:hover{translate:0 calc(-1 * min(.16vw,.28vh));scale:1.015;
+  .rs-scorechip:hover{translate:0 calc(-1 * min(.16dvw,.28dvh));scale:1.015;
     filter:brightness(1.025)}
-  .rs-award:hover{translate:0 calc(-1 * min(.24vw,.43vh));scale:1.035;
+  .rs-award:hover{translate:0 calc(-1 * min(.24dvw,.43dvh));scale:1.035;
     rotate:-6.55deg;filter:brightness(1.025)}
-  .rs-stat:hover{translate:0 calc(-1 * min(.18vw,.32vh));scale:1.04;
+  .rs-stat:hover{translate:0 calc(-1 * min(.18dvw,.32dvh));scale:1.04;
     filter:brightness(1.025)}
 }
 
 body[data-screen="results"] .rs-title:active{
-  translate:0 min(.12vw,.21vh);scale:.965;rotate:-1.8deg;filter:brightness(.97)}
+  translate:0 min(.12dvw,.21dvh);scale:.965;rotate:-1.8deg;filter:brightness(.97)}
 body[data-screen="results"] .rs-rematch:active:not(:disabled),
 body[data-screen="results"] .rs-breakdown:active:not(:disabled),
 body[data-screen="results"] .rs-back:active:not(:disabled),
 body[data-screen="results"] .rs-save:active:not(:disabled),
 body[data-screen="results"] .ps-back:active:not(:disabled),
 body[data-screen="results"] .ps-save:active:not(:disabled){
-  translate:0 min(.14vw,.25vh);scale:.965;filter:brightness(.96)}
+  translate:0 min(.14dvw,.25dvh);scale:.965;filter:brightness(.96)}
 .rs-thumb:active{scale:.975}
 .rs-thumb.on:active{scale:1.035}
-.rs-arrow:active{translate:0 min(.12vw,.21vh);scale:.9;filter:brightness(.94)}
+.rs-arrow:active{translate:0 min(.12dvw,.21dvh);scale:.9;filter:brightness(.94)}
 
 .rs-focus{position:absolute;left:21.53%;top:12.84%;width:57.08%;aspect-ratio:1.427;z-index:6;
   container-type:inline-size}
 .rs-focus-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;
   pointer-events:none;z-index:2;transition:filter var(--rs-base) ease}
 .rs-focus-shots{position:absolute;z-index:1;left:1.6%;right:1.6%;top:2%;bottom:2%;overflow:hidden;
-  background:#0e1b4a;border-radius:min(.3vw,.55vh)}
+  background:#0e1b4a;border-radius:min(.3dvw,.55dvh)}
 /* HARD CUT — no cross-fade, no scale, no animation of any kind. The old
    .22s opacity transition ran on the outgoing still while the incoming one
    animated up from opacity:.45, so both were partly visible every swap and
@@ -2650,7 +2654,7 @@ body[data-screen="results"] .ps-save:active:not(:disabled){
   transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
     rotate var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
 .rs-award img{width:100%;height:100%;display:block;object-fit:fill;
-  filter:drop-shadow(0 min(.48612vw,.8642vh) min(.27778vw,.49383vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.48612dvw,.8642dvh) min(.27778dvw,.49383dvh) rgba(0,0,0,.35))}
 .rs-award span{position:absolute;left:0;width:100%;text-align:center;color:#17356f;
   letter-spacing:.01em;overflow:visible;transform-origin:50% 50%}
 .rs-award .aw-kicker{top:-2.855%;font-family:var(--f-sign);font-weight:800;
@@ -2670,7 +2674,7 @@ body[data-screen="results"] .ps-save:active:not(:disabled){
   transition:translate var(--rs-base) var(--rs-hover),scale var(--rs-base) var(--rs-hover),
     filter var(--rs-base) ease}
 .rs-stat img{width:100%;height:100%;display:block;object-fit:fill;
-  filter:drop-shadow(0 min(.54748vw,.97329vh) min(.31284vw,.55617vh) rgba(0,0,0,.35))}
+  filter:drop-shadow(0 min(.54748dvw,.97329dvh) min(.31284dvw,.55617dvh) rgba(0,0,0,.35))}
 .rs-stat b{position:absolute;inset:0;display:flex;align-items:center;
   justify-content:center;font-family:var(--f-sign);font-weight:800;font-size:26.181cqw;
   line-height:1.517;letter-spacing:.01em;color:#17356f;white-space:nowrap;
@@ -2761,7 +2765,7 @@ body[data-state="playing"] .devbar,
 body[data-state="word-won"] .devbar{display:none}
 /* the photo strips put SAVE in the bar's own corner */
 body:has(#resStage[data-strips]) .devbar{display:none}
-.devbtn{font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72vw,13px);
+.devbtn{font-family:var(--f-label);font-weight:800;font-size:clamp(9px,.72dvw,13px);
   letter-spacing:.06em;color:#fff;background:rgba(9,22,62,.72);
   border:1px solid rgba(255,255,255,.35);border-radius:var(--r-xs);
   padding:.5em .8em;cursor:pointer}
@@ -2898,8 +2902,8 @@ body[data-screen="results"] .camdock .brackets{display:none}
   width:var(--paper-w);height:var(--paper-h);rotate:var(--paper-rot)}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-stat b{
   rotate:var(--text-rot);
-  font-size:min(2.837715vw,5.044828vh);
-  text-shadow:min(.218286vw,.388064vh) min(.218286vw,.388064vh) 0 rgba(255,255,255,.9)}
+  font-size:min(2.837715dvw,5.044828dvh);
+  text-shadow:min(.218286dvw,.388064dvh) min(.218286dvw,.388064dvh) 0 rgba(255,255,255,.9)}
 .resstage[data-mode="1v1"][data-page="breakdown"] .rs-focus .rs-nametag.big{
   left:-.903083%;top:3.286887%;width:27.481468%;height:12.779678%;
   rotate:-5.258087deg}
@@ -2941,8 +2945,8 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-mode="1v1"][data-enter="breakdown"] :is(.rs-back,.rs-save){
   animation:rs1v1PaperIn 320ms 260ms var(--rs-pop) both}
 @keyframes rs1v1PaperIn{
-  from{opacity:0;transform:translateY(min(.7vw,1.24vh)) scale(.978)}
-  70%{opacity:1;transform:translateY(calc(-1 * min(.07vw,.12vh))) scale(1.003)}
+  from{opacity:0;transform:translateY(min(.7dvw,1.24dvh)) scale(.978)}
+  70%{opacity:1;transform:translateY(calc(-1 * min(.07dvw,.12dvh))) scale(1.003)}
   to{opacity:1;transform:none}
 }
 
@@ -3016,8 +3020,8 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-page="solo"] #rsStat3{
   left:37.235204%;top:86.081193%;width:10.957301%}
 .resstage[data-page="solo"] .rs-stat b{
-  font-size:min(2.86882vw,5.10012vh);
-  text-shadow:min(.22068vw,.39232vh) min(.22068vw,.39232vh) 0 rgba(255,255,255,.9)}
+  font-size:min(2.86882dvw,5.10012dvh);
+  text-shadow:min(.22068dvw,.39232dvh) min(.22068dvw,.39232dvh) 0 rgba(255,255,255,.9)}
 .resstage[data-page="solo"] .rs-rematch{
   left:51.548379%;top:85.809114%;width:47.083312%;rotate:-.347283deg}
 .resstage[data-page="solo"] .rs-rematch img{aspect-ratio:6.784044}
@@ -3038,9 +3042,9 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-page="solo"] .rs-posecol li{
   display:flex;align-items:baseline;gap:.34em;white-space:nowrap;
   font-family:var(--f-lobby);font-weight:400;color:#17356f;
-  font-size:calc(min(1.905285vw,3.387174vh) * var(--pl-row-fs,1));
+  font-size:calc(min(1.905285dvw,3.387174dvh) * var(--pl-row-fs,1));
   line-height:1.093449;letter-spacing:.01em;
-  text-shadow:min(.073280vw,.130276vh) min(.073280vw,.130276vh) 0 rgba(255,255,255,.9);
+  text-shadow:min(.073280dvw,.130276dvh) min(.073280dvw,.130276dvh) 0 rgba(255,255,255,.9);
   transition:translate var(--rs-base) var(--rs-hover),filter var(--rs-base) ease}
 .resstage[data-page="solo"] .rs-posecol .pl-word,
 .resstage[data-page="solo"] .rs-posecol .pl-dash,
@@ -3064,7 +3068,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-page="solo"] .rs-scorechip span{
   left:6.294986%;top:33.584126%;width:91.805224%;height:52.202042%;
   justify-content:flex-start;
-  font-size:min(4.861111vw,8.641975vh)!important;line-height:.702823}
+  font-size:min(4.861111dvw,8.641975dvh)!important;line-height:.702823}
 
 /* Solo's reel auto-advances like the others — the still hard cuts. */
 
@@ -3081,8 +3085,8 @@ body[data-screen="results"] .camdock .brackets{display:none}
 .resstage[data-page="solo"] .rs-rematch{
   animation:rsSoloPaperIn 360ms 290ms var(--rs-pop) both}
 @keyframes rsSoloPaperIn{
-  from{opacity:0;transform:translateY(min(.75vw,1.33vh)) scale(.975)}
-  70%{opacity:1;transform:translateY(calc(-1 * min(.08vw,.14vh))) scale(1.004)}
+  from{opacity:0;transform:translateY(min(.75dvw,1.33dvh)) scale(.975)}
+  70%{opacity:1;transform:translateY(calc(-1 * min(.08dvw,.14dvh))) scale(1.004)}
   to{opacity:1;transform:none}
 }
 
@@ -3090,9 +3094,9 @@ body[data-screen="results"] .camdock .brackets{display:none}
   .resstage[data-page="solo"] .rs-seat:hover{
     translate:0 0;scale:1;filter:brightness(1.018)}
   .resstage[data-page="solo"] .rs-poselist:hover li{
-    translate:min(.08vw,.14vh) 0;filter:brightness(1.04)}
+    translate:min(.08dvw,.14dvh) 0;filter:brightness(1.04)}
   .resstage[data-page="solo"] .rs-poselist:hover li:nth-child(even){
-    translate:min(.13vw,.23vh) 0}
+    translate:min(.13dvw,.23dvh) 0}
 }
 
 @media (prefers-reduced-motion:reduce){
@@ -3155,7 +3159,7 @@ body[data-screen="results"] .camdock .brackets{display:none}
    Every cqw here is the board's: nothing inside it is a container, so a
    Figma px value is always n / 14.4 cqw. */
 .rs-strips{display:none;position:fixed;inset:0;z-index:30;overflow:hidden;
-  background:#1a3c86;--ps-x:0px;--ps-y:0px;--ps-w:100vw}
+  background:#1a3c86;--ps-x:0px;--ps-y:0px;--ps-w:100dvw}
 .resstage[data-strips] .rs-strips{display:block}
 /* the page under it stays laid out (its fits keep measuring) but is gone:
    not painted, not clickable, not in the tab order. The descendant half is
@@ -3247,15 +3251,15 @@ body[data-screen="results"] .camdock .brackets{display:none}
    Running out of time is the one moment the game has to be unmistakable, so
    the paper slams in, shakes, and burns red before it leaves. */
 .timesup{position:fixed;left:50%;top:42%;z-index:97;pointer-events:none;
-  width:min(46vw,660px);translate:-50% -50%;opacity:0;scale:.4}
+  width:min(46dvw,660px);translate:-50% -50%;opacity:0;scale:.4}
 .timesup img{width:100%;display:block;
-  filter:drop-shadow(0 min(.6vw,1.06vh) min(.42vw,.74vh) rgba(0,0,0,.36))}
+  filter:drop-shadow(0 min(.6dvw,1.06dvh) min(.42dvw,.74dvh) rgba(0,0,0,.36))}
 /* the red is a glow behind the paper, so the torn edge stays paper */
 .timesup::before{content:"";position:absolute;inset:-52% -26%;z-index:-1;
   border-radius:50%;
   background:radial-gradient(ellipse at 50% 50%,rgba(255,86,54,.95),
     rgba(232,64,42,.72) 42%,rgba(214,40,24,.3) 66%,transparent 78%);
-  filter:blur(min(1.6vw,2.9vh));opacity:0}
+  filter:blur(min(1.6dvw,2.9dvh));opacity:0}
 .timesup.fire{animation:tuIn 1.5s cubic-bezier(.16,1.4,.32,1) both}
 .timesup.fire img{animation:tuShake .09s linear 6 .16s}
 .timesup.fire::before{animation:tuGlow 1.5s ease-out both}

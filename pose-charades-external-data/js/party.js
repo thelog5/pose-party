@@ -408,8 +408,12 @@ function fitPartyName(chip){
     const ctx = nameFitCanvas.getContext("2d");
     ctx.font = style.fontStyle + " " + style.fontWeight + " " + base + "px " + style.fontFamily;
     const spacing = parseFloat(style.letterSpacing) || 0;
-    const measured = ctx.measureText(label.textContent).width +
-      Math.max(0, label.textContent.length - 1) * spacing;
+    /* measure what is drawn: the chip is text-transform:uppercase, and
+       "Alexandria" is narrower than "ALEXANDRIA" */
+    const text = style.textTransform === "uppercase" ?
+      label.textContent.toUpperCase() : label.textContent;
+    const measured = ctx.measureText(text).width +
+      Math.max(0, text.length - 1) * spacing;
     const available = label.clientWidth - (parseFloat(style.paddingLeft) || 0) -
       (parseFloat(style.paddingRight) || 0);
     if(measured > available)

@@ -33,6 +33,11 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
+/* A phone must not resize our type. iOS Safari enlarges text when the phone
+   turns to landscape, and Android Chrome can "boost" it, unless this is 100%.
+   Every paper's type is sized as a fraction of its box, so an enlarged font
+   is text that runs out of its paper and gets cut off. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{
   background:
     radial-gradient(circle at 78% 12%,rgba(255,255,255,.98),transparent 31%),
@@ -41,9 +46,9 @@ body{
   color:var(--ink);
   font-family:var(--f-body);
   font-weight:700;
-  min-height:100vh;
+  min-height:100dvh;
 }
-.wrap{max-width:1680px;margin:0 auto;padding:18px 32px 26px;min-height:100vh;display:flex;flex-direction:column}
+.wrap{max-width:1680px;margin:0 auto;padding:18px 32px 26px;min-height:100dvh;display:flex;flex-direction:column}
 svg{display:block}
 button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
