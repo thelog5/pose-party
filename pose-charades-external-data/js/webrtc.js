@@ -11,7 +11,19 @@
    see the video. That is the line between a relay and an SFU, and it is why
    this can exist here at all. */
 
+import { isSlowComputer, onSlowComputer } from "./speed.js";
+
 const ICE_FALLBACK = [{ urls: "stun:stun.l.google.com:19302" }];
+
+/* A SLOW COMPUTER GETS LIGHTER VIDEO, IN BOTH DIRECTIONS. Its own camera is
+   encoded smaller (less work for its processor), and it sends
+   `{ lightVideo:true }` down the signaling channel so every peer encodes the
+   link TO it smaller too (less to decode). Each link has its own sender, so
+   in Party only the links that touch the slow computer change; everyone
+   else keeps their normal video. Older clients ignore the message. The
+   pose model never reads these streams, only people do. */
+const LIGHT_VIDEO = { width:640, maxFramerate:15, maxBitrate:350_000 };
+const ENCODING_KEYS = ["maxBitrate", "maxFramerate", "scaleResolutionDownBy"];
 
 function applyVideoEncoding(sender, limits){
   if(!sender || !limits) return;
@@ -19,10 +31,11 @@ function applyVideoEncoding(sender, limits){
     const params = sender.getParameters();
     if(!params.encodings?.length) params.encodings = [{}];
     const encoding = params.encodings[0];
-    if(Number.isFinite(limits.maxBitrate)) encoding.maxBitrate = limits.maxBitrate;
-    if(Number.isFinite(limits.maxFramerate)) encoding.maxFramerate = limits.maxFramerate;
-    if(Number.isFinite(limits.scaleResolutionDownBy)){
-      encoding.scaleResolutionDownBy = Math.max(1, limits.scaleResolutionDownBy);
+    /* A key the limits leave out goes back to the browser default, so a link
+       that stops being light gets its full video back. */
+    for(const key of ENCODING_KEYS){
+      if(!Number.isFinite(limits[key])) delete encoding[key];
+      else encoding[key] = key === "scaleResolutionDownBy" ? Math.max(1, limits[key]) : limits[key];
     }
     params.degradationPreference = "maintain-framerate";
     sender.setParameters(params).catch(() => {});
@@ -81,6 +94,29 @@ export function createPeer({
      different phenomenon from one that never connects, and both are worth
      seeing, but neither is worth repeating. */
   const reported = new Set();
+  let peerSlow = false, lightened = false;
+
+  /* This link's limits: the mode's own, made lighter while either end is a
+     slow computer. Undefined means "never touched", which 1v1 relies on to
+     keep the browser's defaults. */
+  function linkEncoding(track){
+    if(!isSlowComputer() && !peerSlow) return lightened ? (videoEncoding || {}) : videoEncoding;
+    lightened = true;
+    const width = track?.getSettings?.().width || 1280;
+    return {
+      maxBitrate: Math.min(videoEncoding?.maxBitrate ?? Infinity, LIGHT_VIDEO.maxBitrate),
+      maxFramerate: Math.min(videoEncoding?.maxFramerate ?? Infinity, LIGHT_VIDEO.maxFramerate),
+      scaleResolutionDownBy: Math.max(videoEncoding?.scaleResolutionDownBy ?? 1, width / LIGHT_VIDEO.width),
+    };
+  }
+  const encodeAll = () => {
+    for(const sender of videoSenders) applyVideoEncoding(sender, linkEncoding(sender.track));
+  };
+  const stopSpeedWatch = onSlowComputer(slow => {
+    if(closed) return;
+    encodeAll();
+    if(pc.connectionState === "connected") sendSignal({ lightVideo: slow });
+  });
 
   async function reportIce(result){
     if(!onIceReport || reported.has(result)) return;
@@ -99,7 +135,7 @@ export function createPeer({
     const sender = pc.addTrack(track, stream);
     if(track.kind === "video"){
       videoSenders.push(sender);
-      applyVideoEncoding(sender, videoEncoding);
+      applyVideoEncoding(sender, linkEncoding(track));
     }
   }
 
@@ -111,7 +147,8 @@ export function createPeer({
   };
   pc.onconnectionstatechange = () => {
     if(pc.connectionState === "connected"){
-      for(const sender of videoSenders) applyVideoEncoding(sender, videoEncoding);
+      encodeAll();
+      if(isSlowComputer()) sendSignal({ lightVideo: true });
       reportIce("connected");
     }
     if(pc.connectionState === "failed") reportIce("failed");
@@ -122,7 +159,7 @@ export function createPeer({
     pc.onnegotiationneeded = async () => {
       try{
         await pc.setLocalDescription(await pc.createOffer());
-        for(const sender of videoSenders) applyVideoEncoding(sender, videoEncoding);
+        encodeAll();
         sendSignal({ sdp: pc.localDescription.toJSON() });
       }catch(e){ console.warn("webrtc offer failed", e); }
     };
@@ -130,13 +167,18 @@ export function createPeer({
 
   async function handleSignal(data){
     if(closed || !data) return;
+    if(typeof data.lightVideo === "boolean"){
+      peerSlow = data.lightVideo;
+      encodeAll();
+      return;
+    }
     try{
       if(data.sdp){
         await pc.setRemoteDescription(data.sdp);
         while(pendingCandidates.length) await pc.addIceCandidate(pendingCandidates.shift());
         if(data.sdp.type==="offer"){
           await pc.setLocalDescription(await pc.createAnswer());
-          for(const sender of videoSenders) applyVideoEncoding(sender, videoEncoding);
+          encodeAll();
           sendSignal({ sdp: pc.localDescription.toJSON() });
         }
       }else if(data.candidate){
@@ -150,6 +192,7 @@ export function createPeer({
   function close(){
     if(closed) return;
     closed = true;
+    stopSpeedWatch();
     /* Only close the connection — the local camera stream belongs to the
        whole app (pose engine keeps using it), so its tracks stay live. */
     try{ pc.close(); }catch(e){}

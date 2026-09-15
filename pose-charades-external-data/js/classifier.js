@@ -380,7 +380,13 @@ export function classifyDetailed(v, m, { reject=true, jointMask=null,
   const q=standardize(v, m.mean, m.sd);
   const dims = jointMask && !jointMask.every(Boolean) ? Array.from(q, (_, d) => d)
     .filter(d => DIM_JOINTS[d].every(j => jointMask[j])) : null;
-  const plainNorm=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q), sims=[];
+  const plainNorm=dims ? Math.sqrt(dims.reduce((sum,d)=>sum+q[d]**2,0)) : l2(q);
+  /* Only the K best neighbours vote, so keep only those while scanning. This
+     used to push one object per sample (about 6800) and sort them all, every
+     250ms: 18ms per call on a 6x slower CPU. A new sample goes in AFTER every
+     kept one with an equal score, so ties keep deck order, the same order the
+     stable sort gave. */
+  const top=[], k=Math.min(K, m.samples.length);
   const nearest={};
   /* The query's norm in each emphasised word's metric, over the same dims. */
   const wordNorm=new Map();
@@ -400,15 +406,19 @@ export function classifyDetailed(v, m, { reject=true, jointMask=null,
       norm=Math.sqrt(sq);
     }else if(w2) for(let d=0;d<q.length;d++) dot+=w2[d]*q[d]*s.v[d];
     else for(let d=0;d<q.length;d++) dot+=q[d]*s.v[d];
-    const sim=nv>0 && norm>0 ? dot/(nv*norm) : 0;
-    sims.push({sim:Number.isFinite(sim)?sim:0, label:s.label});
-    nearest[s.label]=Math.max(nearest[s.label] ?? -1, Number.isFinite(sim)?sim:0);
+    const raw=nv>0 && norm>0 ? dot/(nv*norm) : 0, sim=Number.isFinite(raw)?raw:0;
+    if(top.length<k || sim>top[top.length-1].sim){
+      let at=top.length;
+      while(at>0 && top[at-1].sim<sim) at--;
+      top.splice(at, 0, {sim, label:s.label});
+      if(top.length>k) top.pop();
+    }
+    nearest[s.label]=Math.max(nearest[s.label] ?? -1, sim);
   }
-  sims.sort((a,b)=>b.sim-a.sim);
   const scores={}; let tot=0;
-  for(let i=0;i<Math.min(K,sims.length);i++){
-    const w=Math.max(sims[i].sim,0)**3;
-    scores[sims[i].label]=(scores[sims[i].label]||0)+w; tot+=w;
+  for(const {sim, label} of top){
+    const w=Math.max(sim,0)**3;
+    scores[label]=(scores[label]||0)+w; tot+=w;
   }
   if(tot>0) for(const k in scores) scores[k]/=tot;
   const best=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];

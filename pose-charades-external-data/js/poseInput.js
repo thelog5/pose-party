@@ -3,6 +3,15 @@ import { JOINTS, WIN, SAMPLE_MS } from "./constants.js";
 
 export const POSE_GAP_MS = 250;
 export const PREDICTION_MAX_AGE_MS = 500;
+/* A STALL IS NOT A LOST PLAYER. When no camera frame reached the engine at
+   all (the page was busy, or the camera paused), the player did not leave
+   the picture; the computer stopped looking. The motion window then survives
+   a gap up to this long. It used to reset after 250ms whatever the cause, and
+   a slow computer stalls that long every few seconds: in e2e/_slowsim.mjs it
+   threw away the window 4 times in 10s, and each reset stops the charge for
+   the second a new window takes to fill. A body really lost, with frames
+   still arriving, resets after `lostMs` as before. */
+export const STALL_MAX_MS = 1000;
 export const MIN_POSE_SAMPLES = 15;
 export const POSE_VISIBILITY = .35;
 export const POSE_SPACE = "torso-reference-16:9-v1";
@@ -40,8 +49,11 @@ export function poseQualityMessage(quality, needsLegs = false, recording = false
 }
 
 export function createPoseInput(){
+  /* `lostMs` is written by engine.js from the real frame rate: at 7 frames a
+     second one missed frame is already 150ms. */
   return { frames:[], masks:[], previous:null, nextAt:null, sampleAt:-Infinity,
-    seenAt:-Infinity, predictionAt:-Infinity, predictedSampleAt:-Infinity,
+    seenAt:-Infinity, observedAt:-Infinity, lostMs:POSE_GAP_MS,
+    predictionAt:-Infinity, predictedSampleAt:-Infinity,
     tracking:false, accepted:false, quality:null, predictionMask:null, predictionLabel:null,
     predictionNeedsLegs:false, generation:0 };
 }
@@ -68,7 +80,11 @@ export function interpolateFrame(a, b, fraction){
 /* Called on every fresh camera frame, including failed detections. Short
    gaps pause recognition; long gaps discard the old action entirely. */
 export function observePose(input, frame, quality, now){
-  if(now - input.seenAt > POSE_GAP_MS && input.previous) resetPoseInput(input);
+  /* No frame arrived since the last body was seen: a stall, not a loss. */
+  const stalled = input.observedAt <= input.seenAt;
+  const gap = stalled ? Math.max(STALL_MAX_MS, input.lostMs || 0) : input.lostMs || POSE_GAP_MS;
+  if(now - input.seenAt > gap && input.previous) resetPoseInput(input);
+  input.observedAt = now;
   input.quality = quality;
   input.tracking = !!frame && !!quality?.usable;
   if(!input.tracking){ input.accepted = false; return false; }
@@ -99,10 +115,12 @@ export function windowJointMask(input){
    legLabels: a word told apart mostly by its legs cannot be recognized while
    the legs are hidden. */
 export function canRecognize(input, label, now = performance.now()){
+  /* On a slow computer the frames are further apart, so "fresh" is too. */
+  const slack = Math.max(0, (input?.lostMs || POSE_GAP_MS) - POSE_GAP_MS);
   return !!input?.tracking && input.accepted && input.quality?.usable &&
     (!label || input.predictionLabel===label) &&
-    now - input.seenAt <= POSE_GAP_MS &&
-    now - input.predictionAt <= PREDICTION_MAX_AGE_MS &&
+    now - input.seenAt <= POSE_GAP_MS + slack &&
+    now - input.predictionAt <= PREDICTION_MAX_AGE_MS + slack &&
     (!input.predictionNeedsLegs || (input.quality.legs &&
       LEGS.every(j=>input.predictionMask?.[JOINTS.indexOf(j)])));
 }

@@ -7,13 +7,14 @@ import { PoseLandmarker, HandLandmarker, FaceLandmarker, FilesetResolver } from 
 import { $ } from "./dom.js";
 import { state } from "./state.js";
 import { JOINTS, WASM_URL, POSE_MODEL_URL, HAND_MODEL_URL,
-         FACE_MODEL_URL } from "./constants.js";
+         FACE_MODEL_URL, SAMPLE_MS } from "./constants.js";
+import { isSlowComputer, setSlowComputer } from "./speed.js";
 import { normalize } from "./pose.js";
 import { createLandmarkFilter, filterLandmarks } from "./smooth.js";
 import { drawSkeleton } from "./draw.js";
 import { features, classifyDetailed } from "./classifier.js";
 import { assessPose, observePose, resetPoseInput, windowJointMask,
-         MIN_POSE_SAMPLES, poseQualityMessage } from "./poseInput.js";
+         MIN_POSE_SAMPLES, POSE_GAP_MS, poseQualityMessage } from "./poseInput.js";
 import { showStatus, renderGuesses, updateMoveBack } from "./ui.js";
 import { finishRecording } from "./capture.js";
 import { gameCheck } from "./game.js";
@@ -31,6 +32,116 @@ const CLASSIFY_EVERY_MS = 250;
    its WebRTC mesh and remote-video decoding. */
 const PARTY_VISION_MIN_MS = 30;
 const CAMERA_PLAY_TIMEOUT_MS = 1400;
+
+/* SPEED: WHICH DELEGATE, AND IS THIS A SLOW COMPUTER.
+   Every pose model call blocks the page until it returns, so a slow call
+   slows the WHOLE game, not only the dots. Measured with e2e/_perf.mjs and
+   e2e/_perfmodels.mjs:
+   - On an M2 a call takes 14-23ms whatever the model, frame size or delegate.
+     That is a wait on the graphics chip, not work.
+   - With no usable graphics chip (blocked driver, hardware acceleration off,
+     a virtual machine), Chrome runs WebGL in software. The GPU delegate then
+     takes ~190ms a call and the CPU delegate ~14ms. The game ran at 5 frames
+     a second and the dots trailed the body. So the GPU delegate is not used
+     on a software renderer, and on any machine where it is slow the CPU
+     delegate is timed once and kept if it is faster.
+   - `lite` was not faster than `full` on either delegate. That was measured
+     on the fake camera, with no person in shot (the detector path), so it is
+     not proof for the landmark path. The model stays `full` until a slow
+     computer is measured with a person in front of it. */
+const TRY_CPU_MS = 30;       // median GPU call over this: time the CPU delegate
+const SLOW_ENTER_MS = 32;    // median call over this: slow computer
+const SLOW_LEAVE_MS = 22;    // back under this: not slow any more
+const SPEED_CALLS = 40;      // calls in the median
+/* A slow computer runs the model at the classifier's own sample rate. Faster
+   than that only spends time the rest of the page needs. The 6ms is timing
+   slack, so a 30 fps camera gives every other frame. */
+const SLOW_VISION_MIN_MS = SAMPLE_MS - 6;
+/* A body lost for this many camera frames resets the motion window, never
+   fewer than POSE_GAP_MS. At 7 frames a second one missed frame is 150ms. */
+const LOST_FRAMES = 2.5;
+const speed = { delegate:"GPU", recent:[], calls:0, tried:false, trial:null, frameMs:33 };
+let engineLandmarker = null;
+const median = list => { const s = [...list].sort((a, b) => a - b); return s[s.length >> 1]; };
+
+function softwareGraphics(){
+  try{
+    const gl = document.createElement("canvas").getContext("webgl2");
+    if(!gl) return true;   // no WebGL2: the GPU delegate cannot run
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const name = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  }catch(e){ return false; }
+}
+
+/* Spelled out rather than left on the .5 defaults. Detection is loosened
+   because a player mid-word is often a shape the
+   detector has never been shown; presence and tracking are tightened because
+   the failure this addresses is the opposite one — the tracker holding on to
+   a body that has left, or half-left, the frame and drawing its guess at full
+   confidence. Losing the skeleton for a frame is honest; painting an invented
+   one is not. */
+const poseOptions = delegate => ({
+  baseOptions:{ modelAssetPath:POSE_MODEL_URL, delegate },
+  runningMode:"VIDEO", numPoses:1,
+  minPoseDetectionConfidence:.4,
+  minPosePresenceConfidence:.6,
+  minTrackingConfidence:.6,
+  outputSegmentationMasks:false,
+});
+
+/* Time the CPU delegate on the live camera for a few calls, then keep the
+   faster of the two. Runs at most once. */
+function tryCpuDelegate(gpuMs){
+  speed.tried = true;
+  speed.trial = { pending:true };
+  PoseLandmarker.createFromOptions(visionRuntime, poseOptions("CPU")).then(cpu => {
+    if(state.landmarker !== engineLandmarker){ cpu.close(); speed.trial = null; return; }
+    speed.trial = { gpu:engineLandmarker, cpu, gpuMs, times:[], warm:3 };
+    state.landmarker = cpu;
+  }).catch(e => {
+    speed.trial = null;
+    console.warn("CPU pose delegate could not load; keeping the GPU one.", e);
+  });
+}
+
+function endCpuTrial(){
+  const { gpu, cpu, gpuMs, times } = speed.trial;
+  const cpuMs = median(times);
+  const keep = cpuMs < gpuMs * .8;
+  engineLandmarker = state.landmarker = keep ? cpu : gpu;
+  (keep ? gpu : cpu).close();
+  if(keep) speed.delegate = "CPU";
+  console.info(`Pose model: GPU ${gpuMs.toFixed(0)}ms a frame, CPU ${cpuMs.toFixed(0)}ms. Using ${speed.delegate}.`);
+  speed.trial = null;
+  speed.recent.length = 0;
+}
+
+/* Called after every model call with how long it blocked the page. */
+function noteModelCall(ms){
+  const trial = speed.trial;
+  if(trial?.times){
+    if(state.landmarker !== trial.cpu){ trial.cpu.close(); speed.trial = null; return; }
+    if(trial.warm-- > 0) return;   // its first calls build its tracking
+    trial.times.push(ms);
+    if(trial.times.length >= 15) endCpuTrial();
+    return;
+  }
+  const recent = speed.recent;
+  recent.push(ms);
+  if(recent.length > SPEED_CALLS) recent.shift();
+  if(recent.length < SPEED_CALLS || ++speed.calls % 10) return;
+  const typical = median(recent);
+  /* Only the engine's own model is ever swapped; the suites stub it. */
+  if(!speed.tried && speed.delegate === "GPU" && typical > TRY_CPU_MS &&
+     state.landmarker === engineLandmarker) tryCpuDelegate(typical);
+  if(speed.trial) return;   // judge the computer on the model it keeps
+  if(!isSlowComputer() && typical > SLOW_ENTER_MS){
+    setSlowComputer(true);
+    console.info(`Slow computer: pose model ${typical.toFixed(0)}ms a frame. Lighter video, no face model.`);
+  }else if(isSlowComputer() && typical < SLOW_LEAVE_MS) setSlowComputer(false);
+}
 let video, overlay, ctx;
 let lastClassifyT = 0;
 let lastVisionT = -Infinity;
@@ -171,7 +282,7 @@ function faceTrackingInterval(){
 function ensureFaceLandmarker(){
   if(state.faceLandmarker || faceLoad || faceLoadFailed || !visionRuntime) return;
   faceLoad = FaceLandmarker.createFromOptions(visionRuntime,{
-    baseOptions:{ modelAssetPath:FACE_MODEL_URL, delegate:"GPU" },
+    baseOptions:{ modelAssetPath:FACE_MODEL_URL, delegate:speed.delegate },
     runningMode:"VIDEO", numFaces:1,
     minFaceDetectionConfidence:.45,
     minFacePresenceConfidence:.45,
@@ -343,21 +454,19 @@ export async function boot(){
     vision = await FilesetResolver.forVisionTasks(WASM_URL);
     visionRuntime = vision;
     setBootProgress("LOADING THE BODY MODEL");
-    state.landmarker = await PoseLandmarker.createFromOptions(vision,{
-      baseOptions:{ modelAssetPath:POSE_MODEL_URL, delegate:"GPU" },
-      runningMode:"VIDEO", numPoses:1,
-      /* Spelled out rather than left on the .5 defaults. Detection is loosened
-         because a player mid-word is often a shape the detector has never been
-         shown; presence and tracking are tightened because the failure this
-         addresses is the opposite one — the tracker holding on to a body that
-         has left, or half-left, the frame and drawing its guess at full
-         confidence. Losing the skeleton for a frame is honest; painting an
-         invented one is not. */
-      minPoseDetectionConfidence:.4,
-      minPosePresenceConfidence:.6,
-      minTrackingConfidence:.6,
-      outputSegmentationMasks:false,
-    });
+    speed.delegate = softwareGraphics() ? "CPU" : "GPU";
+    try{
+      state.landmarker = await PoseLandmarker.createFromOptions(vision, poseOptions(speed.delegate));
+    }catch(e){
+      /* A GPU delegate that cannot start used to end the boot here. The CPU
+         delegate runs everywhere wasm does. */
+      if(speed.delegate !== "GPU") throw e;
+      console.warn("GPU pose delegate failed; using the CPU one.", e);
+      speed.delegate = "CPU";
+      state.landmarker = await PoseLandmarker.createFromOptions(vision, poseOptions("CPU"));
+    }
+    if(speed.delegate === "CPU") speed.tried = true;
+    engineLandmarker = state.landmarker;
   }catch(e){
     cameraControl.cancelled = true;
     /* getUserMedia itself cannot be aborted. If it is already in flight, stop
@@ -379,7 +488,7 @@ export async function boot(){
   try{
     setBootProgress("LOADING HAND TRACKING");
     state.handmarker = await HandLandmarker.createFromOptions(vision,{
-      baseOptions:{ modelAssetPath:HAND_MODEL_URL, delegate:"GPU" },
+      baseOptions:{ modelAssetPath:HAND_MODEL_URL, delegate:speed.delegate },
       runningMode:"VIDEO", numHands:2
     });
   }catch(e){
@@ -458,10 +567,18 @@ function loop(){
   if(video.currentTime===lastVideoTime) return;
 
   const now=performance.now();
-  if(state.screen==="pmatch" && now-lastVisionT<PARTY_VISION_MIN_MS) return;
+  const minGap=Math.max(state.screen==="pmatch" ? PARTY_VISION_MIN_MS : 0,
+    isSlowComputer() ? SLOW_VISION_MIN_MS : 0);
+  if(now-lastVisionT<minGap) return;
+  /* How often frames really arrive here. A long pause (a hidden tab) says
+     nothing about the computer. */
+  if(now-lastVisionT<1000) speed.frameMs+=.1*(now-lastVisionT-speed.frameMs);
+  state.poseInput.lostMs=Math.max(POSE_GAP_MS, speed.frameMs*LOST_FRAMES);
   lastVisionT=now;
   lastVideoTime=video.currentTime;
+  const callAt=performance.now();
   const res=state.landmarker.detectForVideo(video, now);
+  noteModelCall(performance.now()-callAt);
   /* Live classification consumes only the 15 body landmarks. The hand model
      is reserved for Training/recording, where its points are actually drawn
      and exported, instead of doubling inference work during every match. */
@@ -469,7 +586,10 @@ function loop(){
   const handRes=needsHands && state.handmarker
     ? state.handmarker.detectForVideo(video, now)
     : null;
-  const faceEvery=faceTrackingInterval();
+  /* A slow computer places the crown from the pose points it already has.
+     The face model is a second full model call on top of the pose one. */
+  const crownEvery=faceTrackingInterval();
+  const faceEvery=isSlowComputer() ? 0 : crownEvery;
   if(faceEvery) ensureFaceLandmarker();
 
   ctx.clearRect(0,0,overlay.width,overlay.height);
@@ -525,7 +645,7 @@ function loop(){
      walks out of shot. */
   updateMoveBack(presence(), now);
   if(lm){
-    if(faceEvery && now-lastFaceSeenT>350) positionLocalCrownFromPose(lm);
+    if(crownEvery && (!faceEvery || now-lastFaceSeenT>350)) positionLocalCrownFromPose(lm);
     drawSkeleton(lm, handRes, ctx, overlay);
   }
 
