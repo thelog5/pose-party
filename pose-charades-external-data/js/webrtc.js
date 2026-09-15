@@ -145,6 +145,59 @@ export function createPeer({
   pc.ontrack = e => {
     if(e.streams && e.streams[0]) onRemoteStream(e.streams[0]);
   };
+
+  /* A LINK THAT DROPS IS RECONNECTED, NOT LEFT DEAD. A phone that changes
+     network, or a route that stops, puts the link in `disconnected` and then
+     `failed`, and nothing brought it back: the feed froze or went black for
+     the rest of the match on this screen only. An ICE restart looks for a new
+     route on the same link, so the video comes back without a new call.
+     Only the initiator sends offers, so the other side asks it to restart
+     (`restartIce`). Restarts are spaced out and back off, because each one
+     costs a burst of signaling messages and the server rate-limits those. */
+  const RESTART_AFTER_MS = 2500;       // `disconnected` often fixes itself
+  const RESTART_MIN_GAP_MS = 8000;
+  const RESTART_MAX_GAP_MS = 60000;
+  let restartGap = RESTART_MIN_GAP_MS;
+  let lastRestartAt = 0;
+  let restartTimer = 0;
+
+  function restart(){
+    if(closed) return;
+    clearTimeout(restartTimer);
+    restartTimer = 0;
+    /* the gap only grows while restarts are failing */
+    if(pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed")
+      restartGap = RESTART_MIN_GAP_MS;
+    const wait = lastRestartAt + restartGap - Date.now();
+    if(wait > 0){ restartTimer = setTimeout(restart, wait); return; }
+    /* an offer may replace an unanswered one, but never cross the peer's */
+    if(initiator && pc.signalingState === "have-remote-offer"){
+      restartTimer = setTimeout(restart, 1000);
+      return;
+    }
+    lastRestartAt = Date.now();
+    restartGap = Math.min(RESTART_MAX_GAP_MS, restartGap * 2);
+    if(!initiator){ sendSignal({ restartIce: true }); return; }
+    pc.createOffer({ iceRestart: true })
+      .then(offer => pc.setLocalDescription(offer))
+      .then(() => { encodeAll(); sendSignal({ sdp: pc.localDescription.toJSON() }); })
+      .catch(e => console.warn("webrtc restart failed", e));
+  }
+
+  pc.oniceconnectionstatechange = () => {
+    const st = pc.iceConnectionState;
+    if(st === "failed") restart();
+    else if(st === "disconnected"){
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(() => {
+        if(pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") restart();
+      }, RESTART_AFTER_MS);
+    }else if(st === "connected" || st === "completed"){
+      clearTimeout(restartTimer);
+      restartTimer = 0;
+      restartGap = RESTART_MIN_GAP_MS;
+    }
+  };
   pc.onconnectionstatechange = () => {
     if(pc.connectionState === "connected"){
       encodeAll();
@@ -172,6 +225,10 @@ export function createPeer({
       encodeAll();
       return;
     }
+    if(data.restartIce === true){
+      if(initiator) restart();
+      return;
+    }
     try{
       if(data.sdp){
         await pc.setRemoteDescription(data.sdp);
@@ -192,11 +249,12 @@ export function createPeer({
   function close(){
     if(closed) return;
     closed = true;
+    clearTimeout(restartTimer);
     stopSpeedWatch();
     /* Only close the connection — the local camera stream belongs to the
        whole app (pose engine keeps using it), so its tracks stay live. */
     try{ pc.close(); }catch(e){}
   }
 
-  return { handleSignal, close, pc };
+  return { handleSignal, close, restart, pc };
 }
