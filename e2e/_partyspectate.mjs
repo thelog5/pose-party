@@ -78,7 +78,15 @@ try {
   const code = await txt(A, "#roomCodeText");
   await A.evaluate(async () => {
     const { lobbySettings, partyBridge } = await import("/js/online.js");
-    const s = lobbySettings(); s.matchSecs = 70; s.wordSecs = 22;
+    /* THREE handovers are now read inside ONE word — mine, the rival's (with
+       its SPECTATE_DELAY_MS beat) and my team-mate's — so the word has to
+       outlast all of them or the later assertions measure the NEXT word's
+       fresh board. The word is the server's maximum because the budget is
+       spent on SCREENSHOTS, not on the game: one `#pmStage` shot of four live
+       feeds is milliseconds on an idle machine and has been measured at 24
+       SECONDS on a loaded one. Reads come before pictures everywhere below
+       for the same reason. */
+    const s = lobbySettings(); s.matchSecs = 240; s.wordSecs = 60;
     partyBridge.settings(s);
   });
   for (const p of [B, C, D]) {
@@ -244,8 +252,52 @@ try {
     `the moved feed keeps showing new frames (${feed?.frames} in 0.7s)`);
   ok(feed?.videos === 1, `the big half holds exactly one feed (${feed?.videos})`);
 
-  /* ---- the team-mate gets it too: the big half STAYS on them ---- */
   const names = { A: "ALICE", B: "BOB", C: "CARA", D: "DAN" };
+
+  /* ---- THE OTHER TEAM'S HALF RE-RANKS TOO ----
+     It used to be local-team only, so the opposing half sat on an opponent
+     who had finished while their team-mate was still hunting in a postcard.
+     The rival guess paper has to move WITH the seat, or it reads a player
+     who is no longer above it. */
+  const foeTag = after.seats.orange0?.tag;
+  const foePage = [B, C, D].find((p, i) => names[["B", "C", "D"][i]] === foeTag);
+  ok(!!foePage, `found the featured rival's page (${foeTag})`);
+  const foePaper = () => A.evaluate(() => ({
+    word: document.getElementById("pmFoeTopWord")?.textContent || "",
+    lit: !!document.getElementById("pmFoeTop")?.classList.contains("recognized"),
+  }));
+  if (foePage) {
+    await foePage.evaluate(`(async () => {
+      const { partyCheck } = await import('${APP}/js/partyMatch.js');
+      const { state } = await import('${APP}/js/state.js');
+      clearInterval(window.__rec);
+      window.__rec = setInterval(() => { const w = state.game?.word; if (!w) return;
+        window.__visionTick(w); state.smooth[w] = .95; partyCheck(w, .95); }, 70);
+    })()`);
+    await A.waitForFunction(() => document.querySelector('#pmStage [data-seat="orange0"], #pmStage [data-seat="orange1"]')
+      && document.querySelector('#pmStage [data-seat^="orange"].got'),
+      { timeout: 10000, polling: 60 });
+    /* The winning rival's OWN catch must be drawn on their paper before the
+       paper can belong to anybody else: hand over first and it never shows. */
+    const won = await foePaper();
+    await foePage.evaluate(() => clearInterval(window.__rec));
+    ok(won.lit, `the rival's catch lights their own guess paper first (${won.word})`);
+
+    /* past SPECTATE_DELAY_MS: the beat that lets that win be read */
+    await sleep(1500);
+    const foeAfter = await board();
+    ok(await sameWord(), "the rival handover is read inside the same word");
+    ok(foeAfter.seats.orange0 && foeAfter.seats.orange0.tag !== foeTag,
+      `the other team's half handed over as well (${foeTag} -> ${foeAfter.seats.orange0?.tag})`);
+    ok(foeAfter.seats.orange0 && !foeAfter.seats.orange0.got,
+      `it shows a rival who has NOT got it (got=${foeAfter.seats.orange0?.got})`);
+    const moved = await foePaper();
+    ok(!moved.lit,
+      `the rival guess paper moved with the seat, back to hunting (${moved.word})`);
+    await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-foe-handover.png` });
+  }
+
+  /* ---- the team-mate gets it too: the big half STAYS on them ---- */
   const mateTag = after.seats.blue0?.tag;
   const matePage = [B, C, D].find((p, i) => names[["B", "C", "D"][i]] === mateTag);
   await A.evaluate(() => {
@@ -274,14 +326,21 @@ try {
       { timeout: 10000, polling: 60 });
     await matePage.evaluate(() => clearInterval(window.__rec));
     await A.waitForFunction(() => window.__bonus, { timeout: 3000, polling: 25 }).catch(() => {});
-    await sleep(250);
-    await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-team-bonus.png` });
     await sleep(1200);
+    /* EVERY READ FIRST, THE PICTURE AFTER. This word ends five seconds after
+       the chase opens, and on a loaded machine one `#pmStage` screenshot of
+       four live feeds has been measured at 24 SECONDS — so a screenshot taken
+       between the catch and the assertions silently moved them onto the NEXT
+       word and failed two of them for a reason that had nothing to do with
+       the board. The bonus paper's own geometry comes from the
+       MutationObserver above, so nothing here needs the image. */
     const stay = await board();
-    ok(await sameWord(), "the team-mate's catch is read inside the same word");
+    const inWord = await sameWord();
+    const bonus = await A.evaluate(() => window.__bonus);
+    await (await A.$("#pmStage")).screenshot({ path: `${OUT}/party-match-team-bonus.png` });
+    ok(inWord, "the team-mate's catch is read inside the same word");
     ok(stay.seats.blue0?.tag === mateTag && !stay.seats.blue0?.mine,
       `after the team-mate gets it too, the big half STAYS on them (${stay.seats.blue0?.tag})`);
-    const bonus = await A.evaluate(() => window.__bonus);
     ok(bonus?.title === "TEAM BONUS!" && bonus?.pts === "+150",
       `the team bonus is the points paper (${bonus?.title} ${bonus?.pts})`);
     if (bonus) console.log(`      bonus  L${bonus.L.toFixed(1)} T${bonus.T.toFixed(1)} R${bonus.R.toFixed(1)} B${bonus.B.toFixed(1)}`);
@@ -289,9 +348,15 @@ try {
       "it lands inside the blue team's half");
   }
 
-  /* the watchdog: a feed that loses its stream, or is paused, comes back */
+  /* The watchdog: a feed that loses its stream, or is paused, comes back.
+     ANY seat holding a REMOTE feed will do, and it must be found rather than
+     assumed. This used to read blue0, which holds a remote player only while
+     the handover is in force — once the word rolls over you are featured
+     there again, and the local camera is REPARENTED into that slot rather
+     than living in it, so the query returned null and the probe threw. */
   const healed = await A.evaluate(async () => {
-    const v = document.querySelector('#pmStage [data-seat="blue0"] .slot > video');
+    const v = document.querySelector('#pmStage [data-seat] .slot > video');
+    if (!v) return { missing: true };
     const count = () => v.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
     v.srcObject = null;
     await new Promise(r => setTimeout(r, 1600));
@@ -302,6 +367,7 @@ try {
     await new Promise(r => setTimeout(r, 1000));
     return { back, playing: !v.paused, frames: count() - a };
   });
+  ok(!healed.missing, "a remote seat feed was found to test the watchdog on");
   ok(healed.back, "a feed that lost its stream is attached again within ~1s");
   ok(healed.playing && healed.frames > 3,
     `a paused feed is played again and shows frames (${healed.frames} in 1s)`);

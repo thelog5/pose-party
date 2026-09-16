@@ -192,7 +192,8 @@ function layoutSeats(){
                 orange: perTeam.orange.map(p => p.id).slice(0, 3) };
   spectating = false;
   clearTimeout(spectateTimer);
-  spectateTimer = 0;
+  clearTimeout(foeSpectateTimer);
+  spectateTimer = foeSpectateTimer = 0;
 
   const biggest = Math.max(perTeam.blue.length, perTeam.orange.length);
   stage().dataset.size = biggest >= 3 ? "3" : "2";
@@ -244,28 +245,41 @@ function setSeatOwner(el, pid){
    It is a straight EXCHANGE of two seats rather than a re-layout: everything
    that describes a player (the chip, `mine`/`got`/`gone`, the stamped award
    paper, the video) moves with them, and everything that describes the seat
-   (its Figma rectangle, its team colour, its border art) stays put. Only the
-   local team is ever re-ranked; the opposing half is the rival's own business
-   and `foeFeaturedId` drives a guess paper that must not change mid-word.
+   (its Figma rectangle, its team colour, its border art) stays put.
+
+   BOTH HALVES RE-RANK (2026-09-16). This used to be local-team only, on the
+   grounds that the opposing half was the rival's own business and that
+   `foeFeaturedId` drives a guess paper that must not change mid-word. Played,
+   that reads as a bug and was reported as one: your own half keeps moving to
+   whoever still has something to do, and the other half sits on an opponent
+   who finished ten seconds ago and is standing still. Half the board goes
+   dead exactly while the race it is showing is at its most interesting.
+
+   The guess paper was the real objection, and it is answered rather than
+   avoided: `setFoeFeatured()` moves `foeFeaturedId` and the paper TOGETHER,
+   so the paper always belongs to the face above it. Nothing on the server
+   changes — it already relays every player's guesses to everyone and the
+   client picks, and a player who has finished stops sending, which is exactly
+   who the handover moves away from.
 
    The handover waits SPECTATE_DELAY_MS so your own GOT IT lands on the big
    screen and is read there before the view moves on. */
 const SPECTATE_DELAY_MS = 1100;
 let spectating = false;
 let spectateTimer = 0;
+let foeSpectateTimer = 0;
 let baseOrder = { blue: [], orange: [] };
 
-/* The team-mate most worth watching. First choice: one still hunting the
-   word. With `anyMate`, a team-mate who already has it is good enough, as
-   long as they are still in the room. */
-function spectateTarget(anyMate = false){
-  const team = myTeam();
+/* The seat on `team` most worth watching. First choice: somebody still
+   hunting the word. With `anyone`, a player who already has it is good
+   enough, as long as they are still in the room. */
+function spectateTarget(team, anyone = false){
   for(const key of [team + "0", team + "1", team + "2"]){
     const id = seats.get(key);
     if(!id || id === ctx.myId) continue;
     const el = seatEl(key);
     if(!el || el.classList.contains("gone")) continue;
-    if(!anyMate && el.classList.contains("got")) continue;
+    if(!anyone && el.classList.contains("got")) continue;
     return key;
   }
   return null;
@@ -288,13 +302,13 @@ function handOverFeaturedSeat(){
   const showingMe = seats.get(featured) === ctx.myId;
   let target;
   if(showingMe){
-    target = spectateTarget() || spectateTarget(true);
+    target = spectateTarget(team) || spectateTarget(team, true);
   }else{
     const cur = seatEl(featured);
     const gone = !!cur?.classList.contains("gone");
     /* still hunting: they are exactly who is worth watching */
     if(!gone && !cur?.classList.contains("got")) return;
-    target = spectateTarget() || (gone ? spectateTarget(true) : null);
+    target = spectateTarget(team) || (gone ? spectateTarget(team, true) : null);
     if(!target){
       if(gone) restoreMyFeaturedSeat();
       return;                    // they got it and nobody else is left: stay
@@ -303,6 +317,74 @@ function handOverFeaturedSeat(){
   if(!target || target === featured) return;
   swapSeats(featured, target);
   spectating = seats.get(featured) !== ctx.myId;
+}
+
+/* THE OPPOSING HALF FOLLOWS THE SAME RULE, without the `myPlace` gate: your
+   own half only moves once you are in at all, because before that it is
+   showing your own feed and there is nothing to re-rank. This half is never
+   you, and whether you are in says nothing about which rival is still worth
+   watching. If everybody over there has finished it STAYS on the last one,
+   exactly as your own half does.
+
+   IT DOES NEED THE SAME BEAT, AND FOR A SHARPER REASON. Your own catch waits
+   SPECTATE_DELAY_MS so your GOT IT is read on the big screen before the view
+   moves on. Over here the guess paper belongs to whoever is featured, so a
+   handover in the same tick as the catch RESETS the very paper that was just
+   lit — the rival's win renders for zero frames and their half simply goes
+   quiet. `_partyspectate.mjs` asserts the paper lights first. A player who
+   LEFT gets no beat: there is nothing to read on a seat that has gone. */
+function scheduleFoeSpectate(roundId, delayMs){
+  clearTimeout(foeSpectateTimer);
+  foeSpectateTimer = 0;
+  const run = () => {
+    foeSpectateTimer = 0;
+    const g = state.game;
+    if(!g || g.mode !== "party" || g.roundId !== roundId) return;
+    handOverFoeFeaturedSeat();
+  };
+  if(delayMs > 0) foeSpectateTimer = setTimeout(run, delayMs);
+  else run();
+}
+
+function handOverFoeFeaturedSeat(){
+  /* Doing the work now, so a beat still waiting to do it is spent. */
+  clearTimeout(foeSpectateTimer);
+  foeSpectateTimer = 0;
+  const team = foeTeam();
+  const featured = team + "0";
+  const cur = seatEl(featured);
+  if(!cur) return;
+  const gone = cur.classList.contains("gone");
+  /* still hunting: they are exactly who is worth watching */
+  if(!gone && !cur.classList.contains("got")) return;
+  const target = spectateTarget(team) || (gone ? spectateTarget(team, true) : null);
+  if(!target || target === featured){
+    /* Nobody to move to. A player who has merely finished keeps the half;
+       one who has LEFT must still give up the guess paper, or it goes on
+       taking relayed guesses from a socket that is gone. */
+    if(gone) setFoeFeatured(null);
+    return;
+  }
+  swapSeats(featured, target);
+  setFoeFeatured(seats.get(featured));
+}
+
+/* The featured rival and the paper that reads their guesses move as ONE
+   thing. Keeping them apart is what made this half un-re-rankable before. */
+function setFoeFeatured(id){
+  if((id || null) === foeFeaturedId) return;
+  foeFeaturedId = id || null;
+  resetGuessSide("Foe");
+  /* Promoted somebody who is already in (their whole team finished and the
+     one you were watching left): their paper says so rather than pretending
+     to hunt a word they have already caught. */
+  const g = state.game;
+  const key = foeFeaturedId ? seatOf(foeFeaturedId) : null;
+  if(!g?.word || !key || !seatEl(key)?.classList.contains("got")) return;
+  const update = updateGuessHistory(partyGuess.pmFoeTop, g.word, 1,
+    { force:true, locked:true });
+  renderPartyGuess("pmFoeTop", "pmFoePast", partyGuess.pmFoeTop, update.changed);
+  markGuessRecognized($("pmFoeTop"), true);
 }
 
 /* The local player has to be IN before the half is worth handing over, and
@@ -335,23 +417,28 @@ function restoreMyFeaturedSeat(){
 }
 
 /* THE AUTHORED ORDER IS RESTORED IN FULL AT THE TOP OF EVERY WORD, not just
-   my own seat. Two handovers inside one word leave the team rotated — I take
+   my own seat. Two handovers inside one word leave a team rotated — I take
    the first watched player's tile, they take the second's — and undoing only
-   my half of that would leave team-mates swapping tiles between words for the
-   rest of the match. `onPartyRound` has already cleared `got`, the crowns and
-   every award by the time this runs, so a full reorder here is only moving
-   video and chips. */
+   part of that would leave players swapping tiles between words for the rest
+   of the match. BOTH teams are restored now that both re-rank; before, the
+   opposing half never moved and had nothing to undo. `onPartyRound` has
+   already cleared `got`, the crowns and every award by the time this runs, so
+   a full reorder here is only moving video and chips. */
 function restoreTeamOrder(){
   clearTimeout(spectateTimer);
-  spectateTimer = 0;
+  clearTimeout(foeSpectateTimer);
+  spectateTimer = foeSpectateTimer = 0;
   spectating = false;
-  const team = myTeam();
-  const want = baseOrder[team] || [];
-  want.forEach((id, i) => {
-    const key = team + i;
-    const at = seatOf(id);
-    if(at && at !== key) swapSeats(key, at);
-  });
+  for(const team of ["blue", "orange"]){
+    (baseOrder[team] || []).forEach((id, i) => {
+      const key = team + i;
+      const at = seatOf(id);
+      if(at && at !== key) swapSeats(key, at);
+    });
+  }
+  /* Every word starts on the authored rival again, so a handover cannot
+     outlast the word that earned it any more than the local one can. */
+  setFoeFeatured(seats.get(foeTeam() + "0") || null);
 }
 
 /* Exchange two seats' occupants. Seat elements are never rebuilt, so this
@@ -590,20 +677,15 @@ export function markPartyPlayerGone(pid){
   for(const v of el.querySelectorAll("video")){ v.pause?.(); v.srcObject = null; }
   const player = ctx.roster?.players.find(p => p.id === pid);
   ctx.toast?.(disp(player?.name) + " left the party.");
-  /* foeFeaturedId is otherwise only assigned in layoutSeats(), which runs once
-     at match start — so losing the featured opponent killed the rival guess
-     paper for the rest of the match. Promote the next one still seated. */
   /* Spectating someone who has just walked out is the one case where the big
      half is worth LESS than your own feed. Re-pick, or take it back. */
   if(spectating) handOverFeaturedSeat();
-  if(pid === foeFeaturedId){
-    const foeTeam = myTeam() === "blue" ? "orange" : "blue";
-    foeFeaturedId = [...seats]
-      .filter(([key, id]) => key.startsWith(foeTeam) && id !== pid &&
-        !seatEl(key)?.classList.contains("gone"))
-      .map(([, id]) => id)[0] || null;
-    resetGuessPapers();
-  }
+  /* Losing the featured opponent used to repoint `foeFeaturedId` at another
+     player WITHOUT moving them into the featured seat, so the big half showed
+     a greyed-out player who had left while the paper beneath it read somebody
+     else's guesses. The same handover the rest of this file uses moves the
+     seat and the paper together, so the two cannot disagree. */
+  handOverFoeFeaturedSeat();
 }
 
 /* party.js calls this when a mesh stream lands after the match began */
@@ -619,6 +701,7 @@ export function attachPartyStream(pid, stream){
 
 const myTeam = () =>
   ctx.roster.players.find(p => p.id === ctx.myId)?.team || "blue";
+const foeTeam = () => myTeam() === "blue" ? "orange" : "blue";
 
 /* ---------------- server events ---------------- */
 
@@ -735,6 +818,10 @@ export function onPartyGot({ id, place } = {}){
     }
     blip([494, 622], .05);
   }
+  /* Keyed to the round, like the local one, so a word that resolves inside
+     the delay never re-seats the board under the next one. */
+  if(!key.startsWith(myTeam()))
+    scheduleFoeSpectate(g?.roundId, SPECTATE_DELAY_MS);
 }
 
 export function onPartyChase({ team, chaseEndsAt, bonus } = {}){
@@ -1042,23 +1129,22 @@ function renderPartyGuess(topId, pastId, history, popped=false){
   }
 }
 
+/* One side, so a mid-word change of featured rival can clear that paper
+   without touching the local one. `side` is "My" or "Foe". */
+function resetGuessSide(side){
+  const top = "pm" + side + "Top", past = "pm" + side + "Past";
+  resetGuessHistory(partyGuess[top]);
+  robotNewWord(side === "My" ? "pmRobotMine" : "pmRobotFoe");
+  setTxt(top + "Word", "GUESSING…"); setTxt(top + "Pct", "0%");
+  markGuessRecognized($(top), false);
+  $(past)?.classList.add("empty");
+  setTxt(past + "Word", ""); setTxt(past + "Pct", "");
+  fitGameplayText($(top + "Word"));
+}
+
 function resetGuessPapers(){
-  resetGuessHistory(partyGuess.pmMyTop);
-  resetGuessHistory(partyGuess.pmFoeTop);
-  robotNewWord("pmRobotMine");
-  robotNewWord("pmRobotFoe");
-  setTxt("pmMyTopWord", "GUESSING…"); setTxt("pmMyTopPct", "0%");
-  setTxt("pmFoeTopWord", "GUESSING…"); setTxt("pmFoeTopPct", "0%");
-  for(const id of ["pmMyTop", "pmFoeTop"]){
-    markGuessRecognized($(id), false);
-  }
-  for(const id of ["pmMyPast", "pmFoePast"]){
-    $(id)?.classList.add("empty");
-  }
-  setTxt("pmMyPastWord", ""); setTxt("pmMyPastPct", "");
-  setTxt("pmFoePastWord", ""); setTxt("pmFoePastPct", "");
-  for(const id of ["pmMyTopWord", "pmFoeTopWord"])
-    fitGameplayText($(id));
+  resetGuessSide("My");
+  resetGuessSide("Foe");
 }
 
 /* ---------------- scores ---------------- */
@@ -1110,7 +1196,8 @@ function endPartyMatch(payload){
   if(g) clearInterval(g.timer);
   clearInterval(ctx?.countdownTimer);
   clearTimeout(spectateTimer);
-  spectateTimer = 0;
+  clearTimeout(foeSpectateTimer);
+  spectateTimer = foeSpectateTimer = 0;
   if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
   $("countdown")?.classList.add("hidden");
   releaseSeatVideos();
