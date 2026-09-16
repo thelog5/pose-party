@@ -520,8 +520,16 @@ function wireSocket(s){
       : "Room error: "+error);
   });
 
+  /* NO TOAST WHERE THE BOARD ALREADY SAYS IT. A departure used to toast on
+     every one of these branches, and two of them were announcing something
+     the player was already looking at: the match end card reads
+     "<NAME> LEFT EARLY", and on results the rival's seat reads LEFT with the
+     rematch paper carrying the whole sentence. A toast repeating a headline
+     is noise, and on results it arrives after the match anybody cared about
+     is over. The lobby keeps its line, because there the departure is not
+     drawn anywhere AND it has a consequence: the room is rebuilt, so the
+     code the player may already have shared has just changed. */
   s.on("peer:left", () => {
-    toast(peerName+" left the game.");
     if(state.game && state.game.mode==="online") endOnline(null, "peer-left");
     else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
       roomCode=null;
@@ -532,7 +540,10 @@ function wireSocket(s){
       markResultsPlayerGone("rival");
       setRematchUnavailable(peerName+" left. Start a new room to play again.");
     }
-    else if(gameState()==="lobby"){ resetLobbyUi(); createRoom(); }
+    else if(gameState()==="lobby"){
+      toast(peerName+" left. You have a new room code.");
+      resetLobbyUi(); createRoom();
+    }
   });
 
   const inOnlineGame = () => Boolean(state.game && state.game.mode==="online");
