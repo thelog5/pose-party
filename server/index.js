@@ -51,6 +51,21 @@ if(config.trustProxy === "cloudflare")
     next();
   });
 
+/* THE SOCKET'S OWN ORIGIN, FOR connect-src. `'self'` covers same-origin
+   WebSockets in current browsers, but it did not always, and this game is
+   played on phones. Naming the host explicitly works everywhere without the
+   bare `ws:` / `wss:` this replaces — those matched EVERY host, which handed
+   any injected script a clean exfiltration channel and made the rest of the
+   policy much less worth having.
+   The Host header is client-supplied, so it is filtered to the characters a
+   hostname can contain: a header value is only ever used in the response to
+   the request it came from, but a stray `;` would still let a caller rewrite
+   their own policy. */
+const selfSocket = scheme => (req) => {
+  const host = String(req.headers.host || "").match(/^[A-Za-z0-9.\-]+(:\d{1,5})?$/)?.[0];
+  return host ? `${scheme}://${host}` : "'self'";
+};
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -58,7 +73,8 @@ app.use(helmet({
       /* MediaPipe: module from jsdelivr, wasm compilation, models from
          Google storage, workers from blobs. */
       scriptSrc: ["'self'", "https://cdn.jsdelivr.net", "'wasm-unsafe-eval'"],
-      connectSrc: ["'self'", "ws:", "wss:", "https://cdn.jsdelivr.net", "https://storage.googleapis.com"],
+      connectSrc: ["'self'", selfSocket("ws"), selfSocket("wss"),
+                   "https://cdn.jsdelivr.net", "https://storage.googleapis.com"],
       workerSrc: ["'self'", "blob:"],
       /* Markup uses inline style attributes; fonts come from Google. */
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
@@ -69,7 +85,25 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false, // CDN resources carry no CORP headers
+  /* DENY, not the SAMEORIGIN default, so the old header agrees with
+     `frame-ancestors 'none'` above. Nothing here is ever meant to be framed,
+     including by us: a camera game inside an iframe is the shape of a
+     clickjacking attack on a permission prompt. */
+  frameguard: { action: "deny" },
 }));
+
+/* WHAT THIS PAGE MAY ASK THE DEVICE FOR. The camera is the whole game, so it
+   keeps it; everything else a browser would otherwise let this origin (or
+   anything it embeds) request is turned off. `microphone=()` is the one that
+   matters most: the privacy policy says this game records no audio, and
+   `getUserMedia` is called with `audio:false` — this makes that a property the
+   browser enforces rather than a promise in a document. */
+app.use((req, res, next) => {
+  res.set("Permissions-Policy",
+    "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), " +
+    "magnetometer=(), gyroscope=(), accelerometer=(), display-capture=()");
+  next();
+});
 
 /* GZIP THE TEXT. The pose deck alone is 8.3 MB of JSON and gzips to about
    1.8 MB, and it is the one download a first visit waits on. The markup, JS
@@ -90,7 +124,10 @@ app.use((req, res, next) => {
    `servedWithoutServer()` probe answers the same question from /socket.io/. */
 app.get("/healthz", (req, res) => {
   res.set("Cache-Control", "no-store");
-  res.json({ ok: true, rooms: store._rooms.size, uptimeSec: Math.round(process.uptime()) });
+  /* Liveness only. The live room count used to be here, which told anybody
+     who asked how busy a private beta is; the owner reads it from /stats,
+     which has a password. */
+  res.json({ ok: true, uptimeSec: Math.round(process.uptime()) });
 });
 
 /* THE PRIVACY POLICY AND TERMS OF USE ARE PUBLIC. A player must be able to
@@ -117,7 +154,13 @@ function deckLabels(){
   }
 }
 const stats = config.statsToken ? createWordStats({ labels: deckLabels() }) : null;
-const statsAuthLimit = createLimiter({ tokens: 10, perMs: 60_000 });
+/* THE PASSWORD BUCKETS CHARGE FOR FAILURES ONLY (peek/spend, not allow), so
+   the window can be long without ever punishing the owner for getting it
+   right. Ten wrong guesses per IP per quarter hour is a hard ceiling on
+   guessing the stats password; a correct one costs nothing and never runs
+   out. `/stats` and `/dev` share this bucket because they share the
+   password. */
+const statsAuthLimit = createLimiter({ tokens: 10, perMs: 15 * 60_000 });
 /* A real player sends one report per word, so even a Party of six behind
    one home connection stays far under this. */
 const reportLimit = createLimiter({ tokens: 40, perMs: 60_000 });
@@ -134,11 +177,13 @@ function basicPassword(header){
 if(stats){
   app.get("/stats", (req, res) => {
     res.set("Cache-Control", "no-store");
-    if(!statsAuthLimit.allow(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a minute.");
+    if(!statsAuthLimit.peek(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a quarter of an hour.");
     const pass = basicPassword(req.headers.authorization);
-    if(!pass || !codeMatches(pass, config.statsToken))
+    if(!pass || !codeMatches(pass, config.statsToken)){
+      statsAuthLimit.spend(req.ip);
       return res.status(401).set("WWW-Authenticate", 'Basic realm="Pose Party stats"')
         .type("text").send("The stats page needs the stats password.");
+    }
     const snap = stats.snapshot({ online: { sockets: io.engine.clientsCount, rooms: store._rooms.size },
       relay: relayStatus() });
     if((req.headers.accept || "").includes("text/html")) return res.type("html").send(statsPage(snap));
@@ -160,11 +205,13 @@ const isOwner = req => !!devSecret && ticketValid(devSecret, readCookie(req.head
 if(devSecret){
   app.get("/dev", (req, res) => {
     res.set("Cache-Control", "no-store");
-    if(!statsAuthLimit.allow(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a minute.");
+    if(!statsAuthLimit.peek(req.ip)) return res.status(429).type("text").send("Too many tries. Wait a quarter of an hour.");
     const pass = basicPassword(req.headers.authorization);
-    if(!pass || !codeMatches(pass, config.statsToken))
+    if(!pass || !codeMatches(pass, config.statsToken)){
+      statsAuthLimit.spend(req.ip);
       return res.status(401).set("WWW-Authenticate", 'Basic realm="Pose Party owner"')
         .type("text").send("Owner tools need the stats password.");
+    }
     res.cookie(DEV_COOKIE, makeTicket(devSecret, 30 * 24 * 60 * 60), {
       httpOnly: true, sameSite: "strict", maxAge: 30 * 24 * 60 * 60 * 1000, secure: req.secure });
     log(`dev: owner tools turned on from ${req.ip}`);
@@ -187,9 +234,19 @@ app.get("/dev/check", (req, res) => {
 function fromThisSite(req){
   const o = req.headers.origin;
   if(!o) return false;
+  return originAllowed(o, req.headers.host);
+}
+
+/* The same question with the "no Origin at all" case left to the caller,
+   because the two callers want opposite answers to it. A browser ALWAYS
+   sends Origin on a POST and on a WebSocket handshake, so a missing one means
+   a script rather than a page — which is a reason to refuse a word report and
+   not a reason to refuse a socket (`scripts/`, the test suites and any native
+   client have no origin, and the access gate is what authenticates them). */
+function originAllowed(origin, host){
   try{
-    const host = new URL(o).host;
-    return host === req.headers.host || config.corsOrigins.some(c => { try{ return new URL(c).host === host; }catch{ return false; } });
+    const o = new URL(origin).host;
+    return o === host || config.corsOrigins.some(c => { try{ return new URL(c).host === o; }catch{ return false; } });
   }catch{ return false; }
 }
 
@@ -199,11 +256,19 @@ function fromThisSite(req){
    underneath that. Unset ACCESS_CODE leaves the game wide open exactly as it
    shipped, which is what local dev and every test suite expect. */
 const gateOn = !!config.accessCode;
-const gateSecret = config.accessSecret || config.accessCode;
+/* NEVER `config.accessCode`. See config.gateSecret: a cookie signed with the
+   code lets anyone holding a cookie guess the code offline. */
+const gateSecret = config.gateSecret;
+if(gateOn && !config.accessSecret){
+  console.warn("WARNING: ACCESS_CODE is set but ACCESS_SECRET is not. A random signing key is used, so every player types the code again after a restart.");
+}
 /* A shared code is guessable at speed, so attempts are capped per IP. The
    bucket is on the SUBMIT path only: rate-limiting page views would lock out
-   somebody who simply reloaded. */
-const gateLimit = createLimiter({ tokens: 10, perMs: 60_000 });
+   somebody who simply reloaded. It charges for WRONG codes only, which is why
+   the window can be a quarter of an hour rather than a minute — a party of
+   six behind one NAT all typing the right code spends nothing, while a
+   guesser gets ten tries and then waits. */
+const gateLimit = createLimiter({ tokens: 10, perMs: 15 * 60_000 });
 setInterval(() => gateLimit.sweep(), 60_000).unref();
 
 function gateOk(req){
@@ -214,12 +279,20 @@ if(gateOn){
   app.use(express.urlencoded({ extended: false, limit: "1kb" }));
 
   app.post("/__gate", (req, res) => {
-    if(!gateLimit.allow(req.ip)){
+    /* LOGIN CSRF. The cookie is SameSite=Lax, so a cross-site form POST does
+       not carry one — but it can still MINT one, which would silently put a
+       visitor into the beta under somebody else's code. A browser always
+       sends Origin on a form POST; a request with none is a script, which can
+       set its own cookies anyway and gains nothing here. */
+    if(req.headers.origin && !fromThisSite(req))
+      return res.status(403).type("text").send("Bad request.");
+    if(!gateLimit.peek(req.ip)){
       log(`gate: too many attempts from ${req.ip}`);
       return res.status(429).type("html")
-        .send(gatePage({ error: "Too many tries. Wait a minute." }));
+        .send(gatePage({ error: "Too many tries. Wait a quarter of an hour." }));
     }
     if(!codeMatches(String(req.body?.code || "").trim(), config.accessCode)){
+      gateLimit.spend(req.ip);
       log(`gate: wrong code from ${req.ip}`);
       return res.status(401).type("html")
         .send(gatePage({ error: "That code is not right." }));
@@ -267,6 +340,21 @@ if(stats){
    train_model.py). The repo is private and the players need none of it. */
 app.use((req, res, next) => /\.(md|py)$/i.test(req.path) ? res.status(404).end() : next());
 
+/* THE DECK IS THE ONE EXPENSIVE THING THIS SERVER SERVES: 8.7 MB of JSON,
+   1.8 MB gzipped, and it is deliberately `no-cache`, so a CDN in front has to
+   revalidate and a request with no validator gets the whole body from here.
+   A real client fetches it once per page load and thereafter gets a 304, so a
+   household of six is nowhere near this; a script asking for it in a loop is
+   the only thing that reaches it. A conditional request is cheap and is not
+   counted, so nobody playing normally can trip it. */
+const deckLimit = createLimiter({ tokens: 30, perMs: 60_000 });
+setInterval(() => deckLimit.sweep(), 60_000).unref();
+app.use("/assets/data", (req, res, next) => {
+  if(req.headers["if-none-match"] || req.headers["if-modified-since"]) return next();
+  if(!deckLimit.allow(req.ip)) return res.status(429).type("text").send("Too many requests.");
+  next();
+});
+
 app.use(express.static(GAME_DIR, {
   index: "index.html",
   setHeaders: (res, filePath) => {
@@ -279,6 +367,16 @@ app.use(express.static(GAME_DIR, {
       : "no-cache");
   },
 }));
+
+/* A PLAIN 404, NOT EXPRESS'S OWN. Nothing matched, so finalhandler would
+   answer with its `<title>Error</title><pre>Cannot GET /whatever</pre>` page:
+   it escapes the path, so it is not an injection, but it names the framework
+   and echoes the request back, and neither tells a player anything. This
+   catches only unmatched routes; thrown errors fall through to the handler
+   below. */
+app.use((req, res) => {
+  res.status(404).set("Cache-Control", "no-store").type("text").send("Not found.");
+});
 
 /* NO STACK TRACES TO THE PUBLIC. Without this, Express's own handler answers
    a malformed request (bad JSON to /stats/word, say) with the error and this
@@ -293,6 +391,22 @@ app.use((err, req, res, next) => {
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: config.corsOrigins, methods: ["GET", "POST"] },
+  /* THE `cors` OPTION ABOVE IS NOT A LOCK, AND THAT IS NOT A SOCKET.IO BUG.
+     It writes Access-Control-Allow-Origin on the POLLING transport, which a
+     browser then enforces — but a WebSocket handshake is exempt from CORS by
+     design, so a page on any origin can open one and the allowlist never
+     comes into it. Measured: with CORS_ORIGINS set to one host, a client
+     presenting `Origin: https://evil.example` connected over websocket.
+     This is the actual check. A browser always sends Origin on a handshake,
+     so a cross-site page is refused here; a client with no Origin is a script
+     rather than a page, and the access gate (io.use, below) is what decides
+     whether it may play. */
+  allowRequest: (req, done) => {
+    const origin = req.headers.origin;
+    if(!origin || originAllowed(origin, req.headers.host)) return done(null, true);
+    log(`socket refused: origin ${origin}`);
+    done("origin-not-allowed", false);
+  },
   maxHttpBufferSize: 64 * 1024, // largest legal payload is an SDP blob
   /* THE RETURNING PLAYER KEEPS THEIR SOCKET ID. Every room, peer, seat, mesh
      entry and video element in this game is keyed by `socket.id`, so an
@@ -526,7 +640,10 @@ async function cloudflareIceServers(){
   const ttl = config.turnTtlSec;
   try{
     const r = await fetch(
-      `https://rtc.live.cloudflare.com/v1/turn/keys/${config.cfTurnKeyId}/credentials/generate-ice-servers`,
+      /* The key id is operator-supplied, never request-supplied, but it is
+         the one value interpolated into a URL path here: encode it so a
+         stray character in an env var cannot reshape the request. */
+      `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(config.cfTurnKeyId)}/credentials/generate-ice-servers`,
       { method: "POST",
         headers: { Authorization: `Bearer ${config.cfTurnApiToken}`,
                    "Content-Type": "application/json" },
@@ -644,6 +761,9 @@ io.on("connection", socket => {
 
   socket.on("player:ready", (payload, cb) => {
     cb = ack(cb);
+    /* Cheap and idempotent, but it walks the roster and can emit to both
+       players, so it gets a bucket like every other state-changing event. */
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
     cb(store.ready(socket.id));
   });
 
@@ -823,9 +943,13 @@ io.on("connection", socket => {
   /* Pressing Esc or walking out of a lobby is a DECISION, not a blip: it
      leaves at once and cancels any hold left over from an earlier drop. */
   socket.on("room:leave", (payload, cb) => {
+    cb = ack(cb);
+    /* Still answers the callback when limited: a client waiting on an ack
+       that never arrives is worse than a refused leave. */
+    if(!claimLimit.allow(socket.id)) return cb({ error: "rate-limited" });
     releaseSeatHold(socket.id);
     store.leave(socket.id);
-    ack(cb)({ ok: true });
+    cb({ ok: true });
   });
   socket.on("disconnect", reason => {
     log(`disconnect ${socket.id.slice(0,6)} (${reason}) — seat held ${config.rejoinGraceMs}ms`);
@@ -841,6 +965,15 @@ function warnIfMisconfigured(){
   if(process.env.NODE_ENV !== "production") return;
   if(!config.trustProxy)
     console.warn("WARNING: TRUST_PROXY is off. Behind a platform proxy every player shares one rate-limit bucket.");
+  /* EVERY RATE LIMIT KEYS ON CF-Connecting-IP UNDER THIS SETTING, and that
+     header is only trustworthy because Cloudflare overwrites whatever the
+     client sent. Reach this process WITHOUT going through Cloudflare and a
+     caller writes the header themselves, which is an unlimited supply of
+     fresh rate-limit keys. Render's own edge is Cloudflare, so the deployed
+     path is covered; anywhere else, the origin must not be directly
+     reachable. */
+  if(config.trustProxy === "cloudflare")
+    console.warn("NOTE: TRUST_PROXY=cloudflare trusts CF-Connecting-IP. Make sure this process cannot be reached except through Cloudflare, or the rate limits can be bypassed.");
   if(config.corsOrigins.every(o => /localhost|127\.0\.0\.1/.test(o)))
     console.warn("WARNING: CORS_ORIGINS still only lists localhost. Set it to your real origin.");
   if(config.turnUrls.length && !config.cfTurnKeyId

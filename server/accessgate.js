@@ -28,11 +28,13 @@ function sign(secret, exp){
 }
 
 /* Compare in constant time. A plain `===` on a secret leaks its length and,
-   over enough tries, its content. */
+   over enough tries, its content — and so does a length check in front of
+   timingSafeEqual, which is what this used to do. Hashing both sides first
+   makes every comparison the same 32 bytes whatever was submitted, so the
+   only thing the timing can say is "not equal". */
 function sameSecret(a, b){
-  const x = Buffer.from(String(a));
-  const y = Buffer.from(String(b));
-  if(x.length !== y.length) return false;
+  const x = crypto.createHash("sha256").update(String(a)).digest();
+  const y = crypto.createHash("sha256").update(String(b)).digest();
   return crypto.timingSafeEqual(x, y);
 }
 

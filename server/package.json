@@ -11,15 +11,16 @@
   "engines": {
     "node": ">=22.9"
   },
+  "comment:versions": "EXACT VERSIONS, NO CARETS. package-lock.json plus `npm ci` (render.yaml's build command) is what actually decides the bytes installed, so these pins change nothing about a deploy; what they change is that an ordinary `npm install` here cannot quietly move a dependency, and the version this server was tested against is readable in one file. Update them deliberately: bump, run `npm test` and the e2e suites, commit the lockfile with it. Express is held on 4.x on purpose; 5.x is a breaking change.",
   "dependencies": {
-    "compression": "^1.8.2",
-    "express": "^4.21.2",
-    "helmet": "^8.0.0",
-    "proxy-addr": "^2.0.7",
-    "socket.io": "^4.8.1"
+    "compression": "1.8.2",
+    "express": "4.22.3",
+    "helmet": "8.3.0",
+    "proxy-addr": "2.0.8",
+    "socket.io": "4.8.3"
   },
   "devDependencies": {
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "4.8.3"
   },
   "overrides": {
     "qs": "^6.16.0"

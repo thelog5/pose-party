@@ -1,6 +1,8 @@
 /* All configuration comes from the environment; nothing is hardcoded in the
    game logic. Copy .env.example and `source` it, or set vars inline. */
 
+import crypto from "node:crypto";
+
 const int = (v, d) => Number.isFinite(+v) ? +v : d;
 /* Same coercion, but the value is genuinely fractional (GB budgets). */
 const num = (v, d) => Number.isFinite(+v) && String(v).trim() !== "" ? +v : d;
@@ -182,6 +184,17 @@ export const config = {
   accessCode: (process.env.ACCESS_CODE || "").trim(),
   accessSecret: (process.env.ACCESS_SECRET || "").trim(),
   accessTtlSec: int(process.env.ACCESS_TTL_SEC, 30 * 24 * 60 * 60),
+
+  /* THE CODE IS NEVER THE SIGNING KEY. The cookie is `<exp>.<HMAC(secret,
+     exp)>`, and it is handed to every admitted player — so if the secret were
+     the code, anyone holding one cookie could run the HMAC against a word
+     list offline, with no rate limit, and recover a short shared code. A
+     random secret makes the cookie say nothing about the code at all.
+     Unset ACCESS_SECRET therefore means a NEW secret each boot: everyone
+     types the code again after a restart. Set it (Render generates one) to
+     keep them signed in. */
+  gateSecret: (process.env.ACCESS_SECRET || "").trim()
+    || crypto.randomBytes(32).toString("hex"),
 
   /* WORD STATS. Set it and the game collects anonymous per-word results;
      /stats shows the totals to anyone who has this password (HTTP Basic,

@@ -15,6 +15,14 @@ const MODES = new Set(["ai", "vs", "online", "party"]);
 const RESULTS = new Set(["got", "miss", "skip"]);
 const MAX_MS = 10 * 60 * 1000;
 
+/* ONE ESCAPER FOR BOTH TABLES ON THIS PAGE. Every value here has already been
+   checked against the deck or coerced to a fixed set, so nothing on it can
+   carry markup today; this is what keeps that true after the next edit.
+   It escapes the apostrophe as well, so a value is safe inside a single-quoted
+   attribute and not only between tags. */
+const escHtml = s => String(s).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+
 export function createWordStats({ labels }){
   const known = new Set(labels);
   const bootId = crypto.randomUUID();
@@ -81,7 +89,11 @@ function netSection(snap){
   const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "-";
   const rows = Object.entries(snap.net || {}).map(([mode, n]) => {
     const all = n.connected + n.failed;
-    return `<tr><td>${mode}</td><td>${all}</td><td>${pct(n.connected - n.relayed, all)}</td>` +
+    /* index.js coerces this to exactly "party" or "1v1" before it becomes a
+       key here, so it cannot carry markup today. Escaped anyway: it is the
+       only slot on this page fed by a field a client sends, and the coercion
+       is one edit away from being relaxed. */
+    return `<tr><td>${escHtml(mode)}</td><td>${all}</td><td>${pct(n.connected - n.relayed, all)}</td>` +
       `<td>${pct(n.relayed, all)}</td><td>${pct(n.failed, all)}</td></tr>`;
   }).join("");
   const r = snap.relay;
@@ -100,7 +112,7 @@ ${rows || '<tr><td colspan="5">No video links yet.</td></tr>'}</table>
 
 /* The admin page: the same snapshot as a table, worst word first. */
 export function statsPage(snap){
-  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+  const esc = escHtml;
   const pct = (a, b) => b ? Math.round(100 * a / b) + "%" : "";
   const rows = Object.entries(snap.words)
     .sort((a, b) => a[1].got / a[1].played - b[1].got / b[1].played)

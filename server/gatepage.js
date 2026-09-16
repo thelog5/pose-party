@@ -2,15 +2,23 @@
    allows no inline script, and every static file behind the gate is blocked,
    so a page that reached for one would render broken to the one visitor who
    most needs it to work. A plain form POST needs neither. */
+/* BOTH SLOTS ARE ESCAPED EVEN THOUGH BOTH CALLERS PASS LITERALS. This is the
+   one template in the server that builds HTML by interpolation, and the
+   obvious future edit — passing an exception's message through as the error
+   line — would turn it into a real hole. Escaping here costs nothing and
+   means that edit stays safe. */
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]);
+
 export function gatePage({ error = "", title = "Pose Party" } = {}){
   const note = error
-    ? `<p class="err">${error}</p>`
+    ? `<p class="err">${esc(error)}</p>`
     : `<p class="sub">This build is in private testing. Enter the code you were given.</p>`;
   return `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>${title}</title>
+<title>${esc(title)}</title>
 <style>
   :root{ color-scheme: dark }
   *{ box-sizing:border-box }
@@ -40,7 +48,7 @@ export function gatePage({ error = "", title = "Pose Party" } = {}){
   .legal a{ color:#41618a; font-weight:700 }
 </style>
 <div class="card">
-  <h1>${title}</h1>
+  <h1>${esc(title)}</h1>
   ${note}
   <form method="POST" action="/__gate">
     <label for="code">Access code</label>
