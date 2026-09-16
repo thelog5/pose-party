@@ -10,6 +10,10 @@
     "party": "node party.test.mjs"
   },
   "devDependencies": {
-    "puppeteer-core": "^24.0.0"
+    "puppeteer-core": "^25.11.0"
+  },
+  "comment:overrides": "ip-address <=10.3.0 reaches here through puppeteer-core > @puppeteer/browsers > proxy-agent > socks-proxy-agent > socks. Nothing in this harness uses a SOCKS proxy, and none of it ships, but npm audit reporting four high findings on every run trains you to ignore it. Pinned to the fixed line so the report stays honest.",
+  "overrides": {
+    "ip-address": "^10.7.2"
   }
 }
