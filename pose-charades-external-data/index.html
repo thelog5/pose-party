@@ -1215,8 +1215,10 @@
 
     <!-- COLUMN 3 — the mode-specific rule. Solo: the run is timed, so it's a
          thinking robot + mini TIMES UP badge. 1v1: a 5s sudden-death-style
-         chase clock. Party: bonus points for the whole team, text only —
-         Figma authors no icon for this one. -->
+         chase clock. Party: the TEAM BONUS paper the match itself lands
+         (showTeamBonus in partyMatch.js) — Figma authors no icon for this
+         rule, so the illustration is the live object, the way every other
+         square here reuses the thing the player will actually see. -->
     <div class="htp-step" style="left:66.268%;top:25.661%;width:29.153%;height:48.566%">
       <img class="htp-sq" src="assets/ui/figma/htp-square.webp" alt="">
 
@@ -1242,6 +1244,12 @@
 
       <span class="htp-lab htp-wrap" data-htp-for="party"
             style="left:.946%;top:6.085%;width:96.786%;height:20.174%;font-size:8.512cqw;line-height:12.611cqw">BONUS POINTS IF YOUR ENTIRE TEAM GETS IT</span>
+      <div class="htp-award" data-htp-for="party" style="left:17.5%;top:49.4%;width:65%">
+        <img src="assets/ui/figma/sp-award.webp" alt="">
+        <span class="aw-got">TEAM BONUS!</span>
+        <span class="aw-pts">+150</span>
+        <span class="aw-lbl">POINTS!</span>
+      </div>
     </div>
 
     <!-- In 1v1 and Party the card is a GRACE, not a barrier: the server
