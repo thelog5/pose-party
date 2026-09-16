@@ -54,9 +54,9 @@ async function passCameraGate(page){
 }
 
 /* HOW TO PLAY IS A GRACE, NOT A BARRIER. The server starts the match when the
-   grace runs out whether or not anybody pressed anything, and the card counts
-   that down on its own button and then fires READY itself. So a click here has
-   to tolerate the card having already closed on its own — otherwise the suite
+   grace runs out whether or not anybody pressed anything, and Party's
+   countdown then closes this card for a tab that never pressed. So a click
+   here has to tolerate the card having already closed — otherwise the suite
    is really asserting that four headless clients can each find a button inside
    six seconds, which is a race, not a behaviour. */
 const readyUp = async page => {

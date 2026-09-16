@@ -20,10 +20,12 @@
    player acknowledges it releases on the spot. Otherwise it releases when the
    grace runs out. The complete synchronized 3·2·1 follows the release either
    way, so no client-only pause can desynchronize the room.
-   The two modes then part ways. PARTY passes `startsAt`: the button counts
-   the grace down and the card closes itself at zero. 1V1 passes nothing:
-   there is no count, the card stays until its player presses I'M READY, and
-   a grace that runs out starts the match BEHIND it (see online.js).
+   The button says I'M READY in all three modes and nothing else. Party used
+   to count the grace down on it, which made the one control on the card read
+   differently depending on which mode you had picked — and the count answers
+   a question Party never asks, because `startPartyCountdown` closes this card
+   for a tab that never pressed. 1v1 deliberately does not close it: a grace
+   that runs out starts the match BEHIND the card (see online.js).
    main.js's Esc-to-leave self-suppresses while this card is open; a second
    Esc, after the acknowledgement closes it, leaves like normal.
 
@@ -37,7 +39,6 @@ import { blip } from "./audio.js";
 let onReady = null;
 let onBack = null;
 let restoreFocus = null;
-let graceTimer = 0;
 
 const panel = () => $("htpPanel");
 /* I'M READY is the only paper on the card now — the BACK paper is gone, so
@@ -49,10 +50,7 @@ export function isHowToPlayOpen(){
   return !$("howToPlay")?.classList.contains("hidden");
 }
 
-/* `startsAt` is a performance.now()-domain deadline (the callers convert the
-   server stamp), and it is the moment the match starts with or without this
-   button. Solo passes nothing and the count never appears. */
-export function showHowToPlay({ ready, back, mode = "ai", startsAt = 0 } = {}){
+export function showHowToPlay({ ready, back, mode = "ai" } = {}){
   const card = $("howToPlay");
   if(!card){ ready?.(); return; }
   onReady = ready || null;
@@ -60,7 +58,6 @@ export function showHowToPlay({ ready, back, mode = "ai", startsAt = 0 } = {}){
   restoreFocus = document.activeElement;
   card.dataset.mode = mode;
   card.classList.remove("hidden");
-  startGraceCount(startsAt);
   /* replay the drop every time — a state selector alone would only animate
      the first open, the same trap the results papers hit */
   const p = panel();
@@ -69,45 +66,9 @@ export function showHowToPlay({ ready, back, mode = "ai", startsAt = 0 } = {}){
   requestAnimationFrame(() => $("htpReady")?.focus({ preventScroll:true }));
 }
 
-/* Ticks the count on the button down to the release. At zero it fires the
-   READY path itself rather than waiting to be told: the server releases on
-   the same deadline, so acknowledging here means the client is never sitting
-   on a card the room has already left — and the acknowledgement is idempotent
-   on both sides, so the two crossing costs nothing. */
-function startGraceCount(startsAt){
-  clearInterval(graceTimer);
-  graceTimer = 0;
-  const pip = $("htpCount");
-  if(pip) pip.textContent = "";
-  if(!(startsAt > 0)) return;
-
-  const paint = () => {
-    if(!isHowToPlayOpen()){ clearInterval(graceTimer); graceTimer = 0; return; }
-    const left = Math.max(0, Math.ceil((startsAt - performance.now()) / 1000));
-    if(left <= 0){
-      clearInterval(graceTimer);
-      graceTimer = 0;
-      /* Same path as the click, so nothing downstream has to know the
-         difference between a player who pressed and a player who read. */
-      fire("ready");
-      return;
-    }
-    if(pip && pip.textContent !== String(left)){
-      pip.textContent = String(left);
-      pip.classList.remove("beat"); void pip.offsetWidth; pip.classList.add("beat");
-    }
-  };
-  paint();
-  graceTimer = setInterval(paint, 120);
-}
-
 export function hideHowToPlay(){
   const card = $("howToPlay");
   if(!card || card.classList.contains("hidden")) return;
-  clearInterval(graceTimer);
-  graceTimer = 0;
-  const pip = $("htpCount");
-  if(pip){ pip.textContent = ""; pip.classList.remove("beat"); }
   card.classList.add("hidden");
   onReady = null;
   onBack = null;

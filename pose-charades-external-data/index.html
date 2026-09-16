@@ -1254,12 +1254,12 @@
 
     <!-- In 1v1 and Party the card is a GRACE, not a barrier: the server
          starts the match a few seconds from now whether or not anybody
-         presses this. `#htpCount` counts that down on the button itself, so
-         the one control on the screen also answers "why has it not started"
-         before anyone has to ask. Solo has no clock and never shows it. -->
+         presses this. The button says the same thing in all three modes, with
+         no count on it — Party carried one for a while and it made the card's
+         one control read differently per mode. -->
     <button class="htp-ready pbtn" id="htpReady">
       <img src="assets/ui/figma/htp-ready.webp" alt="">
-      <span>I&rsquo;M READY<i class="htp-count" id="htpCount"></i></span>
+      <span>I&rsquo;M READY</span>
     </button>
   </div>
 </div>

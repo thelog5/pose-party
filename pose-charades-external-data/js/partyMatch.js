@@ -124,12 +124,11 @@ export function startPartyMatch(bridge, payload){
     });
   };
   /* All six readying releases the room at once; otherwise the server's grace
-     does, and `tutorialStartsAt` is that moment. Six people looking at a card
-     that never says why nothing is happening is the same bug as two, only
-     louder — so the button counts it down. */
-  const startsAt = Number(payload.tutorialStartsAt);
-  showHowToPlay({ mode:"party", ready:acknowledge, back:acknowledge,
-    startsAt: startsAt ? ctx.perfFromServer(startsAt) : 0 });
+     does. The button carries NO count, exactly as Solo's and 1v1's do not:
+     three modes sharing one card must not have three different buttons on it.
+     Nobody is stranded by that here, because `startPartyCountdown` closes this
+     card for a tab that never pressed. */
+  showHowToPlay({ mode:"party", ready:acknowledge, back:acknowledge });
 }
 
 export function startPartyCountdown({tutorialId, startAt, matchEndsAt}={}){

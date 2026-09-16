@@ -210,13 +210,14 @@ try {
   ok(htp1v1.labels.join("|") ===
     "SEE THE WORD AND ACT IT OUT|GET AI TO GUESS YOUR ACTION FIRST|5 SECONDS TO ACT IF YOUR OPPONENT GETS IT FIRST",
     `1v1's three columns show 1v1-specific copy (${htp1v1.labels.join(" / ")})`);
-  /* 1V1: I'M READY, AND NO COUNTDOWN. The button is the card's one control
-     and carries no count. A player who waits too long does not hold the room:
-     when the grace runs out the match starts BEHIND their card, which stays
-     up until they press. Party keeps its count (party.test.mjs). */
-  const graceCount = await A.evaluate(() =>
-    document.getElementById("htpCount").textContent.trim());
-  ok(graceCount === "", `1v1's I'M READY carries no countdown (${JSON.stringify(graceCount)})`);
+  /* I'M READY, AND NO COUNTDOWN, IN EVERY MODE. The button is the card's one
+     control and it reads the same whichever mode raised the card. A 1v1
+     player who waits too long does not hold the room: when the grace runs out
+     the match starts BEHIND their card, which stays up until they press. */
+  const readyLabel = await A.evaluate(() =>
+    document.querySelector("#htpReady span").textContent.trim());
+  ok(readyLabel === "I’M READY",
+    `I'M READY carries no countdown (${JSON.stringify(readyLabel)})`);
   await act(A, () => readyUp(A));
   ok(await A.evaluate(() => document.getElementById("howToPlay").classList.contains("hidden")),
     "I'M READY acknowledges and dismisses the local 1v1 card");
