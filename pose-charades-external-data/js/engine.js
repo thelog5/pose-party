@@ -146,6 +146,12 @@ let video, overlay, ctx;
 let lastClassifyT = 0;
 let lastVisionT = -Infinity;
 let lastVideoTime = -1;
+let loopArmed = false;
+let cameraWatchT = null;
+let detectFails = 0;
+let rebuilding = false;
+let rebuildAfter = 0;
+let rebuildWait = 2000;
 let lastFaceTrackT = 0;
 let lastFaceSeenT = -Infinity;
 let visionRuntime = null;
@@ -508,6 +514,7 @@ export async function boot(){
   sizeCameraOverlay();
   showStatus(null);
   scheduleLoop();
+  watchCamera();
 }
 
 /* Learned from the deck by buildModel, so a new word needs no code change. */
@@ -552,7 +559,115 @@ function classifyLive(now){
 /* A camera is normally 30 fps while requestAnimationFrame is 60+ fps.
    requestVideoFrameCallback prevents re-running MediaPipe on duplicate camera
    frames; older browsers keep the existing RAF fallback. */
+/* THE VISION LOOP HAD TWO WAYS TO DIE SILENTLY, AND A PHONE FINDS BOTH.
+   Reported as "it says 100% but the bar won't move and it just stops
+   registering". Neither fault touches the meter or the papers, which is
+   exactly why it looks like the detection code is broken: the guess cards
+   keep the last text `renderGuesses()` wrote (so a card can sit at 100%
+   forever) while the charge bar, still advanced by each mode's own rAF,
+   sees `canRecognize()` go false on stale input and bleeds to its ratchet.
+
+     1. THE CALLBACK CHAIN STOPS. `requestVideoFrameCallback` fires only when
+        the video presents a new frame, so a video that PAUSES never re-arms
+        the loop. iOS pauses the camera preview on an app switch, a lock, a
+        call or Low Power Mode, and does not always resume it; an
+        interruption can also leave the track muted with the element stalled.
+        The RAF fallback survives this, which is why desktop never saw it.
+     2. THE MODEL CALL THROWS. `detectForVideo` is unguarded, and a
+        backgrounded phone loses its WebGL context routinely. `scheduleLoop()`
+        runs first so the chain lives, and then every single frame throws:
+        the loop is running perfectly and nothing is ever detected again.
+
+   Recovery for both is cheap and idempotent, so the watchdog can be blunt.
+   It runs on a timer rather than on frames, because the thing it is watching
+   for is the absence of frames. */
+const CAMERA_STALL_MS = 1500;
+/* A lost GPU context throws on every call, so a handful in a row is the
+   signal. Rebuilding is a model load; never more than one at a time. */
+const DETECT_FAIL_LIMIT = 5;
+const REBUILD_WAIT_MS = 2000;
+const REBUILD_WAIT_MAX_MS = 30000;
+
+function detectPose(now){
+  try{
+    const res = state.landmarker.detectForVideo(video, now);
+    detectFails = 0;
+    return res;
+  }catch(e){
+    if(++detectFails === 1) console.warn("Pose model call failed; retrying.", e);
+    if(detectFails >= DETECT_FAIL_LIMIT) rebuildLandmarker(e);
+    return null;
+  }
+}
+
+/* The delegate is kept: a context loss says nothing about which one is
+   faster, and `speed` has already paid for that measurement.
+
+   A FAILED REBUILD MUST NOT BE RETRIED ON THE NEXT FRAME. `detectFails` only
+   climbs while the calls keep throwing, so without a wait the failure path is
+   a model download every 30ms on a device that is already in trouble. */
+function rebuildLandmarker(cause){
+  if(rebuilding || performance.now() < rebuildAfter) return;
+  if(!visionRuntime || state.landmarker !== engineLandmarker) return;
+  rebuilding = true;
+  console.warn("Pose model stopped responding; rebuilding it.", cause);
+  PoseLandmarker.createFromOptions(visionRuntime, poseOptions(speed.delegate)).then(fresh => {
+    const old = engineLandmarker;
+    engineLandmarker = state.landmarker = fresh;
+    detectFails = 0;
+    rebuildWait = REBUILD_WAIT_MS;
+    try{ old?.close(); }catch(e){}
+  }).catch(e => {
+    /* Back off rather than give up: a context lost with the phone in a pocket
+       comes back when the page does, and the player never asked for a reload. */
+    rebuildWait = Math.min(rebuildWait * 2, REBUILD_WAIT_MAX_MS);
+    console.warn("Pose model could not be rebuilt; waiting " + rebuildWait + "ms.", e);
+  }).finally(() => {
+    rebuilding = false;
+    rebuildAfter = performance.now() + rebuildWait;
+  });
+}
+
+/* Put playback back and re-arm the loop. Safe to call on any suspicion: a
+   playing video ignores `play()` and an armed chain ignores `scheduleLoop()`. */
+function nudgeCamera(){
+  if(document.hidden || !video) return;
+  const stream = state.mediaStream;
+  if(stream && video.srcObject !== stream) video.srcObject = stream;
+  if(video.paused || video.ended) playCamera();
+  /* The equality guard would otherwise swallow the first frame back when the
+     video resumes on the same `currentTime` it stopped at. */
+  lastVideoTime = -1;
+  scheduleLoop();
+}
+
+function watchCamera(){
+  if(cameraWatchT) return;
+  cameraWatchT = setInterval(() => {
+    if(document.hidden || !state.landmarker) return;
+    /* No live track is a camera that was stopped or revoked, not one that
+       stalled, and re-playing a dead element would only spin. */
+    if(!liveVideoTrack(state.mediaStream)) return;
+    if(performance.now() - lastVisionT < CAMERA_STALL_MS) return;
+    nudgeCamera();
+  }, 1000);
+  /* The events are not a second mechanism, only a faster one: coming back
+     from a locked phone should not cost the player another second. */
+  for(const type of ["pause", "stalled", "suspend", "ended", "emptied"])
+    video.addEventListener(type, nudgeCamera);
+  document.addEventListener("visibilitychange", () => {
+    if(!document.hidden) nudgeCamera();
+  });
+}
+
+/* ARMED ONCE. `requestVideoFrameCallback` only ever fires again if the VIDEO
+   produces another frame, so the chain is not self-healing and it must not be
+   doubled either: two chains mean two full model calls per frame on the one
+   device that can least afford them. The watchdog below re-arms it, and this
+   flag is what makes that call free when the chain is already alive. */
 function scheduleLoop(){
+  if(loopArmed) return;
+  loopArmed = true;
   if(typeof video?.requestVideoFrameCallback === "function"){
     video.requestVideoFrameCallback(loop);
   }else{
@@ -561,6 +676,7 @@ function scheduleLoop(){
 }
 
 function loop(){
+  loopArmed = false;
   scheduleLoop();
   if(!state.landmarker || video.readyState<2) return;
   if(document.hidden){ resetPoseInput(state.poseInput); return; }
@@ -577,7 +693,8 @@ function loop(){
   lastVisionT=now;
   lastVideoTime=video.currentTime;
   const callAt=performance.now();
-  const res=state.landmarker.detectForVideo(video, now);
+  const res=detectPose(now);
+  if(!res) return;
   noteModelCall(performance.now()-callAt);
   /* Live classification consumes only the 15 body landmarks. The hand model
      is reserved for Training/recording, where its points are actually drawn
