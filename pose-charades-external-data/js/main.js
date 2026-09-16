@@ -19,6 +19,7 @@ import { wireHowToPlay, isHowToPlayOpen } from "./howToPlay.js";
 import { requireOnlineAge, isAgeGateOpen } from "./ageGate.js";
 import { wireCameraGate } from "./cameraGate.js";
 import { wireLobbyAlive } from "./lobbyAlive.js";
+import { wireSupport } from "./support.js";
 import { boot } from "./engine.js";
 
 /* Order matters: repaint the screen first, then let the game module tear
@@ -186,6 +187,7 @@ function applyDevMode(){
 }
 
 applyDevMode();
+wireSupport();
 wireControls();
 buildStarterWords();
 renderClasses();

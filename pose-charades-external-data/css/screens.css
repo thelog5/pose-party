@@ -300,13 +300,38 @@ body[data-boot] .homestage
 .pp-circle svg{width:24px;height:24px}
 /* Privacy / Terms. Centred with left+width, never translate: homePieceIn
    animates `translate` and would shove it off centre while Home arrives. */
-.home-legal{position:absolute;left:40%;width:20%;bottom:1.6%;z-index:10;
-  display:flex;justify-content:center;gap:1.4em;
-  font:700 clamp(10px,min(1dvw,1.8dvh),15px)/1 var(--f-label);letter-spacing:.03em}
+/* Lower on the wave and a size up from the original: at a 15px ceiling these
+   three sat as fine print on a board whose smallest other type is a card
+   caption. The row is a plain flex row centred on 50%, so its CONTENT is
+   balanced there whatever it says and the fixed 40%..60% box is only a hint.
+   THE px MINIMUM HAD TO COME DOWN TO 9, and that is not a taste call. The
+   maker's boat is a hard object at 65.48%, and this row is the only text on
+   the board that grows towards it. At an 11px floor a third link pushed the
+   row to 67.04% at 750x340 and to 65.45% at 667x375, i.e. through the boat
+   and then touching it — the floor stops scaling with the stage exactly when
+   the stage runs out of room. 1.3dvw/2.32dvh still gives 18.7px at 1440x810,
+   which is what "larger" was asking for. `_supportshot.mjs` measures a true
+   rect intersection with the boat at six viewports; keep it clear there
+   before changing any of these three numbers. */
+.home-legal{position:absolute;left:40%;width:20%;bottom:1.2%;z-index:10;
+  display:flex;align-items:baseline;justify-content:center;gap:1.15em;
+  font:700 clamp(9px,min(1.3dvw,2.32dvh),20px)/1 var(--f-label);letter-spacing:.03em}
+/* nowrap: the 20% box is narrower than three links, and without this the
+   longest one folds onto a second line inside it instead of letting the row
+   overflow evenly on both sides of 50%, which is what centring is for */
 .home-legal a{color:rgba(255,247,230,.86);text-decoration:none;
-  transition:color .15s ease,transform .15s ease;display:inline-block}
+  transition:color .15s ease,transform .15s ease;display:inline-block;
+  white-space:nowrap}
 .home-legal a:hover,.home-legal a:focus-visible{color:#fff;text-decoration:underline;transform:translateY(-1px)}
 .home-legal a:active{transform:translateY(1px)}
+
+/* BUY ME A RED BULL is a THIRD LINK, not a button. It first shipped as HOW TO
+   PLAY's torn READY paper, which made it the loudest thing on the bottom edge
+   and put a fourth pressable-looking object on a board whose three mode cards
+   are the only things that should read that way. A link asks; a button
+   demands. It keeps its sibling's colour and hover exactly, so the only thing
+   marking it out is the emoji. */
+.home-legal .home-support span{font-size:1.06em;line-height:1}
 
 /* =================== SHARED GAMEPLAY ENTRANCE ===================
    Solo, 1v1 and Party count in with the SAME motion language as Home: every

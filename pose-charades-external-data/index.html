@@ -214,10 +214,20 @@
         </button>
       </div>
       <!-- CalOPPA wants a link with the word "privacy" on the homepage.
-           Centred on the screen, on the blue wave right of the triangle. -->
+           Centred on the screen, on the blue wave right of the triangle.
+           The support link is a THIRD LINK IN THE SAME ROW, not a paper
+           button: the wave is the only clear strip along the bottom (the
+           robot's boots hold the left, the SOLO card the right, the boat
+           65.5% onward), and a paper button here read as a control competing
+           with the three mode cards, which are the only things on this
+           screen that should look pressable.
+           It is HIDDEN until js/support.js finds a SUPPORT_URL, so a build
+           with no Stripe link never shows a link that goes nowhere. -->
       <nav class="home-legal" aria-label="Legal">
         <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
         <a href="terms.html" target="_blank" rel="noopener">Terms</a>
+        <a class="home-support" id="homeSupport" href="#" target="_blank"
+           rel="noopener" hidden>Buy me a Red Bull <span aria-hidden="true">🙏</span></a>
       </nav>
     </div>
   </section>
@@ -1351,9 +1361,17 @@
 
     <img class="cg-row cg-row2" src="assets/ui/figma/cam-row.webp" alt="">
     <img class="cg-icon cg-icon-hi5" src="assets/ui/figma/cam-icon-highfive.webp" alt="">
+    <!-- The encryption half of this line is the true half and always was.
+         What it left out is the half a player is most likely to be surprised
+         by later: every player's own game takes still photos of everybody on
+         their screen, on their own device, to build the photo strips at the
+         end, and they can save that picture. Saying "STAYS PRIVATE" without
+         saying that is the sentence doing the most work on this card and the
+         one most able to mislead. 74 characters against the old line's 83, so
+         it still wraps to two lines in the Figma text box. -->
     <span class="cg-head cg-head2">YOUR VIDEO STAYS PRIVATE</span>
-    <span class="cg-sub cg-sub2">Your video goes only to players in your lobby.
-      It is encrypted, so we never see it.</span>
+    <span class="cg-sub cg-sub2">Encrypted, and only for your lobby. Players'
+      games take photos on their device.</span>
 
     <img class="cg-row cg-row3" src="assets/ui/figma/cam-row.webp" alt="">
     <img class="cg-icon cg-icon-room" src="assets/ui/figma/cam-icon-room.webp" alt="">
@@ -1397,12 +1415,20 @@
       that nothing else is using it, then try again.</span>
   </div>
   </div>
-  <!-- On the scrim, OUT of the grid (absolute), so the centred card does not
-       move. New tab: the boot flow must not be lost to reading a policy. -->
-  <nav class="cg-legal" aria-label="Legal">
-    <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+  <!-- THIS IS THE AGREEMENT, NOT A FOOTER. It used to be two bare links, so
+       nothing on the whole boot path ever said that using the game accepts
+       anything. The notice is now a sentence, immediately under the card and
+       directly above the one button the screen asks you to press, which is
+       what makes an agreement by conduct hold up: the terms are named, they
+       are one tap away, and the act that accepts them is spelled out.
+       It does not name the button's LABEL, which changes (ENABLE CAMERA /
+       LET'S GO / TRY AGAIN).
+       Still on the scrim, OUT of the grid (absolute), so the centred card
+       does not move a pixel for it. New tab: the boot flow must not be lost
+       to reading a policy. -->
+  <p class="cg-legal" id="cgLegal">By continuing you agree to our
     <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a>
-  </nav>
+    and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p>
 </div>
 
 <!-- The chase / sudden-death screen-edge pulse. Its own fixed layer, not an

@@ -447,13 +447,20 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
   -webkit-backdrop-filter:brightness(.84) saturate(1.02);
   animation:htpScrim .3s ease-out both}
 .cg.hidden{display:none}
-/* Privacy Policy and Terms of Use, on the scrim under the card. Absolute, so
-   the grid that centres the card never sees it. */
+/* The agreement notice, on the scrim under the card. Absolute, so the grid
+   that centres the card never sees it. It is ONE sentence now rather than two
+   bare links, so it wraps rather than sitting on a nowrap flex row: at
+   667x375 (a phone in landscape) the sentence is wider than the screen. The
+   width cap keeps it to two comfortable lines and centred on the card.
+   The links are BRIGHTER than the sentence around them, because the whole
+   point of the line is that the two documents are reachable. */
 .cg-legal{position:absolute;left:50%;bottom:max(1.4dvh,10px);translate:-50% 0;
-  display:flex;gap:1.6em;font:700 clamp(11px,1.45dvh,15px)/1 var(--f-label);
-  letter-spacing:.02em;white-space:nowrap}
-.cg-legal a{color:rgba(255,247,230,.82);text-decoration:none}
-.cg-legal a:hover,.cg-legal a:focus-visible{color:#fff;text-decoration:underline}
+  margin:0;max-width:min(46rem,86vw);text-align:center;text-wrap:balance;
+  font:700 clamp(11px,1.45dvh,15px)/1.4 var(--f-label);
+  letter-spacing:.02em;color:rgba(255,247,230,.66)}
+.cg-legal a{color:rgba(255,247,230,.92);text-decoration:underline;
+  text-underline-offset:.18em}
+.cg-legal a:hover,.cg-legal a:focus-visible{color:#fff}
 
 /* The card and the boot readout are ONE centred column. The readout is not
    part of 322:717 but it is very much part of what the player sees, so
