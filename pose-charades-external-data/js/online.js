@@ -36,6 +36,7 @@ import {
 } from "./gameplayFeedback.js";
 import {
   captureMoment,
+  markResultsPlayerGone,
   setCandidSources,
   setRematchState,
   setRematchUnavailable,
@@ -525,6 +526,10 @@ function wireSocket(s){
     else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
       roomCode=null;
       closePeer();
+      /* Their seat, score, award and photos are the record of the match you
+         both just played, so they stay; only the live feed goes, and the
+         seat says LEFT. */
+      markResultsPlayerGone("rival");
       setRematchUnavailable(peerName+" left. Start a new room to play again.");
     }
     else if(gameState()==="lobby"){ resetLobbyUi(); createRoom(); }

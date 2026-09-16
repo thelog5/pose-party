@@ -707,12 +707,21 @@ try {
     { timeout: 6000, polling: 100 });
   await A.waitForFunction(() =>
     /0\/3/.test(document.getElementById("rsRematchLabel").textContent) &&
-    document.querySelectorAll(".rs-seat:not(.vacant)").length === 3,
+    document.querySelectorAll(".rs-seat.gone").length === 1,
     { timeout: 6000, polling: 100 });
-  ok(await A.evaluate(() =>
-    ![...document.querySelectorAll(".rs-seat:not(.vacant) .rs-nametag b")]
-      .some(node => /DAN/.test(node.textContent))),
-    "a results-phase leaver is removed and the authoritative tally drops to three");
+  /* THE LEAVER STAYS ON THE BOARD. This used to assert that DAN's seat was
+     gone from every survivor's screen: the four of them had just played a
+     match together and one walking out to the lobby erased his face, his
+     score, his award and his photo-strip windows from the page reporting it.
+     He keeps his seat and loses only his vote. */
+  ok(await A.evaluate(() => {
+    const seats = [...document.querySelectorAll(".rs-seat:not(.vacant)")];
+    const dan = seats.find(s => /DAN/.test(s.querySelector(".rs-nametag b").textContent));
+    return seats.length === 4 && !!dan && dan.classList.contains("gone") &&
+      dan.querySelector(".rs-ready b").textContent === "LEFT" &&
+      !dan.classList.contains("ready");
+  }),
+    "a results-phase leaver keeps their seat, marked LEFT, while the tally drops to three");
   ok(await D.evaluate(() => !/^[A-Z2-9]{6}$/.test(
     document.getElementById("roomCodeText").textContent.trim())),
     "leaving party results clears the shared room code after one lifecycle cleanup");

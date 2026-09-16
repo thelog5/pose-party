@@ -2414,6 +2414,8 @@ await page.emulateMediaFeatures([{ name:"prefers-reduced-motion", value:"no-pref
 
 await page.click("#rsStripOrange .rs-thumb");
 await sleep(80);
+const thumbsBeforeLeave = await page.evaluate(() =>
+  document.querySelectorAll(".rs-thumb").length);
 await page.evaluate(async () => {
   const {syncResultsRoster}=await import("/js/results.js");
   syncResultsRoster([
@@ -2422,13 +2424,25 @@ await page.evaluate(async () => {
     {id:"orange1",name:"ZOE",team:"orange"},
   ]);
 });
-ok(await page.evaluate(() =>
-  document.querySelectorAll(".rs-thumb").length === 3 &&
-  !document.querySelector('[data-pid="orange0"]') &&
-  /1\/3/.test(document.getElementById("rsRematchLabel").textContent) &&
-  !document.getElementById("rsFocusName").classList.contains("orange") &&
-  /LOGAN/.test(document.getElementById("rsFocusName").textContent)),
-  "a results-phase leaver disappears and focus falls back to a surviving local player");
+/* THE RESULTS SCREEN IS THE MATCH'S RECORD, SO A LEAVER IS NOT ERASED FROM
+   IT. This used to assert the opposite: three players walk out to the lobby
+   and their seats, names, scores, awards and photo-strip windows vanished
+   from everyone else's screen while the match was still being read. They
+   stay, marked `gone`: no live feed, no rematch vote (1 of the 3 who are
+   still here), a LEFT stamp in the READY paper's slot, and their breakdown
+   still open if that is the page you were on. */
+ok(await page.evaluate(before => {
+  const focus = document.getElementById("rsFocusName");
+  const gone = document.querySelector('#resStage .rs-seat.gone');
+  return document.querySelectorAll(".rs-thumb").length === before &&
+    !!document.querySelector('.rs-thumb[data-pid="orange0"]') &&
+    !!gone && !gone.classList.contains("vacant") &&
+    gone.querySelector(".rs-ready b").textContent === "LEFT" &&
+    /1\/3/.test(document.getElementById("rsRematchLabel").textContent) &&
+    /* the breakdown you were reading is the leaver's, and it stays open */
+    focus.classList.contains("orange");
+}, thumbsBeforeLeave),
+  "a results-phase leaver keeps their seat, photos and stats, and only loses their rematch vote");
 
 await page.evaluate(async () => {
   const {showResults}=await import("/js/results.js");

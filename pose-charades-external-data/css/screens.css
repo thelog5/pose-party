@@ -2429,6 +2429,15 @@ body[data-screen="results"] header{display:none}
   justify-content:center;font-family:var(--f-lobby);font-weight:400;color:#fff;
   letter-spacing:.01em;line-height:.7586;white-space:nowrap;font-size:20.47cqw;
   text-shadow:.787cqw .787cqw 0 rgba(0,0,0,.5)}
+/* A PLAYER WHO LEAVES STAYS ON THE BOARD. They played the match this screen
+   reports, so their seat, name, score and photos hold until the screen
+   closes; only their live feed goes. The seat reads as a record rather than a
+   vacancy: their last still behind a quieter border, and the READY paper's
+   own slot carrying LEFT in grey. */
+.rs-seat.gone .slot{filter:grayscale(.55) brightness(.82)}
+.rs-seat.gone .rs-border,.rs-seat.gone .rs-nametag{opacity:.78}
+.rs-seat.gone .rs-ready{opacity:1;scale:1;filter:grayscale(1) brightness(.92);
+  animation:none}
 .resstage[data-size="2"] [data-seat="blue2"],
 .resstage[data-size="2"] [data-seat="orange2"]{display:none}
 .rs-seat.vacant{display:none}

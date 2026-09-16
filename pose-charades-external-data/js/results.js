@@ -421,6 +421,7 @@ function renderSeats(){
     const el = seatEl(key);
     if(!el) continue;
     el.classList.toggle("vacant", !p);
+    el.classList.toggle("gone", !!p?.gone);
     /* Pop the READY paper only when readiness actually turns on. Driving the
        animation off `.ready` alone replayed it every time the seat came back
        from display:none — i.e. on every flip to the breakdown and back. */
@@ -442,6 +443,11 @@ function renderSeats(){
     if(nowReady && !wasReady && !rebuilt) popReady(el);
     else if(!nowReady) el.querySelector(".rs-ready")?.classList.remove("pop");
     el.querySelector(".rs-nametag b").textContent = disp(p.name);
+    /* A departed player is never ready, so the READY paper's slot is free to
+       say the one thing the board still owes the others: they are not coming
+       back to this rematch. Same paper, greyed. */
+    const stamp = el.querySelector(".rs-ready b");
+    if(stamp) stamp.textContent = p.gone ? "LEFT" : "READY";
   }
 
   /* Local first keeps the shared dock out of any remote slot; every later
@@ -484,7 +490,7 @@ function mountSeatVideo(el, p){
   /* A rival who left ends the match with a stream whose tracks are already
      stopped — attaching it paints a black rectangle where their face was.
      Treat a dead stream as no stream and show their last still instead. */
-  if(p.stream && streamIsLive(p.stream)){
+  if(!p.gone && p.stream && streamIsLive(p.stream)){
     removeDirect("img");
     const videos = [...slot.querySelectorAll(":scope > video")];
     const v = videos.shift() || document.createElement("video");
@@ -542,9 +548,12 @@ function renderRematch(animate = true){
   const total = Math.max(0, Number(r?.total ?? payload.players.length) || 0);
   const ready = Math.max(0, Math.min(total, Number(r?.ready) || 0));
   const mine = !!r?.mine;
+  /* A departed player keeps their seat on this page, but they cannot stand on
+     a team for the NEXT match — count only who is still in the room, or a 2-1
+     roster reads as 2-2 and NEED 2 PER TEAM never appears. */
   const teams = { blue:0, orange:0 };
   for(const p of payload.players)
-    if(p.team === "blue" || p.team === "orange") teams[p.team]++;
+    if(!p.gone && (p.team === "blue" || p.team === "orange")) teams[p.team]++;
   const needsTeams = payload.mode === "party" && total > 0 && ready === total &&
     (teams.blue < 2 || teams.orange < 2);
   const previous = btn.dataset.ready === undefined ? null : Number(btn.dataset.ready);
@@ -588,7 +597,7 @@ function syncPlayerReady(mine, voters){
   if(!payload) return;
   if(Array.isArray(voters)){
     const set = new Set(voters);
-    for(const p of payload.players) p.ready = set.has(p.id);
+    for(const p of payload.players) p.ready = !p.gone && set.has(p.id);
     return;
   }
   const local = payload.players.find(p => p.mine);
@@ -623,27 +632,53 @@ export function setRematchUnavailable(message){
   renderRematch(false);
 }
 
-/* A party room survives on the results screen. If somebody leaves there,
-   keep the papers in sync without rebuilding streams for the survivors. */
+/* THE RESULTS SCREEN IS THE MATCH'S RECORD, SO NOBODY IS ERASED FROM IT.
+   A party room survives here, and a player who walks out to the lobby used to
+   be dropped from `payload.players` on the next roster event: their seat went
+   vacant, their name, score, award and stat chips vanished from the
+   breakdown, and their windows emptied out of the photo strips — on everyone
+   else's screen, while the match they had just played together was still
+   being read. They played the match; they stay on the page that reports it.
+   `gone` is the only thing that changes: no live feed (their last still
+   instead), no rematch vote, and a seat marked LEFT so the board is honest
+   about who is still in the room. It all goes when the screen closes, with
+   the stills. */
+function markGone(player){
+  if(!player || player.gone) return;
+  player.gone = true;
+  player.ready = false;
+  player.stream = null;
+}
+
+/* 1v1's two players are built once at match end and never re-sent, so its
+   departure arrives as a single event from online.js instead. */
+export function markResultsPlayerGone(id){
+  const player = payload?.players.find(p => p.id === id);
+  if(!player) return;
+  markGone(player);
+  renderSeats();
+  if(stage()?.dataset.page === "breakdown") renderBreakdown();
+}
+
 export function syncResultsRoster(nextPlayers = []){
   if(!payload || payload.mode !== "party" || !Array.isArray(nextPlayers)) return;
-  const previous = new Map(payload.players.map(p => [p.id, p]));
-  payload.players = nextPlayers.map(member => {
-    const player = previous.get(member.id);
-    return player ? { ...player, name: member.name, team: member.team } : null;
-  }).filter(Boolean);
+  const present = new Map(nextPlayers.map(member => [member.id, member]));
+  for(const player of payload.players){
+    const member = present.get(player.id);
+    if(!member){ markGone(player); continue; }
+    player.name = member.name;
+    player.team = member.team;
+  }
 
-  const total = payload.players.length;
-  const ready = payload.players.filter(p => p.ready).length;
+  const staying = payload.players.filter(p => !p.gone);
+  const total = staying.length;
+  const ready = staying.filter(p => p.ready).length;
   payload.rematch = {
     ...(payload.rematch || {}),
     ready: Math.min(total, ready),
     total,
     mine: !!payload.players.find(p => p.mine)?.ready,
   };
-  if(!payload.players.some(p => p.id === focusId)){
-    focusId = (payload.players.find(p => p.mine) || payload.players[0])?.id || null;
-  }
 
   renderSeats();
   renderRematch(true);
