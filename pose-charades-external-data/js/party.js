@@ -19,7 +19,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { createPeer } from "./webrtc.js";
 import { partyBridge, enterLobby, ensureSocket, iceServers, myName, setLobbyStatus,
-         lobbySettings, renderLobbySettings, setLobbyCode,
+         lobbySettings, renderLobbySettings, setLobbyCode, watchConnection,
          serverNow, perfFromServer } from "./online.js";
 import { setRematchState, syncResultsRoster } from "./results.js";
 import { startPartyMatch, startPartyCountdown, wirePartyMatch, attachPartyStream, onPartyRound,
@@ -304,19 +304,28 @@ function wirePartySocket(s){
       markPartyPlayerGone(id);
   });
 
-  s.on("disconnect", () => {
-    /* countdown/playing/word-won/results are SHARED with 1v1, and online.js
-       has its own disconnect handler — only claim the drop when this module
-       is the one holding a room, or a 1v1 player gets bounced by the party. */
+  /* countdown/playing/word-won/results are SHARED with 1v1, and online.js
+     watches the same socket — only claim the drop when this module is the one
+     holding a room, or a 1v1 player gets bounced by the party. The wait
+     itself is watchConnection's: a phone drops its socket often enough that
+     acting on the first `disconnect` was the fault, not the network. */
+  const inParty = () => {
     const screen = gameState();
-    const inParty = screen === "party" ||
+    return screen === "party" ||
       (screen === "results" && $("resStage")?.dataset.mode === "party") ||
       (state.game?.mode === "party" &&
        ["countdown", "playing", "word-won"].includes(screen));
-    if(!inParty) return;
-    toast("Connection to the party was lost.");
-    leaveParty();
-    transition("menu");
+  };
+  watchConnection(s, {
+    active: inParty,
+    onWait: () => toast("Connection dropped. Getting you back in…", 4000),
+    onBack: () => toast("Back in the party!", 2200),
+    onLost: () => {
+      if(!inParty()) return;
+      toast("Connection to the party was lost.");
+      leaveParty();
+      transition("menu");
+    },
   });
   s.on("party:started", () => { blip([523, 659, 784, 1047], 0.09); });
   s.on("party:error", ({error} = {}) => {

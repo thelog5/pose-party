@@ -33,6 +33,10 @@ const ENV = {
   BETWEEN_ROUNDS_MS: "150",
   RATE_JOIN: "50",
   RATE_CREATE: "10",
+  /* A DROPPED SOCKET HOLDS ITS SEAT. Long enough here that the client's own
+     reconnect (1000ms +/- 50%) lands comfortably inside it, short enough that
+     the expiry is quick to prove. The shipped default is 45s. */
+  REJOIN_GRACE_MS: "3000",
   /* word stats on, so the report endpoint and the totals page are tested */
   STATS_TOKEN: "stats-test-token",
 };
@@ -457,17 +461,23 @@ try {
   const psig = await gotSig;
   ok(psig.data.sdp === "v=0 party" && !!psig.from, "peer got targeted signal with sender id");
 
-  // A tutorial leaver is removed from the barrier as well as the roster. If
-  // every survivor already accepted, their synchronized countdown releases
-  // immediately instead of waiting for the bounded fallback.
+  // A tutorial leaver eventually shrinks the roster, and never holds the room
+  // in the meantime. A dropped socket now KEEPS its seat for the rejoin grace
+  // (that is the whole point: a phone blinking must not empty a chair), so the
+  // barrier can no longer be released early by somebody's tab closing — the
+  // tutorial grace releases it instead, which is the path that has to work
+  // anyway for a player who simply never presses the button.
   for(let i = 0; i < P.length - 1; i++)
     await emit(P[i], "party:tutorial-ready", { tutorialId:prepared[i].tutorialId });
   const survivorCountdown = once(P[0], "party:countdown");
-  const rosterAfter = once(P[0], "party:roster");
+  const rosterAfter = once(P[0], "party:roster", 6000);
   P[5].disconnect();
-  const [ros2, survivorStart] = await Promise.all([rosterAfter, survivorCountdown]);
-  ok(ros2.players.length === 5 && survivorStart.startAt > Date.now(),
-    "tutorial disconnect shrinks the roster and releases ready survivors together");
+  const survivorStart = await survivorCountdown;
+  ok(survivorStart.startAt > Date.now(),
+    "one player's tab closing never holds the room: the grace releases the countdown");
+  const ros2 = await rosterAfter;
+  ok(ros2.players.length === 5,
+    `and the seat is given up once the rejoin grace expires (${ros2.players.length} left)`);
   for (const s of P) s.disconnect();
 
   /* The 2v2 gate needs its own room: the six-player room above has already
@@ -632,6 +642,48 @@ try {
   ok(true, "everyone ready restarts the match in the SAME room — no new code");
   for (const s of M) s.disconnect();
 
+
+  /* A PHONE DROPS ITS SOCKET; THAT MUST NOT END THE GAME. Wifi handing over
+     to cellular, a lock screen, a notification shade: all of them close the
+     transport, and `disconnect` used to call store.leave, which in 1v1
+     DESTROYS THE ROOM. The seat is now held for config.rejoinGraceMs and
+     socket.io's connection-state recovery gives the returning player the SAME
+     socket id — the thing every room, seat, peer and video here is keyed by.
+     `engine.close()` is the closest thing to what a phone actually does: the
+     transport goes, the client reconnects on its own. */
+  console.log("reconnect:");
+  const DROPPER = connect(URL, { transports: ["websocket"] });
+  const WATCHER = connect(URL, { transports: ["websocket"] });
+  /* `net:hello` is what makes the socket recoverable: a client can only be
+     restored if it can say which EVENT it last received, and an ack carries
+     no such marker. A player alone in a lobby has been sent nothing else. */
+  const greeting = await Promise.all([once(DROPPER, "net:hello"), once(WATCHER, "net:hello")]);
+  ok(greeting[0]?.rejoinGraceMs === 3000,
+    `the server greets a new socket and states its own grace (${JSON.stringify(greeting[0])})`);
+  const blipRoom = await emit(DROPPER, "room:create", { name: "Hana", labels: SHARED });
+  await emit(WATCHER, "room:join", { code: blipRoom.code, name: "Ivan", labels: SHARED });
+  const droppedId = DROPPER.id;
+  /* The player who stayed must NOT be told the room ended over a blip. */
+  let toldLeft = false;
+  WATCHER.once("peer:left", () => { toldLeft = true; });
+
+  const backAgain = once(DROPPER, "connect", 8000);
+  DROPPER.io.engine.close();
+  await backAgain;
+  ok(DROPPER.recovered, "a socket that drops and comes back inside the grace is recovered, not re-admitted");
+  ok(DROPPER.id === droppedId,
+    `the recovered socket keeps its id (${droppedId.slice(0,6)} -> ${DROPPER.id.slice(0,6)})`);
+  ok(!toldLeft, "the other player is never told their rival left over a blip");
+  const stillSeated = await emit(DROPPER, "player:ready", {});
+  ok(!stillSeated?.error,
+    `the held seat is still in the room after the blip (${JSON.stringify(stillSeated)})`);
+
+  /* And a player who really is gone still goes, one grace later. */
+  const reallyLeft = once(WATCHER, "peer:left", 8000);
+  DROPPER.disconnect();
+  await reallyLeft;
+  ok(true, "a socket that stays away past the grace leaves for real");
+  WATCHER.disconnect();
 
   console.log("abuse:");
   // disjoint labels -> no-shared-words

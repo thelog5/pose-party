@@ -378,6 +378,11 @@ async function ensureSocket(){
      itself loads, while a websocket-first connect dies on machines whose
      antivirus/filters block unencrypted ws:// to LAN addresses. */
   socket=window.io({ transports:["polling","websocket"] });
+  /* Before anything else, because it is the packet that makes this socket
+     recoverable at all — see watchConnection. */
+  socket.on("net:hello", ({rejoinGraceMs:ms}={}) => {
+    if(Number.isFinite(ms) && ms > 0) rejoinGraceMs = ms;
+  });
   await new Promise((resolve, reject) => {
     socket.once("connect", resolve);
     socket.once("connect_error", e=>reject(new Error("cannot reach server: "+e.message)));
@@ -387,6 +392,48 @@ async function ensureSocket(){
   _ice = await fetchIceServers(socket);
   wireSocket(socket);
   return socket;
+}
+
+/* ---- A DROPPED SOCKET IS A HICCUP UNTIL IT IS NOT ----
+   `disconnect` fires on a phone constantly: wifi handing over to cellular, a
+   lock screen, a notification shade pulled down over the page, a lift. It used
+   to end the match on the spot — and in 1v1 the server DESTROYED THE ROOM in
+   the same breath — so a two-second blip on one phone ended both players'
+   game while socket.io was already reconnecting underneath it. That is the
+   whole of "people still get disconnected, especially on phones": the network
+   event is ordinary, the response to it was not.
+   So a drop is now REPORTED and waited out. The server holds the seat for
+   `config.rejoinGraceMs` and socket.io's connection-state recovery hands the
+   returning player back the SAME socket id — which is what every room, seat,
+   peer and video element in this game is keyed by.
+   `recovered` is the whole test. A reconnect without it is a new id with no
+   room behind it, i.e. the hold expired and the game really is over; there is
+   nothing to rejoin and pretending otherwise leaves a player watching a board
+   that will never move again. */
+const REJOIN_SLACK_MS = 5000;    // room for the retry that lands on the line
+/* The server states its own grace in `net:hello`; this is only what to assume
+   before the first one arrives, or from an older build that sends none. */
+let rejoinGraceMs = 30000;
+
+export function watchConnection(s, { active, onLost, onWait, onBack }){
+  let giveUp = 0;
+
+  s.on("disconnect", () => {
+    /* One socket serves 1v1 and Party, so each module answers only for the
+       screens it owns — otherwise a party drop bounces a 1v1 player. */
+    if(giveUp || !active()) return;
+    onWait?.();
+    giveUp = setTimeout(() => { giveUp = 0; onLost(); },
+                        rejoinGraceMs + REJOIN_SLACK_MS);
+  });
+
+  s.on("connect", () => {
+    if(!giveUp) return;
+    clearTimeout(giveUp);
+    giveUp = 0;
+    if(s.recovered) onBack?.();
+    else onLost();
+  });
 }
 
 /* THE ICE LIST COMES FROM THE SERVER, so switching a TURN relay on is a
@@ -410,6 +457,12 @@ function fetchIceServers(s){
 }
 
 export function iceServers(){ return _ice; }
+
+/* Read-only test hook, same convention as results.js's `_shotsFor`. The
+   socket.io browser build exposes no way to reach a live socket from the page,
+   and `e2e/_reconnect.mjs` has to drop a real transport to prove that a blip
+   no longer ends a match. Nothing in the game calls this. */
+export function _socketForTest(){ return socket; }
 
 function syncClock(){
   return new Promise(resolve => {
@@ -477,15 +530,22 @@ function wireSocket(s){
     else if(gameState()==="lobby"){ resetLobbyUi(); createRoom(); }
   });
 
-  s.on("disconnect", () => {
-    if(state.game && state.game.mode==="online"){
-      toast("Connection to the server was lost.");
-      endOnline(null, "disconnected");
-    }else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
-      roomCode=null;
-      closePeer();
-      setRematchUnavailable("Connection lost. Reconnect to play again.");
-    }
+  const inOnlineGame = () => Boolean(state.game && state.game.mode==="online");
+  watchConnection(s, {
+    active: () => inOnlineGame() ||
+      (gameState()==="results" && $("resStage")?.dataset.mode==="1v1"),
+    onWait: () => toast("Connection dropped. Getting you back in…", 4000),
+    onBack: () => toast("Back in the game!", 2200),
+    onLost: () => {
+      if(inOnlineGame()){
+        toast("Connection to the server was lost.");
+        endOnline(null, "disconnected");
+      }else if(gameState()==="results" && $("resStage")?.dataset.mode==="1v1"){
+        roomCode=null;
+        closePeer();
+        setRematchUnavailable("Connection lost. Reconnect to play again.");
+      }
+    },
   });
 }
 

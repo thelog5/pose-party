@@ -189,6 +189,21 @@ export const config = {
      game sends no reports at all. */
   statsToken: (process.env.STATS_TOKEN || "").trim(),
 
+  /* A PHONE DROPS ITS SOCKET ALL THE TIME, AND THAT MUST NOT END THE MATCH.
+     Switching from wifi to cellular, a lock screen, a notification pulled
+     down over the page, a lift ride: every one of them closes the transport
+     or freezes the tab long enough for the server to notice. Until now the
+     first `disconnect` tore the room down on the spot, so a two-second blip
+     on one phone ended everybody's game. A seat is now HELD for this long
+     and socket.io's own connection-state recovery hands the returning player
+     back the SAME socket id, which is what every room, peer and seat in this
+     app is keyed by. Long enough to cross a network handoff or a glance at a
+     notification; short enough that a tab somebody closed for good does not
+     sit in a party of six as a frozen chair for a whole minute. An explicit
+     exit (Esc, the lobby's own leave) is immediate and unaffected — this only
+     covers the drops nobody chose. */
+  rejoinGraceMs: int(process.env.REJOIN_GRACE_MS, 30 * 1000),
+
   /* Housekeeping. */
   roomTtlMs: int(process.env.ROOM_TTL_MS, 30 * 60 * 1000),
   maxRooms: int(process.env.MAX_ROOMS, 500),

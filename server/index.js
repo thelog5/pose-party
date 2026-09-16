@@ -294,6 +294,18 @@ const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: config.corsOrigins, methods: ["GET", "POST"] },
   maxHttpBufferSize: 64 * 1024, // largest legal payload is an SDP blob
+  /* THE RETURNING PLAYER KEEPS THEIR SOCKET ID. Every room, peer, seat, mesh
+     entry and video element in this game is keyed by `socket.id`, so an
+     ordinary socket.io reconnect — which issues a NEW id — is indistinguishable
+     from a stranger arriving, and the player who blinked is gone for good.
+     Connection-state recovery restores the id, the socket's rooms and the
+     packets missed in between, which is the whole reason a rejoin can be a
+     hiccup rather than a re-entry. `skipMiddlewares:false` keeps the access
+     gate in front of a restored socket as well as a fresh one. */
+  connectionStateRecovery: {
+    maxDisconnectionDuration: config.rejoinGraceMs,
+    skipMiddlewares: false,
+  },
 });
 
 /* THE SAME LOCK ON THE SOCKET. Gating only the HTML would leave the whole
@@ -556,10 +568,50 @@ async function iceServers(){
   return list;
 }
 
+/* THE SEAT OUTLIVES THE SOCKET, for `config.rejoinGraceMs`. A disconnect used
+   to call `store.leave` on the spot, and in 1v1 that DESTROYS THE ROOM — so
+   one phone crossing from wifi to cellular ended a match for both players,
+   with nothing to come back to even though socket.io was already reconnecting
+   underneath. The leave is now a pending timer that a recovered connection
+   cancels. A player who really left still goes, one grace later, by the same
+   path as before; the room's own TTL sweep is unchanged and still the
+   backstop. Keyed by socket id, which recovery preserves. */
+const pendingLeave = new Map();
+
+function holdSeat(socketId){
+  clearTimeout(pendingLeave.get(socketId));
+  const timer = setTimeout(() => {
+    pendingLeave.delete(socketId);
+    store.leave(socketId);
+  }, config.rejoinGraceMs);
+  timer.unref?.();
+  pendingLeave.set(socketId, timer);
+}
+
+function releaseSeatHold(socketId){
+  const timer = pendingLeave.get(socketId);
+  if(!timer) return false;
+  clearTimeout(timer);
+  pendingLeave.delete(socketId);
+  return true;
+}
+
 io.on("connection", socket => {
   const ip = clientIp(socket);
   const ack = cb => (typeof cb === "function" ? cb : () => {});
-  log(`connect ${socket.id.slice(0,6)} from ${ip} (origin: ${socket.handshake.headers.origin || "?"})`);
+  /* `socket.recovered` means this is the same player on the same id, not a
+     new arrival: their seat is still being held, so take it off the clock. */
+  const resumed = socket.recovered && releaseSeatHold(socket.id);
+  log(`${resumed ? "resume" : "connect"} ${socket.id.slice(0,6)} from ${ip} (origin: ${socket.handshake.headers.origin || "?"})`);
+
+  /* ONE GREETING, AND IT IS LOAD-BEARING. A client can only be recovered if it
+     can tell the server where it got to, and that marker is the id of the last
+     EVENT it received — an ack does not carry one. A player sitting alone in a
+     lobby has been sent no events at all, so without this the one case where a
+     phone is most likely to be idle and drop is the one case that could not
+     come back. It also carries the grace itself, so the client's give-up timer
+     is this server's number rather than a second copy of it. */
+  socket.emit("net:hello", { rejoinGraceMs: config.rejoinGraceMs });
 
   socket.on("room:create", (payload, cb) => {
     cb = ack(cb);
@@ -768,10 +820,16 @@ io.on("connection", socket => {
     cb({ iceServers: await iceServers() });
   });
 
-  socket.on("room:leave", (payload, cb) => { store.leave(socket.id); ack(cb)({ ok: true }); });
-  socket.on("disconnect", reason => {
-    log(`disconnect ${socket.id.slice(0,6)} (${reason})`);
+  /* Pressing Esc or walking out of a lobby is a DECISION, not a blip: it
+     leaves at once and cancels any hold left over from an earlier drop. */
+  socket.on("room:leave", (payload, cb) => {
+    releaseSeatHold(socket.id);
     store.leave(socket.id);
+    ack(cb)({ ok: true });
+  });
+  socket.on("disconnect", reason => {
+    log(`disconnect ${socket.id.slice(0,6)} (${reason}) — seat held ${config.rejoinGraceMs}ms`);
+    holdSeat(socket.id);
   });
 });
 
