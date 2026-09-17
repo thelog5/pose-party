@@ -347,6 +347,39 @@ app.use((req, res, next) => /\.(md|py)$/i.test(req.path) ? res.status(404).end()
    household of six is nowhere near this; a script asking for it in a loop is
    the only thing that reaches it. A conditional request is cheap and is not
    counted, so nobody playing normally can trip it. */
+/* THE EDGE MAY HOLD THE DECK BRIEFLY; THE BROWSER STILL REVALIDATES EVERY
+   LOAD. `no-cache` kept a CDN out of the path entirely, so every first visit
+   pulled the whole 1.57 MB from this process — fine for a household, and the
+   first thing to give at a launch spike, which is by definition all first
+   visits (450 of them is ~700 MB off the origin).
+
+     max-age=0, must-revalidate   the browser behaves exactly as it did under
+                                  `no-cache`: it asks every page load and gets
+                                  a 304. Nothing about a returning player
+                                  changes.
+     s-maxage                     a SHARED cache may serve it for this long
+                                  without asking. Each Cloudflare PoP then
+                                  revalidates a few times an hour instead of
+                                  every visitor reaching Render, and because
+                                  the validator matches, those are 304s: the
+                                  body crosses only when the deck changes.
+
+   THE PRICE IS A STALENESS WINDOW, and the deck is exactly the file where
+   that matters: a stale one means players running the previous MODEL. Five
+   minutes is deliberately far below the hour a longer TTL would buy, because
+   the benefit is nearly identical (a spike lasts hours; a 5-minute edge TTL
+   still absorbs almost all of it) and a deck install is a thing somebody is
+   watching. This is the same hazard as CHANGED ART NEEDS A NEW FILE NAME —
+   there the answer is a new name because art is cached for 30 days; here the
+   window is short enough to wait out.
+
+   NEVER WITH THE BETA LOCK ON. The access gate sits ABOVE express.static, so
+   everything under it is gated content; letting a shared cache hold the deck
+   would serve it to anyone who asked, with no cookie. Gate on, `no-cache`. */
+const deckCacheControl = () => gateOn
+  ? "no-cache"
+  : `public, max-age=0, must-revalidate, s-maxage=${config.deckEdgeMaxAge}`;
+
 const deckLimit = createLimiter({ tokens: 30, perMs: 60_000 });
 setInterval(() => deckLimit.sweep(), 60_000).unref();
 app.use("/assets/data", (req, res, next) => {
@@ -359,11 +392,13 @@ app.use(express.static(GAME_DIR, {
   index: "index.html",
   setHeaders: (res, filePath) => {
     const rel = path.relative(GAME_DIR, filePath).split(path.sep);
-    const isArt = rel[0] === "assets" && rel[1] !== "data";
+    const isData = rel[0] === "assets" && rel[1] === "data";
+    const isArt = rel[0] === "assets" && !isData;
     /* tells the client to send word reports (js/wordStats.js) */
-    if(stats && rel[0] === "assets" && rel[1] === "data") res.set("X-Word-Stats", "on");
+    if(stats && isData) res.set("X-Word-Stats", "on");
     res.set("Cache-Control", isArt
       ? `public, max-age=${config.staticMaxAge}`
+      : isData ? deckCacheControl()
       : "no-cache");
   },
 }));

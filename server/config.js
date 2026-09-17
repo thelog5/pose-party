@@ -104,6 +104,14 @@ export const config = {
      know. See the static handler in index.js. */
   staticMaxAge: int(process.env.STATIC_MAX_AGE, 30 * 24 * 60 * 60),
 
+  /* How long a SHARED cache (Cloudflare, any CDN) may serve the pose deck
+     without asking. The browser revalidates every load regardless; this is
+     only about keeping 1.57 MB per first-time visitor off the origin. It is
+     also the window in which a freshly installed deck is still the old one,
+     so it is short on purpose. 0 disables edge caching of the deck. It is
+     ignored entirely while ACCESS_CODE is set: see deckCacheControl(). */
+  deckEdgeMaxAge: int(process.env.DECK_EDGE_MAX_AGE, 300),
+
   /* TURN. A RELAY IS NOT AN SFU, AND THE DIFFERENCE IS THE WHOLE DESIGN.
      WebRTC media is DTLS-SRTP encrypted end to end and the keys are derived
      between the two browsers, so a TURN server forwards packets it holds no
