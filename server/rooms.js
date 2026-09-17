@@ -855,13 +855,41 @@ export function createRoomStore({ config, emit }){
     if(!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
       return { error: "bad-payload" };
     if(partyFinished(room, socketId)) return { ok: true };
+    /* FAN OUT TO THE PLAYERS WHO ACTUALLY DISPLAY THIS, WHICH IS AT MOST ONE
+       EACH. A client shows exactly one rival's live read (partyMatch.js
+       onPartyGuess drops everything that is not its featured foe), so sending
+       every guess to all five others meant four of every five messages were
+       decoded and thrown away. This is the server's dominant cost by a wide
+       margin: e2e/_loadtest.mjs measured 24,718 delivered events a second at
+       200 rooms, essentially all of it this loop.
+
+       `watching` is UNDEFINED until a client asks for somebody, and that case
+       still gets the old broadcast. Clients are cached for four hours
+       (max-age=14400), so for four hours after a deploy some players are
+       running the previous build, which never sends party:watch and would
+       otherwise sit on a guess paper that never updates. The saving arrives
+       as those clients refresh; nothing has to be timed with the rollout. */
     for(const p of room.players){
       if(p.id === socketId) continue;
+      if(p.watching !== undefined && p.watching !== socketId) continue;
       emit(p.id, "party:guess", {
         roundId, id: socketId, label: cleanLabel,
         confidence: Math.round(confidence * 1000) / 1000,
       });
     }
+    return { ok: true };
+  }
+
+  /* Which player's live read this client is showing. `null` is a real answer
+     (nobody is featured), and is why the legacy case tests for undefined. */
+  function partyWatch(socketId, watchId){
+    const room = roomOf(socketId);
+    if(!room || room.kind !== "party") return { error: "not-in-room" };
+    const me = playerOf(room, socketId);
+    if(!me) return { error: "not-in-room" };
+    /* Only somebody in this room, so a socket cannot name an id elsewhere and
+       have the server start writing to it. */
+    me.watching = watchId && room.players.some(p => p.id === watchId) ? watchId : null;
     return { ok: true };
   }
 
@@ -1054,6 +1082,7 @@ export function createRoomStore({ config, emit }){
            matchTutorialReady, matchRematch, leave,
            relaySignal, relayGuess, sweep,
            partyCreate, partyJoin, partyTeam, partyName, partySettings, partyStart,
-           partyTutorialReady, partySignal, partyClaim, relayPartyGuess, partyRematch,
+           partyTutorialReady, partySignal, partyClaim, relayPartyGuess, partyWatch,
+           partyRematch,
            _rooms: rooms };
 }

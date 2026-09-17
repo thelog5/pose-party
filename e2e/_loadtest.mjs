@@ -118,6 +118,14 @@ async function openRoom(i, sockets, rounds) {
     s.on("party:round", ({ roundId, word }) => { s._round = roundId; s._word = word; });
     s.on("party:guess", () => { rounds.delivered++; });
   }
+  /* WATCH=0 leaves these clients looking like a build cached from before
+     party:watch existed, which is the path the server still has to serve.
+     WATCH=1 (the default) is what a current client does: each one names the
+     single rival whose read it displays, so the relay writes six messages a
+     tick instead of thirty. Run both to see the difference in delivered/s. */
+  if (process.env.WATCH !== "0")
+    for (let k = 0; k < room.length; k++)
+      await call(room[k], "party:watch", { id: room[(k + 1) % room.length].id });
   const started = await call(host, "party:start", {});
   if (started?.error) throw new Error("start: " + started.error);
   return room;

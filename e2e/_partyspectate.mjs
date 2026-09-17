@@ -267,6 +267,27 @@ try {
     lit: !!document.getElementById("pmFoeTop")?.classList.contains("recognized"),
   }));
   if (foePage) {
+    /* THE RELAY ITSELF, which nothing covered before. The server no longer
+       broadcasts every guess to the whole room; it writes only to the clients
+       that asked for that player (party:watch), because each one displays
+       exactly one rival and dropped the other four. So the featured rival's
+       live read reaching this paper is now a thing that can break.
+       A confidence under the party gate keeps them guessing without claiming,
+       so this measures the relay and not a catch. */
+    await foePage.evaluate(`(async () => {
+      const { partyCheck } = await import('${APP}/js/partyMatch.js');
+      const { state } = await import('${APP}/js/state.js');
+      clearInterval(window.__rec);
+      window.__rec = setInterval(() => { const w = state.game?.word; if (!w) return;
+        partyCheck(w, .30); }, 120);
+    })()`);
+    const relayed = await A.waitForFunction(
+      () => (document.getElementById("pmFoeTopWord")?.textContent || "").trim().length > 0 &&
+            document.getElementById("pmFoeTopWord").textContent.trim() !== "GUESSING…",
+      { timeout: 6000, polling: 60 }).then(() => true).catch(() => false);
+    ok(relayed, `the featured rival's live guess reaches this client (${(await foePaper()).word})`);
+    await foePage.evaluate(() => clearInterval(window.__rec));
+
     await foePage.evaluate(`(async () => {
       const { partyCheck } = await import('${APP}/js/partyMatch.js');
       const { state } = await import('${APP}/js/state.js');
@@ -348,14 +369,18 @@ try {
       "it lands inside the blue team's half");
   }
 
-  /* The watchdog: a feed that loses its stream, or is paused, comes back.
-     ANY seat holding a REMOTE feed will do, and it must be found rather than
-     assumed. This used to read blue0, which holds a remote player only while
-     the handover is in force — once the word rolls over you are featured
-     there again, and the local camera is REPARENTED into that slot rather
-     than living in it, so the query returned null and the probe threw. */
+  /* The watchdog: a REMOTE feed that loses its stream, or is paused, comes
+     back (checkRemoteVideos). The seat must be found rather than assumed, and
+     `:not(.mine)` is load-bearing twice over. This used to read blue0, which
+     holds a remote player only while the handover is in force; once the word
+     rolls over you are featured there again, and for the local player
+     mountSeatVideo calls mountCamera(slot), which REPARENTS the shared #video
+     into that slot. So a bare `[data-seat] .slot > video` first returned null
+     (probe threw) and then picked the LOCAL CAMERA — which checkRemoteVideos
+     ignores by design, so it never healed and the assertion failed on a quiet
+     machine as readily as a loaded one. */
   const healed = await A.evaluate(async () => {
-    const v = document.querySelector('#pmStage [data-seat] .slot > video');
+    const v = document.querySelector('#pmStage [data-seat]:not(.mine) .slot > video');
     if (!v) return { missing: true };
     const count = () => v.getVideoPlaybackQuality?.().totalVideoFrames ?? 0;
     v.srcObject = null;
@@ -363,14 +388,21 @@ try {
     const back = !!v.srcObject && !v.paused;
     v.pause();
     await new Promise(r => setTimeout(r, 2200));
+    /* COUNT OVER TWO SECONDS, NOT ONE. Re-attaching a stream starts a NEW
+       decoder, which shows nothing until the next key frame — so the first
+       second after a heal is exactly the second with the fewest frames in it,
+       and a threshold measured there reports the healthy case as broken (3
+       frames one run, 8 the next, against a `> 3` bar). The question this
+       asks is "is it decoding again", and two seconds answers it without
+       being a stopwatch on WebRTC's key-frame interval. */
     const a = count();
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 2000));
     return { back, playing: !v.paused, frames: count() - a };
   });
   ok(!healed.missing, "a remote seat feed was found to test the watchdog on");
   ok(healed.back, "a feed that lost its stream is attached again within ~1s");
   ok(healed.playing && healed.frames > 3,
-    `a paused feed is played again and shows frames (${healed.frames} in 1s)`);
+    `a paused feed is played again and shows frames (${healed.frames} in 2s)`);
 
 
   /* ---- and it must not outlast the word ----

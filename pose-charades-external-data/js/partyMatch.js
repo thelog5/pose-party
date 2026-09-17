@@ -186,6 +186,9 @@ function layoutSeats(){
     members.forEach((p, i) => { if(i < 3) seats.set(team + i, p.id); });
   }
   foeFeaturedId = perTeam[myTeam() === "blue" ? "orange" : "blue"][0]?.id || null;
+  /* The one assignment that does not go through setFoeFeatured, so it has to
+     announce itself: without this the first word of a match relays nothing. */
+  watchFoe();
   /* The seating a word STARTS from, so repeated handovers inside a match
      cannot permanently shuffle who sits in which tile. */
   baseOrder = { blue: perTeam.blue.map(p => p.id).slice(0, 3),
@@ -374,6 +377,7 @@ function handOverFoeFeaturedSeat(){
 function setFoeFeatured(id){
   if((id || null) === foeFeaturedId) return;
   foeFeaturedId = id || null;
+  watchFoe();
   resetGuessSide("Foe");
   /* Promoted somebody who is already in (their whole team finished and the
      one you were watching left): their paper says so rather than pretending
@@ -702,6 +706,17 @@ export function attachPartyStream(pid, stream){
 const myTeam = () =>
   ctx.roster.players.find(p => p.id === ctx.myId)?.team || "blue";
 const foeTeam = () => myTeam() === "blue" ? "orange" : "blue";
+
+/* TELL THE SERVER WHOSE READ WE ARE SHOWING. onPartyGuess displays exactly
+   one rival and drops everything else, so without this the server writes five
+   guesses to every client four times a second and four of them are decoded
+   and thrown away. That loop is its dominant cost.
+   Fire and forget: the answer changes nothing here, and a client that never
+   sends this still receives the whole room (server/rooms.js relayPartyGuess),
+   which is what keeps a build cached from before this change working. */
+function watchFoe(){
+  ctx?.socket?.emit("party:watch", { id: foeFeaturedId || null }, () => {});
+}
 
 /* ---------------- server events ---------------- */
 

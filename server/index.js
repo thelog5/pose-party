@@ -447,11 +447,12 @@ const guessLimit  = createLimiter({ tokens: 360, perMs: 60000 });   // per socke
 /* A six-player mesh is five links per client, and each reports at most one
    success and one failure. 60 is far above that and far below a flood. */
 const netLimit    = createLimiter({ tokens: 60,  perMs: 60000 });   // per socket
+const watchLimit  = createLimiter({ tokens: 240, perMs: 60000 });   // per socket
 
 setInterval(() => {
   store.sweep();
   createLimit.sweep(); joinLimit.sweep(); claimLimit.sweep();
-  signalLimit.sweep(); guessLimit.sweep(); netLimit.sweep();
+  signalLimit.sweep(); guessLimit.sweep(); netLimit.sweep(); watchLimit.sweep();
 }, 60000).unref();
 
 /* Support log: connection + room events only — never landmarks or video
@@ -887,6 +888,19 @@ io.on("connection", socket => {
     if(!guessLimit.allow(socket.id)) return cb({ error: "rate-limited" });
     if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
     cb(store.relayPartyGuess(socket.id, payload.roundId, payload.label, payload.confidence));
+  });
+  /* Names the one rival whose live read this client is showing, so the guess
+     relay writes to the players who display it instead of to the whole room.
+     Its own bucket: a featured seat changes on a handover, several times a
+     word in a busy round, which would eat the claim bucket it would otherwise
+     share. It is still far below the guess rate it saves. */
+  socket.on("party:watch", (payload, cb) => {
+    cb = ack(cb);
+    if(!watchLimit.allow(socket.id)) return cb({ error: "rate-limited" });
+    if(!isPlainObject(payload)) return cb({ error: "bad-payload" });
+    const id = payload.id;
+    if(id !== null && typeof id !== "string") return cb({ error: "bad-payload" });
+    cb(store.partyWatch(socket.id, id));
   });
   socket.on("party:rematch", (payload, cb) => {
     cb = ack(cb);
