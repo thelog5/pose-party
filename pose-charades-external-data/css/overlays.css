@@ -742,9 +742,20 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    reflow. */
 .mvb-title{top:41%;font-size:13cqw;white-space:nowrap;
   text-shadow:.9cqw .9cqw 0 rgba(122,20,8,.55)}
-/* the sub wraps to two balanced lines on purpose: one line at this width would
-   have to drop to about 4cqw and stop reading as part of the same object */
-.mvb-sub{top:72%;font-size:5.4cqw;letter-spacing:.02em;
+/* THE SUB NAMES THE CONSEQUENCE, NOT THE COURTESY. It used to read "SO WE CAN
+   SEE YOUR WHOLE BODY", which is a reason and reads as a nicety: a player who
+   is standing too close sees a polite request, ignores it, keeps missing words
+   and concludes the AI is bad. It is not. `cropped` gates nothing in the
+   engine, so the classifier keeps guessing off landmarks MediaPipe INVENTED
+   for the joints that left the picture, against a deck recorded full body.
+   The guesses are noise, and the player has no way to know that. So the line
+   now states the failure outright.
+   It wraps to three balanced lines, which is why it is 4.7cqw rather than the
+   old 5.4: the sentence is 62 characters against 29. Anything under about
+   4cqw stops reading as part of the same object (measured), and this stays
+   clear of that. `top` comes up from 72% to keep the third line off the torn
+   bottom edge of the paper. */
+.mvb-sub{top:70%;font-size:4.7cqw;letter-spacing:.02em;text-wrap:balance;
   text-shadow:.5cqw .5cqw 0 rgba(122,20,8,.5)}
 @keyframes mvbIn{
   0%{opacity:0;transform:scale(1.5) rotate(-5deg)}

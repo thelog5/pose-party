@@ -2870,7 +2870,8 @@ console.log("move back:");
       art: img.getAttribute("src"), pe: getComputedStyle(el).pointerEvents,
       z: getComputedStyle(el).zIndex,
       nowrap: getComputedStyle(title).whiteSpace,
-      title: title.textContent };
+      title: title.textContent,
+      sub: el.querySelector(".mvb-sub").textContent };
   });
   ok(card.exists && card.hidden, "the card starts down");
   ok(card.art === "assets/ui/figma/warn-paper-red.webp",
@@ -2880,6 +2881,16 @@ console.log("move back:");
     `it sits under sudden death and the tutorial (z ${card.z})`);
   ok(card.nowrap === "nowrap" && card.title === "MOVE BACK!",
     "the headline cannot reflow onto the sub");
+  /* THE SUB MUST NAME THE CONSEQUENCE. It read "SO WE CAN SEE YOUR WHOLE BODY",
+     which is a courtesy, and a player who is standing too close reads a
+     courtesy as optional: they keep missing words and blame the AI. Standing
+     close does not weaken recognition, it invalidates it, because `cropped`
+     gates nothing in the engine and MediaPipe extrapolates the joints that
+     left the picture. This asserts the failure is stated, not the exact
+     wording: the voice is free to change, the fact is not. */
+  ok(/\bAI\b/.test(card.sub) && /CANNOT|WILL NOT|NEEDS/.test(card.sub)
+     && /WHOLE BODY|FULL BODY/.test(card.sub),
+    `the sub says the AI cannot read them, not merely that we would like to see them ("${card.sub}")`);
 
   /* The timing, driven straight through updateMoveBack in ONE synchronous
      block: the live camera loop also calls it every frame (with no body, so it

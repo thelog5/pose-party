@@ -1464,17 +1464,23 @@
 <!-- MOVE BACK. The paper is Figma's own blank red warning cutout
      (`warning-red-paper-cutout-blank-v3`, 317:651, imageRef 4583925b…, drawn
      at 1283x715 = aspect 1.794) with live type on it, the same way SUDDEN
-     DEATH and the 3·2·1 put live type on authored paper. The wording is the
-     ENABLE CAMERA screen's own line (322:703, "Step back until your full body
-     is visible"), so a player meets the same sentence twice rather than two
-     different explanations of one problem.
+     DEATH and the 3·2·1 put live type on authored paper. The headline is the
+     ENABLE CAMERA screen's own instruction (322:703, "Step back until your
+     full body is visible"), so a player meets the same action twice rather
+     than two different explanations of one problem.
+     THE SUB SAYS WHAT BREAKS, because the polite version was being ignored.
+     Standing too close does not degrade recognition, it invalidates it: the
+     joints outside the picture are extrapolated by MediaPipe, and the deck
+     every word is matched against was recorded with the whole body in shot.
+     A player who is not told that blames the AI for their own framing. See
+     the .mvb-sub rule in overlays.css.
      role="status" and aria-live="polite": this is advice, not an alert, and it
      must never interrupt whatever a screen reader is already saying. -->
 <div class="moveback hidden" id="moveBack" role="status" aria-live="polite">
   <div class="mvb-card">
     <img src="assets/ui/figma/warn-paper-red.webp" alt="">
     <span class="mvb-title">MOVE BACK!</span>
-    <span class="mvb-sub">SO WE CAN SEE YOUR WHOLE BODY</span>
+    <span class="mvb-sub">THE AI CANNOT READ YOUR POSE UNTIL YOUR WHOLE BODY IS IN FRAME</span>
   </div>
 </div>
 
