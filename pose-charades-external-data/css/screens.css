@@ -2358,6 +2358,11 @@ body[data-screen="results"] header{display:none}
 .rs-tape-logo-cream{left:10.232273%;top:8.954911%;width:4.444444%;height:7.407407%}
 .rs-tape-score{left:25.208333%;top:-4.197531%;width:10.550421%;height:13.051290%}
 .resstage[data-size="2"] .rs-tape-score{left:25.138889%;top:-4.938272%}
+/* The two logo tapes are drawn AFTER the Title Card in every results frame,
+   so they hold it down. `.rs-title` is lifted to 12 further down the file to
+   clear the breakdown papers, which put the card over its own tape and left
+   them floating; these follow it up rather than dragging the card back. */
+.rs-tape-logo-yellow,.rs-tape-logo-cream{z-index:13}
 
 /* ---- score board ---- */
 /* Layer order inside the Score Board is the same in all five Figma results
