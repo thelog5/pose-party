@@ -1028,6 +1028,20 @@
       <div class="rs-seat orange" data-seat="orange1"></div>
       <div class="rs-seat orange" data-seat="orange2"></div>
 
+      <!-- ===== confetti =====
+           Figma authors these as the LAST children of both party results
+           frames (203:367 3v3, 203:581 2v2), so they lie over the board. Each
+           image is a render of its own node, which bakes the rotation and the
+           authored paper shadow. The scrap off the top edge is in both frames;
+           the four along the bottom only exist in the 2v2 one, where the
+           shorter seats leave that edge clear. They are alive like Home's
+           confetti: hover lifts them, a tap shakes, spins or pops them. -->
+      <img class="rs-conf rs-conf-top" src="assets/ui/figma/rs-conf-blue-tri.webp" alt="">
+      <img class="rs-conf two rs-conf-bl" src="assets/ui/figma/rs-conf-star.webp" alt="">
+      <img class="rs-conf two rs-conf-bm" src="assets/ui/figma/rs-conf-red-tri.webp" alt="">
+      <img class="rs-conf two rs-conf-br" src="assets/ui/figma/rs-conf-blue-tri.webp" alt="">
+      <img class="rs-conf two rs-conf-bre" src="assets/ui/figma/rs-conf-star.webp" alt="">
+
       <!-- ===== rematch + breakdown ===== -->
       <img class="rs-tape rs-tape-rematch rs-tape-rematch-stage" src="assets/ui/figma/rs-tape-stage-rematch-blue.webp" alt="">
       <img class="rs-tape rs-tape-rematch rs-tape-rematch-breakdown" src="assets/ui/figma/rs-tape-breakdown-rematch-blue.webp" alt="">

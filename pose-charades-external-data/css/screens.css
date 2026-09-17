@@ -2364,6 +2364,31 @@ body[data-screen="results"] header{display:none}
    them floating; these follow it up rather than dragging the card back. */
 .rs-tape-logo-yellow,.rs-tape-logo-cream{z-index:13}
 
+/* ---- confetti (party stage only) ----
+   Figma's own scraps, the last children of 203:367 and 203:581: over the
+   board, under the logo corner and the LEAVE button. Each render is placed at
+   its node's bounding box with object-fit:fill — rotation and paper shadow
+   are already in the art, so nothing here rotates a box twice. The stage is
+   always 16:9, so a square node is still square with width % of 1440 and
+   height % of 810. Hover and tap use the individual transform properties,
+   because the tap reaction animates `transform`. */
+.rs-conf{position:absolute;display:none;object-fit:fill;z-index:10;cursor:pointer;
+  transition:translate .18s ease,rotate .18s ease,scale .18s ease,filter .18s ease}
+.resstage[data-page="stage"]:not([data-mode="1v1"]) .rs-conf{display:block}
+.resstage:not([data-size="2"]) .rs-conf.two{display:none}
+.rs-conf-top{left:15.694444%;top:-2.345679%}
+.resstage[data-size="2"] .rs-conf-top{left:16.018042%;top:-2.264178%}
+.rs-conf-br{left:77.708334%;top:83.333333%}
+.rs-conf-top,.rs-conf-br{width:11.575035%;height:20.578457%}
+.rs-conf-bm{left:15.486111%;top:82.469136%;width:12.569444%;height:22.345679%}
+.rs-conf-bl{left:.208333%;top:79.776468%}
+.rs-conf-bre{left:87.361111%;top:81.975301%}
+.rs-conf-bl,.rs-conf-bre{width:12.437263%;height:22.110689%}
+@media (hover:hover){
+  .rs-conf:hover{translate:0 calc(-1 * min(.49dvw,.86dvh));rotate:9deg;scale:1.1;
+    filter:brightness(1.04) drop-shadow(0 min(.42dvw,.74dvh) min(.55dvw,.99dvh) rgba(23,53,111,.22))}
+}
+
 /* ---- score board ---- */
 /* Layer order inside the Score Board is the same in all five Figma results
    frames: score-card-yellow FIRST (backmost), then secret-word-card-wide-cream,
@@ -2799,6 +2824,10 @@ body[data-screen="results"] .ps-save:active:not(:disabled){
     transition:none!important}
   .rs-title,.rs-title:hover,.rs-title:active{rotate:-2.52119deg!important}
   .rs-award,.rs-award:hover{rotate:-5.89592deg!important}
+  /* theme.css already stops every animation and transition here; the hover
+     lift is a plain declaration, so it would still snap. */
+  .rs-conf,.rs-conf:hover{translate:0 0!important;scale:1!important;
+    rotate:0deg!important;animation:none!important;transition:none!important}
 }
 
 /* dev shortcuts — deliberately plain so they never read as game UI. The BAR

@@ -22,6 +22,7 @@ import { gameState, transition, onTransition } from "./fsm.js";
 import { mountCamera } from "./screens.js";
 import { mountPhotoStrips, unmountPhotoStrips, renderPhotoStrips, stripSlots }
   from "./photoStrips.js";
+import { wireAlphaHitAreas } from "./alphaHit.js";
 
 const SHOT_W = 640, SHOT_H = 426;     // 3:2 — covers both the square thumb and the frame
 /* TWO PHOTOS PER WORD, AND KEEP THEM ALL. There used to be one still per
@@ -1292,9 +1293,34 @@ function teardownResultsMedia(){
 
 /* ---------------- wiring ---------------- */
 
+/* The confetti is decoration, so it answers the way Home's scraps do: a tap
+   shakes, spins or pops it, never twice the same way running. The reaction
+   animates `transform`, which is why the hover lift in screens.css uses the
+   individual properties instead. */
+const CONF_REACTIONS = [["shook", [440]], ["spun", [392, 494]], ["popped", [523, 392]]];
+function wireConfetti(st){
+  for(const el of st.querySelectorAll(".rs-conf")){
+    el.addEventListener("click", () => {
+      const [cls, notes] = CONF_REACTIONS[Math.floor(Math.random() * CONF_REACTIONS.length)];
+      el.classList.remove("shook", "spun", "popped");
+      void el.offsetWidth;
+      el.classList.add(cls);
+      blip(notes, .06);
+    });
+    el.addEventListener("animationend", () =>
+      el.classList.remove("shook", "spun", "popped"));
+  }
+  /* A torn scrap is drawn in a square box that is mostly transparent, and two
+     of them sit over a seat. Alpha routing keeps the clicks the box would
+     otherwise swallow with the thing underneath. */
+  wireAlphaHitAreas(st, ".rs-conf");
+}
+
 export function wireResults(){
   if(wired) return;
   wired = true;
+
+  wireConfetti(stage());
 
   $("rsSeeBreakdown").onclick = () => {
     setResultsPage("breakdown");
