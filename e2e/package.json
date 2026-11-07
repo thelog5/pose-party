@@ -1,5 +1,5 @@
 {
-  "name": "pose-charades-e2e",
+  "name": "pose-party-e2e",
   "private": true,
   "type": "module",
   "description": "Headless-Chrome end-to-end tests (fake camera; vision input simulated by seeding classifier output).",

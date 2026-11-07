@@ -1,4 +1,4 @@
-/* Pose Charades online 1v1 server.
+/* Pose Party game server: online 1v1 and Party rooms.
 
    Express serves the game itself (so localhost:PORT is the whole app) and
    Socket.IO carries signaling + authoritative game events. Video travels
@@ -1048,7 +1048,7 @@ function startTurnBudgetWatch(){
 httpServer.listen(config.port, () => {
   warnIfMisconfigured();
   startTurnBudgetWatch();
-  console.log(`Pose Charades server running.`);
+  console.log(`Pose Party server running.`);
   console.log(`  On this computer:   http://localhost:${config.port}`);
   for(const addrs of Object.values(os.networkInterfaces()))
     for(const a of addrs || [])

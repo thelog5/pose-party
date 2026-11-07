@@ -29,7 +29,7 @@ export function importData(file){
     try{
       const clips=mergeClips(JSON.parse(r.result));
       toast("Merged "+clips.length+" clips.");
-    }catch(e){ toast("That file doesn’t look like a Pose Charades dataset."); }
+    }catch(e){ toast("That file doesn’t look like a Pose Party dataset."); }
   };
   r.readAsText(file);
 }

@@ -1,7 +1,7 @@
 """
-Pose Charades — production model training (Phase 2)
-====================================================
-Trains a GRU sequence classifier on datasets exported from the Pose Charades app.
+Pose Party: GRU sequence-model training (experimental)
+======================================================
+Trains a GRU sequence classifier on datasets exported from the Pose Party app.
 
 The current app records:
   - 15 normalized body landmarks from MediaPipe Pose

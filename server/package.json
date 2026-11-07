@@ -1,7 +1,7 @@
 {
-  "name": "pose-charades-server",
+  "name": "pose-party-server",
   "version": "1.0.0",
-  "description": "Authoritative game server for Pose Charades online 1v1 (signaling + rounds; no video, no landmarks).",
+  "description": "Authoritative game server for Pose Party: online 1v1 and Party rooms, WebRTC signaling and scoring. It never receives video or body landmarks.",
   "type": "module",
   "main": "index.js",
   "scripts": {
