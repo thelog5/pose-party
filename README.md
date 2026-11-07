@@ -1,135 +1,122 @@
-# Pose Charades
+# Pose Party
 
-A browser charades game: act out a word in front of your webcam and a local
-AI (MediaPipe pose landmarks + a kNN motion classifier) guesses it. Includes
-Play-with-AI, a practice 1v1 against a robot rival, an AI-training studio,
-online private-room 1v1, and 2v2–3v3 Party mode — both with peer-to-peer
-video.
+A browser charades game played with your whole body. You act out a word in
+front of your webcam, and an AI that runs in your browser tries to guess it.
+You can play alone against the AI, 1v1 against a friend, or in teams of up to
+six in Party mode, with live video between all players.
 
-| Directory | What it is |
+**Play it:** [poseparty.ca](https://poseparty.ca)
+
+This repository holds the source code. The art, the trained pose data and the
+name are not included (see [What is not in this repo](#what-is-not-in-this-repo)).
+
+## Highlights
+
+- **Pose recognition in the browser.** MediaPipe finds 33 body landmarks per
+  frame. A One Euro filter removes jitter. A k-nearest-neighbour classifier
+  compares two-second motion windows against recorded takes of each word.
+  No video and no landmarks leave the device.
+- **Measured model work.** Every classifier change was tested with
+  leave-one-clip-out evaluation on the recorded deck
+  (`scripts/pose-deck-eval.mjs`). Mirroring every clip, standardising the
+  feature space and time-scaling took held-out accuracy from 63% to 88% on
+  an early deck. The current deck (35 words, 174 clips) scores 84.6%.
+- **Authoritative multiplayer server.** Node, Express and Socket.IO. The
+  server deals words, owns every clock and computes every score. Clients send
+  a synchronised recognition timestamp, so network delay never changes a
+  result. A dropped phone connection keeps its seat for 30 seconds.
+- **Peer-to-peer video.** WebRTC, a full mesh in Party mode. The server only
+  relays the connection handshake. An optional TURN relay uses short-lived
+  credentials and a spend cap that fails closed.
+- **Load tested.** A headless harness drove 200 rooms (1,200 simulated
+  players) on one process at 32% of one CPU core, with a p95 ack time of
+  23 ms. A later change cut the guess relay from five recipients to one.
+- **Works on slow hardware.** The game times the pose model at boot. On a
+  computer without a usable GPU it switches to the CPU path, which raised
+  pose tracking from 6.6 to 19.8 frames per second in testing. A watchdog
+  restarts the vision loop when a phone pauses the camera.
+- **No build step.** The client is plain ES modules, HTML and CSS. The UI is
+  built from Figma frames: every position is a frame percentage, and type
+  scales with container query units, so layouts hold at any aspect ratio.
+- **Tested end to end.** A server integration suite plays full matches with
+  real socket clients. Four headless-Chrome suites play Solo, 1v1 and a 2v2
+  Party round with a fake camera. More than 50 probe scripts measure layout,
+  timing and recovery behaviour.
+
+## Architecture
+
+```
+            browser (each player)                         server (Node)
+ ┌──────────────────────────────────────────┐     ┌──────────────────────────┐
+ │ webcam ─► MediaPipe Pose ─► One Euro     │     │ Express: game files,     │
+ │        ─► normalise ─► 1 s window        │     │   access gate, stats     │
+ │        ─► features ─► kNN ─► charge meter│     │ Socket.IO: rooms, clocks,│
+ │                                          │◄───►│   scoring, signaling     │
+ │ game state machine (fsm.js) ─► screens   │     │ (rooms live in memory)   │
+ └──────────────┬───────────────────────────┘     └──────────────────────────┘
+                │ WebRTC video, peer to peer (the server never sees it)
+                ▼
+         other players' browsers
+```
+
+The full design notes, with the measurements behind each decision, are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Repository layout
+
+| Path | Contents |
 | --- | --- |
-| `client/` | The game (static ES modules, no build step). Its README covers architecture, game states, and data flow. |
-| `server/` | Node/Express/Socket.IO server: serves the game and runs authoritative 1v1 and Party rooms. `npm start`, config via env (`.env.example`). |
-| `e2e/` | Headless-Chrome end-to-end suites (offline, online 1v1, party) using a fake camera. |
+| `client/` | The game: `index.html`, `css/`, and 46 ES modules in `js/`. See [client/README.md](client/README.md) for the module map. |
+| `server/` | The game server and its integration test. |
+| `e2e/` | Headless-Chrome suites (`*.test.mjs`) and measurement probes (`_*.mjs`). |
+| `scripts/` | Model evaluation, deck tools and the art pipeline. |
+| `docs/` | Architecture and design notes. |
+| `render.yaml` | Deployment blueprint for Render. |
 
-## Quick start
+## Running it
+
+Requirements: Node 22.9 or later, and Chrome for the browser tests.
 
 ```bash
 cd server
-npm install
-npm start          # http://localhost:3000 — full game incl. online 1v1
+npm ci
+npm start            # http://localhost:3000
 ```
+
+The game needs its art and pose deck in `client/assets/` to run. They are not
+in this repo, so a fresh clone starts the server but does not show a playable
+game.
 
 ## Tests
 
 ```bash
-cd server && npm test        # server integration (full match + abuse cases)
-cd e2e && npm install
-npm run online               # spawns server + two headless players
-npm run party                # spawns server + four headless players (2v2 round)
-# offline suite needs a static host first:
-#   (cd client && python3 -m http.server 8123) &
-npm run offline
+node --test scripts/pose-reliability.test.mjs   # pose and classifier unit tests
+(cd server && npm test)                         # full matches with real socket clients
+cd e2e && npm ci
+npm run online                 # two headless players, a full 1v1 match
+npm run party                  # four headless players, a 2v2 round
+npm run offline                # Solo and UI checks (static host on 8123)
 ```
 
-## Deploy on Render
+The server tests and the unit tests run on a fresh clone. Checks that need
+the private pose deck are skipped. The browser suites need the art and the
+deck, like the game itself.
 
-`render.yaml` is a Render Blueprint. It runs ONE instance on purpose: rooms
-live in memory, so a second instance cannot see the first one's rooms.
+## What is not in this repo
 
-1. In Render, choose **New > Blueprint**, pick this repo, and pick the branch
-   to deploy.
-2. Fill in the environment values it asks for:
+- **Art.** All images, the robot rig layers and the Figma sources.
+- **Pose data.** The recorded training deck
+  (`client/assets/data/pose-charades-data.json`). It contains body motion
+  recorded by real people.
+- **Private notes and tooling.** Working notes, the security audit and
+  editor configuration.
 
-   | key | value |
-   | --- | --- |
-   | `ACCESS_CODE` | the code players type to get in. Leave it empty to open the game to everyone. |
-   | `ACCESS_SECRET` | nothing to do: Render generates a long random value. It signs the access cookie, so the code cannot be guessed from a cookie. |
-   | `CORS_ORIGINS` | optional. The game and the socket share one origin, so it works without it. |
-   | `TURN_CF_KEY_ID`, `TURN_CF_API_TOKEN` | the Cloudflare TURN key. Copy from your local `.env`. |
-   | `TURN_CF_ACCOUNT_ID`, `TURN_CF_ANALYTICS_TOKEN` | turn on the spend cap. Without them the relay stays off. |
+## License
 
-3. Keep the **Starter** plan. The free plan sleeps after 15 minutes idle,
-   takes about a minute to wake, and loses any open rooms.
-4. When the deploy is live, open `https://<your-app>.onrender.com/healthz`.
-   It answers `{"ok":true,...}` without the access code.
-5. Check `TRUST_PROXY`: open the game once, then find the log line
-   `page load from <ip>`. It must be YOUR public IP (compare with
-   https://ifconfig.me). If it is a proxy address, set `TRUST_PROXY` to `2`.
-   A wrong value puts every player in one rate-limit bucket.
+The source code is under the [MIT License](LICENSE). The license does not
+cover the art, the pose data or the "Pose Party" name, none of which are in
+this repository.
 
-A redeploy restarts the server and ends every room, so deploy when nobody is
-playing. Every push to the branch deploys again unless you turn off
-auto-deploy.
+## Author
 
-### Your own domain, with Cloudflare's free CDN in front
-
-Cloudflare keeps copies of the art near each player, so Render sends each
-file once per Cloudflare location instead of once per player. It needs a
-domain whose DNS is on Cloudflare (Cloudflare Registrar puts it there).
-
-1. Check the game works on the `onrender.com` address first.
-2. Render: **Settings > Custom Domains**, add the domain. Render shows the
-   record to create.
-3. Cloudflare DNS: create that record with the proxy **OFF** (grey cloud,
-   "DNS only"). Render must reach the domain directly to verify it and issue
-   its certificate.
-4. When Render shows the domain as verified, turn the proxy **ON** (orange
-   cloud).
-5. Cloudflare **SSL/TLS**: set the mode to **Full (strict)**. A weaker mode
-   leaves part of the path unencrypted or loops redirects.
-6. Leave Cloudflare's caching on its defaults. The server already says what
-   may be kept: art for 30 days; the page, code and pose deck are checked
-   every time (`no-cache`), so a deploy shows up at once.
-7. Render: set `CORS_ORIGINS` to `https://<your-domain>`.
-8. Do the `TRUST_PROXY` log check again. Cloudflare adds a proxy, so it is
-   probably `2` now. The log must show YOUR IP.
-
-After a deploy that CHANGES an existing art file, choose **Caching > Purge
-Everything** in Cloudflare. New file names need nothing.
-
-With the CDN on, art files are served without the access code (Cloudflare
-sends its copies to anyone). The page and the match server still need it.
-
-## The owner's tools
-
-Players never see the settings gear (the way into Training, where takes are
-recorded), the sound buttons or the DEV bar. Open `https://<your-app>/dev`
-and type the stats password (`STATS_TOKEN`, any user name): that browser gets
-a signed cookie for 30 days and shows them. `/dev/off` hides them again. On
-localhost, `?dev` and `?dev=0` still work.
-
-## Word stats
-
-Anonymous per-word results from real players: how often each word is
-recognized, how long it takes, and what the AI guesses instead. On when the
-server has `STATS_TOKEN` (Render generates one).
-
-- Look: open `https://<your-app>/stats`. The password is `STATS_TOKEN`; any
-  user name works.
-- Keep: put `STATS_URL=https://<your-app>` and `STATS_TOKEN=...` in the root
-  `.env`, then run `node scripts/pull-stats.mjs`. It saves to `stats/`
-  (never committed) and prints every word, worst first.
-- The server keeps totals in memory only. **A restart starts over**, so pull
-  before you deploy. Pulling twice never counts anything twice.
-
-## Privacy
-
-Video is WebRTC peer-to-peer (a full mesh in Party) and never recorded.
-If a TURN relay is configured (off by default, see `server/.env.example`),
-links that cannot connect directly are carried by it. WebRTC media is
-DTLS-SRTP encrypted between the two browsers, so a relay forwards packets it
-holds no key for and cannot see the video. That is the difference between a
-relay and an SFU, and it is why this project will never have an SFU.
-Pose/face landmarks and training data never leave the browser — including the
-head tracking that places the 1v1 crown and the Party "GOT IT" sticker, which
-only ever runs on your own camera. During 1v1 and Party the server relays the
-current top guess label and confidence so opponents' papers can update; it also
-sees names, trained word labels, synchronized recognition timestamps, and
-opaque connection handshakes. Live guesses are not stored. With `STATS_TOKEN`
-set, it also keeps anonymous per-word totals (see Word stats), and never a
-single report.
-
-The player-facing versions are `privacy.html` and `terms.html` in the game
-folder, served at `/privacy` and `/terms` without the access code. **Keep them
-true:** a change to what the game sends or stores must change `privacy.html`.
+Made by Logan Li. [LinkedIn](https://www.linkedin.com/in/logan-li-9089b7216/)

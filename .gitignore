@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+.DS_Store
+
+# The art and the pose deck are private. Put them here to run the game
+# locally; they are never committed.
+client/assets/
+
+# Output of the e2e probes and of scripts/pull-stats.mjs
+e2e/shots/
+e2e/shots-live/
+stats/
