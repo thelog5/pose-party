@@ -2,7 +2,8 @@
 
 **Charades in the browser, where an AI watches your webcam and guesses the word you act out.**
 
-<!-- DEMO VIDEO: on github.com, edit this file and drag Poseparty-Demo-30s-github.mp4 onto this line. -->
+https://github.com/user-attachments/assets/f2d045d7-e22f-45c4-a67c-a2aaecb39d99
+
 
 **[Play it at poseparty.ca](https://poseparty.ca)** · Built by [Logan Li](https://www.linkedin.com/in/logan-li-9089b7216/)
 
@@ -21,7 +22,7 @@ to the other players in your game, and the game server never sees it.
 
 ## How it works
 
-<!-- ARCHITECTURE DIAGRAM: drag the architecture image onto this line. -->
+<img width="2000" height="940" alt="pose-party-architecture" src="https://github.com/user-attachments/assets/f212fa30-8703-472c-93d4-9e2b98dcdcb1" />
 
 1. **MediaPipe** finds 33 body points in each camera frame. A One Euro filter
    removes the jitter.
