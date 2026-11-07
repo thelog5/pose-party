@@ -724,38 +724,43 @@ try {
 
   console.log("word stats and legal pages:");
   const deckRes = await fetch(`${URL}/assets/data/pose-charades-data.json`);
-  ok(deckRes.headers.get("x-word-stats") === "on", "the deck tells the client to send word reports");
-  const deckWords = [...new Set((await deckRes.json()).clips.map(c => c.label))];
-  const [w1, w2] = deckWords;
-  const report = body => fetch(`${URL}/stats/word`, { method: "POST",
-    headers: { "content-type": "application/json", origin: URL }, body: JSON.stringify(body) });
-  ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
-    "a report that does not come from a page of this site is refused");
-  ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" },
-    body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
-    "a report from another site is refused");
-  ok((await report({ word: w1, mode: "ai", result: "got", ms: 4200, peak: .91, wrong: null })).status === 204,
-    "a good report is accepted");
-  ok((await report({ word: w1, mode: "party", result: "miss", ms: null, peak: .3, wrong: w2 })).status === 204,
-    "a miss with its wrong guess is accepted");
-  ok((await report({ word: "not a deck word", mode: "ai", result: "got", ms: 1, peak: .5 })).status === 400,
-    "a word that is not in the deck is refused");
-  ok((await report({ word: w1, mode: "ai", result: "won", ms: 1, peak: .5 })).status === 400,
-    "an unknown result is refused");
-  ok((await report({ word: w1, mode: "ai", result: "miss", ms: null, peak: 7 })).status === 400,
-    "a peak outside 0..1 is refused");
   const auth = t => ({ authorization: "Basic " + Buffer.from("x:" + t).toString("base64") });
-  ok((await fetch(`${URL}/stats`)).status === 401, "the totals page needs its password");
-  ok((await fetch(`${URL}/stats`, { headers: auth("wrong") })).status === 401, "a wrong stats password is refused");
-  const snap = await (await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "application/json" } })).json();
-  const tw = snap.words[w1];
-  ok(snap.bootId && snap.reports === 2, `the totals count only the good reports (${snap.reports})`);
-  ok(tw?.played === 2 && tw.got === 1 && tw.miss === 1 && tw.msN === 1 && tw.wrong[w2] === 1,
-    "per-word totals: played, got, missed, time and the wrong guess");
-  ok(tw?.modes.ai?.got === 1 && tw?.modes.party?.played === 1, "totals split by mode");
-  ok(!JSON.stringify(snap).includes("127.0.0.1") && !JSON.stringify(snap).includes("::1"),
-    "no IP address is stored with the stats");
+  /* The pose deck is not in the public repo. Without it the server knows no
+     words and refuses every report, so the report checks need a real deck. */
+  if (!deckRes.ok) console.log("  skip word reports: no pose deck in client/assets/data");
+  else {
+    ok(deckRes.headers.get("x-word-stats") === "on", "the deck tells the client to send word reports");
+    const deckWords = [...new Set((await deckRes.json()).clips.map(c => c.label))];
+    const [w1, w2] = deckWords;
+    const report = body => fetch(`${URL}/stats/word`, { method: "POST",
+      headers: { "content-type": "application/json", origin: URL }, body: JSON.stringify(body) });
+    ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
+      "a report that does not come from a page of this site is refused");
+    ok((await fetch(`${URL}/stats/word`, { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" },
+      body: JSON.stringify({ word: w1, mode: "ai", result: "got", ms: 1, peak: .5 }) })).status === 403,
+      "a report from another site is refused");
+    ok((await report({ word: w1, mode: "ai", result: "got", ms: 4200, peak: .91, wrong: null })).status === 204,
+      "a good report is accepted");
+    ok((await report({ word: w1, mode: "party", result: "miss", ms: null, peak: .3, wrong: w2 })).status === 204,
+      "a miss with its wrong guess is accepted");
+    ok((await report({ word: "not a deck word", mode: "ai", result: "got", ms: 1, peak: .5 })).status === 400,
+      "a word that is not in the deck is refused");
+    ok((await report({ word: w1, mode: "ai", result: "won", ms: 1, peak: .5 })).status === 400,
+      "an unknown result is refused");
+    ok((await report({ word: w1, mode: "ai", result: "miss", ms: null, peak: 7 })).status === 400,
+      "a peak outside 0..1 is refused");
+    ok((await fetch(`${URL}/stats`)).status === 401, "the totals page needs its password");
+    ok((await fetch(`${URL}/stats`, { headers: auth("wrong") })).status === 401, "a wrong stats password is refused");
+    const snap = await (await fetch(`${URL}/stats`, { headers: { ...auth("stats-test-token"), accept: "application/json" } })).json();
+    const tw = snap.words[w1];
+    ok(snap.bootId && snap.reports === 2, `the totals count only the good reports (${snap.reports})`);
+    ok(tw?.played === 2 && tw.got === 1 && tw.miss === 1 && tw.msN === 1 && tw.wrong[w2] === 1,
+      "per-word totals: played, got, missed, time and the wrong guess");
+    ok(tw?.modes.ai?.got === 1 && tw?.modes.party?.played === 1, "totals split by mode");
+    ok(!JSON.stringify(snap).includes("127.0.0.1") && !JSON.stringify(snap).includes("::1"),
+      "no IP address is stored with the stats");
+  }
 
   /* video links: the clients' own net:report, counted by mode and path */
   const N = connect(URL, { transports: ["websocket"] });

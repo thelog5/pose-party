@@ -188,8 +188,11 @@ test('timed clips split at camera loss and exclude bad landmark sections',()=>{
   clip.visibility[10][0]=.1;
   assert.equal(clipSegments(clip).length,3);
 });
-test('legacy deck round trips unchanged and malformed timing is rejected',()=>{
-  const deck=JSON.parse(fs.readFileSync(new URL('../client/assets/data/pose-charades-data.json',import.meta.url)));
+/* The pose deck is not in the public repo, so this test runs only where it is. */
+const DECK=new URL('../client/assets/data/pose-charades-data.json',import.meta.url);
+test('legacy deck round trips unchanged and malformed timing is rejected',
+  { skip: !fs.existsSync(DECK) && 'no pose deck in client/assets/data' },()=>{
+  const deck=JSON.parse(fs.readFileSync(DECK));
   const before=JSON.stringify(deck);
   const decoded=decodePoseDataset(deck);
   assert.equal(decoded.length,deck.clips.length);
