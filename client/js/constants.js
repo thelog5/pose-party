@@ -96,7 +96,7 @@ export const PTS_CORRECT = 100, PTS_FAST_BONUS = 100, FAST_WINDOW_MS = 15000, PT
 
 /* Solo "Play with AI" is a timed sprint. Single source of truth for the HUD
    timers and scoring — the Round Timer, Word Timer and points all read from
-   here (see CLAUDE.md). A future solo-settings screen writes to this block. */
+   here. A future solo-settings screen writes to this block. */
 export const SOLO = {
   roundMs: 120000,        // Round Timer: total run; at 0 the game ends
   wordMs: 20000,          // Word Timer: per word; at 0 the word is skipped

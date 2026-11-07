@@ -181,8 +181,8 @@ body:has(.chase-final) .edgepulse{--pulse:rgba(216,32,26,1);--reach:13%}
    tutorial grace. Every size inside is `cqw` against this box, so shrinking
    the box is the ONLY edit needed: the whole composition scales with it and
    no percentage in this file changes.
-   2026-09-14: smaller again, min(54dvw,108dvh,800px), at the owner's request
-   ("a bit too large on all screens"). The cap also keeps the art closer to
+   2026-09-14: smaller again, min(54dvw,108dvh,800px), because the card
+   still read as too large on every screen. The cap also keeps the art closer to
    sharp: htp-panel.webp is 1400 px wide, so above ~700 CSS px a 2x screen
    is stretching it. Every child is cqw of this box, so nothing else moved. */
 .htp-panel{position:relative;container-type:inline-size;

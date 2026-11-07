@@ -11,8 +11,8 @@
    - No card number, name or address ever touches our page or our server, so
      nothing in privacy.html has to change about payments beyond naming Stripe
      as the processor.
-   - The game's frontend is static and is played from static hosts too (see
-     "I can't join" in CLAUDE.md). A server route would make the button dead
+   - The game's frontend is static and is played from static hosts too.
+     A server route would make the button dead
      on exactly those copies; a link works everywhere.
    - No Stripe script loads at boot. The page stays as fast as it was.
 

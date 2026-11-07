@@ -290,8 +290,8 @@ function spectateTarget(team, anyone = false){
 
 /* ONCE THE BIG HALF IS HANDED OVER, IT STAYS HANDED OVER. It used to come
    back to you the moment the team-mate you were watching got the word too,
-   so the player lost sight of the person they had just watched win. The
-   player asked for the opposite. Now:
+   so the player lost sight of the person they had just watched win.
+   Playtesting asked for the opposite. Now:
      · you get it          -> the half goes to a team-mate (one still
                               hunting if there is one, else any team-mate)
      · that team-mate gets -> it moves on to a team-mate still hunting, and

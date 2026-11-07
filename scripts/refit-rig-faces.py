@@ -25,15 +25,14 @@ And three of the shapes are the wrong drawing entirely — see DERIVE below.
 WHY THE ART AND NOT THE LAYOUT
 ------------------------------
 Every rig layer lives on the SAME 640x640 canvas and is drawn at `inset:0`;
-that shared registration is load-bearing (see CLAUDE.md, "THE ROBOT IS A
-JOINTED PUPPET") and `js/robot.js` composes each part's joint chain as
+that shared registration is load-bearing and `js/robot.js` composes each part's joint chain as
 percentages of that one box. Adding per-layer CSS geometry would put a second
 owner on the same transform and break the "registration is a property of the
 art" rule. So this script rescales each face PNG's ink IN PLACE, about its
 target centre, on the same 640x640 canvas. Everything downstream — CSS, the
 compose() chain, the gaze parallax, the blink — keeps working untouched.
 
-SOURCES: `rig-face-src/` (repo root, NOT served)
+SOURCES: `rig-face-src/` (repo root, NOT served; the art is not in the public repo)
 ------------------------------------------------
     rig-face-src/           the 14 pristine pack layers. NEVER written.
     rig-face-src/ref/       authored Figma face renders, used as shape sources.
@@ -46,10 +45,8 @@ would compound resampling loss every run). DERIVE obeys the same rule — every
 recipe reads only from `rig-face-src/` and `rig-face-src/ref/`, never from
 `derived/`, so the two stages can be re-run in any order any number of times.
 
-`rig-face-src/` is deliberately left TRACKED, not gitignored. The repo's
-`.gitignore` carries only `.env` and `graphify-out/` — it does not ignore build
-inputs anywhere, so there is no precedent to follow, and these PNGs ARE the
-source of truth: without them a re-run has nothing pristine to resample from
+`rig-face-src/` is deliberately left TRACKED, not gitignored: these PNGs ARE
+the source of truth: without them a re-run has nothing pristine to resample from
 and the refit is unrepeatable. It is 21 small files across the three dirs.
 
 DERIVE — three shapes the pack gets wrong or does not have at all

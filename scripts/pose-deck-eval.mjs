@@ -70,7 +70,7 @@ const GATE_EARLY = CHARGE_PROFILES.solo.gateFrom;
 /* Hips, knees and ankles. The tracker is least sure of these, and the deck is
    hip-centred and torso-scaled, so their noise is what a live room adds. */
 const JITTER_JOINTS = [23, 24, 25, 26, 27, 28].map(j => JOINTS.indexOf(j));
-/* .02, not the .06 in CLAUDE.md's older notes: on the 2026-09-11 deck .06
+/* .02, not the .06 used in older notes: on the 2026-09-11 deck .06
    takes every weighting to 10-15% and the pass stops telling them apart. */
 const JITTER_SD = Number(opt("--jitter") ?? 0.02);
 

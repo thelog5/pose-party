@@ -1,4 +1,4 @@
-/* Both rigs across the four viewports CLAUDE.md requires. Every .pr-* value is
+/* Both rigs across the four target viewports. Every .pr-* value is
    a percentage of its stage or a cqw of the rig's own root, so the ink must
    land on the same fraction of the stage at every aspect. */
 import puppeteer from "puppeteer-core";

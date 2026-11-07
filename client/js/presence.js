@@ -148,8 +148,8 @@ let mX = 0, mY = 0, mSpan = 0;
    plenty of rooms cannot fit them and a warning somebody cannot act on is
    worse than no warning.
 
-   THIS USED TO ASK ONLY FOR THE HEAD AND THE HIPS, and the player said it was
-   not strict enough: in Party it never showed at all, because a phone on a
+   THIS USED TO ASK ONLY FOR THE HEAD AND THE HIPS, and playtesting showed it
+   was not strict enough: in Party it never showed at all, because a phone on a
    table sees the hips of somebody standing close and cuts them off at the
    thigh. The AI reads the knees on every leg word, so a body cut off above
    them is a body it cannot read. The knees are now required, and so are the

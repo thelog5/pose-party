@@ -121,7 +121,7 @@
   </div>
 
   <!-- ============ HOME — Figma "Screen / Home / Desktop v2" (50:72).
-       Every element is the user's exported component instance at its exact
+       Every element is an exported Figma component instance at its exact
        frame position; ALL of them are alive (hover/click) via homeAlive.js
        + the CSS below. ============ -->
   <section class="screen" id="scrHome">
@@ -236,7 +236,7 @@
        HUD overlay on the full-bleed camera. Timed sprint: Round Timer =
        whole run, Word Timer = current word. The Word card's yellow pill IS
        a progress bar driven by target-word confidence; the bottom-right
-       guess stack fades downward (newest green on top). See CLAUDE.md.
+       guess stack fades downward (newest green on top). See docs/ARCHITECTURE.md.
 
        Every left/top/width below is the Figma frame percentage. Each card is
        a container (container-type:inline-size) so its text scales in `cqw`
@@ -397,7 +397,7 @@
   </section>
 
   <!-- ============ 1v1 LOBBY — Figma "1v1 Lobby" frame (111:82).
-       Paper art is the user's exported components; live text (name, codes,
+       Paper art is the exported Figma components; live text (name, codes,
        settings, waiting dots, robot sign) renders in HTML on top. The
        video mounts BETWEEN each panel background and its torn-frame
        overlay so the border wraps the feed. ============ -->

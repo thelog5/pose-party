@@ -22,7 +22,7 @@
                  what was sent. A shortfall means the server is dropping or
                  lagging, not merely slow.
 
-   READ THE RESULT CORRECTLY. This Mac's core is much faster than the shared
+   READ THE RESULT CORRECTLY. A desktop core is much faster than the shared
    half-CPU of a Render starter instance, so the derived room count is an
    UPPER BOUND. The report applies an explicit discount and says so. It also
    refuses to run on a loaded machine, because a CPU measurement taken while

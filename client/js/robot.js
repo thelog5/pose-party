@@ -8,7 +8,7 @@
    Figma's "RObot Sprites" section (286:599) ships him as a RIG rather than a
    picture: eight full bodies, each with a blank screen for a head, and eight
    faces drawn to composite into that screen. The bodies were exported through
-   ONE shared crop box (see the note in CLAUDE.md), so they are in register
+   ONE shared crop box, so they are in register
    with each other and the face is a single rectangle over the head — with a
    nudge for the only two poses that move it, `present` (leans right) and
    `sad` (slumps down). That is why one CSS rule dresses all eight.

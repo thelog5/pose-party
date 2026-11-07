@@ -274,8 +274,8 @@ export function showTimesUp(){
 
    IT STAYS UP FOR AS LONG AS THE PLAYER IS TOO CLOSE. It used to say its piece
    for 4.2s and then go quiet for 25s, so a player in a small room would not be
-   nagged through a whole match. The player asked for the opposite, and it is
-   their game: a warning that vanishes while you are still cropped reads as the
+   nagged through a whole match. Playtesting showed the opposite is better:
+   a warning that vanishes while you are still cropped reads as the
    problem having gone away. Feet are never required (see presence.js), so a
    small room can still clear it.
 

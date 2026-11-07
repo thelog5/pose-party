@@ -852,7 +852,7 @@ function onMatchPrepare({tutorialId, matchMs, players}={}){
      players readying releases the room at once; otherwise the server's grace
      does, and the match simply starts BEHIND any card still up: the FULL BODY
      check, the 3-2-1 and the first word all play under it, and that player
-     joins whenever they press. That is what the player asked for. It is the
+     joins whenever they press. This is deliberate. It is the
      opposite of what Party does (Party counts down on the button and closes
      itself), so neither onMatchStart nor onRoundStart closes this card.
      Esc counts as an acknowledgement too: it dismisses the same decision and
