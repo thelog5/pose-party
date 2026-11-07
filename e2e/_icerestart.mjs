@@ -4,7 +4,7 @@
    that video keeps arriving. A real network drop cannot be made in headless
    Chrome, so this proves the renegotiation, not the detection.
 
-     cd pose-charades-external-data && python3 -m http.server 8123
+     cd client && python3 -m http.server 8123
      node _icerestart.mjs */
 import puppeteer from "puppeteer-core";
 

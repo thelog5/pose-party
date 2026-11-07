@@ -8,7 +8,7 @@ import { mkdir } from "node:fs/promises";
 import { passCameraGate } from "./_gate.mjs";
 
 /* Layout only, so a static host is enough — same default as
-   offline.test.mjs: `cd pose-charades-external-data && python3 -m http.server 8123`.
+   offline.test.mjs: `cd client && python3 -m http.server 8123`.
    Point APP_URL at the game server instead if you want a live room. */
 const APP = process.env.APP_URL || "http://localhost:8123";
 const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";

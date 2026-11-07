@@ -40,7 +40,7 @@ SOURCES: `rig-face-src/` (repo root, NOT served)
     rig-face-src/derived/   written by DERIVE. Committed, but regenerable.
 
 The script reads pristine copies of the shipped face layers and writes over
-`pose-charades-external-data/assets/ui/rig/`, so it is idempotent: re-running
+`client/assets/ui/rig/`, so it is idempotent: re-running
 it always resamples from the original art, never from its own output (which
 would compound resampling loss every run). DERIVE obeys the same rule — every
 recipe reads only from `rig-face-src/` and `rig-face-src/ref/`, never from
@@ -153,8 +153,8 @@ REPO = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO / "rig-face-src"
 REF_DIR = SRC_DIR / "ref"
 DERIVED_DIR = SRC_DIR / "derived"
-OUT_DIR = REPO / "pose-charades-external-data" / "assets" / "ui" / "rig"
-FIGMA_FACE_DIR = REPO / "pose-charades-external-data" / "assets" / "ui" / "figma"
+OUT_DIR = REPO / "client" / "assets" / "ui" / "rig"
+FIGMA_FACE_DIR = REPO / "client" / "assets" / "ui" / "figma"
 
 CANVAS = 640          # every rig layer shares this canvas
 INK_ALPHA = 8         # see MEASUREMENT CONVENTION above

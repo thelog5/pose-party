@@ -8,7 +8,7 @@
 
    Written for the WebP conversion (scripts/to-webp.sh). Serve the game
    statically and point APP_URL at it:
-     python3 -m http.server 8123 -d pose-charades-external-data
+     python3 -m http.server 8123 -d client
      node e2e/_imgcheck.mjs */
 import puppeteer from "puppeteer-core";
 import { passCameraGate } from "./_gate.mjs";

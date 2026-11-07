@@ -9,8 +9,8 @@ import { io as connect } from "socket.io-client";
 import {
   calculateFirstPoints,
   calculateChaserPoints,
-} from "../../pose-charades-external-data/js/scoring.js";
-import { freshOrder } from "../../pose-charades-external-data/js/wordOrder.js";
+} from "../../client/js/scoring.js";
+import { freshOrder } from "../../client/js/wordOrder.js";
 import { cleanSeen } from "../validate.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -25,7 +25,7 @@ import os, sys
 from PIL import Image
 
 HERE = os.path.dirname(__file__)
-RIG  = os.path.join(HERE, "..", "pose-charades-external-data", "assets", "ui", "rig")
+RIG  = os.path.join(HERE, "..", "client", "assets", "ui", "rig")
 ORIG = os.path.join(HERE, "..", "rig-body-src", "deployed-arms-orig")
 HANDS_ORIG = os.path.join(HERE, "..", "rig-body-src", "deployed-hands-orig")
 os.makedirs(ORIG, exist_ok=True)

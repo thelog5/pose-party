@@ -21,8 +21,8 @@ import numpy as np
 from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
-SOURCE = REPO / "pose-charades-external-data/assets/ui/figma/rb-body-thumbsup.png"
-OUT = REPO / "pose-charades-external-data/assets/ui/rig"
+SOURCE = REPO / "client/assets/ui/figma/rb-body-thumbsup.png"
+OUT = REPO / "client/assets/ui/rig"
 CANVAS = 640
 
 # Measured on the shared 520x610 body export. The crop contains the raised

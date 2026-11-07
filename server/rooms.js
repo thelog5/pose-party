@@ -20,8 +20,8 @@ import {
   PARTY_TEAM_BONUS,
   PARTY_CHASE_WINDOW_MS,
   calculatePartyPlayerPoints,
-} from "../pose-charades-external-data/js/scoring.js";
-import { freshOrder } from "../pose-charades-external-data/js/wordOrder.js";
+} from "../client/js/scoring.js";
+import { freshOrder } from "../client/js/wordOrder.js";
 
 export function createRoomStore({ config, emit }){
   const rooms = new Map();          // code -> room

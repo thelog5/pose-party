@@ -17,7 +17,7 @@ Then open `http://localhost:3000` in Chrome.
 **Offline modes only** (Play with AI, training, practice 1v1) — any static server works:
 
 ```bash
-cd pose-charades-external-data
+cd client
 python3 -m http.server 8000
 ```
 

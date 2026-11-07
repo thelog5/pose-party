@@ -12,7 +12,7 @@
      bottom below it, and flags any horizontal overflow.
 
    Serve the game folder on 8123 first, e.g.
-     (cd pose-charades-external-data && python3 -m http.server 8123)
+     (cd client && python3 -m http.server 8123)
    then  node _supportshot.mjs                                          */
 import puppeteer from "puppeteer-core";
 import { mkdir } from "node:fs/promises";

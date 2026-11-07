@@ -8,7 +8,7 @@
    z-indexes and leaves the corner crop to the eye.
 
    Against a static host on 8124:
-     cd pose-charades-external-data && python3 -m http.server 8124
+     cd client && python3 -m http.server 8124
      cd e2e && node _confshot.mjs                 # shots land in ./shots */
 import puppeteer from "puppeteer-core";
 import { mkdir } from "node:fs/promises";

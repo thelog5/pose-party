@@ -11,7 +11,7 @@
    are therefore not a player's numbers; the ratios between the rows are the
    useful part.
 
-   APP_URL defaults to a static host on 8124 (serve pose-charades-external-data). */
+   APP_URL defaults to a static host on 8124 (serve client). */
 import puppeteer from "puppeteer-core";
 import { passCameraGate } from "./_gate.mjs";
 

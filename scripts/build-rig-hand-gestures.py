@@ -48,7 +48,7 @@ from PIL import Image
 
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "rig-hand-src"
-OUT = REPO / "pose-charades-external-data/assets/ui/rig"
+OUT = REPO / "client/assets/ui/rig"
 CANVAS = 640
 
 # rig.json's hand pivots, character-relative.

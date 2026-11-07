@@ -8,7 +8,7 @@ video.
 
 | Directory | What it is |
 | --- | --- |
-| `pose-charades-external-data/` | The game (static ES modules, no build step). Its README covers architecture, game states, and data flow. |
+| `client/` | The game (static ES modules, no build step). Its README covers architecture, game states, and data flow. |
 | `server/` | Node/Express/Socket.IO server: serves the game and runs authoritative 1v1 and Party rooms. `npm start`, config via env (`.env.example`). |
 | `e2e/` | Headless-Chrome end-to-end suites (offline, online 1v1, party) using a fake camera. |
 
@@ -28,7 +28,7 @@ cd e2e && npm install
 npm run online               # spawns server + two headless players
 npm run party                # spawns server + four headless players (2v2 round)
 # offline suite needs a static host first:
-#   (cd pose-charades-external-data && python3 -m http.server 8123) &
+#   (cd client && python3 -m http.server 8123) &
 npm run offline
 ```
 

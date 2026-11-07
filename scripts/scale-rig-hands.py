@@ -15,7 +15,7 @@ import os, sys
 from PIL import Image
 
 RIG = os.path.join(os.path.dirname(__file__), "..",
-                   "pose-charades-external-data", "assets", "ui", "rig")
+                   "client", "assets", "ui", "rig")
 # Originals live OUTSIDE the served directory, next to the pack's other
 # pristine sources — an unreferenced `*.orig.png` in assets/ui/rig is dead
 # weight on a static host.

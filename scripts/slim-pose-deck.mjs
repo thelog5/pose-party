@@ -23,12 +23,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const JS = path.join(ROOT, "pose-charades-external-data", "js");
+const JS = path.join(ROOT, "client", "js");
 const { JOINTS } = await import(path.join(JS, "constants.js"));
 const { decodePoseDataset } = await import(path.join(JS, "poseData.js"));
 const { clipSegments, POSE_VISIBILITY } = await import(path.join(JS, "poseInput.js"));
 
-const [src, out = path.join(ROOT, "pose-charades-external-data/assets/data/pose-charades-data.json")] =
+const [src, out = path.join(ROOT, "client/assets/data/pose-charades-data.json")] =
   process.argv.slice(2);
 if(!src){ console.error("usage: node scripts/slim-pose-deck.mjs <export.json> [out.json]"); process.exit(2); }
 

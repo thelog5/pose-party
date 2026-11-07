@@ -12,7 +12,7 @@
 
    Each case counts detector calls before, during and after, so a recovery is
    measured rather than assumed. Serve the game folder on 8124 first:
-     cd pose-charades-external-data && python3 -m http.server 8124
+     cd client && python3 -m http.server 8124
      node e2e/_camstall.mjs
 */
 import puppeteer from "puppeteer-core";

@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { normalize } from '../pose-charades-external-data/js/pose.js';
-import { JOINTS, FRAME_POINTS } from '../pose-charades-external-data/js/constants.js';
+import { normalize } from '../client/js/pose.js';
+import { JOINTS, FRAME_POINTS } from '../client/js/constants.js';
 import { createPoseInput, assessPose, observePose, canRecognize, clipSegments,
-  canonicalClip, POSE_SPACE, windowJointMask } from '../pose-charades-external-data/js/poseInput.js';
-import { createChargeMeter, advancePoseCharge } from '../pose-charades-external-data/js/recognition.js';
-import { buildModel, classifyDetailed, features, timeScaleFrames, windowsOf } from '../pose-charades-external-data/js/classifier.js';
-import { decodePoseDataset } from '../pose-charades-external-data/js/poseData.js';
+  canonicalClip, POSE_SPACE, windowJointMask } from '../client/js/poseInput.js';
+import { createChargeMeter, advancePoseCharge } from '../client/js/recognition.js';
+import { buildModel, classifyDetailed, features, timeScaleFrames, windowsOf } from '../client/js/classifier.js';
+import { decodePoseDataset } from '../client/js/poseData.js';
 
 function landmarks(width=1280,height=720){
   const p=Array.from({length:33},()=>({x:.5,y:.3,visibility:.99}));
@@ -189,7 +189,7 @@ test('timed clips split at camera loss and exclude bad landmark sections',()=>{
   assert.equal(clipSegments(clip).length,3);
 });
 test('legacy deck round trips unchanged and malformed timing is rejected',()=>{
-  const deck=JSON.parse(fs.readFileSync(new URL('../pose-charades-external-data/assets/data/pose-charades-data.json',import.meta.url)));
+  const deck=JSON.parse(fs.readFileSync(new URL('../client/assets/data/pose-charades-data.json',import.meta.url)));
   const before=JSON.stringify(deck);
   const decoded=decodePoseDataset(deck);
   assert.equal(decoded.length,deck.clips.length);

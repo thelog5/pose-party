@@ -39,7 +39,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const JS = path.join(ROOT, "pose-charades-external-data/js");
+const JS = path.join(ROOT, "client/js");
 const { buildModel, classify, classifyDetailed, features, windowsOf, l2 } = await import(path.join(JS, "classifier.js"));
 const { JOINTS, K } = await import(path.join(JS, "constants.js"));
 const { CHARGE_PROFILES } = await import(path.join(JS, "recognition.js"));
@@ -50,7 +50,7 @@ const flag = n => args.includes(n);
 const opt = n => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : null; };
 const VALUED = ["--word", "--jitter", "--modes", "--drop"];
 const deckPath = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1]))
-  || path.join(ROOT, "pose-charades-external-data/assets/data/pose-charades-data.json");
+  || path.join(ROOT, "client/assets/data/pose-charades-data.json");
 const focusWord = opt("--word");
 const QUICK = flag("--quick");
 

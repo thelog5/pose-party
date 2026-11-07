@@ -23,7 +23,7 @@ import sys, os
 from PIL import Image
 
 DST = os.path.join(os.path.dirname(__file__), "..",
-                   "pose-charades-external-data", "assets", "ui", "figma")
+                   "client", "assets", "ui", "figma")
 
 # key -> (output name, crop [sx, ox, sy, oy] or None, max long edge)
 JOBS = {

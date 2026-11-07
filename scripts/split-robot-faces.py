@@ -25,7 +25,7 @@ import numpy as np
 import glob, os
 from collections import deque
 
-SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pose-charades-external-data", "assets", "ui", "figma")
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "client", "assets", "ui", "figma")
 
 
 def components(mask):

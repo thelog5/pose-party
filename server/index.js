@@ -28,7 +28,7 @@ import { gatePage } from "./gatepage.js";
 import { createWordStats, statsPage } from "./wordstats.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const GAME_DIR = path.join(__dirname, "..", "pose-charades-external-data");
+const GAME_DIR = path.join(__dirname, "..", "client");
 
 const app = express();
 
