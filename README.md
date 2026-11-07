@@ -4,6 +4,9 @@
 
 <!-- DEMO VIDEO: on github.com, edit this file and drag Poseparty-Demo-30s-github.mp4 onto this line. -->
 
+
+https://github.com/user-attachments/assets/5d02ec1e-7bd0-4b5a-b260-ad8b08421812
+
 **[Play it at poseparty.ca](https://poseparty.ca)** · Built by [Logan Li](https://www.linkedin.com/in/logan-li-9089b7216/)
 
 ## What it is
@@ -21,17 +24,7 @@ to the other players in your game, and the game server never sees it.
 
 ## How it works
 
-```
- your browser                                        game server (Node)
-┌───────────────────────────────────────────┐       ┌─────────────────────┐
-│ camera → MediaPipe Pose → smoothing       │       │ rooms, clocks,      │
-│        → motion features → kNN classifier │◄─────►│ scoring, signaling  │
-│        → "charge meter" → score claim     │       └─────────────────────┘
-└─────────────────────┬─────────────────────┘
-                      │ WebRTC video, peer to peer
-                      ▼
-               other players' browsers
-```
+<img width="2000" height="940" alt="pose-party-architecture" src="https://github.com/user-attachments/assets/502891ca-11c3-478d-b19d-575d9cf5e25a" />
 
 1. **MediaPipe** finds 33 body points in each camera frame. A One Euro filter
    removes the jitter.
