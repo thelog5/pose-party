@@ -1,6 +1,6 @@
 # Pose Party
 
-**Charades in the browser, where an AI watches your webcam and guesses the word you act out.**
+**Charades in the browser, where a custom-trained kNN model watches your webcam and guesses the word you act out.**
 
 https://github.com/user-attachments/assets/f2d045d7-e22f-45c4-a67c-a2aaecb39d99
 
